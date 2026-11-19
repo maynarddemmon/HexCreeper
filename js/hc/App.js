@@ -203,7 +203,8 @@
             }
         },
         
-        centerOn: p => {if (p) gameView.centerOn(p);},
+        // Centres the board on p, or on the start cell if there's no p (e.g. the core is gone).
+        centerOn: p => {gameView.centerOn(p ?? {x:0, y:0});},
         handleClick: (c, force) => gameView.handleClick(c, force),
         
         newGame: () => {

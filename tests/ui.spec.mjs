@@ -90,6 +90,23 @@ test('losing the core offers to play again', async ({page}) => {
     expect(await page.evaluate(() => [hc.app.game.over, hc.app.game.turn])).toEqual([false, 1]);
 });
 
+test('after losing, recentering goes to the start cell', async ({page}) => {
+    await startGame(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
+        g.damage(g.playerCore, 99, e);
+        hc.view.cam.x = 40; hc.view.cam.y = -30;
+        hc.view.draw();
+    });
+    await button(page, 'X Close').click();
+    await button(page, '⌖').click();
+    expect(await page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]);
+    
+    await page.evaluate(() => {hc.view.cam.x = 40; hc.view.cam.y = -30;});
+    await page.keyboard.press('Space');
+    expect(await page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]);
+});
+
 test('Place and Heal show as on while choosing; Esc cancels', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
