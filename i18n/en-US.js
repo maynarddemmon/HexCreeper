@@ -14,6 +14,7 @@ myt.I18N.setDictionary({
 "btn-reset-defaults":"Reset to Defaults",
 
 // Top Bar
+"lbl-turn":"Turn",
 "lbl-score":"Score",
 "lbl-rank":"Rank",
 "lbl-rank-top":"$0 (top $1)",
@@ -29,12 +30,7 @@ myt.I18N.setDictionary({
 
 // Info Panel
 "info-core-hp":"Core HP",
-"info-turn":"Turn",
-"info-pieces":"Your pieces",
-"info-enemies":"Enemies",
-"info-next-wave":"Next wave",
 "info-selected":"Selected",
-"info-next-wave-value":"$0 in $1 · squads ≤ $2",
 "info-selected-value":"$0 · rank $1 · $2/$3 HP",
 "info-selected-carries":" · +$0",
 "info-core":"Core",

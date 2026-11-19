@@ -48,7 +48,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - A wave arrives every 3 turns with **base + perRank × (R − 1)** enemies = **1, 3, 5, 7, 9…** at rank 1, 2, 3, 4, 5.
 - The wave is split into squads of the **squad cap or one less**, where squad cap = **R + 1** (max 8).
 - Losing rank immediately lowers the pressure of later waves.
-- 3 single enemies at the start. The HUD shows the **Next wave**.
+- 3 single enemies at the start.
 
 ## Enemy squads
 - Squads are link trees shaped as binary trees (piece i links to piece ⌊(i−1)/2⌋), so a squad of 3 has a rank-2 leader, 7 a rank-3 leader.
@@ -116,13 +116,13 @@ Every value applies immediately (those marked "new game" from the next game) and
 - Pieces show their rank number. Player pieces are red-orange, and the core has an extra outer ring. Enemies are indigo, with indigo link arrows within squads. HP bars show under pieces with more than 1 max HP. Occupied cells are tinted.
 - **Moved this turn:** player pieces that have moved (or were just placed) are drawn **inverted**: a light fill with a coloured ring and number. Pieces that can't move because you're out of moves are faded.
 - **Selection:** the selected piece and everything it carries turn **amber**, along with the link arrows between them.
-- **Link arrows point from each child to its parent**, so they converge on the core or squad leader.
+- **Link arrows point from each child to its parent**, so they converge on the core or squad leader. Each is a translucent (50%) trapezoid from the child's cell centre to the parent's, behind the pieces, widening towards the parent. Width grows with the longest chain of pieces below the link, so a lone piece's link starts as a point and widths match where links meet.
 - Legal moves are highlighted; attacks in indigo. Hovering a move shows a faint copy of the whole group at its destination, and marks landing cells that are active harm tiles in strong red and active heal tiles in bright green. Hovering an attack highlights every enemy that would be hit.
 - **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
 - A dashed outline shows the link range around the selected piece's parent.
 - Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown.
-- A header bar holds the score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP, turn, piece counts, the Next wave and the selected piece.
+- A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
 - Settings live in a dialog (⚙): every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
 

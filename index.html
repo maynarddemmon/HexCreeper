@@ -9,67 +9,72 @@
 	}
 
 	:root {
-		--bg: #000;
-		--grid: #222;
+		--bg:#000;
+		--grid:#222;
 		--grid-major:#333;
-		--ink: #ddd;
-		--muted: #999;
+		--ink:#ddd;
+		--muted:#999;
 		
-		--core: #e86;
-		--core-dark: #fa8;
+		--core:#e86;
+		--core-dark:#fa8;
 		
-		--enemy: #89d;
-		--enemy-dark: #cdf;
-		--enemy-link: rgba(195, 199, 240, 0.5);
-		--move: rgba(226, 115, 90, 0.18);
-		--move-hover: rgba(226, 115, 90, 0.4);
-		--attack: rgba(140, 146, 209, 0.2);
-		--attack-hover: rgba(140, 146, 209, 0.42);
+		--enemy:#89d;
+		--enemy-dark:#cdf;
+		--enemy-link:rgba(195, 199, 240, 0.5);
 		
-		--place: rgba(240, 192, 64, 0.18);
-		--place-hover: rgba(240, 192, 64, 0.42);
-		--place-ink: #fc4;
+		--move:rgba(226, 115, 90, 0.18);
+		--move-hover:rgba(226, 115, 90, 0.4);
 		
-		--link: rgba(242, 160, 140, 0.6);
-		--range: rgba(242, 160, 140, 0.35);
-		--dmg: #f65;
-		--gain: #6d8;
-		--heal: #6d8;
-		--heal-bg: rgba(111, 209, 143, 0.14);
+		--attack:rgba(140, 146, 209, 0.2);
+		--attack-hover:rgba(140, 146, 209, 0.42);
 		
-		--harm: #f65;
-		--harm-bg: rgba(255, 107, 90, 0.14);
-		--visited: rgba(110, 160, 240, 0.08);
-		--panel: rgba(38, 36, 33, 0.92);
-		--sel-bg: rgba(240, 184, 64, 0.32);
-		--sel-fill: #f0b840;
-		--sel-stroke: #ffe3a3;
-		--sel-link: rgba(240, 184, 64, 0.95);
-		--sel-tint: rgba(240, 184, 64, 0.14);
-		--harm-hover: rgba(255, 90, 70, 0.55);
-		--heal-hover: rgba(90, 220, 130, 0.5);
-		--core-tint: rgba(226, 115, 90, 0.13);
-		--enemy-tint: rgba(140, 146, 209, 0.14);
+		--place:rgba(240, 192, 64, 0.18);
+		--place-hover:rgba(240, 192, 64, 0.42);
+		--place-ink:#fc4;
 		
-		--header-bg: #2a2825;
-		--header-text: #ece7dc;
+		--link:rgba(242, 160, 140, 0.6);
+		--range:rgba(242, 160, 140, 0.35);
+		--dmg:#f65;
+		--gain:#6d8;
 		
-		--dlg-bg: #23211e;
-		--dlg-header: #2f2c28;
-		--dlg-footer: #2a2825;
+		--heal:#6d8;
+		--heal-bg:rgba(111, 209, 143, 0.14);
+		--heal-hover:rgba(90, 220, 130, 0.5);
 		
-		--btn-bg: rgba(255, 255, 255, 0.06);
-		--btn-bg-hover: rgba(255, 255, 255, 0.14);
+		--harm:#f65;
+		--harm-bg:rgba(255, 107, 90, 0.14);
+		--harm-hover:rgba(255, 90, 70, 0.55);
+		
+		--visited:#6663;
+		
+		--sel-bg:rgba(240, 184, 64, 0.32);
+		--sel-fill:#f0b840;
+		--sel-stroke:#ffe3a3;
+		--sel-link:rgba(240, 184, 64, 0.95);
+		--sel-tint:rgba(240, 184, 64, 0.14);
+		
+		--core-tint:rgba(226, 115, 90, 0.13);
+		--enemy-tint:rgba(140, 146, 209, 0.14);
+		
+		--header-bg:#222;
+		--header-text:#eed;
+		
+		--dlg-bg:#222;
+		--dlg-header:#333;
+		--dlg-footer:#333;
+		
+		--btn-bg:rgba(255, 255, 255, 0.06);
+		--btn-bg-hover:rgba(255, 255, 255, 0.14);
 	}
 
-	html,body{height:100%;margin:0px;padding:0px;border:0px none;overflow:hidden;}
-	input,textarea,select{box-sizing:border-box;}
-	input.mytNativeInput:not([type=button]), textarea.mytNativeInput{margin:0px;padding:1px;border:0px none;}
-	.mytButtonText{font-size:12px;font-weight:bold;}
-	.mytUnselectable{user-select:none;}
-	::placeholder{user-select:none;}
+	html,body {height:100%;margin:0px;padding:0px;border:0px none;overflow:hidden;}
+	input,textarea,select {box-sizing:border-box;}
+	input.mytNativeInput:not([type=button]), textarea.mytNativeInput {margin:0px;padding:1px;border:0px none;}
+	.mytButtonText {font-size:12px;font-weight:bold;}
+	.mytUnselectable {user-select:none;}
+	::placeholder {user-select:none;}
 
-	body{
+	body {
 		background:var(--bg);
 		color:var(--ink);
 		font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;

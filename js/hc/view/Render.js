@@ -69,32 +69,31 @@
             }
         },
         
-        // Draws a tapered arrow from `from` (thick end) to `to` (arrowhead).
-        // Links are drawn child -> parent.
-        drawLink = (from, to, color) => {
-            const parent = from, child = to; // geometry below: thick at `parent`, tip at `child`
-            const s = cam.size;
-            const [ax, ay] = cellCenter(parent.x, parent.y);
-            const [bx, by] = cellCenter(child.x, child.y);
-            const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy); if (!len) return;
-            const ux = dx / len, uy = dy / len, px = -uy, py = ux;
-            const gap = s * (PIECE_R + 0.05);
-            const sx = ax + ux * gap, sy = ay + uy * gap;          // start: parent edge
-            const ex = bx - ux * gap, ey = by - uy * gap;          // end: child edge (arrow tip)
-            const head = Math.min(s * 0.16, (len - 2 * gap) * 0.5);
-            const hx = ex - ux * head, hy = ey - uy * head;        // arrowhead base
-            const w0 = s * 0.07, w1 = s * 0.015, wh = s * 0.075;
+        // Half the width of a link at the end where `chain` pieces hang below it: wider the
+        // longer the chain, up to a limit.
+        linkHalfWidth = chain => cam.size * Math.min(0.03 * chain, 0.27),
+        
+        // Draws a translucent link from `from` to `to` (child -> parent) as a trapezoid between
+        // the two cell centres, behind the pieces. `chain` is the longest chain of pieces from
+        // `from` down, counting `from`: the link widens from that chain's width at `from` (a
+        // point for a lone piece) to one more at `to`, so widths match where links meet.
+        drawLink = (from, to, color, chain) => {
+            const [ax, ay] = cellCenter(from.x, from.y),
+                [bx, by] = cellCenter(to.x, to.y),
+                len = Math.hypot(bx - ax, by - ay);
+            if (!len) return;
+            const px = (ay - by) / len, py = (bx - ax) / len,
+                w0 = linkHalfWidth(chain - 1),
+                w1 = linkHalfWidth(chain);
             ctx.fillStyle = css(color);
             ctx.beginPath();
-            ctx.moveTo(sx + px * w0, sy + py * w0);
-            ctx.lineTo(hx + px * w1, hy + py * w1);
-            ctx.lineTo(hx + px * wh, hy + py * wh);
-            ctx.lineTo(ex, ey);
-            ctx.lineTo(hx - px * wh, hy - py * wh);
-            ctx.lineTo(hx - px * w1, hy - py * w1);
-            ctx.lineTo(sx - px * w0, sy - py * w0);
+            ctx.moveTo(ax + px * w0, ay + py * w0);
+            ctx.lineTo(bx + px * w1, by + py * w1);
+            ctx.lineTo(bx - px * w1, by - py * w1);
+            ctx.lineTo(ax - px * w0, ay - py * w0);
             ctx.closePath();
             ctx.fill();
+            ctx.globalAlpha = 1;
         },
         
         drawHpBar = (p, cx, cy, s) => {
@@ -210,18 +209,28 @@
             }
         }
         
-        // Link lines: arrows from each child to its parent
+        // Link lines: from each child to its parent. A piece's chain is the longest chain of
+        // pieces from it down to a leaf, counting itself.
+        const chains = new Map();
+        for (const p of game.pieces.values()) {
+            let n = 1;
+            for (let a = game.parent(p); a; a = game.parent(a)) {
+                if ((chains.get(a.id) ?? 0) >= ++n) break; // already set from a longer chain
+                chains.set(a.id, n);
+            }
+        }
+        const chain = p => chains.get(p.id) ?? 1;
         for (const p of game.piecesOf('enemy')) {
-            const par = game.parent(p); if (par) drawLink(p, par, '--enemy-link');
+            const par = game.parent(p); if (par) drawLink(p, par, '--enemy-link', chain(p));
         }
         for (const p of game.piecesOf('player')) {
             const par = game.parent(p); if (!par) continue;
-            drawLink(p, par, selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link');
+            drawLink(p, par, selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p));
         }
         // Pending placement link preview
         if (V.placeMode && V.placeMode.stage === 'link' && V.hover) {
             const cand = game.pieceAt(V.hover.x, V.hover.y);
-            if (cand && linkTargets.has(cand.id)) drawLink({ x: V.placeMode.x, y: V.placeMode.y }, cand, '--place-ink');
+            if (cand && linkTargets.has(cand.id)) drawLink({x:V.placeMode.x, y:V.placeMode.y}, cand, '--place-ink', 1);
         }
         
         // Effects state per cell (flash)

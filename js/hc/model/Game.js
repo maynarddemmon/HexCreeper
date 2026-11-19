@@ -498,7 +498,6 @@
             const R = Math.max(1, this.maxRank());
             return Math.max(1, Math.min(ENEMY.maxSquad, R + PRESSURE.squadExtra));
         }
-        turnsToWave() { const r = this.turn % SPAWN.every; return r === 0 ? SPAWN.every : SPAWN.every - r; }
         
         // Split the wave's enemies into squads of (cap or cap-1) pieces.
         spawnWave() {

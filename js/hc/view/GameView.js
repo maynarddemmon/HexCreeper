@@ -20,7 +20,7 @@
         MIN_SIZE = 12,
         MAX_SIZE = 140,
         
-        INFO_WIDTH = 236,
+        INFO_WIDTH = 300,
         
         /*  The stats that don't fit in the header: core HP, turn, piece counts, the next wave
             and the selected piece. */
@@ -42,10 +42,6 @@
                 self.hp = row('info-core-hp', colorAccent);
                 const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
                 self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
-                self.turn = row('info-turn');
-                self.pieces = row('info-pieces');
-                self.enemies = row('info-enemies');
-                self.nextWave = row('info-next-wave');
                 self.selected = row('info-selected');
                 
                 new SpacedLayout(self, {axis:'y', inset:padding/2, spacing, outset:padding/2, collapseParent:true});
@@ -56,14 +52,9 @@
                     core = game.playerCore,
                     hp = Math.max(0, core ? core.hp : 0),
                     max = core ? core.maxHp : 1,
-                    tw = game.turnsToWave(),
                     sel = game.selected;
                 self.hp.update(hp + ' / ' + max);
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
-                self.turn.update(game.turn);
-                self.pieces.update(game.piecesOf('player').length);
-                self.enemies.update(game.piecesOf('enemy').length);
-                self.nextWave.update(i18n('info-next-wave-value', game.waveSize(), tw, game.squadCap()));
                 if (sel) {
                     const carries = game.group(sel).length - 1;
                     self.selected.update(

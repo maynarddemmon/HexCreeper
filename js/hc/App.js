@@ -7,6 +7,7 @@
         scoreView,
         rankView,
         movesView,
+        turnView,
         endTurnBtn,
         placeBtn,
         healBtn,
@@ -110,6 +111,7 @@
             new Spacer(topView);
             
             const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
+            turnView = new LabeledValue(topView, {label:i18n('lbl-turn'), ...statAttrs});
             scoreView = new LabeledValue(topView, {label:i18n('lbl-score'), ...statAttrs});
             rankView = new LabeledValue(topView, {label:i18n('lbl-rank'), ...statAttrs});
             movesView = new LabeledValue(topView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
@@ -165,6 +167,7 @@
         /*  Called once per frame, as the board is drawn: updates the header and overlays,
             and offers a new game once the core is destroyed. */
         update: () => {
+            turnView.update(game.turn);
             scoreView.update(game.score);
             const coreRank = game.coreRank(), maxRank = game.maxRank();
             rankView.update(maxRank > coreRank ? i18n('lbl-rank-top', coreRank, maxRank) : coreRank);
