@@ -22,6 +22,7 @@ Enemies arrive in waves of linked squads, and waves grow with your rank. A squad
 <span style="font-size:16px;">TILES</span>
 - Green + heals the piece that steps on it; spare healing flows along links (up first, then down), and any left over becomes score. Its value, shown on the tile, is higher near unexplored quadrants.
 - Red × deals damage to anything that moves onto it. Enemies walk around them. It clears once every quadrant around it has been visited.
+- Dark grey hexes are solid: nothing can move onto them.
 - Dashed cells with a number are tiles counting down to appear. Quadrants you've visited are tinted blue.
 
 <span style="font-size:16px;">SPENDING SCORE</span>

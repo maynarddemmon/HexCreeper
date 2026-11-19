@@ -33,21 +33,23 @@ test.describe('waves', () => {
     });
 });
 
-test('enemies path around a wall of harm tiles', async ({page}) => {
-    const r = await page.evaluate(() => {
-        const g = hc.app.game;
-        for (let x = -4; x <= 4; x++) g.tiles.set(g.key(x, -2), {x, y:-2, kind:'harm', timer:0});
-        const e = g.addPiece('core', 'enemy', 1, -6);
-        let stepped = false, hit = false;
-        for (let i = 0; i < 20 && !hit; i++) {
-            g.playerWait();
-            if (g.pieces.has(e.id) && g.isHarm(e.x, e.y)) stepped = true;
-            hit = g.over || g.playerCore.hp < g.playerCore.maxHp;
-        }
-        return {stepped, hit};
+for (const kind of ['harm', 'solid']) {
+    test(`enemies path around a wall of ${kind} tiles`, async ({page}) => {
+        const r = await page.evaluate(kind => {
+            const g = hc.app.game;
+            for (let x = -4; x <= 4; x++) g.tiles.set(g.key(x, -2), {x, y:-2, kind, timer:0});
+            const e = g.addPiece('core', 'enemy', 1, -6);
+            let stepped = false, hit = false;
+            for (let i = 0; i < 20 && !hit; i++) {
+                g.playerWait();
+                if (g.pieces.has(e.id) && g.tiles.get(g.key(e.x, e.y))?.kind === kind) stepped = true;
+                hit = g.over || g.playerCore.hp < g.playerCore.maxHp;
+            }
+            return {stepped, hit};
+        }, kind);
+        expect(r).toEqual({stepped:false, hit:true});
     });
-    expect(r).toEqual({stepped:false, hit:true});
-});
+}
 
 test('a squad facing a wall strikes and pulls back out of reach', async ({page}) => {
     const r = await page.evaluate(adjSrc => {

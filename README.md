@@ -12,7 +12,7 @@ It runs in a desktop browser. It's a work in progress, and games aren't saved be
 - **Rank** is 1, or 1 + the lower of a piece's two highest-ranked children, so a full binary tree ranks up fastest but is the most fragile. Max HP is 2 × rank. Your highest rank is how many pieces you may move each turn, and your core's rank sets the cost to place a piece or buy a heal (5 × rank).
 - **Moving onto an enemy attacks it.** When a group moves, every piece in it that would land on an enemy hits that enemy. Killing *n* enemies in one move scores *n²*, and a kill lets the attacker advance into the empty cell.
 - **Enemies come in squads**: link trees with ranks of their own. A squad gets as many actions as its rank and plans its turn piece by piece, so it will carry a piece into reach, strike, and pull back out of reach. Waves grow with your rank, not with time.
-- **Quadrants** generate a heal tile and a harm tile each, once, as you approach them. Heal tiles are worth more near unexplored ground; harm tiles hurt anything that steps on them and clear away once the area around them is explored. Both count down before they appear.
+- **Quadrants** generate a heal tile and a harm tile each, once, as you approach them. Heal tiles are worth more near unexplored ground; harm tiles hurt anything that steps on them and clear away once the area around them is explored. Both count down before they appear. Each quadrant also gets a clump of up to five solid tiles that nothing can enter.
 
 The in-game **Show help** panel has the full rules and controls, and **Settings** has every tunable number.
 
@@ -47,7 +47,7 @@ The tests start their own static server and load the real `index.html`, then dri
 - the game starts with no errors or warnings;
 - the hex geometry is sound: quadrants tile the plane with no gaps or overlaps, rings and picking are exact;
 - the rules behave as intended: ranks, moves per turn, link range, group attacks and combos, advancing after a kill, tiles and their countdowns, heal flow and the paid heal;
-- enemy waves follow your rank, squads path around harm, strike and pull back, and don't wait forever;
+- enemy waves follow your rank, squads path around harm and solid tiles, strike and pull back, and don't wait forever;
 - the UI works: header buttons, help, click versus shift-click, keyboard moves and settings.
 
 `npm run setup-hooks` turns on a pre-commit hook that runs the linter and the startup tests. `npx playwright test --headed` shows the browser while they run, and `npx playwright test combat` runs a single file.

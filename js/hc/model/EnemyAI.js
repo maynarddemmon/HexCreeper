@@ -154,7 +154,7 @@
                         let ok = true;
                         for (const gid of grp) {
                             const [gx, gy] = st.pos.get(gid), nx = gx + dx, ny = gy + dy;
-                            if (!this.inBounds(nx, ny) || this.isHarm(nx, ny)) { ok = false; break; }
+                            if (!this.isOpen(nx, ny) || this.isHarm(nx, ny)) { ok = false; break; }
                             const sq = occ.get(nx + ',' + ny);
                             if (sq !== undefined && !gset.has(sq)) { ok = false; break; }
                             if (sq === undefined) {

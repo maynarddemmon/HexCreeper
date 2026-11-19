@@ -49,6 +49,8 @@
         num('quadRadius',  GROUP_TILES, QUAD,     'radius', 1, 6, true),
         num('healPerQuad', GROUP_TILES, TILES,    'healPerQuad', 0, 20),
         num('harmPerQuad', GROUP_TILES, TILES,    'harmPerQuad', 0, 40),
+        num('solidMin',    GROUP_TILES, TILES,    'solidMin', 0, 20),
+        num('solidMax',    GROUP_TILES, TILES,    'solidMax', 0, 20),
         num('timerMin',    GROUP_TILES, TILES,    'timerMin', 0, 50),
         num('timerMax',    GROUP_TILES, TILES,    'timerMax', 0, 50),
         num('harmDamage',  GROUP_TILES, TILES,    'harmDamage', 0, 10),
@@ -77,6 +79,7 @@
             // Keep the ranges the right way round.
             if (SPAWN.maxDist < SPAWN.minDist) SPAWN.maxDist = SPAWN.minDist;
             if (TILES.timerMax < TILES.timerMin) TILES.timerMax = TILES.timerMin;
+            if (TILES.solidMax < TILES.solidMin) TILES.solidMax = TILES.solidMin;
         },
         
         writeOverrides = overrides => {

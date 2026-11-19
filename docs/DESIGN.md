@@ -68,15 +68,16 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 ## Quadrants and tiles
 - The world is divided into **quadrants** (hexagonal chunks), drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
 - When a player piece is in a quadrant, that quadrant and its neighbours get their tiles, **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
-- Each quadrant gets **1 heal tile and 1 harm tile** *(setting)* at random empty cells.
+- Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, and **0–5 solid tiles** *(settings)* in one connected clump: the first on a random free cell, each next one on a free cell of the quadrant touching the clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
 - **Harm tile** (red ×): 1 damage to any piece that moves onto it or is standing on it when it activates. It disappears once **every neighbouring quadrant has been visited**.
 - Enemies never step onto active harm tiles, and they path around them.
+- **Solid tile** (dark grey hex): no piece can ever move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown) and never go away.
 
 ## Enemy pathing and spawning
-- A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm tiles), over the grid's neighbour directions.
-- Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm tile.
+- A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm and solid tiles), over the grid's neighbour directions.
+- Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm or solid tile.
 
 ## Settings
 Every value applies immediately (those marked "new game" from the next game) and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
@@ -99,6 +100,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 | Quadrant radius (new game) | 3 |
 | Heal tiles per quadrant | 1 |
 | Harm tiles per quadrant | 1 |
+| Solid tiles per quadrant | 0–5 |
 | Tile countdown min / max (turns) | 2 / 8 |
 | Harm tile damage | 1 |
 | Base rank | 1 |
@@ -121,7 +123,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
 - A dashed outline shows the link range around the selected piece's parent.
-- Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown.
+- Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown; solid = dark grey filled hex.
 - A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
 - Settings live in a dialog (⚙): every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.

@@ -26,7 +26,7 @@
             this.effects = [];              // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
-            this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm", timer}
+            this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid", timer}
             this.generatedQuads = new Set();
             this.visitedQuads = new Set();
             this.acted = new Set();         // ids of player pieces moved this turn (counts toward the move limit)
@@ -41,7 +41,11 @@
         }
         
         key(x, y) { return x + ',' + y; }
-        inBounds(x, y) { return Math.abs(x) <= WORLD_LIMIT && Math.abs(y) <= WORLD_LIMIT; }
+        // Can a piece ever be on (x, y)? Not past the edge of the world or on a solid tile.
+        isOpen(x, y) {
+            if (Math.abs(x) > WORLD_LIMIT || Math.abs(y) > WORLD_LIMIT) return false;
+            return this.tiles.get(this.key(x, y))?.kind !== 'solid';
+        }
         
         addPiece(type, owner, x, y, parentId = null) {
             const s = PIECE_TYPES[type].stats[owner];
@@ -126,7 +130,7 @@
             const out = [];
             for (const [dx, dy] of PIECE_TYPES[piece.type].steps(piece)) {
                 const x = piece.x + dx, y = piece.y + dy;
-                if (!this.inBounds(x, y)) continue;
+                if (!this.isOpen(x, y)) continue;
                 const occ = this.pieceAt(x, y);
                 if (occ && occ.owner === piece.owner && !ids.has(occ.id)) continue;
                 const hits = [];
@@ -164,7 +168,7 @@
         groupMoveOk(group, ids, dx, dy) {
             for (const g of group) {
                 const x = g.x + dx, y = g.y + dy;
-                if (!this.inBounds(x, y)) return false;
+                if (!this.isOpen(x, y)) return false;
                 const o = this.pieceAt(x, y);
                 if (o && !ids.has(o.id)) return false;
             }
@@ -279,6 +283,28 @@
             };
             for (let i = 0; i < TILES.healPerQuad; i++) place('heal');
             for (let i = 0; i < TILES.harmPerQuad; i++) place('harm');
+            this.placeSolids(cells);
+        }
+        
+        // Solid tiles come as one connected clump of solidMin to solidMax cells within the
+        // quadrant: the first on a random free cell, each next one on a free cell touching
+        // the clump. They're solid from the start (no countdown).
+        placeSolids(cells) {
+            const inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
+                free = (x, y) => inQuad.has(this.key(x, y)) && !this.tiles.has(this.key(x, y)) && !this.pieceAt(x, y),
+                count = TILES.solidMin + Math.floor(Math.random() * (TILES.solidMax - TILES.solidMin + 1));
+            const edge = new Map(); // free cells touching the clump, by key
+            let options = cells.filter(c => free(c.x, c.y));
+            for (let i = 0; i < count && options.length; i++) {
+                const {x, y} = options[Math.floor(Math.random() * options.length)];
+                this.tiles.set(this.key(x, y), {x, y, kind:'solid', timer:0});
+                edge.delete(this.key(x, y));
+                for (const [dx, dy] of pkg.GRID.dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    if (free(nx, ny)) edge.set(this.key(nx, ny), {x:nx, y:ny});
+                }
+                options = [...edge.values()];
+            }
         }
     
         // Active tile at (x, y), optionally of a given kind.
@@ -332,7 +358,7 @@
             const seen = new Set(), out = [];
             for (const p of this.piecesOf('player')) for (const [dx, dy] of pkg.GRID.dirs) {
                 const x = p.x + dx, y = p.y + dy, k = this.key(x, y);
-                if (seen.has(k) || !this.inBounds(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
+                if (seen.has(k) || !this.isOpen(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
                 seen.add(k); out.push({ x, y });
             }
             return out;
@@ -345,7 +371,7 @@
         
         playerPlace(x, y, parent) {
             if (this.over || !this.canAffordPlace()) return false;
-            if (this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
+            if (!this.isOpen(x, y) || this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
             const cost = this.placeCost();
             this.score -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id);
@@ -481,7 +507,7 @@
                 if (d >= radius) continue;
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const nx = x + dx, ny = y + dy, k = this.key(nx, ny);
-                    if (dist.has(k) || this.isHarm(nx, ny)) continue;
+                    if (dist.has(k) || !this.isOpen(nx, ny) || this.isHarm(nx, ny)) continue;
                     dist.set(k, d + 1); q.push(nx, ny);
                 }
             }
@@ -519,7 +545,7 @@
             for (let i = 1; i < size; i++) {
                 const parent = nodes[Math.floor((i - 1) / 2)];
                 const spots = pkg.GRID.dirs.map(([dx, dy]) => ({ x: parent.x + dx, y: parent.y + dy }))
-                    .filter(q => this.inBounds(q.x, q.y) && !this.pieceAt(q.x, q.y) && !this.isHarm(q.x, q.y)
+                    .filter(q => this.isOpen(q.x, q.y) && !this.pieceAt(q.x, q.y) && !this.isHarm(q.x, q.y)
                         && !players.some(p => hexDist(p, q) < 2));
                 if (!spots.length) break;
                 const q = spots[Math.floor(Math.random() * spots.length)];
@@ -537,7 +563,7 @@
             for (let tries = 0; tries < 60; tries++) {
                 const d = SPAWN.minDist + Math.floor(Math.random() * (SPAWN.maxDist - SPAWN.minDist + 1));
                 const { x, y } = pkg.GRID.ring(core.x, core.y, d);
-                if (!this.inBounds(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
+                if (!this.isOpen(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
                 if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                 const p = this.addPiece('core', 'enemy', x, y);
                 p.hp = p.maxHp = ENEMY.hpPer * RANK.base;

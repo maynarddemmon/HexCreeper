@@ -80,6 +80,8 @@ myt.I18N.setDictionary({
 "setting-quadRadius":"Quadrant radius ✱",
 "setting-healPerQuad":"Heal tiles per quadrant",
 "setting-harmPerQuad":"Harm tiles per quadrant",
+"setting-solidMin":"Solid tiles per quadrant (min)",
+"setting-solidMax":"Solid tiles per quadrant (max)",
 "setting-timerMin":"Tile countdown min (turns)",
 "setting-timerMax":"Tile countdown max (turns)",
 "setting-harmDamage":"Harm tile damage",

@@ -125,10 +125,13 @@
                 every:3,     // spawn a wave every N turns
             },
             
-            // Tiles appear with a countdown (turns) and become active when it reaches 0.
+            // Heal and harm tiles appear with a countdown (turns) and become active when it
+            // reaches 0. Solid tiles are there from the start and can never be entered.
             TILES:{
                 healPerQuad:1,
                 harmPerQuad:1,
+                solidMin:0, // solid tiles per quadrant, in one connected clump
+                solidMax:5,
                 timerMin:2,
                 timerMax:8,
                 harmDamage:1, // damage to any piece that moves onto an active harm tile

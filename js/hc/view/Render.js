@@ -20,6 +20,11 @@
         HEAL_LABEL_OFFSET = [0.3, 0.32],
         
         drawTile = (t, now) => {
+            if (t.kind === 'solid') {
+                fillCell(t.x, t.y, '--solid');
+                strokeCell(t.x, t.y, css('--solid-edge'), Math.max(1, cam.size * 0.03), 1);
+                return;
+            }
             const s = cam.size,
                 [cx, cy] = cellCenter(t.x, t.y),
                 heal = t.kind === 'heal',
@@ -135,7 +140,7 @@
         for (const c of visible) if (game.visitedQuads.has(chunkKey(c.x, c.y))) addCellPath(c.x, c.y, 0);
         ctx.fillStyle = css('--visited'); ctx.fill();
         
-        // Heal / harm tiles
+        // Heal, harm and solid tiles
         for (const t of game.tiles.values()) {
             if (inView(t.x, t.y)) drawTile(t, now);
         }
