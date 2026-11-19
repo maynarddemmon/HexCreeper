@@ -127,6 +127,7 @@ myt.I18N.setDictionary({
 "setting-healScore":"Unused heal: score per point",
 "save-problem-not-save":"it is not a HexCreeper save",
 "save-problem-version":"it is from an unsupported version ($0)",
+"save-problem-format":"it is in an unknown format ($0)",
 "save-problem-no-data":"it has no game in it",
 "save-problem-not-applied":"it could not be applied",
 "save-problem-storage-blocked":"the browser blocked storage for this site"

@@ -63,6 +63,10 @@
             DEFAULT_TALL_DIALOG_WIDTH:560,
             DIALOG_FOOTER_HEIGHT:40,
             
+            // How exported save files are written: "compact" (as small as possible, one line)
+            // or "pretty" (indented, to read). Either can be imported.
+            EXPORT_FORMAT:'pretty',
+            
             // The project's home, linked from the header's GitHub mark.
             GITHUB_URL:'https://github.com/maynarddemmon/HexCreeper',
             

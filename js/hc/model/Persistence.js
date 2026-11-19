@@ -1,7 +1,7 @@
 (pkg => {
     'use strict';
     
-    const {I18N:{get:i18n}, downloadObjectAsJSON} = myt,
+    const {I18N:{get:i18n}, downloadBlob, prettyFormatJSON} = myt,
         
         SAVE_FORMAT_VERSION = 1,
         DEFAULT_STORAGE_KEY = 'hc.save',
@@ -18,9 +18,17 @@
             }
         },
         
-        /*  A save record of the game as it is now. */
-        prepareRecord = game => ({
+        /*  How a record can be written out, by the name kept in its "format". Saves in the
+            browser are always compact. */
+        FORMATS = {
+            compact: record => JSON.stringify(record),
+            pretty: record => prettyFormatJSON(record)
+        },
+        
+        /*  A save record of the game as it is now, written out in a format. */
+        writeRecord = (game, format) => FORMATS[format]({
             version:SAVE_FORMAT_VERSION,
+            format,
             savedAt:new Date().toISOString(),
             data:game.exportToObj()
         }),
@@ -30,6 +38,8 @@
         validateRecord = record => {
             if (!isObj(record)) return i18n('save-problem-not-save');
             if (record.version !== SAVE_FORMAT_VERSION) return i18n('save-problem-version', record.version);
+            // Saves from before the format was recorded have none.
+            if (record.format !== undefined && !Object.hasOwn(FORMATS, record.format)) return i18n('save-problem-format', record.format);
             if (!isObj(record.data)) return i18n('save-problem-no-data');
             return null;
         };
@@ -39,7 +49,8 @@
         
         A save can also be exported to a file and imported again.
         
-        Saved record: {version, savedAt:<ISO string>, data:<game.exportToObj()>} */
+        Saved record: {version, format:"compact" | "pretty", savedAt:<ISO string>,
+            data:<game.exportToObj()>} */
     pkg.PersistenceManager = new JS.Class('PersistenceManager', {
         // Life Cycle //////////////////////////////////////////////////////////
         initialize: function(game, storageKey=DEFAULT_STORAGE_KEY) {
@@ -62,7 +73,7 @@
         /*  Returns whether it saved. */
         save: function() {
             try {
-                localStorage.setItem(this.storageKey, JSON.stringify(prepareRecord(this.game)));
+                localStorage.setItem(this.storageKey, writeRecord(this.game, 'compact'));
                 return true;
             } catch (err) {
                 console.error('Save failed', err);
@@ -87,9 +98,11 @@
             return problem;
         },
         
-        /*  Downloads the game as it is now as a save file. */
+        /*  Downloads the game as it is now as a save file, in hc.cfg.EXPORT_FORMAT (compact
+            if that isn't a known format). */
         export: function() {
-            downloadObjectAsJSON(prepareRecord(this.game), 'hexcreeper-save');
+            const format = Object.hasOwn(FORMATS, pkg.cfg.EXPORT_FORMAT) ? pkg.cfg.EXPORT_FORMAT : 'compact';
+            downloadBlob(new Blob([writeRecord(this.game, format)], {type:'application/json'}), 'hexcreeper-save.json');
         },
         
         /*  Carries on from a record read from a save file: it replaces the game, and is saved.
