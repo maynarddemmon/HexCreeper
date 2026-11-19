@@ -39,6 +39,7 @@
             this.recomputeRanks();
             core.hp = core.maxHp;
             this.selectedId = core.id;
+            this.corePath = [[0, 0]];       // every cell the core has been on, in order (the golden path)
             this.updateQuadrants();
             for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy();
         }
@@ -63,7 +64,8 @@
                 acted:[...this.acted],
                 fresh:[...this.fresh],
                 playerCoreId:this.playerCoreId,
-                selectedId:this.selectedId
+                selectedId:this.selectedId,
+                corePath:this.corePath.map(c => [...c])
             };
         }
         
@@ -73,7 +75,7 @@
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.quadRadius) ||
-                ![o.pieces, o.tiles, o.terrainQuads, o.borders ?? [], o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh].every(isArr) ||
+                ![o.pieces, o.tiles, o.terrainQuads, o.borders ?? [], o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh, o.corePath ?? []].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && isNum(t.timer) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
@@ -101,6 +103,9 @@
             this.fresh = new Set(o.fresh);
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
+            // Saves from before the path was kept start it where the core is.
+            const core = this.playerCore;
+            this.corePath = o.corePath?.map(c => [...c]) ?? (core ? [[core.x, core.y]] : []);
             this._sightKey = null;
         }
         
@@ -309,6 +314,7 @@
             const group = this.group(piece);
             for (const g of group) this.board.delete(this.key(g.x, g.y));
             for (const g of group) { g.x += dx; g.y += dy; this.board.set(this.key(g.x, g.y), g.id); }
+            if (piece.id === this.playerCoreId) this.corePath.push([piece.x, piece.y]);
             if (piece.owner === 'player') { this.landOnTiles(group); this.updateQuadrants(); }
         }
         

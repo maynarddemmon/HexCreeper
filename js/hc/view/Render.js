@@ -262,6 +262,30 @@
             }
         }
         
+        // The golden path: a trail of small dots along every step the core has taken, kept
+        // faint and small since it's only a reminder of where you've been. Each step starts
+        // at the centre of its cell and stops a gap short of the next one, where the next
+        // step starts, so steps don't overlap; the last step goes all the way to the core.
+        // Each step is filled on its own, so retraced steps stack up and look darker.
+        const path = game.corePath,
+            dot = Math.max(0.7, s * 0.025);
+        ctx.fillStyle = css('--path');
+        for (let i = 1; i < path.length; i++) {
+            const [ax, ay] = path[i - 1], [bx, by] = path[i];
+            if (!inView(ax, ay) && !inView(bx, by)) continue;
+            const [sx, sy] = cellCenter(ax, ay), [ex, ey] = cellCenter(bx, by),
+                len = Math.hypot(ex - sx, ey - sy);
+            if (!len) continue;
+            const n = Math.max(1, Math.round(len / Math.max(8, s * 0.22)));
+            ctx.beginPath();
+            for (let k = 0, last = i === path.length - 1 ? n : n - 1; k <= last; k++) {
+                const t = k / n, px = sx + (ex - sx) * t, py = sy + (ey - sy) * t;
+                ctx.moveTo(px + dot, py);
+                ctx.arc(px, py, dot, 0, 2 * Math.PI);
+            }
+            ctx.fill();
+        }
+        
         // Known cells out of sight are dimmed
         if (sight) fillCells(known.filter(c => !sight.has(game.key(c.x, c.y))), '--fog');
         
