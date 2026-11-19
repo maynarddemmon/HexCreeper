@@ -1,92 +1,22 @@
 /*  The game area: a myt view that holds the canvas (see View.js and Render.js), handles
-    the mouse (select, move, attack, drag to pan, scroll to zoom, place and heal modes),
-    and overlays an info panel and a status line on the board. */
+    the mouse (select, move, attack, drag to pan, scroll to zoom, place and heal modes) */
 (pkg => {
     'use strict';
-
-    const M = myt,
-        {I18N:{get:i18n}, View, PaddedText, SpacedLayout, SizeToParent} = M,
-        
-        V = pkg.view,
-        {
-            canvas, game, cam, screenToWorld, cellAt, cellCenter, sameCell, draw, eventPos
-        } = V,
-        
-        {
-            LabeledValue,
-            theme:{padding, spacing, cornerRadius, colorPanel, colorText, colorAccent, fontSizeMedium}
-        } = pkg,
+    
+    const V = pkg.view,
+        {canvas, game, cam, screenToWorld, cellAt, sameCell, draw, eventPos} = V,
         
         MIN_SIZE = 12,
-        MAX_SIZE = 140,
-        
-        INFO_WIDTH = 300,
-        
-        /*  The stats that don't fit in the header: core HP, turn, piece counts, the next wave
-            and the selected piece. */
-        InfoPanel = new JS.Class('InfoPanel', View, {
-            initNode: function(parent, attrs) {
-                const self = this;
-                attrs.x ??= 12;
-                attrs.y ??= 12;
-                attrs.width ??= INFO_WIDTH;
-                attrs.bgColor ??= colorPanel;
-                attrs.roundedCorners ??= cornerRadius;
-                attrs.boxShadow ??= [0, 1, 4, '#0002'];
-                self.callSuper(parent, attrs);
-                
-                const row = (key, valueColor=colorText) => new LabeledValue(self, {
-                    label:i18n(key), fontSize:fontSizeMedium, valueTextColor:valueColor,
-                    width:INFO_WIDTH, whiteSpace:'nowrap'
-                });
-                self.hp = row('info-core-hp', colorAccent);
-                const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
-                self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
-                self.selected = row('info-selected');
-                
-                new SpacedLayout(self, {axis:'y', inset:padding/2, spacing, outset:padding/2, collapseParent:true});
-            },
-            
-            update: function() {
-                const self = this,
-                    core = game.playerCore,
-                    hp = Math.max(0, core ? core.hp : 0),
-                    max = core ? core.maxHp : 1,
-                    sel = game.selected;
-                self.hp.update(hp + ' / ' + max);
-                self.hpFill.setWidth(self.hpBar.width * hp / max);
-                if (sel) {
-                    const carries = game.group(sel).length - 1;
-                    self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : 'info-linked'), sel.rank, sel.hp, sel.maxHp) +
-                        (carries > 0 ? i18n('info-selected-carries', carries) : '')
-                    );
-                } else {
-                    self.selected.update(i18n('info-none'));
-                }
-            }
-        });
+        MAX_SIZE = 140;
     
-    pkg.GameView = new JS.Class('GameView', View, {
-        include: [SizeToParent],
-        
-        
+    pkg.GameView = new JS.Class('GameView', myt.View, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
             const self = this;
-            attrs.percentOfParentWidth ??= 100;
-            attrs.overflow ??= 'hidden';
             
             self.callSuper(parent, attrs);
             
             self.getIDE().appendChild(canvas);
-            
-            self.infoPanel = new InfoPanel(self);
-            self.statusTxt = new PaddedText(self, {
-                align:'center', y:12, padding, visible:false,
-                bgColor:colorPanel, textColor:colorText, roundedCorners:cornerRadius, fontSize:fontSizeMedium,
-                boxShadow:[0, 1, 4, '#0002']
-            });
             
             self.syncTo(self, '_onResize', 'width');
             self.syncTo(self, '_onResize', 'height');
@@ -96,39 +26,16 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  Updates the overlays, once per frame. */
-        update: function() {
-            this.infoPanel.update();
-            let status = '';
-            if (V.placeMode) {
-                status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
-            } else if (V.healMode) {
-                status = i18n('status-heal', game.healAmount());
-            }
-            const statusTxt = this.statusTxt;
-            if (statusTxt.text !== status) {
-                statusTxt.setText(status);
-                statusTxt.sizeViewToDom();
-            }
-            statusTxt.setVisible(!!status);
-        },
-        
         /*  Called after the player acts: keeps the core comfortably on screen. */
         afterTurn: function() {
-            this.followCore();
-            draw();
-        },
-        
-        followCore: function() {
+            // Follow Core
             const c = game.playerCore;
-            if (!c) return;
-            const [sx, sy] = cellCenter(c.x, c.y),
-                margin = cam.size * 3;
-            if (sx < margin || sx > V.W - margin || sy < margin || sy > V.H - margin) this.centerOn(c);
-        },
-        
-        centerOn: function(p) {
-            [cam.x, cam.y] = pkg.GRID.center(p.x, p.y);
+            if (c) {
+                const [sx, sy] = V.cellCenter(c.x, c.y),
+                    margin = cam.size * 3;
+                if (sx < margin || sx > V.W - margin || sy < margin || sy > V.H - margin) this.centerOn(c);
+            }
+            
             draw();
         },
         
@@ -161,32 +68,6 @@
                 }
                 if (sel && game.playerAct(sel, c.x, c.y)) this.afterTurn();
             }
-        },
-        
-        togglePlace: () => {
-            if (!game.over) {
-                V.healMode = false;
-                if (V.placeMode) {
-                    V.placeMode = null;
-                } else if (game.canAffordPlace()) {
-                    V.placeMode = {stage:'cell'};
-                }
-                draw();
-            }
-        },
-        
-        toggleHeal: () => {
-            if (!game.over) {
-                V.placeMode = null;
-                V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
-                draw();
-            }
-        },
-        
-        cancelModes: () => {
-            V.placeMode = null;
-            V.healMode = false;
-            draw();
         },
         
         /** @private */

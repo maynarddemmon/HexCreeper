@@ -17,8 +17,6 @@ myt.I18N.setDictionary({
 // Top Bar
 "lbl-turn":"Turn",
 "lbl-score":"Score",
-"lbl-rank":"Rank",
-"lbl-rank-top":"$0 (top $1)",
 "lbl-moves":"Moves",
 "tip-end-turn":"End your turn and let the enemies act. (Enter)",
 "tip-place":"Place a linked piece: choose an empty cell next to your pieces, then the piece to link it to. Costs $0 score. (P)",
@@ -32,6 +30,7 @@ myt.I18N.setDictionary({
 "lbl-help":"Help",
 "tip-export":"Export your game to a save file.",
 "tip-import":"Import a save file and carry on from it.",
+"tip-score":"Score you have to spend / all the score you've earned.",
 "tip-new-game":"Start a new game.",
 "tip-last-saved":"Save the game. Last saved $0.",
 "tip-not-saved":"Save the game. Not saved yet.",

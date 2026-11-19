@@ -21,7 +21,8 @@
             this.nextId = 1;
             this.pieces = new Map();        // id -> piece
             this.board = new Map();         // "x,y" -> id
-            this.score = 0;
+            this.score = 0;                 // score you have to spend
+            this.scoreEarned = 0;           // all the score you've earned, spent or not
             this.over = false;
             this.effects = [];              // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
@@ -52,6 +53,7 @@
                 turn:this.turn,
                 nextId:this.nextId,
                 score:this.score,
+                scoreEarned:this.scoreEarned,
                 over:this.over,
                 quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
@@ -83,6 +85,8 @@
             this.turn = o.turn;
             this.nextId = o.nextId;
             this.score = o.score;
+            // Saves from before the total was kept only know what's left to spend.
+            this.scoreEarned = Number.isFinite(o.scoreEarned) ? o.scoreEarned : o.score;
             this.over = !!o.over;
             this.effects = [];
             pkg.GRID = pkg.makeGrid(o.quadRadius);
@@ -302,7 +306,7 @@
                 }
                 if (kills && piece.owner === 'player') {
                     const gain = kills * value;
-                    this.score += gain;
+                    this.earn(gain);
                     this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
                     if (COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true)) this.moveGroup(piece, m.dx, m.dy);
                 }
@@ -348,7 +352,7 @@
         attack(attacker, target, dmg = 1) {
             const lost = this.damage(target, dmg, attacker);
             const v = lost.reduce((a, g) => a + g.scoreValue, 0);
-            if (v && attacker.owner === 'player') { this.score += v * lost.length; attacker.score += v; }
+            if (v && attacker.owner === 'player') { this.earn(v * lost.length); attacker.score += v; }
             return lost.length > 0;
         }
         
@@ -523,6 +527,12 @@
         }
         
         // ---- Placing linked pieces ----
+        // Adds to the score you have, and to the total earned.
+        earn(n) {
+            this.score += n;
+            this.scoreEarned += n;
+        }
+        
         canAffordPlace() { return this.score >= this.placeCost(); }
         
         // ---- Heal action ----
@@ -610,7 +620,7 @@
             }
             if (units > 0 && leftoverToScore) {
                 const gain = units * RANK.healScorePer;
-                piece.score += gain; this.score += gain;
+                piece.score += gain; this.earn(gain);
                 this.fx(x, y, `+${gain} score`, '--gain', { delay: 60 });
             }
         }

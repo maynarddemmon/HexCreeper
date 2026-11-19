@@ -2,10 +2,11 @@
     'use strict';
     
     let appView,
+        infoPanel,
+        statusTxt,
         gameView,
         
         scoreView,
-        rankView,
         movesView,
         turnView,
         endTurnBtn,
@@ -19,15 +20,18 @@
         gameOverShown = false,
         settingsDialog;
     
-    const M = myt,
-        {View, PlainText, I18N:{get:i18n}} = M,
+    const JSClass = JS.Class,
+        
+        M = myt,
+        {View, PaddedPlainText, PlainText, I18N:{get:i18n}} = M,
         
         {
+            view:V,
             Btn, ToggleBtn, IconBtn, WideView, Spacer, LabeledValue,
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, isAnyShowing},
             theme:{
-                spacing, padding, 
-                colorHeaderBg, colorHeaderText, colorBtn, 
+                spacing, padding,
+                colorAccent, colorText, colorHeaderBg, colorHeaderText, colorBtn, 
                 fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
@@ -36,8 +40,7 @@
             ICON_SEPARATOR
         } = pkg,
         
-        V = pkg.view,
-        {game, draw} = V,
+        {game, draw, cam} = V,
         
         I18N_CLOSE_BTN = pkg.ICON_CANCEL + ' ' + i18n('btn-close'),
         GITHUB_MARK_URL = './img/github-mark.svg',
@@ -68,7 +71,7 @@
             gameOverShown = false;
             V.placeMode = null;
             V.healMode = false;
-            gameView.centerOn(game.playerCore);
+            centerOn();
             draw();
         },
         
@@ -86,11 +89,64 @@
             V.healMode = false;
             game.playerWait();
             gameView.afterTurn();
-        };
+        },
+        
+        cancelModes = () => {
+            V.placeMode = null;
+            V.healMode = false;
+            draw();
+        },
+        
+        // Centres the board on p, or on the start cell if there's no p (e.g. the core is gone).
+        centerOn = () => {
+            const p = game.playerCore ?? {x:0, y:0};
+            [cam.x, cam.y] = pkg.GRID.center(p.x, p.y);
+            draw();
+        },
+        
+        INFO_WIDTH = 300,
+        
+        /*  The stats that don't fit in the header: core HP, turn, piece counts, the next wave
+            and the selected piece. */
+        InfoPanel = new JSClass('InfoPanel', View, {
+            initNode: function(parent, attrs) {
+                const self = this;
+                attrs.width ??= INFO_WIDTH;
+                self.callSuper(parent, attrs);
+                
+                const row = (key, valueColor=colorText) => new LabeledValue(self, {
+                    label:i18n(key), fontSize:fontSizeMedium, valueTextColor:valueColor,
+                    width:INFO_WIDTH, whiteSpace:'nowrap'
+                });
+                self.hp = row('info-core-hp', colorAccent);
+                const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
+                self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
+                self.selected = row('info-selected');
+                
+                new M.SpacedLayout(self, {axis:'y', inset:padding/2, spacing, outset:padding/2, collapseParent:true});
+            },
+            
+            update: function() {
+                const self = this,
+                    core = game.playerCore,
+                    hp = Math.max(0, core ? core.hp : 0),
+                    max = core ? core.maxHp : 1,
+                    sel = game.selected;
+                self.hp.update(hp + '/' + max);
+                self.hpFill.setWidth(self.hpBar.width * hp / max);
+                if (sel) {
+                    self.selected.update(
+                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : 'info-linked'), sel.rank, sel.hp, sel.maxHp)
+                    );
+                } else {
+                    self.selected.update(i18n('info-none'));
+                }
+            }
+        });
     
     /*  What gets stored into hc.app. This is myt root view with a header bar across the 
         top and the game below it. Handles the keyboard, the dialogs and setting changes. */
-    pkg.App = new JS.Class('App', View, {
+    pkg.App = new JSClass('App', View, {
         include: [M.RootView, M.SizeToWindow],
         
         
@@ -108,9 +164,34 @@
             
             appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT}));
             gameView = appView.gameView = new pkg.GameView(appView, {
-                y:HEADER_HEIGHT, percentOfParentHeight:100, percentOfParentHeightOffset:-(HEADER_HEIGHT + FOOTER_HEIGHT)
-            });
+                y:HEADER_HEIGHT, 
+                percentOfParentWidth:100, percentOfParentHeight:100, 
+                percentOfParentHeightOffset:-(HEADER_HEIGHT + FOOTER_HEIGHT)
+            }, [M.SizeToParent]);
             appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
+            
+            infoPanel = new InfoPanel(appView, {x:padding, y:HEADER_HEIGHT + padding});
+            
+            statusTxt = new PaddedPlainText(appView, {
+                align:'center', valign:'bottom',
+                valignOffset:FOOTER_HEIGHT + padding, padding, visible:false,
+                textColor:colorText, fontSize:fontSizeMedium
+            }, [{
+                /*  Updates the overlays, once per frame. */
+                update: function() {
+                    let status = '';
+                    if (V.placeMode) {
+                        status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
+                    } else if (V.healMode) {
+                        status = i18n('status-heal', game.healAmount());
+                    }
+                    if (this.text !== status) {
+                        this.setText(status);
+                        this.sizeViewToDom();
+                    }
+                    this.setVisible(!!status);
+                }
+            }]);
             
             // Capture phase: myt's global key handling stops keydown from bubbling.
             window.addEventListener('keydown', appView._keyDown.bind(appView), true);
@@ -124,13 +205,15 @@
             updateLastSaved();
             
             V.resize();
-            gameView.centerOn(game.playerCore);
+            centerOn();
             
             if (!hasSeenHelp()) appView.openHelp();
         },
         
         
         // Methods /////////////////////////////////////////////////////////////
+        centerOn,
+        
         buildHdrView: hdrView => {
             hdrView.setTextColor(colorHeaderText);
             
@@ -140,9 +223,7 @@
             
             const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
             turnView = new LabeledValue(hdrView, {label:i18n('lbl-turn'), ...statAttrs});
-            scoreView = new LabeledValue(hdrView, {label:i18n('lbl-score'), ...statAttrs});
-            rankView = new LabeledValue(hdrView, {label:i18n('lbl-rank'), ...statAttrs});
-            movesView = new LabeledValue(hdrView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
+            scoreView = new LabeledValue(hdrView, {label:i18n('lbl-score'), tooltip:i18n('tip-score'), ...statAttrs});
             
             new Spacer(hdrView);
             
@@ -184,18 +265,37 @@
             
             new Spacer(ftrView);
             
+            const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
+            movesView = new LabeledValue(ftrView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
+            
             endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
                 doActivated:endTurn
             }]);
             placeBtn = new ToggleBtn(ftrView, {text:i18n('btn-place', 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {gameView.togglePlace();}
+                doActivated: () => {
+                    if (!game.over) {
+                        V.healMode = false;
+                        if (V.placeMode) {
+                            V.placeMode = null;
+                        } else if (game.canAffordPlace()) {
+                            V.placeMode = {stage:'cell'};
+                        }
+                        draw();
+                    }
+                }
             }]);
             healBtn = new ToggleBtn(ftrView, {text:i18n('btn-heal', 1, 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {gameView.toggleHeal();}
+                doActivated: () => {
+                    if (!game.over) {
+                        V.placeMode = null;
+                        V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
+                        draw();
+                    }
+                }
             }]);
             
             new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
-                doActivated: () => {appView.centerOn(game.playerCore);}
+                doActivated:centerOn
             }]);
             
             new Spacer(ftrView);
@@ -208,16 +308,13 @@
             and offers a new game once the core is destroyed. */
         update: () => {
             turnView.update(game.turn);
-            scoreView.update(game.score);
-            const coreRank = game.coreRank(),
-                maxRank = game.maxRank(),
-                gameOver = game.over,
+            scoreView.update(game.score + '/' + game.scoreEarned); // to spend/earned in all
+            const gameOver = game.over,
                 placeCost = game.placeCost(),
                 healCost = game.healCost(),
                 healAmount = game.healAmount();
             
-            rankView.update(maxRank > coreRank ? i18n('lbl-rank-top', coreRank, maxRank) : coreRank);
-            movesView.update(game.movesLeft() + ' / ' + game.moveLimit());
+            movesView.update(game.movesLeft() + '/' + game.moveLimit());
             
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
@@ -233,7 +330,9 @@
             healBtn.setDisabled(gameOver || (!V.healMode && (!game.canAffordHeal() || !game.anyDamaged())));
             healBtn.setOn(V.healMode);
             
-            gameView.update();
+            
+            infoPanel.update();
+            statusTxt.update();
             
             if (game.over && !gameOverShown) {
                 gameOverShown = true;
@@ -242,7 +341,7 @@
                     const hasSave = persistenceMgr.hasSave();
                     openConfirmMsgDialog(
                         i18n('dlg-game-over-title'),
-                        i18n('dlg-game-over-msg', game.score, game.turn),
+                        i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
                         () => {appView.newGame();},
                         hasSave ? () => {appView.loadSave();} : null,
                         i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
@@ -251,8 +350,6 @@
             }
         },
         
-        // Centres the board on p, or on the start cell if there's no p (e.g. the core is gone).
-        centerOn: p => {gameView.centerOn(p ?? {x:0, y:0});},
         handleClick: (c, force) => gameView.handleClick(c, force),
         
         newGame: () => {
@@ -260,7 +357,7 @@
             V.placeMode = null;
             V.healMode = false;
             game.reset();
-            gameView.centerOn(game.playerCore);
+            centerOn();
         },
         
         /*  Replaces this game with the saved one. If the save can't be used, it's cleared,
@@ -353,18 +450,18 @@
             const k = keyOf(e);
             if (k === ' ') {
                 e.preventDefault();
-                appView.centerOn(game.playerCore);
+                centerOn();
             } else if (!game.over) {
-                if (k === 'Escape') {gameView.cancelModes(); return;}
-                if (k === 'p') {gameView.togglePlace(); return;}
-                if (k === 'h') {gameView.toggleHeal(); return;}
+                if (k === 'Escape') {cancelModes(); return;}
+                if (k === 'p') {placeBtn.doActivated(); return;}
+                if (k === 'h') {healBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');
                     if (!mine.length) return;
                     const i = mine.findIndex(p => p.id === game.selectedId);
                     game.selectedId = mine[(i + (e.shiftKey ? mine.length - 1 : 1)) % mine.length].id;
-                    gameView.cancelModes();
+                    cancelModes();
                     return;
                 }
                 if (V.placeMode || V.healMode) return;

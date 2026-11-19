@@ -19,7 +19,7 @@ const snapshot = page => page.evaluate(() => {
     const g = hc.app.game,
         sorted = a => [...a].sort();
     return {
-        turn:g.turn, score:g.score, over:g.over, quadRadius:hc.GRID.chunkRadius,
+        turn:g.turn, score:g.score, scoreEarned:g.scoreEarned, over:g.over, quadRadius:hc.GRID.chunkRadius,
         pieces:[...g.pieces.values()].map(p => JSON.stringify(p)).sort(),
         tiles:[...g.tiles.values()].map(t => JSON.stringify(t)).sort(),
         visitedQuads:sorted(g.visitedQuads), seenCells:sorted(g.seenCells), borders:[...g.borders].map(String).sort(), corePath:g.corePath,

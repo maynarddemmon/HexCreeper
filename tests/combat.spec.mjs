@@ -106,3 +106,20 @@ test('a linked piece must stay within link range of its parent', async ({page}) 
     // It starts 1 step away, so it can take (range - 1) steps outward and no more.
     expect(r).toEqual({dist:r.range, steps:r.range - 1, range:3});
 });
+
+test('score earned is kept as a total; spending only lowers what you have', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.playerCore, [a, b] = hc.GRID.dirs;
+        g.addPiece('core', 'enemy', a[0], a[1]);
+        g.playerAct(c, a[0], a[1]);           // a kill: +1
+        const afterKill = [g.score, g.scoreEarned];
+        g.score += 10; g.scoreEarned += 10;   // as if earned elsewhere
+        g.playerWait();
+        g.playerPlace(c.x + b[0], c.y + b[1], c); // costs 5
+        return {afterKill, afterPlace:[g.score, g.scoreEarned]};
+    });
+    expect(r).toEqual({afterKill:[1, 1], afterPlace:[6, 11]});
+});
+
