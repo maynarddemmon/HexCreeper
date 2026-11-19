@@ -1,10 +1,12 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard} from './helpers.mjs';
 
-test('the start quadrant and its 6 neighbours get 1 heal and 1 harm tile each', async ({page}) => {
+test('quadrants out to the vision radius get 1 heal and 1 harm tile each', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind !== 'solid');
+        // Radius 12 and quadrant radius 3: quadrants out to ceil(12 / 11) = 2 from the start,
+        // a hexagon of 19.
+        const g = hc.app.game, n = 19, tiles = [...g.tiles.values()].filter(t => t.kind !== 'solid');
         return {quads:g.generatedQuads.size === n, heal:tiles.filter(t => t.kind === 'heal').length === n,
             harm:tiles.filter(t => t.kind === 'harm').length === n, timers:tiles.every(t => t.timer >= 2 && t.timer <= 8)};
     });

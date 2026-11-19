@@ -62,10 +62,36 @@
             _keyDown: function(event) {
                 if (M.KeyObservable.getCodeFromEvent(event) === globalKeys.CODE_ENTER) this._commit();
             }
+        }),
+        
+        /*  A checkbox for one boolean setting. The value is set as soon as it's toggled. */
+        BooleanRow = new JS.Class('BooleanRow', WideView, {
+            initNode: function(parent, attrs) {
+                const self = this,
+                    def = self.def = attrs.def;
+                delete attrs.def;
+                attrs.height ??= rowHeight;
+                
+                self.callSuper(parent, attrs);
+                
+                self.checkbox = new M.Checkbox(self, {
+                    x:padding, y:5, label:def.label, fontSize:fontSizeMedium, textColor:colorText,
+                    value:settings.get(def.id)
+                }, [{
+                    setValue: function(v) {
+                        this.callSuper(v);
+                        if (this.inited && settings.get(def.id) !== this.value) settings.set(def.id, this.value);
+                    }
+                }]);
+            },
+            
+            refresh: function() {
+                this.checkbox.setValue(settings.get(this.def.id));
+            }
         });
     
     /*  Edits hc.settings. Built from the setting definitions, and changes apply as soon as they 
-        are made. A note comes first, then each group of numbers. The footer resets everything. */
+        are made. A note comes first, then each group of settings. The footer resets everything. */
     pkg.SettingsDialog = new JS.Class('SettingsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -91,11 +117,11 @@
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
-            // Number settings, by group //
+            // Settings, by group //
             for (const group of settings.getGroups()) {
                 const header = new WideView(container, {height:rowHeight + padding});
                 new Text(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
-                for (const def of group.definitions) rows.push(new NumberRow(container, {def}));
+                for (const def of group.definitions) rows.push(new (def.type === 'boolean' ? BooleanRow : NumberRow)(container, {def}));
             }
         
             new M.SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});

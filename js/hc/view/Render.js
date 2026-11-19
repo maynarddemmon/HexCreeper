@@ -101,6 +101,17 @@
             ctx.globalAlpha = 1;
         },
         
+        // Fills each cell on its own. (One path holding many closed cells is far slower to
+        // fill: hundreds of ms for a screenful.)
+        fillCells = (cells, color) => {
+            ctx.fillStyle = css(color);
+            for (const c of cells) {
+                ctx.beginPath();
+                addCellPath(c.x, c.y, 0);
+                ctx.fill();
+            }
+        },
+        
         drawHpBar = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
@@ -118,9 +129,6 @@
         const W = V.W,
             H = V.H,
             s = cam.size;
-        ctx.fillStyle = css('--bg');
-        ctx.fillRect(0, 0, W, H);
-        
         const [x0, y0] = screenToWorld(0, 0),
             [x1, y1] = screenToWorld(W, H),
             visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)],
@@ -135,19 +143,35 @@
                 return v;
             };
         
+        // Fog of war: sight is null when it's off. Enemies show only on cells in sight.
+        // Cells never seen show only as fog, so the board below is drawn only on cells
+        // that have been seen ("known"); the ones out of sight now are dimmed after.
+        const sight = game.cellsInSight(),
+            inSight = (x, y) => !sight || sight.has(game.key(x, y)),
+            shown = p => p.owner === 'player' || inSight(p.x, p.y),
+            isKnown = (x, y) => !sight || game.seenCells.has(game.key(x, y)),
+            known = sight ? visible.filter(c => isKnown(c.x, c.y)) : visible;
+        
+        // Background: fog everywhere, then plain floor on known cells.
+        ctx.fillStyle = css('--bg');
+        ctx.fillRect(0, 0, W, H);
+        if (sight) {
+            ctx.fillStyle = css('--fog');
+            ctx.fillRect(0, 0, W, H);
+            fillCells(known, '--bg');
+        }
+        
         // Visited quadrants
-        ctx.beginPath();
-        for (const c of visible) if (game.visitedQuads.has(chunkKey(c.x, c.y))) addCellPath(c.x, c.y, 0);
-        ctx.fillStyle = css('--visited'); ctx.fill();
+        fillCells(known.filter(c => game.visitedQuads.has(chunkKey(c.x, c.y))), '--visited');
         
         // Heal, harm and solid tiles
         for (const t of game.tiles.values()) {
-            if (inView(t.x, t.y)) drawTile(t, now);
+            if (inView(t.x, t.y) && isKnown(t.x, t.y)) drawTile(t, now);
         }
         
         // Tint occupied cells
         for (const p of game.pieces.values()) {
-            if (!inView(p.x, p.y)) continue;
+            if (!inView(p.x, p.y) || !shown(p)) continue;
             fillCell(p.x, p.y, p.owner === 'player' ? '--core-tint' : '--enemy-tint');
         }
         
@@ -190,13 +214,20 @@
         
         // Grid lines (darker along quadrant borders)
         ctx.lineWidth = 1;
-        // each hex draws its NE, E and SE edges, so every edge is drawn once
+        // each hex draws its NE, E and SE edges, so every edge is drawn once; only edges
+        // touching a known cell
         const minor = new Path2D(), major = new Path2D();
         for (const c of visible) {
-            const cs = pkg.GRID.corners(c.x, c.y), mine = chunkKey(c.x, c.y);
+            const cKnown = isKnown(c.x, c.y);
+            let cs = null, mine;
             for (let e = 0; e < 3; e++) {
-                const [dx, dy, a, b] = pkg.GRID.edges[e],
-                    path = chunkKey(c.x + dx, c.y + dy) === mine ? minor : major,
+                const [dx, dy, a, b] = pkg.GRID.edges[e];
+                if (!cKnown && !isKnown(c.x + dx, c.y + dy)) continue;
+                if (!cs) {
+                    cs = pkg.GRID.corners(c.x, c.y);
+                    mine = chunkKey(c.x, c.y);
+                }
+                const path = chunkKey(c.x + dx, c.y + dy) === mine ? minor : major,
                     [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
                 path.moveTo(ax, ay); path.lineTo(bx, by);
             }
@@ -214,6 +245,9 @@
             }
         }
         
+        // Known cells out of sight are dimmed
+        if (sight) fillCells(known.filter(c => !sight.has(game.key(c.x, c.y))), '--fog');
+        
         // Link lines: from each child to its parent. A piece's chain is the longest chain of
         // pieces from it down to a leaf, counting itself.
         const chains = new Map();
@@ -226,7 +260,7 @@
         }
         const chain = p => chains.get(p.id) ?? 1;
         for (const p of game.piecesOf('enemy')) {
-            const par = game.parent(p); if (par) drawLink(p, par, '--enemy-link', chain(p));
+            const par = game.parent(p); if (par && shown(p) && shown(par)) drawLink(p, par, '--enemy-link', chain(p));
         }
         for (const p of game.piecesOf('player')) {
             const par = game.parent(p); if (!par) continue;
@@ -256,7 +290,7 @@
         
         // Pieces
         for (const p of game.pieces.values()) {
-            if (!inView(p.x, p.y)) continue;
+            if (!inView(p.x, p.y) || !shown(p)) continue;
             let [sx, sy] = cellCenter(p.x, p.y);
             const sp = game.effects.find(f => f.spawn && f.x === p.x && f.y === p.y);
             let scale = 1;
@@ -296,7 +330,7 @@
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         for (const f of game.effects) {
             const age = (now - f.t0) / FX_MS;
-            if (age < 0 || age >= 1) continue;
+            if (age < 0 || age >= 1 || !inSight(f.x, f.y)) continue;
             const [sx, sy] = cellCenter(f.x, f.y);
             if (f.text) {
                 ctx.globalAlpha = 1 - age;

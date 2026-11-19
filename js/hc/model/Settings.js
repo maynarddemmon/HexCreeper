@@ -4,11 +4,12 @@
     const {I18N:{get:i18n}} = myt,
         
         {
-            cfg:{AI, QUAD, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK}
+            cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK}
         } = pkg,
         
         STORAGE_KEY = 'hc.settings',
         
+        GROUP_VISION = 'vision',
         GROUP_WAVES = 'waves',
         GROUP_ENEMIES = 'enemies',
         GROUP_SWARM = 'swarm',
@@ -17,13 +18,22 @@
         
         // Each number setting edits obj[prop]. newGame: it only matters from the next game.
         num = (id, group, obj, prop, min, max, newGame=false) => ({
-            id, group, obj, prop, min, max, newGame,
+            id, type:'number', group, obj, prop, min, max, newGame,
+            defaultValue:obj[prop], label:i18n('setting-' + id)
+        }),
+        
+        // Each boolean setting edits obj[prop] too, and is shown as a checkbox.
+        bool = (id, group, obj, prop) => ({
+            id, type:'boolean', group, obj, prop,
             defaultValue:obj[prop], label:i18n('setting-' + id)
         }),
         
         /*  Every player setting. The SettingsDialog builds its UI from this list, so adding a
             setting here is enough to make it appear there. */
         DEFINITIONS = [
+        bool('fog',        GROUP_VISION, VISION,  'fog'),
+        num('visionRadius', GROUP_VISION, VISION, 'radius', 1, 30),
+        
         num('spawnEvery',  GROUP_WAVES, SPAWN,    'every', 1, 50),
         num('pBase',       GROUP_WAVES, PRESSURE, 'base', 0, 50),
         num('pPerRank',    GROUP_WAVES, PRESSURE, 'perRank', 0, 20),
@@ -38,13 +48,13 @@
         num('enemyHpPer',  GROUP_ENEMIES, ENEMY,  'hpPer', 1, 20),
         num('maxSquad',    GROUP_ENEMIES, ENEMY,  'maxSquad', 1, 31),
         
-        num('advance',     GROUP_SWARM, COMBAT,   'advance', 0, 1),
+        bool('advance',    GROUP_SWARM, COMBAT,   'advance'),
         num('linkRange',   GROUP_SWARM, LINK,     'range', 1, 20),
         num('rankBase',    GROUP_SWARM, RANK,     'base', 1, 10),
         num('hpPer',       GROUP_SWARM, RANK,     'hpPer', 1, 20),
         num('movesPer',    GROUP_SWARM, RANK,     'movesPer', 1, 10),
         num('costPer',     GROUP_SWARM, RANK,     'costPer', 0, 100),
-        num('rankUpHeals', GROUP_SWARM, RANK,     'rankUpHeals', 0, 1),
+        bool('rankUpHeals', GROUP_SWARM, RANK,    'rankUpHeals'),
         
         num('quadRadius',  GROUP_TILES, QUAD,     'radius', 1, 6, true),
         num('healPerQuad', GROUP_TILES, TILES,    'healPerQuad', 0, 20),
@@ -61,14 +71,16 @@
         num('healPer',     GROUP_HEALS, HEAL,     'per', 1, 8),
         num('healScore',   GROUP_HEALS, RANK,     'healScorePer', 0, 20)],
         
-        GROUPS = [GROUP_WAVES, GROUP_ENEMIES, GROUP_SWARM, GROUP_TILES, GROUP_HEALS].map(id => ({
+        GROUPS = [GROUP_VISION, GROUP_WAVES, GROUP_ENEMIES, GROUP_SWARM, GROUP_TILES, GROUP_HEALS].map(id => ({
             id, label:i18n('settings-group-' + id), definitions:DEFINITIONS.filter(def => def.group === id)
         })),
         
         DEFINITIONS_BY_ID = new Map(DEFINITIONS.map(def => [def.id, def])),
         
-        /*  A value the setting can hold, rounded and clamped, or undefined. */
+        /*  A value the setting can hold, or undefined: booleans must be booleans, and
+            numbers are rounded and clamped. */
         normalize = (def, value) => {
+            if (def.type === 'boolean') return typeof value === 'boolean' ? value : undefined;
             const n = Math.round(Number(value));
             return Number.isFinite(n) ? Math.min(def.max, Math.max(def.min, n)) : undefined;
         },

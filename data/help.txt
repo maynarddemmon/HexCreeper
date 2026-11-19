@@ -25,6 +25,9 @@ Enemies arrive in waves of linked squads, and waves grow with your rank. A squad
 - Dark grey hexes are solid: nothing can move onto them.
 - Dashed cells with a number are tiles counting down to appear. Quadrants you've visited are tinted blue.
 
+<span style="font-size:16px;">FOG OF WAR</span>
+You only see enemies within sight of your pieces: up to 12 steps away, with solid tiles blocking the view. Cells out of sight are dimmed. Tiles stay on the map once you've seen them. Fog of war can be turned off in Settings.
+
 <span style="font-size:16px;">SPENDING SCORE</span>
 - Place (P): pick an empty cell next to your pieces, then the piece to link it to.
 - Heal (H): heal HP equal to your core's rank, starting from a piece you pick.

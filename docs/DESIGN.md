@@ -67,13 +67,21 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 
 ## Quadrants and tiles
 - The world is divided into **quadrants** (hexagonal chunks), drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
-- When a player piece is in a quadrant, that quadrant and its neighbours get their tiles, **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
+- When a player piece is in a quadrant, every quadrant within ⌈vision radius ÷ (3 × quadrant radius + 2)⌉ quadrants of it (at least 1; 2 with the defaults) gets its tiles, so tiles exist wherever you could see. This is **once per quadrant**, never cleaned up, and doesn't depend on whether fog of war is on. Visited quadrants are tinted light blue.
 - Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, and **0–5 solid tiles** *(settings)* in one connected clump: the first on a random free cell, each next one on a free cell of the quadrant touching the clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
 - **Harm tile** (red ×): 1 damage to any piece that moves onto it or is standing on it when it activates. It disappears once **every neighbouring quadrant has been visited**.
 - Enemies never step onto active harm tiles, and they path around them.
 - **Solid tile** (dark grey hex): no piece can ever move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown) and never go away.
+
+## Fog of war
+- *(Setting, on by default.)* A cell is **in sight** if it's within the **vision radius** (12 steps, *setting*) of one of your pieces and the straight line between the two cell centres isn't blocked by a solid tile. The two end cells don't count, so you see the solid tiles that block you. A line running exactly along the edge between two cells is blocked only if both are solid.
+- **Enemies** (and their links and effects) show only on cells in sight. **Tiles** show once they've been in sight, and after that always show their current state.
+- Cells out of sight are dimmed.
+- Only you are limited: the enemy AI still sees everything.
+- Sight is worked out again only when your pieces' positions, the tiles or the settings change.
+- First version, to playtest radius 6 against 12. Possible next steps: markers where enemies were last seen, remembered tiles shown as last seen, denser solid clumps.
 
 ## Enemy pathing and spawning
 - A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm and solid tiles), over the grid's neighbour directions.
@@ -84,6 +92,8 @@ Every value applies immediately (those marked "new game" from the next game) and
 
 | Setting | Default |
 |---|---|
+| Fog of war | on |
+| Vision radius | 12 |
 | Spawn a wave every N turns | 3 |
 | Enemies per wave at rank 1 | 1 |
 | + enemies per wave per rank | 2 |
@@ -95,7 +105,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 | Enemy patience (turns) | 2 |
 | Enemy HP per rank | 1 |
 | Max squad size | 8 |
-| Advance after a kill (0/1) | 1 |
+| Advance after a kill | on |
 | Link range | 3 |
 | Quadrant radius (new game) | 3 |
 | Heal tiles per quadrant | 1 |
@@ -112,7 +122,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 | Heal tile: base value | 1 |
 | Heal +1 per N unvisited quads | 2 |
 | Unused heal: score per unit | 1 |
-| Rank-up also adds HP (0/1) | 0 |
+| Rank-up also adds HP | off |
 
 ## UI
 - Pieces show their rank number. Player pieces are red-orange, and the core has an extra outer ring. Enemies are indigo, with indigo link arrows within squads. HP bars show under pieces with more than 1 max HP. Occupied cells are tinted.
@@ -123,9 +133,10 @@ Every value applies immediately (those marked "new game" from the next game) and
 - **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
 - A dashed outline shows the link range around the selected piece's parent.
+- With fog of war on, cells out of sight are dimmed and enemies there aren't drawn.
 - Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown; solid = dark grey filled hex.
 - A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
-- Settings live in a dialog (⚙): every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
+- Settings live in a dialog (⚙): every setting, grouped (numbers as fields, on/off as checkboxes); values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
 
 ## Balance notes

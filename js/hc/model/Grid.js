@@ -44,6 +44,21 @@
                     return [R * mathCos(a), R * mathSin(a)];
                 }),
                 hexDist = (dq, dr) => (mathAbs(dq) + mathAbs(dr) + mathAbs(dq + dr)) / 2,
+                // The cell holding fractional axial coordinates (q, r).
+                cubeRound = (q, r) => {
+                    let rx = mathRound(q), rz = mathRound(r), ry = mathRound(-q - r);
+                    const dx = mathAbs(rx - q), dz = mathAbs(rz - r), dy = mathAbs(ry - (-q - r));
+                    if (dx > dy && dx > dz) rx = -ry - rz;
+                    else if (dz > dy) rz = -rx - ry;
+                    return {x:rx, y:rz};
+                },
+                // Cells within n steps of (cq, cr).
+                disk = (cq, cr, n) => {
+                    const out = [];
+                    for (let dq = -n; dq <= n; dq++)
+                        for (let dr = mathMax(-n, -dq - n); dr <= mathMin(n, -dq + n); dr++) out.push({ x: cq + dq, y: cr + dr });
+                    return out;
+                },
                 // Chunk lattice: hexagons of radius k tile the plane with these basis vectors.
                 A = [2 * k + 1, -k], B = [k, k + 1], det = 3 * k * k + 3 * k + 1,
                 chunkCenter = (i, j) => [i * A[0] + j * B[0], i * A[1] + j * B[1]],
@@ -67,12 +82,20 @@
                 dist: (a, b) => hexDist(a.x - b.x, a.y - b.y),
                 center: (q, r) => [q + r / 2, r * HALF_SQRT3],
                 cellAtWorld(wx, wy) {
-                    const r = wy / HALF_SQRT3, q = wx - r / 2;
-                    let rx = mathRound(q), rz = mathRound(r), ry = mathRound(-q - r);
-                    const dx = mathAbs(rx - q), dz = mathAbs(rz - r), dy = mathAbs(ry - (-q - r));
-                    if (dx > dy && dx > dz) rx = -ry - rz;
-                    else if (dz > dy) rz = -rx - ry;
-                    return {x:rx, y:rz};
+                    const r = wy / HALF_SQRT3;
+                    return cubeRound(wx - r / 2, r);
+                },
+                disk,
+                // The cells a straight line from cell a to cell b passes through, a and b
+                // included. A line running exactly along an edge between two cells touches
+                // both: nudge (1 or -1) picks which side it is counted on.
+                line(a, b, nudge) {
+                    const n = hexDist(b.x - a.x, b.y - a.y), out = [];
+                    for (let i = 0; i <= n; i++) {
+                        const t = n ? i / n : 0;
+                        out.push(cubeRound(a.x + (b.x - a.x) * t + nudge * 1e-6, a.y + (b.y - a.y) * t + nudge * 2e-6));
+                    }
+                    return out;
                 },
                 corners(q, r) {
                     const cx = q + r / 2,
@@ -87,10 +110,8 @@
                 },
                 chunkNeighbours: (i, j) => [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1], [i + 1, j - 1], [i - 1, j + 1]],
                 chunkCells(i, j) {
-                    const [cq, cr] = chunkCenter(i, j), out = [];
-                    for (let dq = -k; dq <= k; dq++)
-                        for (let dr = mathMax(-k, -dq - k); dr <= mathMin(k, -dq + k); dr++) out.push({ x: cq + dq, y: cr + dr });
-                    return out;
+                    const [cq, cr] = chunkCenter(i, j);
+                    return disk(cq, cr, k);
                 },
                 ring(cq, cr, d) {
                     // pick a random cell on the ring of radius d: start d steps toward SW,

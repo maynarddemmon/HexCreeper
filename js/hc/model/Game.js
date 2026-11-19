@@ -5,7 +5,7 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, QUAD, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
+            WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
         },
         hexDist, PIECE_TYPES
     } = pkg;
@@ -29,6 +29,7 @@
             this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid", timer}
             this.generatedQuads = new Set();
             this.visitedQuads = new Set();
+            this.seenCells = new Set();     // keys of cells that have been in sight (fog of war)
             this.acted = new Set();         // ids of player pieces moved this turn (counts toward the move limit)
             this.fresh = new Set();         // ids of pieces placed this turn (can't move until next turn)
             const core = this.addPiece('core', 'player', 0, 0);
@@ -43,8 +44,44 @@
         key(x, y) { return x + ',' + y; }
         // Can a piece ever be on (x, y)? Not past the edge of the world or on a solid tile.
         isOpen(x, y) {
-            if (Math.abs(x) > WORLD_LIMIT || Math.abs(y) > WORLD_LIMIT) return false;
-            return this.tiles.get(this.key(x, y))?.kind !== 'solid';
+            return Math.abs(x) <= WORLD_LIMIT && Math.abs(y) <= WORLD_LIMIT && !this.isSolid(x, y);
+        }
+        isSolid(x, y) { return this.tiles.get(this.key(x, y))?.kind === 'solid'; }
+        
+        // ---- Fog of war ----
+        // Keys of the cells in sight of a player piece, or null when fog of war is off.
+        // Cells in sight are added to seenCells, so what's on them stays shown after.
+        // Worked out again only when
+        // something it depends on changes: piece positions, the tiles (solid tiles only
+        // come with new quadrants, which add tiles) or the settings.
+        cellsInSight() {
+            if (!VISION.fog) return null;
+            const players = this.piecesOf('player'),
+                sightKey = [VISION.radius, this.tiles.size, ...players.map(p => this.key(p.x, p.y))].join(';');
+            if (sightKey !== this._sightKey) {
+                const sight = new Set();
+                for (const p of players) {
+                    for (const c of pkg.GRID.disk(p.x, p.y, VISION.radius)) {
+                        const k = this.key(c.x, c.y);
+                        if (!sight.has(k) && this.canSee(p, c)) sight.add(k);
+                    }
+                }
+                for (const k of sight) this.seenCells.add(k);
+                this._sight = sight;
+                this._sightKey = sightKey;
+            }
+            return this._sight;
+        }
+        
+        // Is the line from cell a to cell b clear? Solid cells block it, but a line along an
+        // edge is only blocked if the cells on both sides are solid. The end cells don't
+        // count, so solid cells themselves can be seen.
+        canSee(a, b) {
+            const left = pkg.GRID.line(a, b, 1), right = pkg.GRID.line(a, b, -1);
+            for (let i = 1; i < left.length - 1; i++) {
+                if (this.isSolid(left[i].x, left[i].y) && this.isSolid(right[i].x, right[i].y)) return false;
+            }
+            return true;
         }
         
         addPiece(type, owner, x, y, parentId = null) {
@@ -246,13 +283,17 @@
         // Quadrants are the grid's hexagonal chunks.
         quadOf(x, y) { return pkg.GRID.chunkOf(x, y); }
         
+        // Visits the quadrants holding player pieces, and generates every quadrant within
+        // reach of them: enough quadrants out to cover the vision radius (at least 1), so
+        // tiles exist wherever you could see. This doesn't depend on whether fog of war is
+        // on, so turning it off and on doesn't change the world.
         updateQuadrants() {
-            const before = this.visitedQuads.size;
+            const before = this.visitedQuads.size,
+                reach = Math.max(1, Math.ceil(VISION.radius / (3 * pkg.GRID.chunkRadius + 2)));
             for (const p of this.piecesOf('player')) {
                 const [qx, qy] = this.quadOf(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);
-                this.generateQuad(qx, qy);
-                for (const [nx, ny] of pkg.GRID.chunkNeighbours(qx, qy)) this.generateQuad(nx, ny);
+                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateQuad(q.x, q.y);
             }
             if (this.visitedQuads.size !== before) this.clearSurroundedHarm();
         }

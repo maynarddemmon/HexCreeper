@@ -78,8 +78,9 @@
             WORLD_LIMIT:1000000,
             
             // Quadrants: the world is divided into hexagonal quadrants of radius QUAD.radius.
-            // Whenever a player piece is in a quadrant, that quadrant and its 6 neighbours
-            // get their tiles generated (once each, never cleaned up). Visited quadrants are tinted.
+            // Whenever a player piece is in a quadrant, that quadrant and those around it, out to
+            // the vision radius (see Game.updateQuadrants), get their tiles generated (once each,
+            // never cleaned up). Visited quadrants are tinted.
             QUAD:{
                 radius:3 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)
             },
@@ -111,7 +112,7 @@
                 movesPer:1,     // pieces you may move per turn = movesPer x highest rank of any piece
                 costPer:5,      // cost to place a piece = costPer x core rank
                 healScorePer:1, // each unused heal unit becomes this much score
-                rankUpHeals:0,  // 1: when max HP rises with rank, HP rises too; 0: the new HP must be healed
+                rankUpHeals:false, // true: when max HP rises with rank, HP rises too; false: the new HP must be healed
                 healCostPer:5,  // Heal action cost = healCostPer x core rank
                 healPer:1,      // Heal action heals healPer x core rank
             },
@@ -144,10 +145,18 @@
                 per:2     // per: unvisited quadrants per +1
             },
             
+            // Fog of war: you see enemies only on cells in sight of one of your pieces: within
+            // radius steps, with the line between the two cell centres not blocked by solid
+            // tiles. Tiles stay shown once seen.
+            VISION:{
+                fog:true,
+                radius:12
+            },
+            
             // After a player attack that kills, the attacking piece (with its group) steps
             // into the attacked direction if the whole group can legally do so (not onto harm).
             COMBAT:{
-                advance:1 // a linked piece must stay within this many steps of its link parent
+                advance:true
             },
             
             // Enemy squads: enemies are link trees too (same rank rules as the player).
