@@ -1,7 +1,40 @@
 (pkg => {
     'use strict';
     
-    const {cfg:{PIECE_R, CORE_BORDER, RING_GAP, OWNERS}} = pkg;
+    const {cfg:{PIECE_R, CORE_BORDER, RING_GAP, OWNERS}} = pkg,
+        
+        {PI, sin, cos, max} = Math,
+        
+        /*  Draws a piece's rank as a symbol inside a circle of radius R (the inside of its
+            border), centred on (cx, cy), in the current fill and stroke styles:
+                1: nothing          2: a vertical line   3: a triangle, point up
+                4: a cross          5: a solid star      6: an asterisk (3 lines)
+                7: a 7 point star   8: 4 lines           9 and up: a star with that many points
+            Lines run edge to edge; ranks 2, 4, 6 and 8 are 1 to 4 lines through the centre,
+            starting with the vertical. */
+        drawRankSymbol = (ctx, cx, cy, R, rank) => {
+            if (rank <= 1) return;
+            const at = (radius, angle) => [cx + radius * sin(angle), cy - radius * cos(angle)];
+            ctx.beginPath();
+            if (rank % 2 === 0 && rank <= 8) {
+                const lines = rank / 2;
+                for (let i = 0; i < lines; i++) {
+                    const a = i * PI / lines;
+                    ctx.moveTo(...at(R, a));
+                    ctx.lineTo(...at(R, a + PI));
+                }
+                ctx.stroke();
+            } else if (rank === 3) {
+                for (let i = 0; i < 3; i++) ctx.lineTo(...at(R * 0.8, i * 2 * PI / 3));
+                ctx.closePath();
+                ctx.stroke();
+            } else {
+                const outer = R * 0.85, inner = outer * (rank === 5 ? 0.4 : 0.55);
+                for (let i = 0; i < 2 * rank; i++) ctx.lineTo(...at(i % 2 ? inner : outer, i * PI / rank));
+                ctx.closePath();
+                ctx.fill();
+            }
+        };
     
     /*  Piece types: per-owner stats, movement (steps) and how each is drawn.
         
@@ -33,7 +66,7 @@
                         ctx.beginPath(); ctx.arc(cx, cy, r + size * RING_GAP + width / 2, 0, Math.PI * 2); ctx.stroke();
                     };
                 
-                // Moved this turn: inverted (light fill, coloured ring and number).
+                // Moved this turn: inverted (light fill, coloured ring and rank symbol).
                 const inv = opts.moved && !opts.ghost;
                 ctx.globalAlpha = opts.ghost ? 0.3 : opts.spent ? 0.5 : 1;
                 ctx.fillStyle = pkg.view.css(inv ? '--bg' : o.fill);
@@ -46,16 +79,12 @@
                 ctx.strokeStyle = pkg.view.css(inv ? o.fill : o.stroke);
                 ctx.beginPath(); ctx.arc(cx, cy, r - border / 2, 0, Math.PI * 2); ctx.stroke();
                 
-                // The rank is the same size on every piece, the core included.
-                if (size >= 20) {
-                    ctx.fillStyle = pkg.view.css(inv ? o.stroke : '--bg');
-                    ctx.font = `700 ${Math.round(size * PIECE_R * 1.05)}px ui-sans-serif, system-ui, sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(String(piece.rank), cx, cy + size * PIECE_R * 0.06);
-                } else {
-                    ctx.fillStyle = pkg.view.css('--bg');
-                    ctx.beginPath(); ctx.arc(cx, cy, size * PIECE_R * 0.3, 0, Math.PI * 2); ctx.fill();
-                }
+                // The rank, as a symbol filling the inside of the border.
+                ctx.fillStyle = ctx.strokeStyle = pkg.view.css(inv ? o.stroke : '--bg');
+                ctx.lineWidth = max(1, size * 0.035);
+                ctx.lineJoin = 'round';
+                drawRankSymbol(ctx, cx, cy, r - border, piece.rank);
+                ctx.lineJoin = 'miter';
                 
                 ctx.globalAlpha = 1;
                 if (opts.selected) ring(o.stroke, Math.max(2, size * 0.045));

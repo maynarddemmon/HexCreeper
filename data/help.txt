@@ -12,6 +12,7 @@ Each turn you may move as many pieces as your highest rank, each once, in any or
 
 <span style="font-size:16px;">RANK</span>
 A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. Max HP is 2 × rank. Your highest rank sets your moves per turn; your core's rank sets the cost of Place and Heal (5 × rank).
+A piece shows its rank as a symbol: rank 1 is a plain circle, 2 a line, 3 a triangle, 4 a cross, 5 a star, 6 three lines, 7 a seven-point star, 8 four lines, and from 9 a star with that many points.
 
 <span style="font-size:16px;">ATTACKING</span>
 Moving onto an enemy attacks it. When a group moves, every piece in it that would land on an enemy hits it. Killing n enemies in one move scores n², and pieces destroyed below a killed piece count too. After a kill, the attacker advances into the empty cell if it can.
