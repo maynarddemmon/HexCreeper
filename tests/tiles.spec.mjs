@@ -1,16 +1,20 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard} from './helpers.mjs';
 
-test('quadrants out to the vision radius get 1 heal and 1 harm tile each', async ({page}) => {
+test('solids go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        // Radius 12 and quadrant radius 3: quadrants out to ceil(12 / 11) = 2 from the start,
-        // a hexagon of 19.
-        const g = hc.app.game, n = 19, tiles = [...g.tiles.values()].filter(t => t.kind !== 'solid');
-        return {quads:g.generatedQuads.size === n, heal:tiles.filter(t => t.kind === 'heal').length === n,
-            harm:tiles.filter(t => t.kind === 'harm').length === n, timers:tiles.every(t => t.timer >= 2 && t.timer <= 8)};
+        // Radius 12 and quadrant radius 3: solids out to ceil(12 / 11) = 2 quadrants from the
+        // start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6 neighbours.
+        const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind !== 'solid'),
+            inReach = tiles.every(t => {
+                const [i, j] = hc.GRID.chunkOf(t.x, t.y);
+                return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
+            });
+        return {solidQuads:g.solidQuads.size, tiledQuads:g.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
+            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, timers:tiles.every(t => t.timer >= 2 && t.timer <= 8)};
     });
-    expect(r).toEqual({quads:true, heal:true, harm:true, timers:true});
+    expect(r).toEqual({solidQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, timers:true});
 });
 
 test('each quadrant gets one connected clump of 0-5 solid tiles, solid at once', async ({page}) => {
@@ -20,8 +24,8 @@ test('each quadrant gets one connected clump of 0-5 solid tiles, solid at once',
         let ok = true;
         for (let i = 0; i < 40; i++) {
             g.tiles.clear();
-            g.generatedQuads.delete('0,0');
-            g.generateQuad(0, 0);
+            g.solidQuads.delete('0,0');
+            g.generateSolids(0, 0);
             const solids = [...g.tiles.values()].filter(t => t.kind === 'solid'),
                 keys = new Set(solids.map(t => g.key(t.x, t.y)));
             sizes.add(solids.length);

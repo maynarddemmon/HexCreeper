@@ -27,7 +27,8 @@
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
             this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid", timer}
-            this.generatedQuads = new Set();
+            this.solidQuads = new Set();     // quadrants whose solid tiles have been placed
+            this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
             this.visitedQuads = new Set();
             this.seenCells = new Set();     // keys of cells that have been in sight (fog of war)
             this.acted = new Set();         // ids of player pieces moved this turn (counts toward the move limit)
@@ -283,23 +284,28 @@
         // Quadrants are the grid's hexagonal chunks.
         quadOf(x, y) { return pkg.GRID.chunkOf(x, y); }
         
-        // Visits the quadrants holding player pieces, and generates every quadrant within
-        // reach of them: enough quadrants out to cover the vision radius (at least 1), so
-        // tiles exist wherever you could see. This doesn't depend on whether fog of war is
-        // on, so turning it off and on doesn't change the world.
+        // Visits the quadrants holding player pieces. Solid tiles are placed in every
+        // quadrant within reach of them: enough quadrants out to cover the vision radius (at
+        // least 1), so they exist wherever you could see. This doesn't depend on whether fog
+        // of war is on, so turning it off and on doesn't change the world. Heal and harm
+        // tiles are placed only 1 quadrant out, so their countdowns are still running when
+        // you get there.
         updateQuadrants() {
             const reach = Math.max(1, Math.ceil(VISION.radius / (3 * pkg.GRID.chunkRadius + 2)));
             for (const p of this.piecesOf('player')) {
                 const [qx, qy] = this.quadOf(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);
-                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateQuad(q.x, q.y);
+                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateSolids(q.x, q.y);
+                for (const q of pkg.GRID.disk(qx, qy, 1)) this.generateTiles(q.x, q.y);
             }
         }
         
-        generateQuad(qx, qy) {
+        // A quadrant's heal and harm tiles, once, on random free cells. They start with a
+        // countdown.
+        generateTiles(qx, qy) {
             const k = qx + ',' + qy;
-            if (this.generatedQuads.has(k)) return;
-            this.generatedQuads.add(k);
+            if (this.tiledQuads.has(k)) return;
+            this.tiledQuads.add(k);
             const cells = pkg.GRID.chunkCells(qx, qy);
             const place = kind => {
                 for (let tries = 0; tries < 50; tries++) {
@@ -313,14 +319,17 @@
             };
             for (let i = 0; i < TILES.healPerQuad; i++) place('heal');
             for (let i = 0; i < TILES.harmPerQuad; i++) place('harm');
-            this.placeSolids(cells);
         }
         
-        // Solid tiles come as one connected clump of solidMin to solidMax cells within the
-        // quadrant: the first on a random free cell, each next one on a free cell touching
-        // the clump. They're solid from the start (no countdown).
-        placeSolids(cells) {
-            const inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
+        // A quadrant's solid tiles, once: one connected clump of solidMin to solidMax cells
+        // within the quadrant, the first on a random free cell, each next one on a free cell
+        // touching the clump. They're solid from the start (no countdown).
+        generateSolids(qx, qy) {
+            const k = qx + ',' + qy;
+            if (this.solidQuads.has(k)) return;
+            this.solidQuads.add(k);
+            const cells = pkg.GRID.chunkCells(qx, qy),
+                inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
                 free = (x, y) => inQuad.has(this.key(x, y)) && !this.tiles.has(this.key(x, y)) && !this.pieceAt(x, y),
                 count = TILES.solidMin + Math.floor(Math.random() * (TILES.solidMax - TILES.solidMin + 1));
             const edge = new Map(); // free cells touching the clump, by key

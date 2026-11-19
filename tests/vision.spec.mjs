@@ -50,6 +50,7 @@ test.describe('fog of war', () => {
 
 test('fog of war can be turned off and its radius changed in Settings', async ({page}) => {
     await startGame(page);
+    await clearBoard(page); // so no random solid tile blocks the cells checked below
     await button(page, '⚙').click();
     const radius = page.locator('input[data-setting="visionRadius"]');
     await radius.fill('5');
