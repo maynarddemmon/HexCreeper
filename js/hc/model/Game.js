@@ -28,6 +28,7 @@
             this.grid = pkg.GRID;
             this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole", timer}
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
+            this.borders = new Map();       // border key (see borderKey) -> door width of its wall (0: none), or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
             this.visitedQuads = new Set();
             this.seenCells = new Set();     // keys of cells that have been in sight (fog of war)
@@ -55,6 +56,7 @@
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
                 terrainQuads:[...this.terrainQuads],
+                borders:[...this.borders],
                 tiledQuads:[...this.tiledQuads],
                 visitedQuads:[...this.visitedQuads],
                 seenCells:[...this.seenCells],
@@ -71,7 +73,7 @@
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.quadRadius) ||
-                ![o.pieces, o.tiles, o.terrainQuads, o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh].every(isArr) ||
+                ![o.pieces, o.tiles, o.terrainQuads, o.borders ?? [], o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && isNum(t.timer) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
@@ -91,6 +93,7 @@
             }
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
             this.terrainQuads = new Set(o.terrainQuads);
+            this.borders = new Map(o.borders ?? []);
             this.tiledQuads = new Set(o.tiledQuads);
             this.visitedQuads = new Set(o.visitedQuads);
             this.seenCells = new Set(o.seenCells);
@@ -392,8 +395,67 @@
             if (this.terrainQuads.has(k)) return;
             this.terrainQuads.add(k);
             const cells = pkg.GRID.chunkCells(qx, qy);
+            
+            // Each border is decided once, by whichever of its two quadrants is made first.
+            for (const [i, j] of pkg.GRID.chunkNeighbours(qx, qy)) {
+                const bk = this.borderKey(k, i + ',' + j);
+                if (this.borders.has(bk)) continue;
+                if (Math.random() * 100 >= TILES.wallChance) {
+                    this.borders.set(bk, null);
+                    continue;
+                }
+                let door = TILES.doorMin + Math.floor(Math.random() * (TILES.doorMax - TILES.doorMin + 1));
+                // No quadrant gets walled in on every side: the last of its walls gets a door.
+                if (door === 0 && (this.walledIn(k, bk) || this.walledIn(i + ',' + j, bk))) door = 1;
+                this.borders.set(bk, door);
+                this.placeWall(cells, i, j, door);
+            }
             this.placeClump(cells, 'solid', TILES.solidMin, TILES.solidMax, []);
             this.placeClump(cells, 'hole', TILES.holeMin, TILES.holeMax, ['solid']);
+        }
+        
+        // The key of the border between two quadrants ("i,j" keys), the same either way round.
+        borderKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+        
+        // Would quadrant q be walled in, with no door on any side, if border `except` were
+        // a wall with no door?
+        walledIn(q, except) {
+            const [i, j] = q.split(',').map(Number);
+            return pkg.GRID.chunkNeighbours(i, j).every(([a, b]) => {
+                const bk = this.borderKey(q, a + ',' + b);
+                return bk === except || this.borders.get(bk) === 0;
+            });
+        }
+        
+        // A wall along the border between a quadrant (its cells) and its neighbour (i, j),
+        // on the quadrant's own side: every cell touching the neighbour, except a door of
+        // doorWidth cells in the middle (not at a corner, where another wall may meet it).
+        // Some walls are holes rather than solid tiles. Cells with a tile or a piece already
+        // are left as they are.
+        placeWall(cells, i, j, doorWidth) {
+            const G = pkg.GRID,
+                middle = cs => {
+                    let sx = 0, sy = 0;
+                    for (const c of cs) {
+                        const [x, y] = G.center(c.x, c.y);
+                        sx += x; sy += y;
+                    }
+                    return [sx / cs.length, sy / cs.length];
+                },
+                [ax, ay] = middle(cells), [bx, by] = middle(G.chunkCells(i, j)),
+                along = c => {const [x, y] = G.center(c.x, c.y); return (x - ax) * (ay - by) + (y - ay) * (bx - ax);},
+                border = cells.filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === i + ',' + j))
+                    .sort((a, b) => along(a) - along(b)),
+                inner = border.length > 2 ? border.slice(1, -1) : border,
+                width = Math.min(inner.length, doorWidth),
+                start = Math.floor(Math.random() * (inner.length - width + 1)),
+                door = new Set(inner.slice(start, start + width)),
+                kind = Math.random() * 100 < TILES.wallHoleChance ? 'hole' : 'solid';
+            for (const c of border) {
+                if (!door.has(c) && !this.tiles.has(this.key(c.x, c.y)) && !this.pieceAt(c.x, c.y)) {
+                    this.tiles.set(this.key(c.x, c.y), {x:c.x, y:c.y, kind, timer:0});
+                }
+            }
         }
         
         // One connected clump of min to max tiles of a kind within a quadrant's cells: the

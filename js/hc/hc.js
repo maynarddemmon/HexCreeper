@@ -82,7 +82,7 @@
             // the vision radius (see Game.updateQuadrants), get their tiles generated (once each,
             // never cleaned up). Visited quadrants are tinted.
             QUAD:{
-                radius:3 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)
+                radius:5 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)
             },
             
             // Links between pieces.
@@ -132,6 +132,10 @@
             TILES:{
                 healPerQuad:1,
                 harmPerQuad:1,
+                wallChance:50, // % chance a border between quadrants is a wall
+                wallHoleChance:25, // % of walls made of holes rather than solid tiles
+                doorMin:1, // cells left open in the middle of a wall
+                doorMax:2,
                 solidMin:0, // solid tiles per quadrant, in one connected clump
                 solidMax:5,
                 holeMin:0, // hole tiles per quadrant, in one connected clump (may replace solid tiles)

@@ -44,7 +44,7 @@ test('a setting marked ✱ applies from the next new game', async ({page}) => {
     const input = page.locator('input[data-setting="quadRadius"]');
     await input.fill('2');
     await input.press('Enter');
-    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(3);
+    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(5);
     await button(page, 'X Close').click();
     await button(page, '⌫').click();
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);

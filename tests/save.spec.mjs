@@ -19,7 +19,7 @@ const snapshot = page => page.evaluate(() => {
         turn:g.turn, score:g.score, over:g.over, quadRadius:hc.GRID.chunkRadius,
         pieces:[...g.pieces.values()].map(p => JSON.stringify(p)).sort(),
         tiles:[...g.tiles.values()].map(t => JSON.stringify(t)).sort(),
-        visitedQuads:sorted(g.visitedQuads), seenCells:sorted(g.seenCells),
+        visitedQuads:sorted(g.visitedQuads), seenCells:sorted(g.seenCells), borders:[...g.borders].map(String).sort(),
         coreAt:hc.app.game.pieceAt(g.playerCore.x, g.playerCore.y)?.id === g.playerCoreId,
         selectedId:g.selectedId
     };

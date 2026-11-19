@@ -59,6 +59,10 @@
         num('quadRadius',  GROUP_TILES, QUAD,     'radius', 1, 6, true),
         num('healPerQuad', GROUP_TILES, TILES,    'healPerQuad', 0, 20),
         num('harmPerQuad', GROUP_TILES, TILES,    'harmPerQuad', 0, 40),
+        num('wallChance',  GROUP_TILES, TILES,    'wallChance', 0, 100),
+        num('wallHoleChance', GROUP_TILES, TILES, 'wallHoleChance', 0, 100),
+        num('doorMin',     GROUP_TILES, TILES,    'doorMin', 0, 10),
+        num('doorMax',     GROUP_TILES, TILES,    'doorMax', 0, 10),
         num('solidMin',    GROUP_TILES, TILES,    'solidMin', 0, 20),
         num('solidMax',    GROUP_TILES, TILES,    'solidMax', 0, 20),
         num('holeMin',     GROUP_TILES, TILES,    'holeMin', 0, 20),
@@ -95,6 +99,7 @@
             if (TILES.timerMax < TILES.timerMin) TILES.timerMax = TILES.timerMin;
             if (TILES.solidMax < TILES.solidMin) TILES.solidMax = TILES.solidMin;
             if (TILES.holeMax < TILES.holeMin) TILES.holeMax = TILES.holeMin;
+            if (TILES.doorMax < TILES.doorMin) TILES.doorMax = TILES.doorMin;
         },
         
         writeOverrides = overrides => {

@@ -4,8 +4,11 @@ import {startGame, clearBoard} from './helpers.mjs';
 test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        // Radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from the
-        // start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6 neighbours.
+        // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants
+        // from the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
+        // neighbours.
+        hc.cfg.QUAD.radius = 3;
+        hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
             inReach = tiles.every(t => {
                 const [i, j] = hc.GRID.chunkOf(t.x, t.y);
@@ -49,19 +52,131 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
     });
 }
 
+// Sets up regenerating quadrant (0,0) with only border walls (no random clumps, no core),
+// walling every border whose neighbour isn't made yet. Helpers go on window.walls.
+const wallsOnly = page => page.evaluate(() => {
+    const g = hc.app.game, G = hc.GRID, T = hc.cfg.TILES,
+        cells = G.chunkCells(0, 0);
+    T.solidMax = T.holeMax = 0;
+    T.wallChance = 100;
+    T.wallHoleChance = 0;
+    g.removePiece(g.playerCore);
+    window.walls = {
+        // Makes quadrant (0,0) again, after the quadrants in `first`.
+        regenerate: (first = []) => {
+            g.tiles.clear();
+            g.terrainQuads.clear();
+            g.borders.clear();
+            for (const [i, j] of first) g.generateTerrain(i, j);
+            g.generateTerrain(0, 0);
+        },
+        border: (i, j) => cells.filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === i + ',' + j)),
+        // A border's cells less its two corners, which other borders share.
+        inner: (i, j) => cells.filter(c => {
+            const outside = G.dirs.map(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy)).filter(k => k !== '0,0');
+            return outside.length && outside.every(k => k === i + ',' + j);
+        }),
+        solid: c => g.tiles.get(g.key(c.x, c.y))?.kind === 'solid'
+    };
+});
+
+test('a wall closes each border but for a door of 1 or 2 cells, reachable from inside', async ({page}) => {
+    await startGame(page);
+    await wallsOnly(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, G = hc.GRID, {regenerate, border, solid} = window.walls,
+            inQuad = new Set(G.chunkCells(0, 0).map(c => g.key(c.x, c.y)));
+        let ok = true;
+        for (let t = 0; t < 20; t++) {
+            regenerate();
+            // Everything reachable from the middle without leaving the quadrant.
+            const seen = new Set(['0,0']), todo = [{x:0, y:0}];
+            for (const c of todo) {
+                for (const [dx, dy] of G.dirs) {
+                    const n = {x:c.x + dx, y:c.y + dy}, k = g.key(n.x, n.y);
+                    if (inQuad.has(k) && !seen.has(k) && !solid(n)) {
+                        seen.add(k);
+                        todo.push(n);
+                    }
+                }
+            }
+            for (const [i, j] of G.chunkNeighbours(0, 0)) {
+                const open = border(i, j).filter(c => !solid(c));
+                if (open.length < 1 || open.length > 2 || !open.every(c => seen.has(g.key(c.x, c.y)))) ok = false;
+            }
+        }
+        return ok;
+    });
+    expect(r).toBe(true);
+});
+
+test('a border is walled only by the first of its two quadrants to be made', async ({page}) => {
+    await startGame(page);
+    await wallsOnly(page);
+    const r = await page.evaluate(() => {
+        const {regenerate, border, inner, solid} = window.walls,
+            [[i, j], ...others] = hc.GRID.chunkNeighbours(0, 0);
+        regenerate([[i, j]]); // its wall is on its own side
+        return {made:inner(i, j).some(solid), others:others.every(([a, b]) => border(a, b).some(solid))};
+    });
+    expect(r).toEqual({made:false, others:true});
+});
+
+test('door widths come from the settings; walls with no door never close a quadrant in', async ({page}) => {
+    await startGame(page);
+    await wallsOnly(page);
+    const r = await page.evaluate(() => {
+        const {regenerate, inner, solid} = window.walls, T = hc.cfg.TILES, G = hc.GRID,
+            openPerBorder = () => G.chunkNeighbours(0, 0).map(([i, j]) => inner(i, j).filter(c => !solid(c)).length).sort();
+        T.doorMin = T.doorMax = 3;
+        regenerate();
+        const three = openPerBorder();
+        T.doorMin = T.doorMax = 0;
+        regenerate();
+        return {three, none:openPerBorder()};
+    });
+    // With six walls and no doors, the last wall made gets a door of 1.
+    expect(r).toEqual({three:[3, 3, 3, 3, 3, 3], none:[0, 0, 0, 0, 0, 1]});
+});
+
+test('a share of walls are holes', async ({page}) => {
+    await startGame(page);
+    await wallsOnly(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, T = hc.cfg.TILES;
+        T.wallHoleChance = 100;
+        window.walls.regenerate();
+        const kinds = new Set([...g.tiles.values()].map(t => t.kind));
+        return [...kinds];
+    });
+    expect(r).toEqual(['hole']);
+});
+
+test('no walls at a 0% chance', async ({page}) => {
+    await startGame(page);
+    await wallsOnly(page);
+    const r = await page.evaluate(() => {
+        hc.cfg.TILES.wallChance = 0;
+        window.walls.regenerate();
+        return hc.app.game.tiles.size;
+    });
+    expect(r).toBe(0);
+});
+
 test('holes are placed after solid tiles and may replace them', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, T = hc.cfg.TILES;
-        T.solidMin = T.solidMax = 40; // every free cell of the quadrant
+        const g = hc.app.game, T = hc.cfg.TILES, free = hc.GRID.chunkCells(0, 0).length - 1; // less the core's
+        T.wallChance = 0;
+        T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;
         g.tiles.clear();
         g.terrainQuads.delete('0,0');
         g.generateTerrain(0, 0);
         const kinds = [...g.tiles.values()].map(t => t.kind);
-        return {holes:kinds.filter(k => k === 'hole').length, solids:kinds.filter(k => k === 'solid').length};
+        return {holes:kinds.filter(k => k === 'hole').length, solids:kinds.filter(k => k === 'solid').length === free - 3};
     });
-    expect(r).toEqual({holes:3, solids:36 - 3}); // 37 cells, less the core's
+    expect(r).toEqual({holes:3, solids:true});
 });
 
 test.describe('rules', () => {

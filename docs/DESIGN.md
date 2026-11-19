@@ -12,9 +12,9 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 
 ## Grid
 - A hex grid: pointy-top hexes in axial coordinates (q, r), 6 neighbours, hex distance (used for link range, spawning and pathing). Link range 3 is a hexagon of 37 cells.
-- Quadrants are hexagonal chunks of radius 3 = 37 cells *(setting)*, each with 6 neighbours. Chunks of radius k tile the plane on the lattice (2k+1, −k), (k, k+1), and chunk (0,0) is centred on the start cell.
+- Quadrants are hexagonal chunks of radius 5 = 91 cells *(setting)*, each with 6 neighbours. Chunks of radius k tile the plane on the lattice (2k+1, −k), (k, k+1), and chunk (0,0) is centred on the start cell.
 - Keys: Q E / A D / Z C (NW NE / W E / SW SE), ← / →, numpad 7 9 4 6 1 3.
-- History: there was also a square grid (8 neighbours, Chebyshev distance, 5×5 quadrants). After playtesting both, hex "works quite well" and felt better, so as of 2026-11-18 the game is hex only. The chunk radius default went from 2 to 3 along the way.
+- History: there was also a square grid (8 neighbours, Chebyshev distance, 5×5 quadrants). After playtesting both, hex "works quite well" and felt better, so as of 2026-11-18 the game is hex only. The chunk radius default went from 2 to 3 along the way, and to 5 with border walls (2026-11-19), for bigger rooms.
 
 ## Combos
 - **Kills:** killing n enemies in one move scores n × (their total score value), which is n² for 1-point enemies (1, 4, 9, 16…). Enemies destroyed because a piece they were linked below died **count as kills** for the combo.
@@ -67,8 +67,9 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 
 ## Quadrants and tiles
 - The world is divided into **quadrants** (hexagonal chunks), drawn with lighter grid lines. The start cell is the centre of quadrant (0,0).
-- When a player piece is in a quadrant, every quadrant within ⌈vision radius ÷ (3 × quadrant radius + 2)⌉ quadrants of it (at least 1; 2 with the defaults) gets its **solid tiles**, so they exist wherever you could see; this doesn't depend on whether fog of war is on. **Heal and harm tiles** are placed only in that quadrant and its 6 neighbours, so their countdowns are still running when you arrive (placing them further out meant their countdowns had always finished). Each is **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
-- Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, **0–5 solid tiles** *(settings)* in one connected clump (the first on a random free cell, each next one on a free cell of the quadrant touching the clump), and then **0–3 hole tiles** *(settings)* in a clump the same way. Holes may land on solid tiles and replace them, so they can break up a solid clump.
+- When a player piece is in a quadrant, every quadrant within ⌈vision radius ÷ (3 × quadrant radius + 2)⌉ quadrants of it (at least 1, which it is with the defaults) gets its **solid tiles**, so they exist wherever you could see; this doesn't depend on whether fog of war is on. **Heal and harm tiles** are placed only in that quadrant and its 6 neighbours, so their countdowns are still running when you arrive (placing them further out meant their countdowns had always finished). Each is **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
+- **Border walls** make chambers: when a quadrant's terrain is made, each of its borders not yet decided becomes a wall with a 50% chance *(setting)*. A wall is tiles on every cell of the quadrant touching that neighbour, except a **door** of 1–2 cells *(settings; 0 makes a solid wall)* in the middle, never at a corner, where walls meet. 25% of walls *(setting)* are holes rather than solid tiles: they block movement but not sight. Each border is decided once, by whichever of its two quadrants is made first, and the wall sits on that quadrant's side; decisions are kept in `Game.borders` (saved). **No quadrant is ever walled in on all six sides:** if a wall with no door would complete that, for either of its quadrants, it gets a door of 1. Random clumps can still block a door. Walls go in first; the random clumps below come after, so holes can replace part of a wall.
+- Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, **0–3 solid tiles** *(settings)* in one connected clump (the first on a random free cell, each next one on a free cell of the quadrant touching the clump), and then **0–3 hole tiles** *(settings)* in a clump the same way. Holes may land on solid tiles and replace them, so they can break up a solid clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
 - **Harm tile** (red ×): 1 damage to a piece that moves onto it or is standing on it when it activates, and then it's **gone**. (It used to stay, and clear once every neighbouring quadrant had been visited; it was what forced the swarm to change shape. Solid tiles do that better now, so as of 2026-11-19 harm tiles are one-shot.)
@@ -108,9 +109,12 @@ Every value applies immediately (those marked "new game" from the next game) and
 | Max squad size | 8 |
 | Advance after a kill | on |
 | Link range | 3 |
-| Quadrant radius (new game) | 3 |
+| Quadrant radius (new game) | 5 |
 | Heal tiles per quadrant | 1 |
 | Harm tiles per quadrant | 1 |
+| Chance a quadrant border is a wall | 50% |
+| Walls made of holes | 25% |
+| Door width | 1–2 |
 | Solid tiles per quadrant | 0–5 |
 | Hole tiles per quadrant | 0–3 |
 | Tile countdown min / max (turns) | 2 / 8 |
@@ -163,7 +167,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
 - `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
-- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateTerrain` (→ `placeClump`) / `generateTiles`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
+- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateTerrain` (→ `walledIn`, `placeWall`, `placeClump`) / `generateTiles`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
