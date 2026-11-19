@@ -31,7 +31,7 @@
                 fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
-                DATA_BASE_DIR, TOP_VIEW_HEIGHT, GITHUB_URL
+                DATA_BASE_DIR, HEADER_HEIGHT, FOOTER_HEIGHT, GITHUB_URL
             },
             ICON_SEPARATOR
         } = pkg,
@@ -98,7 +98,7 @@
         initNode: function(parent, attrs) {
             appView = pkg.app = this;
             
-            attrs.minWidth = 960;
+            attrs.minWidth = 360;
             attrs.minHeight = 560;
             
             appView.callSuper(parent, attrs);
@@ -106,10 +106,11 @@
             // For tests and the console.
             appView.game = game;
             
-            appView.buildTopView(new WideView(appView, {bgColor:colorHeaderBg, height:TOP_VIEW_HEIGHT}));
+            appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT}));
             gameView = appView.gameView = new pkg.GameView(appView, {
-                y:TOP_VIEW_HEIGHT, percentOfParentHeight:100, percentOfParentHeightOffset:-TOP_VIEW_HEIGHT
+                y:HEADER_HEIGHT, percentOfParentHeight:100, percentOfParentHeightOffset:-(HEADER_HEIGHT + FOOTER_HEIGHT)
             });
+            appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
             
             // Capture phase: myt's global key handling stops keydown from bubbling.
             window.addEventListener('keydown', appView._keyDown.bind(appView), true);
@@ -130,70 +131,77 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        buildTopView: topView => {
-            topView.setTextColor(colorHeaderText);
+        buildHdrView: hdrView => {
+            hdrView.setTextColor(colorHeaderText);
             
-            new PlainText(topView, {text:i18n('game-title'), fontSize:fontSizeVeryLarge, fontWeight:'bold', fontFamily:fontFamilyMono});
+            new PlainText(hdrView, {text:i18n('game-title'), fontSize:fontSizeVeryLarge, fontWeight:'bold', fontFamily:fontFamilyMono});
             
-            new Spacer(topView);
+            new Spacer(hdrView);
             
             const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
-            turnView = new LabeledValue(topView, {label:i18n('lbl-turn'), ...statAttrs});
-            scoreView = new LabeledValue(topView, {label:i18n('lbl-score'), ...statAttrs});
-            rankView = new LabeledValue(topView, {label:i18n('lbl-rank'), ...statAttrs});
-            movesView = new LabeledValue(topView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
+            turnView = new LabeledValue(hdrView, {label:i18n('lbl-turn'), ...statAttrs});
+            scoreView = new LabeledValue(hdrView, {label:i18n('lbl-score'), ...statAttrs});
+            rankView = new LabeledValue(hdrView, {label:i18n('lbl-rank'), ...statAttrs});
+            movesView = new LabeledValue(hdrView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
             
-            new Spacer(topView);
+            new Spacer(hdrView);
             
-            endTurnBtn = new Btn(topView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
-                doActivated:endTurn
-            }]);
-            placeBtn = new ToggleBtn(topView, {text:i18n('btn-place', 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {gameView.togglePlace();}
-            }]);
-            healBtn = new ToggleBtn(topView, {text:i18n('btn-heal', 1, 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {gameView.toggleHeal();}
-            }]);
-            
-            new PlainText(topView, {text:ICON_SEPARATOR});
-            
-            new IconBtn(topView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
-                doActivated: () => {appView.centerOn(game.playerCore);}
-            }]);
-            
-            new PlainText(topView, {text:ICON_SEPARATOR});
-            
-            saveBtn = new IconBtn(topView, {icon:'save', label:i18n('lbl-save')}, [{
+            saveBtn = new IconBtn(hdrView, {icon:'save', label:i18n('lbl-save')}, [{
                 doActivated:appView.confirmSave
             }]);
-            exportBtn = new IconBtn(topView, {icon:'download', label:i18n('lbl-export'), tooltip:i18n('tip-export')}, [{
+            exportBtn = new IconBtn(hdrView, {icon:'download', label:i18n('lbl-export'), tooltip:i18n('tip-export')}, [{
                 doActivated: () => {persistenceMgr.export();}
             }]);
-            new IconBtn(topView, {icon:'upload', label:i18n('lbl-import'), tooltip:i18n('tip-import')}, [{
+            new IconBtn(hdrView, {icon:'upload', label:i18n('lbl-import'), tooltip:i18n('tip-import')}, [{
                 doActivated:appView.confirmImport
             }]);
-            new IconBtn(topView, {icon:'rotate-ccw', label:i18n('lbl-new-game'), tooltip:i18n('tip-new-game')}, [{
+            new IconBtn(hdrView, {icon:'rotate-ccw', label:i18n('lbl-new-game'), tooltip:i18n('tip-new-game')}, [{
                 doActivated:appView.confirmNewGame
             }]);
             
-            new PlainText(topView, {text:ICON_SEPARATOR});
+            new PlainText(hdrView, {text:ICON_SEPARATOR});
             
-            new IconBtn(topView, {icon:'settings', label:i18n('tip-settings'), tooltip:i18n('tip-settings')}, [{
+            new IconBtn(hdrView, {icon:'settings', label:i18n('tip-settings'), tooltip:i18n('tip-settings')}, [{
                 doActivated:appView.openSettings
             }]);
-            new IconBtn(topView, {icon:'circle-help', label:i18n('lbl-help'), tooltip:i18n('tip-help')}, [{
+            new IconBtn(hdrView, {icon:'circle-help', label:i18n('lbl-help'), tooltip:i18n('tip-help')}, [{
                 doActivated:appView.openHelp
             }]);
             
-            new PlainText(topView, {text:ICON_SEPARATOR});
+            new PlainText(hdrView, {text:ICON_SEPARATOR});
             
             // GitHub's mark, linking to the project in a new tab.
-            new IconBtn(topView, {iconUrl:GITHUB_MARK_URL, iconSize:20, label:i18n('tip-github'), tooltip:i18n('tip-github')}, [{
+            new IconBtn(hdrView, {iconUrl:GITHUB_MARK_URL, iconSize:20, label:i18n('tip-github'), tooltip:i18n('tip-github')}, [{
                 doActivated: () => {window.open(GITHUB_URL, '_blank', 'noopener');}
             }]);
             
-            new M.ResizeLayout(topView, {inset:padding, spacing:spacing, outset:padding});
-            new M.ConstantLayout(topView, {targetAttrName:'valign', targetValue:'middle'});
+            new M.ResizeLayout(hdrView, {inset:padding, spacing:spacing, outset:padding});
+            new M.ConstantLayout(hdrView, {targetAttrName:'valign', targetValue:'middle'});
+        },
+        
+        buildFtrView: ftrView => {
+            ftrView.setTextColor(colorHeaderText);
+            
+            new Spacer(ftrView);
+            
+            endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
+                doActivated:endTurn
+            }]);
+            placeBtn = new ToggleBtn(ftrView, {text:i18n('btn-place', 5), fontSize:fontSizeMedium}, [{
+                doActivated: () => {gameView.togglePlace();}
+            }]);
+            healBtn = new ToggleBtn(ftrView, {text:i18n('btn-heal', 1, 5), fontSize:fontSizeMedium}, [{
+                doActivated: () => {gameView.toggleHeal();}
+            }]);
+            
+            new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
+                doActivated: () => {appView.centerOn(game.playerCore);}
+            }]);
+            
+            new Spacer(ftrView);
+            
+            new M.ResizeLayout(ftrView, {inset:padding, spacing:spacing, outset:padding});
+            new M.ConstantLayout(ftrView, {targetAttrName:'valign', targetValue:'middle'});
         },
         
         /*  Called once per frame, as the board is drawn: updates the header and overlays,

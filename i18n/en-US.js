@@ -1,5 +1,5 @@
 myt.I18N.setDictionary({
-"game-title":"Hex ⬡ Creeper", // ⬢
+"game-title":"HexCreeper",
 
 // Buttons
 "btn-close":"Close",

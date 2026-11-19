@@ -57,7 +57,8 @@
             DATA_BASE_DIR:'./data/',
             
             // The height of the top "header" view in the App.
-            TOP_VIEW_HEIGHT:44,
+            HEADER_HEIGHT:44,
+            FOOTER_HEIGHT:44,
             
             // Dialogs
             DEFAULT_TALL_DIALOG_WIDTH:560,

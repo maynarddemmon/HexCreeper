@@ -18,7 +18,7 @@
                 colorPanel, colorPanelFooter, colorSuccess, colorError,
                 fontSizeMedium, fontSizeLarge, fontFamilyMono
             },
-            cfg:{DEFAULT_TALL_DIALOG_WIDTH, DIALOG_FOOTER_HEIGHT, TOP_VIEW_HEIGHT}
+            cfg:{DEFAULT_TALL_DIALOG_WIDTH, DIALOG_FOOTER_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT}
         } = pkg,
         
         SPACER_CFG = {klass:pkg.Spacer},
@@ -132,7 +132,7 @@
                 
                 const panelView = this.getPanelView(),
                     fitHeight = this.getContentView().y + contentHeight + (this.getFooterView()?.height ?? 0);
-                panelView.setHeight(mathMin(fitHeight, this.height - 2*(TOP_VIEW_HEIGHT + spacing)));
+                panelView.setHeight(mathMin(fitHeight, this.height - (HEADER_HEIGHT + FOOTER_HEIGHT + 2*spacing)));
             },
             
             /*  Esc is handled in the capture phase because myt buttons stop keydown from
