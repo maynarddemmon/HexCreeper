@@ -212,7 +212,7 @@
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
         }
         
-        // Grid lines (darker along quadrant borders)
+        // Grid lines (lighter along quadrant borders)
         ctx.lineWidth = 1;
         // each hex draws its NE, E and SE edges, so every edge is drawn once; only edges
         // touching a known cell
@@ -233,7 +233,7 @@
             }
         }
         ctx.strokeStyle = css('--grid'); ctx.stroke(minor);
-        ctx.strokeStyle = css('--grid-major'); ctx.lineWidth = 1.5; ctx.stroke(major); ctx.lineWidth = 1;
+        ctx.strokeStyle = css('--grid-major'); ctx.stroke(major);
         
         // Origin marker
         {

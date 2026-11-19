@@ -66,7 +66,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Observed against a wall of player pieces: a leader moves the squad in for a 6-hit group strike, then the mid pieces pull their branches back; or a mid piece strikes and the leader pulls everything back, with idle turns at a safe distance in between. Against a lone, surrounded target there is no safe retreat (any step back carries a piece onto the target, which counts as another attack), so squads keep attacking.
 
 ## Quadrants and tiles
-- The world is divided into **quadrants** (hexagonal chunks), drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
+- The world is divided into **quadrants** (hexagonal chunks), drawn with lighter grid lines. The start cell is the centre of quadrant (0,0).
 - When a player piece is in a quadrant, every quadrant within ⌈vision radius ÷ (3 × quadrant radius + 2)⌉ quadrants of it (at least 1; 2 with the defaults) gets its tiles, so tiles exist wherever you could see. This is **once per quadrant**, never cleaned up, and doesn't depend on whether fog of war is on. Visited quadrants are tinted light blue.
 - Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, and **0–5 solid tiles** *(settings)* in one connected clump: the first on a random free cell, each next one on a free cell of the quadrant touching the clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
