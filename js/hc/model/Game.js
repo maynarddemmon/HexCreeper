@@ -26,8 +26,8 @@
             this.effects = [];              // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
-            this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid", timer}
-            this.solidQuads = new Set();     // quadrants whose solid tiles have been placed
+            this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole", timer}
+            this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
             this.visitedQuads = new Set();
             this.seenCells = new Set();     // keys of cells that have been in sight (fog of war)
@@ -43,10 +43,14 @@
         }
         
         key(x, y) { return x + ',' + y; }
-        // Can a piece ever be on (x, y)? Not past the edge of the world or on a solid tile.
+        // Can a piece ever be on (x, y)? Not past the edge of the world, or on a solid or
+        // hole tile.
         isOpen(x, y) {
-            return Math.abs(x) <= WORLD_LIMIT && Math.abs(y) <= WORLD_LIMIT && !this.isSolid(x, y);
+            if (Math.abs(x) > WORLD_LIMIT || Math.abs(y) > WORLD_LIMIT) return false;
+            const kind = this.tiles.get(this.key(x, y))?.kind;
+            return kind !== 'solid' && kind !== 'hole';
         }
+        // Solid tiles block sight; holes don't.
         isSolid(x, y) { return this.tiles.get(this.key(x, y))?.kind === 'solid'; }
         
         // ---- Fog of war ----
@@ -284,7 +288,7 @@
         // Quadrants are the grid's hexagonal chunks.
         quadOf(x, y) { return pkg.GRID.chunkOf(x, y); }
         
-        // Visits the quadrants holding player pieces. Solid tiles are placed in every
+        // Visits the quadrants holding player pieces. Solid and hole tiles are placed in every
         // quadrant within reach of them: enough quadrants out to cover the vision radius (at
         // least 1), so they exist wherever you could see. This doesn't depend on whether fog
         // of war is on, so turning it off and on doesn't change the world. Heal and harm
@@ -295,7 +299,7 @@
             for (const p of this.piecesOf('player')) {
                 const [qx, qy] = this.quadOf(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);
-                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateSolids(q.x, q.y);
+                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateTerrain(q.x, q.y);
                 for (const q of pkg.GRID.disk(qx, qy, 1)) this.generateTiles(q.x, q.y);
             }
         }
@@ -321,22 +325,34 @@
             for (let i = 0; i < TILES.harmPerQuad; i++) place('harm');
         }
         
-        // A quadrant's solid tiles, once: one connected clump of solidMin to solidMax cells
-        // within the quadrant, the first on a random free cell, each next one on a free cell
-        // touching the clump. They're solid from the start (no countdown).
-        generateSolids(qx, qy) {
+        // A quadrant's solid and hole tiles, once: a clump of solidMin to solidMax solid
+        // tiles, then a clump of holeMin to holeMax holes, which may land on (replace)
+        // solid tiles. Both are there from the start (no countdown).
+        generateTerrain(qx, qy) {
             const k = qx + ',' + qy;
-            if (this.solidQuads.has(k)) return;
-            this.solidQuads.add(k);
-            const cells = pkg.GRID.chunkCells(qx, qy),
-                inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
-                free = (x, y) => inQuad.has(this.key(x, y)) && !this.tiles.has(this.key(x, y)) && !this.pieceAt(x, y),
-                count = TILES.solidMin + Math.floor(Math.random() * (TILES.solidMax - TILES.solidMin + 1));
+            if (this.terrainQuads.has(k)) return;
+            this.terrainQuads.add(k);
+            const cells = pkg.GRID.chunkCells(qx, qy);
+            this.placeClump(cells, 'solid', TILES.solidMin, TILES.solidMax, []);
+            this.placeClump(cells, 'hole', TILES.holeMin, TILES.holeMax, ['solid']);
+        }
+        
+        // One connected clump of min to max tiles of a kind within a quadrant's cells: the
+        // first on a random free cell, each next one on a free cell touching the clump. A
+        // cell is free if no piece is on it and it has no tile, or a tile of a kind in
+        // `replaces`.
+        placeClump(cells, kind, min, max, replaces) {
+            const inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
+                free = (x, y) => {
+                    const k = this.key(x, y), t = this.tiles.get(k);
+                    return inQuad.has(k) && (!t || replaces.includes(t.kind)) && !this.pieceAt(x, y);
+                },
+                count = min + Math.floor(Math.random() * (max - min + 1));
             const edge = new Map(); // free cells touching the clump, by key
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
                 const {x, y} = options[Math.floor(Math.random() * options.length)];
-                this.tiles.set(this.key(x, y), {x, y, kind:'solid', timer:0});
+                this.tiles.set(this.key(x, y), {x, y, kind, timer:0});
                 edge.delete(this.key(x, y));
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const nx = x + dx, ny = y + dy;

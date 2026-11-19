@@ -33,7 +33,7 @@ test.describe('waves', () => {
     });
 });
 
-for (const kind of ['harm', 'solid']) {
+for (const kind of ['harm', 'solid', 'hole']) {
     test(`enemies path around a wall of ${kind} tiles`, async ({page}) => {
         const r = await page.evaluate(kind => {
             const g = hc.app.game;

@@ -61,6 +61,8 @@
         num('harmPerQuad', GROUP_TILES, TILES,    'harmPerQuad', 0, 40),
         num('solidMin',    GROUP_TILES, TILES,    'solidMin', 0, 20),
         num('solidMax',    GROUP_TILES, TILES,    'solidMax', 0, 20),
+        num('holeMin',     GROUP_TILES, TILES,    'holeMin', 0, 20),
+        num('holeMax',     GROUP_TILES, TILES,    'holeMax', 0, 20),
         num('timerMin',    GROUP_TILES, TILES,    'timerMin', 0, 50),
         num('timerMax',    GROUP_TILES, TILES,    'timerMax', 0, 50),
         num('harmDamage',  GROUP_TILES, TILES,    'harmDamage', 0, 10),
@@ -92,6 +94,7 @@
             if (SPAWN.maxDist < SPAWN.minDist) SPAWN.maxDist = SPAWN.minDist;
             if (TILES.timerMax < TILES.timerMin) TILES.timerMax = TILES.timerMin;
             if (TILES.solidMax < TILES.solidMin) TILES.solidMax = TILES.solidMin;
+            if (TILES.holeMax < TILES.holeMin) TILES.holeMax = TILES.holeMin;
         },
         
         writeOverrides = overrides => {

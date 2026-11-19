@@ -127,12 +127,15 @@
             },
             
             // Heal and harm tiles appear with a countdown (turns) and become active when it
-            // reaches 0. Solid tiles are there from the start and can never be entered.
+            // reaches 0. Solid and hole tiles are there from the start and can never be
+            // entered; solid tiles block sight, holes don't.
             TILES:{
                 healPerQuad:1,
                 harmPerQuad:1,
                 solidMin:0, // solid tiles per quadrant, in one connected clump
                 solidMax:5,
+                holeMin:0, // hole tiles per quadrant, in one connected clump (may replace solid tiles)
+                holeMax:3,
                 timerMin:2,
                 timerMax:8,
                 harmDamage:1, // damage to any piece that moves onto an active harm tile

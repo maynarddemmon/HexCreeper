@@ -1,48 +1,67 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard} from './helpers.mjs';
 
-test('solids go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
+test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        // Radius 12 and quadrant radius 3: solids out to ceil(12 / 11) = 2 quadrants from the
+        // Radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from the
         // start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6 neighbours.
-        const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind !== 'solid'),
+        const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
             inReach = tiles.every(t => {
                 const [i, j] = hc.GRID.chunkOf(t.x, t.y);
                 return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
-        return {solidQuads:g.solidQuads.size, tiledQuads:g.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
+        return {terrainQuads:g.terrainQuads.size, tiledQuads:g.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
             harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, timers:tiles.every(t => t.timer >= 2 && t.timer <= 8)};
     });
-    expect(r).toEqual({solidQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, timers:true});
+    expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, timers:true});
 });
 
-test('each quadrant gets one connected clump of 0-5 solid tiles, solid at once', async ({page}) => {
+// Each kind is checked with the other turned off, since holes may replace solid tiles.
+for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
+    test(`each quadrant gets one connected clump of 0-${max} ${kind} tiles, there at once`, async ({page}) => {
+        await startGame(page);
+        const r = await page.evaluate(([kind, max, other]) => {
+            const g = hc.app.game, G = hc.GRID, sizes = new Set();
+            hc.cfg.TILES[other + 'Max'] = 0;
+            let ok = true;
+            for (let i = 0; i < 40; i++) {
+                g.tiles.clear();
+                g.terrainQuads.delete('0,0');
+                g.generateTerrain(0, 0);
+                const clump = [...g.tiles.values()].filter(t => t.kind === kind),
+                    keys = new Set(clump.map(t => g.key(t.x, t.y)));
+                sizes.add(clump.length);
+                if (clump.length > max || g.tiles.size !== clump.length || clump.some(t => t.timer !== 0 || G.chunkOf(t.x, t.y).join() !== '0,0')) ok = false;
+                // Connected: everything is reachable from the first one.
+                const seen = new Set(), todo = clump.slice(0, 1);
+                for (const t of todo) {
+                    const k = g.key(t.x, t.y);
+                    if (seen.has(k)) continue;
+                    seen.add(k);
+                    for (const [dx, dy] of G.dirs) if (keys.has(g.key(t.x + dx, t.y + dy))) todo.push({x:t.x + dx, y:t.y + dy});
+                }
+                if (seen.size !== clump.length) ok = false;
+            }
+            return {ok, varies:sizes.size > 1};
+        }, [kind, max, other]);
+        expect(r).toEqual({ok:true, varies:true});
+    });
+}
+
+test('holes are placed after solid tiles and may replace them', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, G = hc.GRID, sizes = new Set();
-        let ok = true;
-        for (let i = 0; i < 40; i++) {
-            g.tiles.clear();
-            g.solidQuads.delete('0,0');
-            g.generateSolids(0, 0);
-            const solids = [...g.tiles.values()].filter(t => t.kind === 'solid'),
-                keys = new Set(solids.map(t => g.key(t.x, t.y)));
-            sizes.add(solids.length);
-            if (solids.length > 5 || solids.some(t => t.timer !== 0 || G.chunkOf(t.x, t.y).join() !== '0,0')) ok = false;
-            // Connected: everything is reachable from the first one.
-            const seen = new Set(), todo = solids.slice(0, 1);
-            for (const t of todo) {
-                const k = g.key(t.x, t.y);
-                if (seen.has(k)) continue;
-                seen.add(k);
-                for (const [dx, dy] of G.dirs) if (keys.has(g.key(t.x + dx, t.y + dy))) todo.push({x:t.x + dx, y:t.y + dy});
-            }
-            if (seen.size !== solids.length) ok = false;
-        }
-        return {ok, varies:sizes.size > 1};
+        const g = hc.app.game, T = hc.cfg.TILES;
+        T.solidMin = T.solidMax = 40; // every free cell of the quadrant
+        T.holeMin = T.holeMax = 3;
+        g.tiles.clear();
+        g.terrainQuads.delete('0,0');
+        g.generateTerrain(0, 0);
+        const kinds = [...g.tiles.values()].map(t => t.kind);
+        return {holes:kinds.filter(k => k === 'hole').length, solids:kinds.filter(k => k === 'solid').length};
     });
-    expect(r).toEqual({ok:true, varies:true});
+    expect(r).toEqual({holes:3, solids:36 - 3}); // 37 cells, less the core's
 });
 
 test.describe('rules', () => {
@@ -62,25 +81,25 @@ test.describe('rules', () => {
         expect(r).toEqual({lost:1, gone:true});
     });
     
-    test('nothing can move onto or be placed on a solid tile', async ({page}) => {
-        const r = await page.evaluate(() => {
+    for (const kind of ['solid', 'hole']) test(`nothing can move onto or be placed on a ${kind} tile`, async ({page}) => {
+        const r = await page.evaluate(kind => {
             const g = hc.app.game, c = g.playerCore, [a, b] = hc.GRID.dirs,
-                solid = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind:'solid', timer:0});
+                block = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind, timer:0});
             g.score = 100;
-            solid(a[0], a[1]);
+            block(a[0], a[1]);
             const out = {
                 move:g.playerAct(c, a[0], a[1]),
                 place:g.placeCells().some(q => q.x === a[0] && q.y === a[1]) || g.playerPlace(a[0], a[1], c)
             };
             
-            // A group can't move if any member would land on a solid tile.
+            // A group can't move if any member would land on one.
             g.tiles.clear();
             g.playerPlace(a[0], a[1], c);
-            solid(a[0] + b[0], a[1] + b[1]);
+            block(a[0] + b[0], a[1] + b[1]);
             out.groupMove = g.playerAct(c, b[0], b[1]);
             out.coreStayed = c.x === 0 && c.y === 0;
             return out;
-        });
+        }, kind);
         expect(r).toEqual({move:false, place:false, groupMove:false, coreStayed:true});
     });
     

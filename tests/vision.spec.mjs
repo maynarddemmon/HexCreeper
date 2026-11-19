@@ -25,6 +25,16 @@ test.describe('fog of war', () => {
         expect(r).toEqual({wall:true, behind:false, farBehind:false, beside:true});
     });
     
+    test('hole tiles don\'t block sight', async ({page}) => {
+        const r = await page.evaluate(() => {
+            const g = hc.app.game;
+            for (let y = -3; y <= 3; y++) g.tiles.set(g.key(2, y), {x:2, y, kind:'hole', timer:0});
+            const sight = g.cellsInSight();
+            return {hole:sight.has('2,0'), behind:sight.has('3,0'), farBehind:sight.has('6,0')};
+        });
+        expect(r).toEqual({hole:true, behind:true, farBehind:true});
+    });
+    
     test('a line along an edge is blocked only when both cells beside it are solid', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, solid = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind:'solid', timer:0}),

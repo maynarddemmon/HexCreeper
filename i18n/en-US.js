@@ -85,6 +85,8 @@ myt.I18N.setDictionary({
 "setting-harmPerQuad":"Harm tiles per quadrant",
 "setting-solidMin":"Solid tiles per quadrant (min)",
 "setting-solidMax":"Solid tiles per quadrant (max)",
+"setting-holeMin":"Hole tiles per quadrant (min)",
+"setting-holeMax":"Hole tiles per quadrant (max)",
 "setting-timerMin":"Tile countdown min (turns)",
 "setting-timerMax":"Tile countdown max (turns)",
 "setting-harmDamage":"Harm tile damage",

@@ -25,6 +25,23 @@
                 strokeCell(t.x, t.y, css('--solid-edge'), Math.max(1, cam.size * 0.03), 1);
                 return;
             }
+            if (t.kind === 'hole') {
+                fillCell(t.x, t.y, '--hole');
+                // Lines from each corner, fading into the dark towards the centre, so it
+                // reads as a pit rather than a cell in fog.
+                const [cx, cy] = cellCenter(t.x, t.y);
+                ctx.lineWidth = Math.max(1, cam.size * 0.03);
+                for (const [wx, wy] of pkg.GRID.corners(t.x, t.y)) {
+                    const [px, py] = worldToScreen(wx, wy),
+                        fade = ctx.createLinearGradient(px, py, cx, cy);
+                    fade.addColorStop(0, css('--hole-line'));
+                    fade.addColorStop(0.8, css('--hole'));
+                    ctx.strokeStyle = fade;
+                    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx, cy); ctx.stroke();
+                }
+                strokeCell(t.x, t.y, css('--hole-edge'), Math.max(1, cam.size * 0.06), Math.max(2, cam.size * 0.08));
+                return;
+            }
             const s = cam.size,
                 [cx, cy] = cellCenter(t.x, t.y),
                 heal = t.kind === 'heal',
@@ -164,7 +181,7 @@
         // Visited quadrants
         fillCells(known.filter(c => game.visitedQuads.has(chunkKey(c.x, c.y))), '--visited');
         
-        // Heal, harm and solid tiles
+        // Heal, harm, solid and hole tiles
         for (const t of game.tiles.values()) {
             if (inView(t.x, t.y) && isKnown(t.x, t.y)) drawTile(t, now);
         }

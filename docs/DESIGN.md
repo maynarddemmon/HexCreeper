@@ -68,12 +68,13 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 ## Quadrants and tiles
 - The world is divided into **quadrants** (hexagonal chunks), drawn with lighter grid lines. The start cell is the centre of quadrant (0,0).
 - When a player piece is in a quadrant, every quadrant within ⌈vision radius ÷ (3 × quadrant radius + 2)⌉ quadrants of it (at least 1; 2 with the defaults) gets its **solid tiles**, so they exist wherever you could see; this doesn't depend on whether fog of war is on. **Heal and harm tiles** are placed only in that quadrant and its 6 neighbours, so their countdowns are still running when you arrive (placing them further out meant their countdowns had always finished). Each is **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
-- Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, and **0–5 solid tiles** *(settings)* in one connected clump: the first on a random free cell, each next one on a free cell of the quadrant touching the clump.
+- Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, **0–5 solid tiles** *(settings)* in one connected clump (the first on a random free cell, each next one on a free cell of the quadrant touching the clump), and then **0–3 hole tiles** *(settings)* in a clump the same way. Holes may land on solid tiles and replace them, so they can break up a solid clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
 - **Harm tile** (red ×): 1 damage to a piece that moves onto it or is standing on it when it activates, and then it's **gone**. (It used to stay, and clear once every neighbouring quadrant had been visited; it was what forced the swarm to change shape. Solid tiles do that better now, so as of 2026-11-19 harm tiles are one-shot.)
 - Enemies never step onto active harm tiles, and they path around them.
 - **Solid tile** (dark grey hex): no piece can ever move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown) and never go away.
+- **Hole tile** (black hex with a dark rim): blocks movement, placing and spawning exactly like a solid tile, but **doesn't block sight**.
 
 ## Fog of war
 - *(Setting, on by default.)* A cell is **in sight** if it's within the **vision radius** (12 steps, *setting*) of one of your pieces and the straight line between the two cell centres isn't blocked by a solid tile. The two end cells don't count, so you see the solid tiles that block you. A line running exactly along the edge between two cells is blocked only if both are solid.
@@ -84,8 +85,8 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - First version, to playtest radius 6 against 12. Possible next steps: markers where enemies were last seen, remembered tiles shown as last seen, denser solid clumps.
 
 ## Enemy pathing and spawning
-- A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm and solid tiles), over the grid's neighbour directions.
-- Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm or solid tile.
+- A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm, solid and hole tiles), over the grid's neighbour directions.
+- Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm, solid or hole tile.
 
 ## Settings
 Every value applies immediately (those marked "new game" from the next game) and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
@@ -111,6 +112,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 | Heal tiles per quadrant | 1 |
 | Harm tiles per quadrant | 1 |
 | Solid tiles per quadrant | 0–5 |
+| Hole tiles per quadrant | 0–3 |
 | Tile countdown min / max (turns) | 2 / 8 |
 | Harm tile damage | 1 |
 | Base rank | 1 |
@@ -134,7 +136,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
 - A dashed outline shows the link range around the selected piece's parent.
 - With fog of war on, cells out of sight are dimmed and enemies there aren't drawn.
-- Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown; solid = dark grey filled hex.
+- Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown; solid = grey filled hex; hole = near-black hex with a dark rim.
 - A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
 - Settings live in a dialog (⚙): every setting, grouped (numbers as fields, on/off as checkboxes); values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
@@ -160,7 +162,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
 - `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
-- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateSolids` / `generateTiles`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
+- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateTerrain` (→ `placeClump`) / `generateTiles`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
