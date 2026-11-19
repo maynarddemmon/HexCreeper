@@ -11,7 +11,9 @@
         endTurnBtn,
         placeBtn,
         healBtn,
+        saveBtn,
         
+        persistenceMgr, // The PersistenceManager.
         gameOverShown = false,
         settingsDialog;
     
@@ -59,6 +61,14 @@
             others, or the key's name (e.g. "Enter"). */
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
         
+        /*  The save button's tooltip says when the game was last saved. */
+        updateLastSaved = () => {
+            const lastSavedDate = persistenceMgr.getLastSavedDate();
+            saveBtn.setTooltip(lastSavedDate ?
+                i18n('tip-last-saved', lastSavedDate.toLocaleString(M.I18N.getLocale(), {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) :
+                i18n('tip-not-saved'));
+        },
+        
         endTurn = () => {
             if (game.over) return;
             V.placeMode = null;
@@ -95,6 +105,12 @@
             window.addEventListener('resize', () => V.resize());
             
             game.reset(); // With the stored settings, now they're in effect.
+            
+            // Carry on with the saved game, if there is one.
+            persistenceMgr = new pkg.PersistenceManager(game);
+            if (persistenceMgr.hasSave()) appView.loadSave();
+            updateLastSaved();
+            
             V.resize();
             gameView.centerOn(game.playerCore);
             
@@ -119,7 +135,7 @@
             new Spacer(topView);
             
             endTurnBtn = new Btn(topView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
-                doActivated: endTurn
+                doActivated:endTurn
             }]);
             placeBtn = new ToggleBtn(topView, {text:i18n('btn-place', 5), fontSize:fontSizeMedium}, [{
                 doActivated: () => {gameView.togglePlace();}
@@ -133,17 +149,20 @@
             new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_CENTER, fontSize:fontSizeVeryLarge, tooltip:i18n('tip-center')}, [{
                 doActivated: () => {appView.centerOn(game.playerCore);}
             }]);
+            saveBtn = new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_SAVE, fontSize:fontSizeVeryLarge}, [{
+                doActivated:appView.confirmSave
+            }]);
             new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_RESTART, fontSize:fontSizeLarge, tooltip:i18n('tip-new-game')}, [{
-                doActivated: () => {appView.confirmNewGame();}
+                doActivated:appView.confirmNewGame
             }]);
             
             new PlainText(topView, {text:ICON_SEPARATOR});
             
             new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_SETTINGS, fontSize:fontSizeVeryLarge, tooltip:i18n('tip-settings')}, [{
-                doActivated: () => {appView.openSettings();}
+                doActivated:appView.openSettings
             }]);
             new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_HELP, fontSize:fontSizeLarge, tooltip:i18n('tip-help')}, [{
-                doActivated: () => {appView.openHelp();}
+                doActivated:appView.openHelp
             }]);
             
             new PlainText(topView, {text:ICON_SEPARATOR});
@@ -169,22 +188,27 @@
         update: () => {
             turnView.update(game.turn);
             scoreView.update(game.score);
-            const coreRank = game.coreRank(), maxRank = game.maxRank();
+            const coreRank = game.coreRank(),
+                maxRank = game.maxRank(),
+                gameOver = game.over,
+                placeCost = game.placeCost(),
+                healCost = game.healCost(),
+                healAmount = game.healAmount();
+            
             rankView.update(maxRank > coreRank ? i18n('lbl-rank-top', coreRank, maxRank) : coreRank);
             movesView.update(game.movesLeft() + ' / ' + game.moveLimit());
             
-            endTurnBtn.setDisabled(game.over);
+            endTurnBtn.setDisabled(gameOver);
+            saveBtn.setDisabled(gameOver);
             
-            const placeCost = game.placeCost();
             placeBtn.setTextAndFit(i18n('btn-place', placeCost));
             placeBtn.setTooltip(i18n('tip-place', placeCost));
-            placeBtn.setDisabled(game.over || (!V.placeMode && !game.canAffordPlace()));
+            placeBtn.setDisabled(gameOver || (!V.placeMode && !game.canAffordPlace()));
             placeBtn.setOn(!!V.placeMode);
             
-            const healCost = game.healCost(), healAmount = game.healAmount();
             healBtn.setTextAndFit(i18n('btn-heal', healAmount, healCost));
             healBtn.setTooltip(i18n('tip-heal', healCost, healAmount));
-            healBtn.setDisabled(game.over || (!V.healMode && (!game.canAffordHeal() || !game.anyDamaged())));
+            healBtn.setDisabled(gameOver || (!V.healMode && (!game.canAffordHeal() || !game.anyDamaged())));
             healBtn.setOn(V.healMode);
             
             gameView.update();
@@ -192,12 +216,14 @@
             if (game.over && !gameOverShown) {
                 gameOverShown = true;
                 setTimeout(() => {
+                    // With a save, closing loads it instead.
+                    const hasSave = persistenceMgr.hasSave();
                     openConfirmMsgDialog(
                         i18n('dlg-game-over-title'),
                         i18n('dlg-game-over-msg', game.score, game.turn),
                         () => {appView.newGame();},
-                        null,
-                        i18n('btn-play-again'), I18N_CLOSE_BTN
+                        hasSave ? () => {appView.loadSave();} : null,
+                        i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
                     );
                 }, 500);
             }
@@ -213,6 +239,34 @@
             V.healMode = false;
             game.reset();
             gameView.centerOn(game.playerCore);
+        },
+        
+        /*  Replaces this game with the saved one. If the save can't be used, it's cleared,
+            this game carries on, and a dialog says why. */
+        loadSave: () => {
+            const problem = persistenceMgr.restore();
+            if (problem) {
+                openAckMsgDialog(i18n('dlg-restore-failed-title'), i18n('dlg-restore-failed-msg', problem));
+                updateLastSaved();
+                return;
+            }
+            gameOverShown = false;
+            V.placeMode = null;
+            V.healMode = false;
+            gameView.centerOn(game.playerCore);
+        },
+        
+        /*  Asks first, since it replaces any existing save. */
+        confirmSave: () => {
+            if (game.over) return;
+            openConfirmMsgDialog(i18n('dlg-save-title'), i18n('dlg-save-msg'), () => {
+                const saved = persistenceMgr.save();
+                updateLastSaved();
+                openAckMsgDialog(
+                    i18n(saved ? 'dlg-save-succeeded-title' : 'dlg-save-failed-title'),
+                    i18n(saved ? 'dlg-save-succeeded-msg' : 'dlg-save-failed-msg')
+                );
+            });
         },
         
         /*  Asks first, unless the game is over or hasn't started. */
@@ -253,36 +307,37 @@
         /** @private */
         _keyDown: function(e) {
             if (e.metaKey || e.ctrlKey || e.altKey || isAnyShowing()) return;
+            
             const k = keyOf(e);
             if (k === ' ') {
                 e.preventDefault();
                 appView.centerOn(game.playerCore);
-                return;
-            }
-            if (game.over) return;
-            if (k === 'Escape') {gameView.cancelModes(); return;}
-            if (k === 'p') {gameView.togglePlace(); return;}
-            if (k === 'h') {gameView.toggleHeal(); return;}
-            if (k === 'Tab') {
+            } else if (!game.over) {
+                if (k === 'Escape') {gameView.cancelModes(); return;}
+                if (k === 'p') {gameView.togglePlace(); return;}
+                if (k === 'h') {gameView.toggleHeal(); return;}
+                if (k === 'Tab') {
+                    e.preventDefault();
+                    const mine = game.piecesOf('player');
+                    if (!mine.length) return;
+                    const i = mine.findIndex(p => p.id === game.selectedId);
+                    game.selectedId = mine[(i + (e.shiftKey ? mine.length - 1 : 1)) % mine.length].id;
+                    gameView.cancelModes();
+                    return;
+                }
+                if (V.placeMode || V.healMode) return;
+                if (k === '.' || k === 'Numpad5' || k === 'Enter') {
+                    e.preventDefault();
+                    endTurn();
+                    return;
+                }
+                const d = pkg.GRID.keyDirs[k];
+                if (!d) return;
+                
                 e.preventDefault();
-                const mine = game.piecesOf('player');
-                if (!mine.length) return;
-                const i = mine.findIndex(p => p.id === game.selectedId);
-                game.selectedId = mine[(i + (e.shiftKey ? mine.length - 1 : 1)) % mine.length].id;
-                gameView.cancelModes();
-                return;
+                const sel = game.selected;
+                if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) gameView.afterTurn();
             }
-            if (V.placeMode || V.healMode) return;
-            if (k === '.' || k === 'Numpad5' || k === 'Enter') {
-                e.preventDefault();
-                endTurn();
-                return;
-            }
-            const d = pkg.GRID.keyDirs[k];
-            if (!d) return;
-            e.preventDefault();
-            const sel = game.selected;
-            if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) gameView.afterTurn();
         }
     });
 

@@ -50,6 +50,7 @@ The tests start their own static server and load the real `index.html`, then dri
 - the rules behave as intended: ranks, moves per turn, link range, group attacks and combos, advancing after a kill, tiles and their countdowns, heal flow and the paid heal;
 - enemy waves follow your rank, squads path around harm, solid and hole tiles, strike and pull back, and don't wait forever;
 - fog of war: the vision radius, solid tiles blocking sight (and the edge rule), and seen tiles staying shown;
+- saving: a saved game comes back intact on reload, a bad save is cleared, and the last save can be loaded after losing;
 - the UI works: header buttons, help, click versus shift-click, keyboard moves and settings.
 
 `npm run setup-hooks` turns on a pre-commit hook that runs the linter and the startup tests. `npx playwright test --headed` shows the browser while they run, and `npx playwright test combat` runs a single file.
@@ -61,7 +62,7 @@ The tests start their own static server and load the real `index.html`, then dri
 | `index.html` | Entry point: colours (light and dark), button styles, locale detection and script loading |
 | `js/hc/hc.js` | The `hc` namespace, the tunable numbers, the UI theme and config, and small utilities |
 | `js/hc/component/` | Reusable [myt](https://github.com/maynarddemmon/myt) views, taken from TimeCorps: `Misc.js` (layout views, `Panel`, `LabeledValue`), `Btn.js` (`Btn`, `UnderlineBtn`, `SquareBtn`, `ToggleBtn`), `Dialogs.js` (modal, confirm and acknowledge dialogs, and `hc.dialogUtil`) |
-| `js/hc/model/` | `Grid.js` (hex geometry), `PieceTypes.js`, `Game.js` (state and rules), `EnemyAI.js` (squad planning), `Settings.js` (every setting, saved to localStorage) |
+| `js/hc/model/` | `Grid.js` (hex geometry), `PieceTypes.js`, `Game.js` (state and rules), `EnemyAI.js` (squad planning), `Settings.js` (every setting, saved to localStorage), `Persistence.js` (the save game, in localStorage) |
 | `js/hc/view/` | `View.js` (canvas, camera, shared view state), `Render.js` (draws the board), `GameView.js` (the myt view holding the canvas, the info panel and mouse input), `SettingsDialog.js` |
 | `js/hc/App.js` | The root view: the header bar and its buttons, keyboard input, new games and the help dialog |
 | `js/hc/manifest.js` | Which file provides and requires what, for the loader |

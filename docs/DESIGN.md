@@ -137,9 +137,10 @@ Every value applies immediately (those marked "new game" from the next game) and
 - A dashed outline shows the link range around the selected piece's parent.
 - With fog of war on, cells out of sight are dimmed and enemies there aren't drawn.
 - Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown; solid = grey filled hex; hole = near-black hex with a dark rim.
-- A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
+- A header bar holds the turn, score, rank and moves left, and every button: End Turn, Place, Heal, Center, Save, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP and the selected piece.
 - Settings live in a dialog (⚙): every setting, grouped (numbers as fields, on/off as checkboxes); values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
+- **Saving** (✇): asks first, then saves the whole game to the browser, replacing any earlier save. Its tooltip says when you last saved. Opening the game carries on from the save if there is one; a save that can't be loaded is cleared with a message. Starting a new game doesn't delete the save, so reloading the page goes back to it. When your core is destroyed and there's a save, the dialog offers **Load Last Save** instead of Close. You can't save a game that's over.
 
 ## Balance notes
 - See [PLAYTESTS.md](PLAYTESTS.md) for play sessions.
@@ -166,5 +167,6 @@ Every value applies immediately (those marked "new game" from the next game) and
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
+- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, savedAt, data}` is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it.
 - `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the settings dialog from the definitions; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
 - UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

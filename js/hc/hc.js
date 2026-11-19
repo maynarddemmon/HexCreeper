@@ -187,6 +187,7 @@
         ICON_SETTINGS:'⚙',
         ICON_CENTER:'⌖',
         ICON_RESTART:'⌫',
+        ICON_SAVE:'✇',
         ICON_CHECKED:'✓',
         ICON_UNCHECKED:'✗',
         ICON_CANCEL:'X',

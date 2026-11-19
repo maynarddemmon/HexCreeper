@@ -23,6 +23,7 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.Game.prototype.planSquad').requires('hc.Game');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg');
+    file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     
     // View //
     file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.Game.prototype.planSquad','hc.settings');
@@ -34,6 +35,6 @@ JS.Packages(file => {
     
     // Include Everything
     file(HC_ROOT + 'App.js').provides('hc.App').requires(
-        'hc.GameView','hc.SettingsDialog','hc.dialogUtil','hc.Btn','hc.LabeledValue'
+        'hc.GameView','hc.SettingsDialog','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
     );
 });

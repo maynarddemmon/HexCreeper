@@ -136,48 +136,51 @@
             move to the clicked cell (e.g. onto a cell one of its own carried pieces is
             vacating), it moves instead of selecting the piece there. */
         handleClick: function(c, force=false) {
-            if (game.over) return;
-            if (V.placeMode) {
-                this._handlePlaceClick(c);
-                return;
+            if (!game.over) {
+                if (V.placeMode) {
+                    this._handlePlaceClick(c);
+                    return;
+                }
+                if (V.healMode) {
+                    const t = game.pieceAt(c.x, c.y);
+                    V.healMode = false;
+                    if (t && t.owner === 'player') game.playerHeal(t);
+                    draw();
+                    return;
+                }
+                const sel = game.selected;
+                if (force && sel && game.playerAct(sel, c.x, c.y)) {
+                    this.afterTurn();
+                    return;
+                }
+                const clicked = game.pieceAt(c.x, c.y);
+                if (clicked && clicked.owner === 'player') {
+                    game.selectedId = clicked.id;
+                    draw();
+                    return;
+                }
+                if (sel && game.playerAct(sel, c.x, c.y)) this.afterTurn();
             }
-            if (V.healMode) {
-                const t = game.pieceAt(c.x, c.y);
-                V.healMode = false;
-                if (t && t.owner === 'player') game.playerHeal(t);
-                draw();
-                return;
-            }
-            const sel = game.selected;
-            if (force && sel && game.playerAct(sel, c.x, c.y)) {
-                this.afterTurn();
-                return;
-            }
-            const clicked = game.pieceAt(c.x, c.y);
-            if (clicked && clicked.owner === 'player') {
-                game.selectedId = clicked.id;
-                draw();
-                return;
-            }
-            if (sel && game.playerAct(sel, c.x, c.y)) this.afterTurn();
         },
         
         togglePlace: () => {
-            if (game.over) return;
-            V.healMode = false;
-            if (V.placeMode) {
-                V.placeMode = null;
-            } else if (game.canAffordPlace()) {
-                V.placeMode = {stage:'cell'};
+            if (!game.over) {
+                V.healMode = false;
+                if (V.placeMode) {
+                    V.placeMode = null;
+                } else if (game.canAffordPlace()) {
+                    V.placeMode = {stage:'cell'};
+                }
+                draw();
             }
-            draw();
         },
         
         toggleHeal: () => {
-            if (game.over) return;
-            V.placeMode = null;
-            V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
-            draw();
+            if (!game.over) {
+                V.placeMode = null;
+                V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
+                draw();
+            }
         },
         
         cancelModes: () => {

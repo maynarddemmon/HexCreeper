@@ -42,6 +42,65 @@
             for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy();
         }
         
+        // ---- Saving ----
+        // Everything needed to carry on with this game later, as plain data for JSON.
+        // Effects aren't kept, and the board and sight are worked out again on import.
+        exportToObj() {
+            return {
+                turn:this.turn,
+                nextId:this.nextId,
+                score:this.score,
+                over:this.over,
+                quadRadius:this.grid.chunkRadius,
+                pieces:[...this.pieces.values()].map(p => ({...p})),
+                tiles:[...this.tiles.values()].map(t => ({...t})),
+                terrainQuads:[...this.terrainQuads],
+                tiledQuads:[...this.tiledQuads],
+                visitedQuads:[...this.visitedQuads],
+                seenCells:[...this.seenCells],
+                acted:[...this.acted],
+                fresh:[...this.fresh],
+                playerCoreId:this.playerCoreId,
+                selectedId:this.selectedId
+            };
+        }
+        
+        // Replaces this game with one from exportToObj(). Throws, leaving this game as it
+        // was, if the data is malformed.
+        importFromObj(o) {
+            const isNum = v => Number.isFinite(v),
+                isArr = Array.isArray;
+            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.quadRadius) ||
+                ![o.pieces, o.tiles, o.terrainQuads, o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh].every(isArr) ||
+                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
+                !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && isNum(t.timer) && typeof t.kind === 'string')
+            ) throw new Error('Malformed game data');
+            
+            this.turn = o.turn;
+            this.nextId = o.nextId;
+            this.score = o.score;
+            this.over = !!o.over;
+            this.effects = [];
+            pkg.GRID = pkg.makeGrid(o.quadRadius);
+            this.grid = pkg.GRID;
+            this.pieces = new Map();
+            this.board = new Map();
+            for (const p of o.pieces) {
+                this.pieces.set(p.id, {...p});
+                this.board.set(this.key(p.x, p.y), p.id);
+            }
+            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
+            this.terrainQuads = new Set(o.terrainQuads);
+            this.tiledQuads = new Set(o.tiledQuads);
+            this.visitedQuads = new Set(o.visitedQuads);
+            this.seenCells = new Set(o.seenCells);
+            this.acted = new Set(o.acted);
+            this.fresh = new Set(o.fresh);
+            this.playerCoreId = o.playerCoreId;
+            this.selectedId = o.selectedId;
+            this._sightKey = null;
+        }
+        
         key(x, y) { return x + ',' + y; }
         // Can a piece ever be on (x, y)? Not past the edge of the world, or on a solid or
         // hole tile.
