@@ -12,7 +12,10 @@ const playABit = page => page.evaluate(() => {
 });
 
 // The parts of the game a save must bring back.
+// The cells seen are brought up to date first, as drawing the board does, since a frame
+// may not have been drawn since the last change.
 const snapshot = page => page.evaluate(() => {
+    hc.app.game.cellsInSight();
     const g = hc.app.game,
         sorted = a => [...a].sort();
     return {
@@ -26,7 +29,7 @@ const snapshot = page => page.evaluate(() => {
 });
 
 const saveWithButton = async page => {
-    await button(page, '✇').click();
+    await button(page, 'Save').click();
     await button(page, '✓ Confirm').click();
     await expect(page.getByText('Save Succeeded', {exact:true}).filter({visible:true})).toBeVisible();
     await button(page, 'Acknowledge').click();
@@ -79,3 +82,49 @@ test('after losing, the last save can be loaded', async ({page}) => {
     await button(page, 'Load Last Save').click();
     expect(await snapshot(page)).toEqual(before);
 });
+
+// Picks a file for the import after confirming it. contents is a string.
+const importFile = async (page, contents) => {
+    await button(page, 'Import').click();
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, '✓ Confirm').click();
+    await (await chooser).setFiles({name:'save.json', mimeType:'application/json', buffer:Buffer.from(contents)});
+};
+
+test('a game exported to a file can be imported again, and is saved', async ({page}) => {
+    await startGame(page);
+    await playABit(page);
+    const before = await snapshot(page);
+    
+    const download = page.waitForEvent('download');
+    await button(page, 'Export').click();
+    const file = await download,
+        contents = await (await file.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString());
+    expect(file.suggestedFilename()).toBe('hexcreeper-save.json');
+    expect(JSON.parse(contents).version).toBe(1);
+    
+    await button(page, 'New game').click();
+    await button(page, '✓ Confirm').click();
+    expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
+    
+    await importFile(page, contents);
+    await expect(page.getByText('Import Succeeded', {exact:true}).filter({visible:true})).toBeVisible();
+    expect(await snapshot(page)).toEqual(before);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hc.save')).data.turn)).toBe(before.turn);
+});
+
+for (const [what, contents, msg] of [
+    ['not JSON', 'not a save', 'That file is not a HexCreeper save file.'],
+    ['not a save', JSON.stringify({version:1, data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.']
+]) {
+    test(`importing a file that is ${what} changes nothing`, async ({page}) => {
+        await startGame(page);
+        await playABit(page);
+        const before = await snapshot(page);
+        await importFile(page, contents);
+        await expect(page.getByText('Import Failed', {exact:true}).filter({visible:true})).toBeVisible();
+        await expect(page.getByText(msg, {exact:false})).toBeVisible();
+        expect(await snapshot(page)).toEqual(before);
+        expect(await page.evaluate(() => localStorage.getItem('hc.save'))).toBe(null);
+    });
+}

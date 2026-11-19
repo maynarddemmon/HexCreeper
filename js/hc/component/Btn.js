@@ -7,6 +7,8 @@
         
         {theme:{btnHeight, colorBtn}} = pkg,
         
+        ICON_DIR = './img/icons/',
+        
         Btn = pkg.Btn = new JSClass('Btn', M.PaddedText, {
             include: [M.Button],
             
@@ -78,6 +80,32 @@
             attrs.lineHeight ??= '0px';
             
             this.callSuper(parent, attrs);
+        }
+    });
+    
+    /*  A square button showing an icon: an SVG from img/icons/ (Lucide) by name, or
+        another image by iconUrl. The icon is drawn in the button's text colour, as a mask,
+        so it follows hover and disabled styles like text does. label names the button for
+        screen readers (and tests), since it has no text. */
+    pkg.IconBtn = new JSClass('IconBtn', pkg.SquareBtn, {
+        initNode: function(parent, attrs) {
+            const iconUrl = attrs.iconUrl ?? ICON_DIR + attrs.icon + '.svg',
+                iconSize = attrs.iconSize ?? 18,
+                label = attrs.label;
+            delete attrs.icon;
+            delete attrs.iconUrl;
+            delete attrs.iconSize;
+            delete attrs.label;
+            attrs.buttonType ??= 'underline';
+            attrs.text = '';
+            
+            this.callSuper(parent, attrs);
+            
+            const iconIDS = new M.View(this, {width:iconSize, height:iconSize, align:'center', valign:'middle'}).getIDS();
+            iconIDS.pointerEvents = 'none';
+            iconIDS.backgroundColor = 'currentColor';
+            iconIDS.mask = iconIDS.webkitMask = 'url(' + iconUrl + ') center / contain no-repeat';
+            if (label) this.getIDE().setAttribute('aria-label', label);
         }
     });
     

@@ -11,11 +11,11 @@ JS.Packages(file => {
         'hc.WideView','hc.Spacer','hc.Panel','hc.LabeledValue'
     ).requires('hc.theme');
     file(COMPONENT_ROOT + 'Btn.js').provides(
-        'hc.Btn','hc.UnderlineBtn','hc.SquareBtn','hc.ToggleBtn'
+        'hc.Btn','hc.UnderlineBtn','hc.SquareBtn','hc.IconBtn','hc.ToggleBtn'
     ).requires('hc.theme');
     file(COMPONENT_ROOT + 'Dialogs.js').provides(
         'hc.dialogUtil','hc.ModalDialog','hc.AckDialog','hc.ConfirmDialog'
-    ).requires('hc.SquareBtn','hc.UnderlineBtn','hc.Spacer','hc.WideView','hc.Panel');
+    ).requires('hc.IconBtn','hc.UnderlineBtn','hc.Spacer','hc.WideView','hc.Panel');
     
     // Model //
     file(MODEL_ROOT + 'Grid.js').provides('hc.makeGrid','hc.hexDist').requires('hc.cfg');

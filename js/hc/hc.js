@@ -187,11 +187,6 @@
         
         // Icons
         ICON_SEPARATOR:'\u00A0·\u00A0',
-        ICON_HELP:'?',
-        ICON_SETTINGS:'⚙',
-        ICON_CENTER:'⌖',
-        ICON_RESTART:'⌫',
-        ICON_SAVE:'✇',
         ICON_CHECKED:'✓',
         ICON_UNCHECKED:'✗',
         ICON_CANCEL:'X',

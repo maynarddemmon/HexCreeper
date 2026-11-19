@@ -77,8 +77,8 @@
                 
                 if (cancelable) {
                     const header = self.getHeaderView();
-                    self._closeBtn = new pkg.SquareBtn(header, {
-                        y:2, text:pkg.ICON_CANCEL, tooltip:i18n('btn-close'), buttonType:'plain'
+                    self._closeBtn = new pkg.IconBtn(header, {
+                        y:2, icon:'x', label:i18n('btn-close'), tooltip:i18n('btn-close'), buttonType:'plain'
                     }, [{
                         doActivated: function() {self.doClose();}
                     }]);

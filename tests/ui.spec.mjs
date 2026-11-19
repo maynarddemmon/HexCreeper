@@ -1,11 +1,11 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage, button} from './helpers.mjs';
 
-const settingsTitle = page => page.getByText('⚙ Settings', {exact:true}).filter({visible:true});
+const settingsTitle = page => page.getByText('Settings', {exact:true}).filter({visible:true});
 
 test('the header has every button, and End Turn ends the turn', async ({page}) => {
     await startGame(page);
-    for (const name of ['End Turn', 'Place · 5', 'Heal 1 · 5', '⌖', '⌫', '⚙', '?']) {
+    for (const name of ['End Turn', 'Place · 5', 'Heal 1 · 5', 'Center', 'Save', 'Export', 'Import', 'New game', 'Settings', 'Help']) {
         await expect(button(page, name)).toBeVisible();
     }
     await button(page, 'End Turn').click();
@@ -25,14 +25,14 @@ test('help opens on a first visit only, loaded from data/help.txt', async ({page
     await page.waitForTimeout(300);
     await expect(title).toHaveCount(0);
 
-    await button(page, '?').click();
+    await button(page, 'Help').click();
     await expect(title).toBeVisible();
 });
 
 test('keys are ignored while a dialog is open', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await button(page, '⚙').click();
+    await button(page, 'Settings').click();
     await expect(settingsTitle(page)).toBeVisible();
     await page.keyboard.press('Enter');   // closes the dialog (its default button), not the turn
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
@@ -40,19 +40,19 @@ test('keys are ignored while a dialog is open', async ({page}) => {
 
 test('a setting marked ✱ applies from the next new game', async ({page}) => {
     await startGame(page);
-    await button(page, '⚙').click();
+    await button(page, 'Settings').click();
     const input = page.locator('input[data-setting="quadRadius"]');
     await input.fill('2');
     await input.press('Enter');
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(5);
     await button(page, 'X Close').click();
-    await button(page, '⌫').click();
+    await button(page, 'New game').click();
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);
 });
 
 test('a setting applies at once, is saved only while not the default, and resets', async ({page}) => {
     await startGame(page);
-    await button(page, '⚙').click();
+    await button(page, 'Settings').click();
     const input = page.locator('input[data-setting="linkRange"]');
     await expect(input).toHaveValue('3');
     await input.fill('5');
@@ -72,7 +72,7 @@ test('a setting applies at once, is saved only while not the default, and resets
 test('New Game asks first once the game has started', async ({page}) => {
     await startGame(page);
     await button(page, 'End Turn').click();
-    await button(page, '⌫').click();
+    await button(page, 'New game').click();
     await expect(page.getByText('Abandon this game and start a new one?')).toBeVisible();
     await button(page, '✓ Confirm').click();
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
@@ -99,7 +99,7 @@ test('after losing, recentering goes to the start cell', async ({page}) => {
         hc.view.draw();
     });
     await button(page, 'X Close').click();
-    await button(page, '⌖').click();
+    await button(page, 'Center').click();
     expect(await page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]);
     
     await page.evaluate(() => {hc.view.cam.x = 40; hc.view.cam.y = -30;});

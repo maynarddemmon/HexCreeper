@@ -105,7 +105,7 @@
             
             self.callSuper(parent, attrs);
             
-            self.setTitle(pkg.ICON_SETTINGS + ' ' + i18n('tip-settings'));
+            self.setTitle(i18n('tip-settings'));
             self.getFooterView().ackBtn.setText(pkg.ICON_CANCEL + ' ' + i18n('btn-close'));
             
             const container = self._container = new WideView(self.getContentView()),

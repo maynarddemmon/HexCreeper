@@ -69,7 +69,7 @@ The tests start their own static server and load the real `index.html`, then dri
 | `i18n/` | UI text (`en-US.js`) and myt's own resources |
 | `data/help.txt` | The How to Play text, loaded when help opens |
 | `lib/` | The script loader and myt |
-| `fonts/`, `img/` | Space Mono (OFL) and the GitHub mark |
+| `fonts/`, `img/` | Space Mono (OFL), the GitHub mark, and in `img/icons/` the [Lucide](https://lucide.dev) icons the UI uses (ISC; only the ones used are copied in, from the `lucide-static` package) |
 | `docs/DESIGN.md` | The design notes: every rule, its numbers and the reasoning behind them |
 | `docs/PLAYTESTS.md` | The playtest log |
 | `tests/` | Playwright tests (`npm test`) and their static server |

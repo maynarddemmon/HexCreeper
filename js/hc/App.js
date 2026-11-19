@@ -12,6 +12,8 @@
         placeBtn,
         healBtn,
         saveBtn,
+        exportBtn,
+        hiddenSaveFileImporter,
         
         persistenceMgr, // The PersistenceManager.
         gameOverShown = false,
@@ -21,12 +23,12 @@
         {View, PlainText, I18N:{get:i18n}} = M,
         
         {
-            Btn, ToggleBtn, SquareBtn, WideView, Spacer, LabeledValue,
+            Btn, ToggleBtn, IconBtn, WideView, Spacer, LabeledValue,
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, isAnyShowing},
             theme:{
                 spacing, padding, 
                 colorHeaderBg, colorHeaderText, colorBtn, 
-                fontSizeMedium, fontSizeLarge, fontSizeVeryLarge, fontFamilyMono
+                fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
                 DATA_BASE_DIR, TOP_VIEW_HEIGHT, GITHUB_URL
@@ -60,6 +62,15 @@
         /*  The key for a keydown: the code for numpad keys, the lowercase character for
             others, or the key's name (e.g. "Enter"). */
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
+        
+        /*  After the game has been replaced by a saved one. */
+        afterLoad = () => {
+            gameOverShown = false;
+            V.placeMode = null;
+            V.healMode = false;
+            gameView.centerOn(game.playerCore);
+            draw();
+        },
         
         /*  The save button's tooltip says when the game was last saved. */
         updateLastSaved = () => {
@@ -146,38 +157,40 @@
             
             new PlainText(topView, {text:ICON_SEPARATOR});
             
-            new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_CENTER, fontSize:fontSizeVeryLarge, tooltip:i18n('tip-center')}, [{
+            new IconBtn(topView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
                 doActivated: () => {appView.centerOn(game.playerCore);}
             }]);
-            saveBtn = new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_SAVE, fontSize:fontSizeVeryLarge}, [{
+            
+            new PlainText(topView, {text:ICON_SEPARATOR});
+            
+            saveBtn = new IconBtn(topView, {icon:'save', label:i18n('lbl-save')}, [{
                 doActivated:appView.confirmSave
             }]);
-            new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_RESTART, fontSize:fontSizeLarge, tooltip:i18n('tip-new-game')}, [{
+            exportBtn = new IconBtn(topView, {icon:'download', label:i18n('lbl-export'), tooltip:i18n('tip-export')}, [{
+                doActivated: () => {persistenceMgr.export();}
+            }]);
+            new IconBtn(topView, {icon:'upload', label:i18n('lbl-import'), tooltip:i18n('tip-import')}, [{
+                doActivated:appView.confirmImport
+            }]);
+            new IconBtn(topView, {icon:'rotate-ccw', label:i18n('lbl-new-game'), tooltip:i18n('tip-new-game')}, [{
                 doActivated:appView.confirmNewGame
             }]);
             
             new PlainText(topView, {text:ICON_SEPARATOR});
             
-            new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_SETTINGS, fontSize:fontSizeVeryLarge, tooltip:i18n('tip-settings')}, [{
+            new IconBtn(topView, {icon:'settings', label:i18n('tip-settings'), tooltip:i18n('tip-settings')}, [{
                 doActivated:appView.openSettings
             }]);
-            new SquareBtn(topView, {buttonType:'underline', text:pkg.ICON_HELP, fontSize:fontSizeLarge, tooltip:i18n('tip-help')}, [{
+            new IconBtn(topView, {icon:'circle-help', label:i18n('lbl-help'), tooltip:i18n('tip-help')}, [{
                 doActivated:appView.openHelp
             }]);
             
             new PlainText(topView, {text:ICON_SEPARATOR});
             
             // GitHub's mark, linking to the project in a new tab.
-            const githubBtn = new SquareBtn(topView, {buttonType:'underline', text:'', tooltip:i18n('tip-github')}, [{
-                    doActivated: () => {window.open(GITHUB_URL, '_blank', 'noopener');}
-                }]),
-                githubMarkSize = 20,
-                githubMark = new View(githubBtn, {
-                    width:githubMarkSize, height:githubMarkSize, align:'center', valign:'middle',
-                    imageUrl:GITHUB_MARK_URL, imageSize:'contain'
-                }, [M.ImageSupport]);
-            githubMark.getIDS().pointerEvents = 'none';
-            githubBtn.getIDE().setAttribute('aria-label', i18n('tip-github'));
+            new IconBtn(topView, {iconUrl:GITHUB_MARK_URL, iconSize:20, label:i18n('tip-github'), tooltip:i18n('tip-github')}, [{
+                doActivated: () => {window.open(GITHUB_URL, '_blank', 'noopener');}
+            }]);
             
             new M.ResizeLayout(topView, {inset:padding, spacing:spacing, outset:padding});
             new M.ConstantLayout(topView, {targetAttrName:'valign', targetValue:'middle'});
@@ -200,6 +213,7 @@
             
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
+            exportBtn.setDisabled(gameOver);
             
             placeBtn.setTextAndFit(i18n('btn-place', placeCost));
             placeBtn.setTooltip(i18n('tip-place', placeCost));
@@ -250,10 +264,30 @@
                 updateLastSaved();
                 return;
             }
-            gameOverShown = false;
-            V.placeMode = null;
-            V.healMode = false;
-            gameView.centerOn(game.playerCore);
+            afterLoad();
+        },
+        
+        /*  Asks first, since it replaces the game and the save, then asks for a save file. */
+        confirmImport: () => {
+            openConfirmMsgDialog(i18n('dlg-import-title'), i18n('dlg-import-msg'), () => {
+                hiddenSaveFileImporter ??= new M.HiddenJSONImporter(appView, null, [{
+                    processJSON: json => {
+                        const problem = persistenceMgr.importRecord(json);
+                        updateLastSaved();
+                        if (problem) {
+                            openAckMsgDialog(i18n('dlg-import-failed-title'), i18n('dlg-import-failed-msg', problem));
+                        } else {
+                            afterLoad();
+                            openAckMsgDialog(i18n('dlg-import-succeeded-title'), i18n('dlg-import-succeeded-msg'));
+                        }
+                    },
+                    handleJSONParsingError: function(err) {
+                        this.callSuper(err);
+                        openAckMsgDialog(i18n('dlg-import-failed-title'), i18n('dlg-import-not-save-msg'));
+                    }
+                }]);
+                hiddenSaveFileImporter.promptForFile();
+            });
         },
         
         /*  Asks first, since it replaces any existing save. */
