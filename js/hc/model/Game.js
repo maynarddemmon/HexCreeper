@@ -248,7 +248,7 @@
         // Apply tiles under pieces that just moved. Harm first, then heals. Eating n
         // heal tiles in one move makes each worth n x HEAL.amount (n^2 in total).
         landOnTiles(pieces) {
-            for (const g of pieces) if (this.pieces.has(g.id) && this.isHarm(g.x, g.y)) this.damage(g, TILES.harmDamage, null);
+            for (const g of pieces) if (this.pieces.has(g.id) && this.isHarm(g.x, g.y)) this.springHarm(g);
             const eaters = pieces.filter(g => this.pieces.has(g.id) && this.tileAt(g.x, g.y, 'heal'));
             const n = eaters.length;
             for (const g of eaters) this.consumeHeal(g, g.x, g.y, n);
@@ -288,22 +288,11 @@
         // tiles exist wherever you could see. This doesn't depend on whether fog of war is
         // on, so turning it off and on doesn't change the world.
         updateQuadrants() {
-            const before = this.visitedQuads.size,
-                reach = Math.max(1, Math.ceil(VISION.radius / (3 * pkg.GRID.chunkRadius + 2)));
+            const reach = Math.max(1, Math.ceil(VISION.radius / (3 * pkg.GRID.chunkRadius + 2)));
             for (const p of this.piecesOf('player')) {
                 const [qx, qy] = this.quadOf(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);
                 for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateQuad(q.x, q.y);
-            }
-            if (this.visitedQuads.size !== before) this.clearSurroundedHarm();
-        }
-        
-        // Harm tiles vanish once every quadrant around theirs has been visited.
-        clearSurroundedHarm() {
-            for (const [k, t] of this.tiles) {
-                if (t.kind !== 'harm' || this.unvisitedAround(t.x, t.y) > 0) continue;
-                this.tiles.delete(k);
-                this.fx(t.x, t.y, '', '--harm', { vanish: true });
             }
         }
         
@@ -355,9 +344,16 @@
         }
         isHarm(x, y) { return !!this.tileAt(x, y, 'harm'); }
         
+        // A harm tile damages the piece on it once, then is gone.
+        springHarm(piece) {
+            this.tiles.delete(this.key(piece.x, piece.y));
+            this.fx(piece.x, piece.y, '', '--harm', { vanish: true });
+            this.damage(piece, TILES.harmDamage, null);
+        }
+        
         // Count tiles down. A tile that activates under a piece takes effect at once:
         // a heal tile is eaten by a player piece standing on it; a harm tile damages
-        // whatever piece is standing on it (and stays).
+        // whatever piece is standing on it (and is gone).
         tickTiles() {
             const armed = [];
             for (const t of this.tiles.values()) {
@@ -369,7 +365,7 @@
                 if (this.over) return;
                 const p = this.pieceAt(t.x, t.y);
                 if (!p) continue;
-                if (t.kind === 'harm') this.damage(p, TILES.harmDamage, null);
+                if (t.kind === 'harm') this.springHarm(p);
                 else if (p.owner === 'player') this.consumeHeal(p, t.x, t.y, 1);
             }
         }

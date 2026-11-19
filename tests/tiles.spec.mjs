@@ -47,15 +47,15 @@ test.describe('rules', () => {
         await clearBoard(page);
     });
     
-    test('a harm tile hurts whoever moves onto it, and stays', async ({page}) => {
+    test('a harm tile hurts whoever moves onto it, then is gone', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.playerCore, d = hc.GRID.dirs[0];
             g.tiles.set(g.key(d[0], d[1]), {x:d[0], y:d[1], kind:'harm', timer:0});
             const hp = c.hp;
             g.playerAct(c, d[0], d[1]);
-            return {lost:hp - c.hp, stays:g.isHarm(d[0], d[1])};
+            return {lost:hp - c.hp, gone:!g.tiles.has(g.key(d[0], d[1]))};
         });
-        expect(r).toEqual({lost:1, stays:true});
+        expect(r).toEqual({lost:1, gone:true});
     });
     
     test('nothing can move onto or be placed on a solid tile', async ({page}) => {
@@ -87,9 +87,9 @@ test.describe('rules', () => {
             const inert = !g.isHarm(0, 0);
             g.playerWait(); const after1 = c.hp;
             g.playerWait(); const after2 = c.hp;
-            return {inert, after1, after2};
+            return {inert, after1, after2, gone:!g.tiles.has(g.key(0, 0))};
         });
-        expect(r).toEqual({inert:true, after1:2, after2:1});
+        expect(r).toEqual({inert:true, after1:2, after2:1, gone:true});
     });
     
     test('heal value drops as nearby quadrants are visited', async ({page}) => {
@@ -103,17 +103,15 @@ test.describe('rules', () => {
         expect(r.v1).toBe(1);
     });
     
-    test('harm tiles vanish once every neighbouring quadrant is visited', async ({page}) => {
+    test('harm tiles stay once every neighbouring quadrant is visited', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, d = hc.GRID.dirs[0];
             g.tiles.set(g.key(d[0], d[1]), {x:d[0], y:d[1], kind:'harm', timer:0});
-            g.tiles.set(g.key(-d[0], -d[1]), {x:-d[0], y:-d[1], kind:'harm', timer:5});
             for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.visitedQuads.add(i + ',' + j);
-            g.visitedQuads.delete('0,0');
             g.updateQuadrants();
-            return g.tiles.size;
+            return g.isHarm(d[0], d[1]);
         });
-        expect(r).toBe(0);
+        expect(r).toBe(true);
     });
     
     test('healing flows up to a damaged ancestor first, then down; leftovers become score', async ({page}) => {

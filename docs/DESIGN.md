@@ -71,7 +71,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, and **0–5 solid tiles** *(settings)* in one connected clump: the first on a random free cell, each next one on a free cell of the quadrant touching the clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
-- **Harm tile** (red ×): 1 damage to any piece that moves onto it or is standing on it when it activates. It disappears once **every neighbouring quadrant has been visited**.
+- **Harm tile** (red ×): 1 damage to a piece that moves onto it or is standing on it when it activates, and then it's **gone**. (It used to stay, and clear once every neighbouring quadrant had been visited; it was what forced the swarm to change shape. Solid tiles do that better now, so as of 2026-11-19 harm tiles are one-shot.)
 - Enemies never step onto active harm tiles, and they path around them.
 - **Solid tile** (dark grey hex): no piece can ever move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown) and never go away.
 
@@ -144,7 +144,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - (Earlier, with both grids.) With the planning AI, a simulated bot that places pieces whenever it can and attacks with every piece that can, but never moves otherwise, lasted a median 11 turns on squares (1 of 10 runs reached the 400-turn cap) and 26 on hexes (none reached it).
 - With the old AI, where squads moved as one block, the same bot had 1–2 of 10 runs on squares and 3 of 8 on hexes holding out forever (the **turtling** problem: a stationary rank-4 swarm fed on squads that arrived piecemeal). Patience in the planning AI largely fixes this.
 - AI tuning sweep against a wall of pieces over 12 turns: caution 6 → squads brawl (ending exposed 11 of 12 turns); caution 10–15 → a safe strike on 3 turns and exposed on only 3; caution ≥ 9 without patience → squads never commit.
-- Heal value rewards exploring; harm tiles clear out of fully explored areas, so the explored interior becomes safer but less rewarding.
+- Heal value rewards exploring, so the explored interior becomes less rewarding; harm tiles you've walked into are gone, but the ones you've avoided stay.
 - Advance after a kill favours aggressive play; turn it off to compare.
 
 ## Next directions (not built)
@@ -160,7 +160,7 @@ Every value applies immediately (those marked "new game" from the next game) and
 - `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
 - `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
-- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateQuad` / `clearSurroundedHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
+- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateQuad` / `placeSolids`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
