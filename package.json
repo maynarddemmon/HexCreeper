@@ -1,0 +1,19 @@
+{
+    "name": "HexCreeper",
+    "version": "0.1",
+    "author": "Maynard Demmon",
+    "description": "A turn-based swarm game on an infinite grid.",
+    "license": "MIT",
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@playwright/test": "^1.63.0",
+        "eslint": "^10.15.0",
+        "globals": "^17.14.0"
+    },
+    "scripts": {
+        "lint": "eslint js tests playwright.config.mjs",
+        "test": "playwright test",
+        "lintest": "npm run lint && npm run test",
+        "setup-hooks": "git config core.hooksPath hooks"
+    }
+}

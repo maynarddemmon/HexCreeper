@@ -1,0 +1,167 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HexCreeper</title>
+<link rel="preload" href="./fonts/SpaceMono-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<style>
+	@font-face {
+		font-family:'SpaceMono';
+		src:url('./fonts/SpaceMono-Regular.ttf') format('truetype');
+	}
+
+	:root {
+		--bg: #000;
+		--grid: #222;
+		--grid-major:#333;
+		--ink: #ddd;
+		--muted: #999;
+		
+		--core: #e66;
+		--core-dark: #fa8;
+		
+		--enemy: #89d;
+		--enemy-dark: #cdf;
+		--enemy-link: rgba(195, 199, 240, 0.5);
+		--move: rgba(226, 115, 90, 0.18);
+		--move-hover: rgba(226, 115, 90, 0.4);
+		--attack: rgba(140, 146, 209, 0.2);
+		--attack-hover: rgba(140, 146, 209, 0.42);
+		
+		--place: rgba(240, 192, 64, 0.18);
+		--place-hover: rgba(240, 192, 64, 0.42);
+		--place-ink: #fc4;
+		
+		--link: rgba(242, 160, 140, 0.6);
+		--range: rgba(242, 160, 140, 0.35);
+		--dmg: #f65;
+		--gain: #6d8;
+		--heal: #6d8;
+		--heal-bg: rgba(111, 209, 143, 0.14);
+		
+		--harm: #f65;
+		--harm-bg: rgba(255, 107, 90, 0.14);
+		--visited: rgba(110, 160, 240, 0.08);
+		--panel: rgba(38, 36, 33, 0.92);
+		--sel-bg: rgba(240, 184, 64, 0.32);
+		--sel-fill: #f0b840;
+		--sel-stroke: #ffe3a3;
+		--sel-link: rgba(240, 184, 64, 0.95);
+		--sel-tint: rgba(240, 184, 64, 0.14);
+		--harm-hover: rgba(255, 90, 70, 0.55);
+		--heal-hover: rgba(90, 220, 130, 0.5);
+		--core-tint: rgba(226, 115, 90, 0.13);
+		--enemy-tint: rgba(140, 146, 209, 0.14);
+		
+		--header-bg: #2a2825;
+		--header-text: #ece7dc;
+		
+		--dlg-bg: #23211e;
+		--dlg-header: #2f2c28;
+		--dlg-footer: #2a2825;
+		
+		--btn-bg: rgba(255, 255, 255, 0.06);
+		--btn-bg-hover: rgba(255, 255, 255, 0.14);
+	}
+
+	html,body{height:100%;margin:0px;padding:0px;border:0px none;overflow:hidden;}
+	input,textarea,select{box-sizing:border-box;}
+	input.mytNativeInput:not([type=button]), textarea.mytNativeInput{margin:0px;padding:1px;border:0px none;}
+	.mytButtonText{font-size:12px;font-weight:bold;}
+	.mytUnselectable{user-select:none;}
+	::placeholder{user-select:none;}
+
+	body{
+		background:var(--bg);
+		color:var(--ink);
+		font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+		font-size:13px;
+	}
+
+	#appDiv {
+		position:absolute;
+		width:100%;
+		height:100%;
+	}
+
+	/* The game board (see view/View.js and view/GameView.js) */
+	canvas.hc-canvas {display:block; width:100%; height:100%; touch-action:none; cursor:grab;}
+	canvas.hc-canvas.dragging {cursor:grabbing;}
+
+	/* Buttons */
+	.hc-Btn {
+		font-family:inherit;
+		font-size:13px;
+		font-weight:600;
+		color:var(--core-dark);
+		background-color:var(--btn-bg);
+		border:1px solid var(--core-dark);
+		border-radius:6px;
+		cursor:pointer;
+	}
+	.hc-Btn:hover {background-color:var(--btn-bg-hover);}
+	.hc-Btn.disabled {opacity:0.45; cursor:default;}
+	.hc-Btn.disabled:hover {background-color:var(--btn-bg);}
+
+	/* A mode that's on, e.g. Place or Heal while choosing, or the chosen grid. */
+	.hc-Btn.on {background-color:var(--sel-bg); border-color:var(--sel-stroke); color:var(--ink);}
+
+	.hc-Btn.plain {background-color:transparent; border:1px solid transparent; color:var(--ink);}
+	.hc-Btn.plain:hover {background-color:var(--btn-bg-hover);}
+
+	.hc-Btn.choice {border-color:var(--muted); color:var(--ink);}
+	.hc-Btn.choice.on {border-color:var(--sel-stroke);}
+
+	.hc-Btn.solid {background-color:var(--core); border-color:var(--core); color:#fff;}
+	.hc-Btn.solid:hover {background-color:var(--core-dark); border-color:var(--core-dark);}
+	.hc-Btn.solid.disabled:hover {background-color:var(--core); border-color:var(--core);}
+
+	.hc-Btn.underline {
+		background-color:transparent;
+		border-radius:0px;
+		border:none;
+	}
+	.hc-Btn.underline::after {
+		pointer-events:none;
+		content:"";
+		position:absolute;
+		background-color:var(--core-dark);
+		left:0;
+		bottom:1px;
+		width:0;
+		height:1px;
+		transition:width .3s ease;
+	}
+	.hc-Btn.underline:hover::after {width:100%;}
+	.hc-Btn.underline.disabled:hover::after {width:0%;}
+</style>
+<script>
+const writeScript = src => document.write('<script src="./'+src+'.js">\x3C/script>');
+writeScript('lib/myt.min');
+let LOCALE_KEY;
+(() => {
+	const SUPPORTED_LOCALES = {
+		en:{US:{default:true}, default:true}
+	};
+	let [lang, country] = navigator.language.split('-'),
+		supportedEntry = SUPPORTED_LOCALES[lang];
+	if (!supportedEntry) {
+		for (lang in SUPPORTED_LOCALES) {
+			supportedEntry = SUPPORTED_LOCALES[lang];
+			if (supportedEntry.default === true) break;
+		}
+	}
+	if (!supportedEntry[country]) {
+		for (country in supportedEntry) {
+			if (supportedEntry[country].default === true) break;
+		}
+	}
+	document.getElementsByTagName('html')[0].lang = LOCALE_KEY = lang + '-' + country;
+	writeScript('i18n/' + LOCALE_KEY);
+	writeScript('i18n/rsrc-' + LOCALE_KEY);
+})();
+globalThis.HC_ROOT = './js/hc/';
+writeScript('lib/loader-browser.min');
+writeScript('js/hc/manifest');
+</script>
+</head><body><div id="appDiv"></div>
+<script>JS.require('hc.App', () => {new hc.App(document.getElementById('appDiv'));});</script>
+</body></html>

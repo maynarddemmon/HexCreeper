@@ -1,0 +1,31 @@
+You are a single core on an endless grid. Grow it into a swarm of linked pieces, hold off the enemy squads, and explore for healing and score. The game ends when your core is destroyed.
+
+<span style="font-size:16px;">YOUR TURN</span>
+Each turn you may move as many pieces as your highest rank, each once, in any order. Click a piece to select it, then click a highlighted cell to move it, or use the keys: Q W E / A D / Z X C on squares, or Q E / A D / Z C on hexes. Tab cycles your pieces. End Turn (Enter) lets the enemies act; the turn ends by itself once nothing can move.
+
+<span style="font-size:16px;">THE SWARM</span>
+- Every piece you place links to a neighbour, its parent. Arrows point from each piece to its parent.
+- Moving a piece carries everything linked below it, keeping its shape. Move the core to shift the whole swarm, or move a branch to reshape it.
+- A linked piece must stay within 3 steps of its parent.
+- If a piece is destroyed, everything linked below it goes too.
+- Shift-click a cell held by one of your own pieces to move onto it instead of selecting it.
+
+<span style="font-size:16px;">RANK</span>
+A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. Max HP is 2 × rank. Your highest rank sets your moves per turn; your core's rank sets the cost of Place and Heal (5 × rank).
+
+<span style="font-size:16px;">ATTACKING</span>
+Moving onto an enemy attacks it. When a group moves, every piece in it that would land on an enemy hits it. Killing n enemies in one move scores n², and pieces destroyed below a killed piece count too. After a kill, the attacker advances into the empty cell if it can.
+
+<span style="font-size:16px;">ENEMIES</span>
+Enemies arrive in waves of linked squads, and waves grow with your rank. A squad acts as often as its rank and plans its turn: it will carry a piece into reach, strike, and pull back out of reach. Kill a squad's leader to destroy the whole squad.
+
+<span style="font-size:16px;">TILES</span>
+- Green + heals the piece that steps on it; spare healing flows along links (up first, then down), and any left over becomes score. Its value, shown on the tile, is higher near unexplored quadrants.
+- Red × deals damage to anything that moves onto it. Enemies walk around them. It clears once every quadrant around it has been visited.
+- Dashed cells with a number are tiles counting down to appear. Quadrants you've visited are tinted blue.
+
+<span style="font-size:16px;">SPENDING SCORE</span>
+- Place (P): pick an empty cell next to your pieces, then the piece to link it to.
+- Heal (H): heal HP equal to your core's rank, starting from a piece you pick.
+
+Drag to pan, scroll to zoom, Space to recenter, Esc to cancel. Settings (⚙) has the grid choice and every number in the game. Open this help again with the ? button at the top right.

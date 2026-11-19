@@ -1,0 +1,164 @@
+# HexCreeper — design notes
+
+Every rule in the game, its default numbers, and why it is the way it is. All the numbers marked *(setting)* can be changed in the in-game Settings panel.
+
+## Core rules
+- World: a **hex or square grid** (chosen in Settings, which starts a new game; hex is the default), effectively infinite (integer coordinates clamped to ±1,000,000). The core starts at (0,0), the centre of the first quadrant.
+- Turn-based. On your turn you may move up to **(highest rank of any of your pieces)** different pieces, each once, in any order. Placing pieces and paid heals are also allowed during the turn and don't use moves. The turn ends with End turn (Enter / `.`), or automatically once no piece can act and you can't afford a placement. Then every enemy squad acts, the turn counter advances, tile countdowns tick (tiles arming under pieces take effect), and enemies may spawn.
+- Pieces have a type (which sets how they move), an owner (player or enemy), HP, a score value, a rank and an optional link parent. Both sides use link trees.
+- Moving onto an opposing piece is an attack: 1 damage.
+- **Advance after a kill** *(setting, on by default)*: if a player attack kills and the whole moving group can then legally step in that direction (every destination cell empty or vacated by the group, link range respected, no active harm tile), the group steps forward as part of the same action, eating any heal tiles it lands on. Otherwise the attackers stay put. Enemies never advance after kills.
+- The game is over when your original core is destroyed.
+
+## Grids
+| | Square | Hex |
+|---|---|---|
+| Neighbours / move directions | 8 (king moves) | 6 |
+| Distance (link range, spawning, pathing) | Chebyshev | hex distance |
+| Link range shape (3) | 7×7 square | hexagon of 37 cells |
+| Quadrants | 5×5 blocks *(setting)*, 8 neighbours | hexagonal chunks of radius 3 = 37 cells *(setting)*, 6 neighbours |
+| Heal tile value max | ⌊8/2⌋+1 = 5 | ⌊6/2⌋+1 = 4 |
+| Harm tiles clear when | all 8 neighbouring quadrants are visited | all 6 neighbouring chunks are visited |
+| Keys | Q W E / A D / Z X C, arrows, numpad | Q E / A D / Z C (NW NE / W E / SW SE), ← / →, numpad 7 9 4 6 1 3 |
+- Hexes are pointy-top, stored in axial coordinates (q, r). Hex chunks of radius k tile the plane on the lattice (2k+1, −k), (k, k+1), and chunk (0,0) is centred on the start cell.
+- The grid choice is remembered in the browser (`hc.grid`).
+- After playtesting, the hex grid "works quite well", and the hex chunk radius default went from 2 to 3.
+
+## Combos
+- **Kills:** killing n enemies in one move scores n × (their total score value), which is n² for 1-point enemies (1, 4, 9, 16…). Enemies destroyed because a piece they were linked below died **count as kills** for the combo.
+- **Heals:** eating n heal tiles in one move (a group carried over several tiles) multiplies each tile's value by n.
+
+## Rank (both sides)
+- Each piece's rank = max(base, 1 + min(rank of its two highest-ranked children)); a missing child counts as 0. Base = 1. So a piece needs **two** children to rank up, and a full binary tree maximises rank but is the most fragile.
+- Player: **max HP = 2 × rank**. When max HP rises, current HP does not *(setting)*: the new capacity has to be healed. When it falls, HP is clamped. **Moves per turn = highest rank among your pieces. Place cost = 5 × core rank.**
+- Enemy: **max HP = 1 × rank** *(setting)*. A squad's **actions per turn = its highest rank**.
+- Ranks are recomputed whenever a piece is placed, spawned or destroyed.
+
+## Piece types
+| Type | Owner | HP | Score value | Movement |
+|------|-------|----|-------------|----------|
+| core | player | 2 × rank | 1 | 1 cell, any neighbour direction |
+| core | enemy  | 1 × rank | 1 | 1 cell, any neighbour direction |
+
+## Actions that cost score
+- **Place piece** (P): costs 5 × core rank. Choose an empty cell next to any of your pieces (not an active harm tile), then the neighbouring piece it links to. New pieces start at full HP and can't move until next turn.
+- **Heal** (H): costs 5 × core rank, the same as placing. Heals **core rank** HP, starting from a piece you click, and flows along links exactly like a heal tile. **Unused healing is lost.** Only available when some piece is damaged. Doesn't use a move or end the turn.
+
+## The swarm
+- Moving a piece moves its whole subtree by the same step. Only the chosen piece spends a move, so pieces it carries can still move themselves afterward. Order matters: reshape the children first, then carry the formation with the parent, or the other way round.
+  - Group attack: if any member would step onto an enemy, every such member hits the enemy in front of it (then the advance rule applies).
+  - Otherwise every member must land on an empty cell or one vacated by the group.
+- Link range: a linked piece must end within 3 steps of its parent *(setting)*. The root is unrestricted.
+- When a piece is destroyed, every descendant is destroyed too (both sides).
+
+## Enemy pressure (tied to player rank)
+- **R = your highest piece rank.** The turn count doesn't drive difficulty (an optional clock ramp exists, off by default).
+- A wave arrives every 3 turns with **base + perRank × (R − 1)** enemies = **1, 3, 5, 7, 9…** at rank 1, 2, 3, 4, 5.
+- The wave is split into squads of the **squad cap or one less**, where squad cap = **R + 1** (max 8).
+- Losing rank immediately lowers the pressure of later waves.
+- 3 single enemies at the start. The HUD shows the **Next wave**.
+
+## Enemy squads
+- Squads are link trees shaped as binary trees (piece i links to piece ⌊(i−1)/2⌋), so a squad of 3 has a rank-2 leader, 7 a rank-3 leader.
+- A squad gets **actions = its highest rank** each turn and, like the player, **each piece acts at most once**. Moving a squad piece carries everything linked below it, and group attacks work the same as the player's.
+- Killing a squad's leader destroys the whole squad, and every destroyed piece counts toward your kill combo.
+
+## Enemy AI (squad planning)
+- **Far squads** (nearest piece more than 6 steps from yours) march: the whole squad steps one cell along the shortest path that avoids harm tiles, keeping its shape.
+- **Near squads** plan their turn with a **beam search** (12 plans kept per step) over sequences of single-piece actions, up to their action budget. A plan is scored on:
+  - damage dealt: +10 per hit, +15 for hitting the core, +6 per player piece destroyed (including pieces linked below it), +1000 for destroying the core;
+  - exposure at the end of the turn: −**caution** (12, *setting*) × (pieces in its subtree) for every squad piece left next to a player piece (×0.6 if it has more than 1 HP);
+  - position: +1 for each piece ending exactly 2 steps away (can strike next turn, can't be hit), −0.5 per step for pieces further out.
+  - While searching, a partial plan also gets credit for strikes it has set up but not made yet, so "carry into reach → strike → pull back with an ancestor" isn't pruned at its first, bad-looking step.
+- **Patience** (2 turns, *setting*): each turn a nearby squad goes without landing a hit, its caution drops (to 0 after 2 idle turns), so it can't hang back at a safe distance forever. A hit resets it. Without patience, cautious squads hovered 2 steps away indefinitely.
+- Observed against a wall of player pieces: a leader moves the squad in for a 6-hit group strike, then the mid pieces pull their branches back; or a mid piece strikes and the leader pulls everything back, with idle turns at a safe distance in between. Against a lone, surrounded target there is no safe retreat (any step back carries a piece onto the target, which counts as another attack), so squads keep attacking.
+
+## Quadrants and tiles
+- The world is divided into **quadrants**: hexagonal chunks on hexes, 5×5 blocks on squares, drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
+- When a player piece is in a quadrant, that quadrant and its neighbours get their tiles, **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
+- Each quadrant gets **1 heal tile and 1 harm tile** *(setting)* at random empty cells.
+- Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
+- **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
+- **Harm tile** (red ×): 1 damage to any piece that moves onto it or is standing on it when it activates. It disappears once **every neighbouring quadrant has been visited**.
+- Enemies never step onto active harm tiles, and they path around them.
+
+## Enemy pathing and spawning
+- A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm tiles), over the grid's neighbour directions.
+- Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm tile.
+
+## Settings
+The grid picker (Hex / Square) is at the top of the panel and starts a new game. Every other value applies immediately and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
+
+| Setting | Default |
+|---|---|
+| Spawn a wave every N turns | 3 |
+| Enemies per wave at rank 1 | 1 |
+| + enemies per wave per rank | 2 |
+| Largest squad = rank + | 1 |
+| +1 enemy/wave every N turns (0 = off) | 0 |
+| Enemies at start | 3 |
+| Spawn distance min / max | 6 / 9 |
+| Enemy caution (0 = reckless) | 12 |
+| Enemy patience (turns) | 2 |
+| Enemy HP per rank | 1 |
+| Max squad size | 8 |
+| Advance after a kill (0/1) | 1 |
+| Link range | 3 |
+| Hex chunk radius (new game) | 3 |
+| Square quadrant size (new game) | 5 |
+| Heal tiles per quadrant | 1 |
+| Harm tiles per quadrant | 1 |
+| Tile countdown min / max (turns) | 2 / 8 |
+| Harm tile damage | 1 |
+| Base rank | 1 |
+| Max HP per rank | 2 |
+| Moves per turn per top rank | 1 |
+| Place cost per core rank | 5 |
+| Heal action cost per core rank | 5 |
+| Heal action HP per core rank | 1 |
+| Heal tile: base value | 1 |
+| Heal +1 per N unvisited quads | 2 |
+| Unused heal: score per unit | 1 |
+| Rank-up also adds HP (0/1) | 0 |
+
+## UI
+- Pieces show their rank number. Player pieces are red-orange, and the core has an extra outer ring. Enemies are indigo, with indigo link arrows within squads. HP bars show under pieces with more than 1 max HP. Occupied cells are tinted.
+- **Moved this turn:** player pieces that have moved (or were just placed) are drawn **inverted**: a light fill with a coloured ring and number. Pieces that can't move because you're out of moves are faded.
+- **Selection:** the selected piece and everything it carries turn **amber**, along with the link arrows between them.
+- **Link arrows point from each child to its parent**, so they converge on the core or squad leader.
+- Legal moves are highlighted; attacks in indigo. Hovering a move shows a faint copy of the whole group at its destination, and marks landing cells that are active harm tiles in strong red and active heal tiles in bright green. Hovering an attack highlights every enemy that would be hit.
+- **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
+- **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
+- A dashed outline shows the link range around the selected piece's parent.
+- Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown.
+- A header bar holds the score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP, turn, piece counts, the Next wave and the selected piece.
+- Settings live in a dialog (⚙): the grid choice plus every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
+- Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
+
+## Balance notes
+- See [PLAYTESTS.md](PLAYTESTS.md) for play sessions.
+- With the planning AI, a simulated bot that places pieces whenever it can and attacks with every piece that can, but never moves otherwise, lasted a median 11 turns on squares (1 of 10 runs reached the 400-turn cap) and 26 on hexes (none reached it).
+- With the old AI, where squads moved as one block, the same bot had 1–2 of 10 runs on squares and 3 of 8 on hexes holding out forever (the **turtling** problem: a stationary rank-4 swarm fed on squads that arrived piecemeal). Patience in the planning AI largely fixes this.
+- AI tuning sweep against a wall of pieces over 12 turns: caution 6 → squads brawl (ending exposed 11 of 12 turns); caution 10–15 → a safe strike on 3 turns and exposed on only 3; caution ≥ 9 without patience → squads never commit.
+- Heal value rewards exploring; harm tiles clear out of fully explored areas, so the explored interior becomes safer but less rewarding.
+- Advance after a kill favours aggressive play; turn it off to compare.
+
+## Next directions (not built)
+- **Levels with goals**, so runs restart now and then and swarms stay manageable (rank ~2–4). Candidate goals: reach a beacon N quadrants away; hunt a boss squad; hold a zone for N turns; or a mix. Open questions: what carries over between levels, and whether maps are procedural with per-level rules or partly hand-designed.
+- A real **theme** and name.
+
+## Ideas parked
+- Chess-like piece types via `steps()`: leapers (knight), sliders (rook, bishop). Both have hex equivalents (e.g. Gliński's hex chess). Open question: does a slider carry its subtree several cells, or only one?
+- Varied enemy types (faster, ranged, different movement).
+- Tools to make moving large swarms less tedious.
+
+## Implementation
+- `js/hc/hc.js`: the `hc` namespace and tunables (`GRIDCFG`, `SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
+- `model/Grid.js`: `makeSquareGrid(S)` / `makeHexGrid(k)` return the `hc.GRID` object: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `cheb()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `GRIDCFG`.
+- `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
+- `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateQuad` / `clearSurroundedHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
+- `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
+- `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers that work for both grid shapes (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
+- `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
+- `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the settings dialog from the definitions; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
+- UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

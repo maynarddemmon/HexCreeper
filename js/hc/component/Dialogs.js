@@ -1,0 +1,346 @@
+(pkg => {
+    'use strict';
+    
+    let confirmMsgDialog,
+        ackMsgDialog;
+    
+    const {Class:JSClass, Module:JSModule} = JS,
+        
+        {min:mathMin, max:mathMax, floor:mathFloor} = Math,
+        
+        M = myt,
+        {I18N:{get:i18n}, PaddedText, global:{keys:globalKeys}} = M,
+        
+        {
+            UnderlineBtn,
+            theme:{
+                spacing, padding, cornerRadius,
+                colorPanel, colorPanelFooter, colorSuccess, colorError,
+                fontSizeMedium, fontSizeLarge, fontFamilyMono
+            },
+            cfg:{DEFAULT_TALL_DIALOG_WIDTH, DIALOG_FOOTER_HEIGHT, TOP_VIEW_HEIGHT}
+        } = pkg,
+        
+        SPACER_CFG = {klass:pkg.Spacer},
+        
+        REF_ID_CANCEL_FUNC = 'cnclFunc',
+        REF_ID_CONFIRM_FUNC = 'confFunc',
+        
+        DEFAULT_CONFIRM_LABEL = pkg.ICON_CHECKED + ' ' + i18n('btn-confirm'),
+        DEFAULT_CANCEL_LABEL = pkg.ICON_UNCHECKED + ' ' + i18n('btn-cancel'),
+        DEFAULT_ACK_LABEL = i18n('btn-acknowledge'),
+        
+        // Every ModalDialog showing now, so the game can ignore its keys meanwhile.
+        showingDialogs = new Set(),
+        
+        ModalDialog = pkg.ModalDialog = new JSClass('ModalDialog', M.Dimmer, {
+            initNode: function(parent, attrs) {
+                const self = this;
+                
+                self.defaultPlacement = '_panelView._contentView';
+                const hasFooter = attrs.hasFooter ??= false,
+                    cancelable = attrs.cancelable ??= true,
+                    sizingStrategy = attrs.sizingStrategy ??= 'tall',
+                    tallWidth = attrs.tallWidth ??= DEFAULT_TALL_DIALOG_WIDTH;
+                delete attrs.hasFooter;
+                delete attrs.cancelable;
+                delete attrs.sizingStrategy;
+                delete attrs.tallWidth;
+                
+                self.callSuper(parent, attrs);
+                
+                let positionAttrs;
+                switch (sizingStrategy) {
+                    case 'simpleCentered':
+                        positionAttrs = {align:'center', valign:'middle'};
+                        break;
+                    case 'fit':
+                        // As tall, but only as high as its content. See setContentHeightToFit.
+                        positionAttrs = {align:'center', valign:'middle', width:tallWidth};
+                        break;
+                    case 'tall':
+                    default:
+                        positionAttrs = {
+                            align:'center', y:padding, width:tallWidth,
+                            percentOfParentHeight:100,
+                            percentOfParentHeightOffset:-2*padding
+                        };
+                        break;
+                }
+                
+                const panelView = self._panelView = new pkg.Panel(self, {
+                    roundedCorners:cornerRadius, bgColor:colorPanel, overflow:'hidden',
+                    boxShadow:[0, 6, 24, '#0004'],
+                    ...positionAttrs
+                }, [M.SizeToParent]);
+                if (sizingStrategy === 'fit') self.syncTo(self, '_updateFitHeight', 'height');
+                
+                if (cancelable) {
+                    const header = self.getHeaderView();
+                    self._closeBtn = new pkg.SquareBtn(header, {
+                        y:2, text:pkg.ICON_CANCEL, tooltip:i18n('btn-close'), buttonType:'plain'
+                    }, [{
+                        doActivated: function() {self.doClose();}
+                    }]);
+                }
+                self.attachToDom(self, '_keyDownCapture', 'keydown', true);
+                self.attachToDom(self, '_keyDown', 'keydown');
+                
+                if (hasFooter) {
+                    const contentView = self.getContentView();
+                    self._footerView = new pkg.WideView(panelView, {
+                        height:DIALOG_FOOTER_HEIGHT, valign:'bottom',
+                        bgColor:colorPanelFooter,
+                        ignorePlacement:true
+                    });
+                    contentView.setPercentOfParentHeightOffset(
+                        contentView.percentOfParentHeightOffset - DIALOG_FOOTER_HEIGHT
+                    );
+                }
+            },
+            
+            show: function(...args) {
+                this.callSuper(...args);
+                showingDialogs.add(this);
+            },
+            
+            hide: function(ignoreRestoreFocus) {
+                this.callSuper(ignoreRestoreFocus);
+                showingDialogs.delete(this);
+            },
+            
+            getPanelView: function() {return this._panelView;},
+            getContentView: function() {return this.getPanelView().getContentView();},
+            getHeaderView: function() {return this.getPanelView().getHeaderView();},
+            setTitle: function(v, tooltip) {this.getPanelView().setTitle(v, tooltip);},
+            getCloseBtn: function() {return this._closeBtn;},
+            getDefaultBtn: M.NOOP,
+            getFooterView: function() {return this._footerView;},
+            
+            /*  For the 'fit' sizing strategy: makes the dialog just tall enough for content of
+                this height, but no taller than the window allows, past which the content
+                scrolls. */
+            setContentHeightToFit: function(contentHeight) {
+                this._contentHeightToFit = contentHeight;
+                this._updateFitHeight();
+            },
+            
+            /** @private */
+            _updateFitHeight: function(_event) {
+                const contentHeight = this._contentHeightToFit;
+                if (contentHeight == null) return;
+                
+                const panelView = this.getPanelView(),
+                    fitHeight = this.getContentView().y + contentHeight + (this.getFooterView()?.height ?? 0);
+                panelView.setHeight(mathMin(fitHeight, this.height - 2*(TOP_VIEW_HEIGHT + spacing)));
+            },
+            
+            /*  Esc is handled in the capture phase because myt buttons stop keydown from
+                bubbling, so a focused one would otherwise swallow it. Returning true lets
+                every other key carry on to its target. */
+            _keyDownCapture: function(event) {
+                if (M.KeyObservable.getCodeFromEvent(event) === globalKeys.CODE_ESC) {
+                    (this.getCloseBtn() ?? this.getDefaultBtn())?.doActivated();
+                    return false;
+                }
+                return true;
+            },
+            
+            /*  Enter is handled in the bubble phase so a focused button gets it first and
+                activates itself. This only runs when nothing focused inside the dialog
+                handled it. */
+            _keyDown: function(event) {
+                if (M.KeyObservable.getCodeFromEvent(event) === globalKeys.CODE_ENTER) {
+                    this.getDefaultBtn()?.doActivated();
+                }
+            },
+            
+            /*  Provides a hook for overriding close behavior. */
+            doClose: function() {
+                this.hide();
+            }
+        }),
+    
+        ThreeColFooter = new JSModule('ThreeColFooter', {
+            initNode: function(parent, attrs) {
+                attrs.hasFooter ??= true;
+                
+                const leftItemCfgs = attrs.leftItemCfgs ??= [],
+                    centerItemCfgs = attrs.centerItemCfgs ??= [],
+                    rightItemCfgs = attrs.rightItemCfgs ??= [];
+                delete attrs.leftItemCfgs;
+                delete attrs.centerItemCfgs;
+                delete attrs.rightItemCfgs;
+                
+                this.callSuper(parent, attrs);
+                
+                const footer = this.getFooterView();
+                for (const itemCfgs of [leftItemCfgs, [SPACER_CFG], centerItemCfgs, [SPACER_CFG], rightItemCfgs]) {
+                    for (const itemCfg of itemCfgs) {
+                        new itemCfg.klass(footer, itemCfg.attrs, itemCfg.mixins);
+                    }
+                }
+                
+                new M.ResizeLayout(footer, {inset:padding, spacing, outset:padding});
+            }
+        }),
+        
+        /*  Dialogs that take turns. While one is showing, anything opened with
+            dialogUtil.openWhenClear waits, and the next one opens once it hides. */
+        QueuedDialog = pkg.QueuedDialog = new JSModule('QueuedDialog', {
+            show: function(...args) {
+                this.callSuper(...args);
+                showingQueuedDialogs.add(this);
+            },
+            
+            hide: function(ignoreRestoreFocus) {
+                this.callSuper(ignoreRestoreFocus);
+                showingQueuedDialogs.delete(this);
+                drainDialogQueue();
+            }
+        }),
+        
+        ConfirmDialog = pkg.ConfirmDialog = new JSClass('ConfirmDialog', ModalDialog, {
+            include: [ThreeColFooter, QueuedDialog],
+            
+            initNode: function(parent, attrs) {
+                const self = this;
+                attrs.centerItemCfgs ??= [
+                    {klass:UnderlineBtn, attrs:{
+                        name:'cancelBtn', text:DEFAULT_CANCEL_LABEL, textColor:colorError,
+                        fontSize:fontSizeLarge, valign:'middle'
+                    }, mixins:[{doActivated:self.doCancel.bind(self)}]},
+                    SPACER_CFG,
+                    {klass:UnderlineBtn, attrs:{
+                        name:'confirmBtn', text:DEFAULT_CONFIRM_LABEL, textColor:colorSuccess,
+                        fontSize:fontSizeLarge, valign:'middle'
+                    }, mixins:[{doActivated:self.doConfirm.bind(self)}]}
+                ];
+                self.callSuper(parent, attrs);
+            },
+            
+            getDefaultBtn: function() {return this.getFooterView().confirmBtn;},
+            
+            doClose: function() {
+                this.doCancel();
+            },
+            
+            doConfirm: function() {
+                const doNotClose = this.getRef(REF_ID_CONFIRM_FUNC)?.() === true;
+                if (!doNotClose) this.hide();
+            },
+            
+            doCancel: function() {
+                const doNotClose = this.getRef(REF_ID_CANCEL_FUNC)?.() === true;
+                if (!doNotClose) this.hide();
+            }
+        }),
+        
+        MsgDialog = new JSModule('MsgDialog', {
+            initNode: function(parent, attrs) {
+                const self = this;
+                
+                attrs.sizingStrategy ??= 'simpleCentered';
+                
+                self.callSuper(parent, attrs);
+                
+                self._msgTxt = new PaddedText(self, {
+                    padding, whiteSpace:'pre-wrap', fontSize:fontSizeMedium, fontFamily:fontFamilyMono
+                });
+            },
+            
+            getMsgTxt: function() {return this._msgTxt;},
+            setMsg: function(msg) {this.getMsgTxt().setText(msg);},
+            
+            show: function(title, msg, confirmFunc, cancelFunc) {
+                this.callSuper();
+                
+                this.setTitle(title);
+                this.setMsg(msg);
+                this.addRef(REF_ID_CONFIRM_FUNC, confirmFunc);
+                this.addRef(REF_ID_CANCEL_FUNC, cancelFunc);
+                
+                const panelView = this.getPanelView(),
+                    msgTxt = this.getMsgTxt(),
+                    fuzzyWidth = mathMin(620, mathMax(350, mathFloor(msg.length)));
+                panelView.setWidth(fuzzyWidth);
+                msgTxt.sizeViewToDom();
+                const idealHeight = this.getHeaderView().height + spacing + msgTxt.height + spacing + this.getFooterView().height;
+                panelView.setHeight(mathMin(this.height - 2*padding, 650, idealHeight));
+            }
+        }),
+        
+        AckDialog = pkg.AckDialog = new JSClass('AckDialog', ModalDialog, {
+            include: [ThreeColFooter, QueuedDialog],
+            
+            initNode: function(parent, attrs) {
+                const self = this;
+                attrs.cancelable ??= false;
+                attrs.centerItemCfgs ??= [
+                    {klass:UnderlineBtn, attrs:{
+                        name:'ackBtn', text:DEFAULT_ACK_LABEL, fontSize:fontSizeLarge, valign:'middle'
+                    }, mixins:[{doActivated:self.doConfirm.bind(self)}]}
+                ];
+                self.callSuper(parent, attrs);
+            },
+            
+            getDefaultBtn: function() {return this.getFooterView().ackBtn;},
+            
+            doConfirm: function() {
+                const doNotClose = this.getRef(REF_ID_CONFIRM_FUNC)?.() === true;
+                if (!doNotClose) this.hide();
+            }
+        }),
+        
+        ConfirmMsgDialog = pkg.ConfirmMsgDialog = new JSClass('ConfirmMsgDialog', ConfirmDialog, {
+            include: [MsgDialog]
+        }),
+        
+        AckMsgDialog = pkg.AckMsgDialog = new JSClass('AckMsgDialog', AckDialog, {
+            include: [MsgDialog]
+        }),
+        
+        // The QueuedDialogs showing now, and the functions waiting to open a dialog.
+        showingQueuedDialogs = new Set(),
+        dialogQueue = [],
+        
+        /*  Opens what's waiting, in order, until a dialog is showing again. */
+        drainDialogQueue = () => {
+            while (dialogQueue.length > 0 && showingQueuedDialogs.size === 0) dialogQueue.shift()();
+        },
+        
+        /*  Calls openFunc now if no QueuedDialog is showing, or if forceIt, returning what it
+            returns. Otherwise it's called once the dialogs ahead of it have closed, and this
+            returns undefined. */
+        openWhenClear = (openFunc, forceIt) => {
+            if (forceIt || showingQueuedDialogs.size === 0) {
+                return openFunc();
+            } else {
+                dialogQueue.push(openFunc);
+            }
+        },
+        
+        openAckMsgDialog = (title, msg, confirmFunc, cancelFunc, btnLabel=DEFAULT_ACK_LABEL) => openWhenClear(() => {
+            ackMsgDialog ??= new AckMsgDialog(pkg.app);
+            ackMsgDialog.show(title, msg, confirmFunc, cancelFunc);
+            ackMsgDialog.getFooterView().ackBtn.setText(btnLabel ?? DEFAULT_ACK_LABEL);
+            return ackMsgDialog;
+        });
+    
+    pkg.dialogUtil = {
+        openConfirmMsgDialog: (title, msg, confirmFunc, cancelFunc, confirmLabel=DEFAULT_CONFIRM_LABEL, cancelLabel=DEFAULT_CANCEL_LABEL) => openWhenClear(() => {
+            confirmMsgDialog ??= new ConfirmMsgDialog(pkg.app);
+            confirmMsgDialog.show(title, msg, confirmFunc, cancelFunc);
+            // Always set both labels since the dialog is shared.
+            const footer = confirmMsgDialog.getFooterView();
+            footer.confirmBtn.setText(confirmLabel);
+            footer.cancelBtn.setText(cancelLabel);
+            return confirmMsgDialog;
+        }),
+        openAckMsgDialog,
+        openWhenClear,
+        
+        /*  Whether any dialog is showing, so the game ignores its keys meanwhile. */
+        isAnyShowing: () => showingDialogs.size > 0
+    };
+})(hc);
