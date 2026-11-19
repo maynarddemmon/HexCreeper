@@ -10,7 +10,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, OWNERS, LINK},
+            cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK},
             PIECE_TYPES
         } = pkg,
         
@@ -129,11 +129,12 @@
             }
         },
         
+        // Your core is bigger, so its bar sits lower, clear of its selection ring.
         drawHpBar = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
                 x = cx - w / 2,
-                y = cy + s * 0.37;
+                y = cy + s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0));
             ctx.fillStyle = css('--grid');
             ctx.fillRect(x, y, w, h);
             ctx.fillStyle = css(OWNERS[p.owner].fill);
@@ -361,7 +362,7 @@
             const fl = flashAt.get(game.key(p.x, p.y));
             if (fl) {
                 ctx.globalAlpha = fl * 0.7; ctx.fillStyle = css('--dmg');
-                ctx.beginPath(); ctx.arc(sx, sy, s * PIECE_R, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(sx, sy, s * (PIECE_R + (p.id === game.playerCoreId ? CORE_BORDER : 0)), 0, Math.PI * 2); ctx.fill();
                 ctx.globalAlpha = 1;
             }
             if (p.maxHp > 1 && s >= 22) drawHpBar(p, sx, sy, s);

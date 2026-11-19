@@ -73,6 +73,8 @@
             
             // Look //
             PIECE_R:0.25, // piece radius as a fraction of a cell
+            CORE_BORDER:0.08, // your core's thick border; the core is bigger by this much
+            RING_GAP:0.07, // the gap between a piece's edge and a ring around it (selection etc.)
             
             OWNERS:{
                 player:{fill:'--core',  stroke:'--core-dark'},
