@@ -1,13 +1,13 @@
 import {test, expect} from '@playwright/test';
 import {startGame} from './helpers.mjs';
 
-/*  Geometry checks run against the grid factories directly, so they don't depend on which
-    grid the current game uses. */
+/*  Geometry checks run against the grid factory directly, so they don't depend on the
+    current game's quadrant radius. */
 
-test('hex: 6 neighbours, 1 step and 1 unit apart', async ({page}) => {
+test('6 neighbours, 1 step and 1 unit apart', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const H = hc.makeHexGrid(3), o = {x:0, y:0};
+        const H = hc.makeGrid(3), o = {x:0, y:0};
         return {
             count:H.dirs.length,
             dist:H.dirs.every(([dx, dy]) => H.dist(o, {x:dx, y:dy}) === 1),
@@ -17,10 +17,10 @@ test('hex: 6 neighbours, 1 step and 1 unit apart', async ({page}) => {
     expect(r).toEqual({count:6, dist:true, unit:true});
 });
 
-test('hex: a point inside a hex picks that hex', async ({page}) => {
+test('a point inside a hex picks that hex', async ({page}) => {
     await startGame(page);
     const ok = await page.evaluate(() => {
-        const H = hc.makeHexGrid(3);
+        const H = hc.makeGrid(3);
         for (let q = -6; q <= 6; q++) for (let r = -6; r <= 6; r++) {
             const [wx, wy] = H.center(q, r);
             for (const [ox, oy] of [[0, 0], [0.3, 0.1], [-0.2, 0.25], [0.1, -0.3]]) {
@@ -34,10 +34,10 @@ test('hex: a point inside a hex picks that hex', async ({page}) => {
 });
 
 for (const k of [1, 2, 3]) {
-    test(`hex chunks of radius ${k} tile the plane with no gaps or overlaps`, async ({page}) => {
+    test(`quadrants of radius ${k} tile the plane with no gaps or overlaps`, async ({page}) => {
         await startGame(page);
         const r = await page.evaluate(k => {
-            const H = hc.makeHexGrid(k), seen = new Map();
+            const H = hc.makeGrid(k), seen = new Map();
             let mismatch = 0;
             for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) for (const c of H.chunkCells(i, j)) {
                 const key = c.x + ',' + c.y;
@@ -60,25 +60,15 @@ for (const k of [1, 2, 3]) {
     });
 }
 
-test('rings: random spawn cells are exactly d steps away on both grids', async ({page}) => {
+test('rings: random spawn cells are exactly d steps away', async ({page}) => {
     await startGame(page);
     const ok = await page.evaluate(() => {
-        for (const G of [hc.makeHexGrid(3), hc.makeSquareGrid(5)]) {
-            for (let t = 0; t < 300; t++) {
-                const d = 1 + Math.floor(Math.random()*9);
-                if (G.dist(G.ring(3, -2, d), {x:3, y:-2}) !== d) return false;
-            }
+        const G = hc.makeGrid(3);
+        for (let t = 0; t < 300; t++) {
+            const d = 1 + Math.floor(Math.random()*9);
+            if (G.dist(G.ring(3, -2, d), {x:3, y:-2}) !== d) return false;
         }
         return true;
     });
     expect(ok).toBe(true);
-});
-
-test('square: 8 neighbours, 5x5 quadrants centred on the start', async ({page}) => {
-    await startGame(page);
-    const r = await page.evaluate(() => {
-        const S = hc.makeSquareGrid(5);
-        return {dirs:S.dirs.length, size:S.chunkCells(0, 0).length, origin:S.chunkOf(0, 0).join(), edge:[S.chunkOf(2, 2).join(), S.chunkOf(3, 0).join(), S.chunkOf(-3, 0).join()]};
-    });
-    expect(r).toEqual({dirs:8, size:25, origin:'0,0', edge:['0,0', '1,0', '-1,0']});
 });

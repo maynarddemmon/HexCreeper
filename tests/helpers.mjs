@@ -9,11 +9,10 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /*  Loads the game and waits until it is ready to play. Returns an object that collects page
     errors, console warnings and console errors for the rest of the test.
 
-    grid is "hex" (the default) or "square". The help that opens on a first visit is
-    skipped unless skipHelp is false. Requests to other origins (e.g. the Font Awesome CDN
+    The help that opens on a first visit is skipped unless skipHelp is false. Requests to other origins (e.g. the Font Awesome CDN
     used by myt) are answered with an empty response so the tests never depend on the
     network. */
-export const startGame = async (page, {grid='hex', skipHelp=true} = {}) => {
+export const startGame = async (page, {skipHelp=true} = {}) => {
     const problems = {pageErrors:[], warnings:[], errors:[]};
     page.on('pageerror', err => problems.pageErrors.push(err.message));
     page.on('console', msg => {
@@ -23,23 +22,7 @@ export const startGame = async (page, {grid='hex', skipHelp=true} = {}) => {
     });
 
     await page.route(url => url.origin !== BASE_URL, route => route.fulfill({status:200, body:''}));
-    await page.addInitScript(({grid, skipHelp}) => {
-        // Only on the first load, so a test can reload to check what was saved.
-        if (sessionStorage.getItem('hc.testInit')) return;
-        sessionStorage.setItem('hc.testInit', 'true');
-        try {
-            const settings = JSON.parse(localStorage.getItem('hc.settings')) ?? {};
-            if (grid === 'square') {
-                settings.grid = 'square';
-            } else {
-                delete settings.grid;
-            }
-            localStorage.setItem('hc.settings', JSON.stringify(settings));
-            if (skipHelp) localStorage.setItem('hc.helpSeen', 'true');
-        } catch {
-            // Ignore. The defaults will be used.
-        }
-    }, {grid, skipHelp});
+    if (skipHelp) await page.addInitScript(() => {localStorage.setItem('hc.helpSeen', 'true');});
 
     await page.goto('/index.html');
     await waitForGame(page);

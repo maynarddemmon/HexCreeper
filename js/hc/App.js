@@ -221,14 +221,10 @@
         },
         
         /*  Called when a setting changes (id is null when they're all reset), so the game
-            reflects it at once. A new grid starts a new game. */
-        notifySettingChanged: (id, _value) => {
-            if (id === pkg.SETTING_GRID) {
-                appView.newGame();
-            } else {
-                game.recomputeRanks();
-                draw();
-            }
+            reflects it at once. */
+        notifySettingChanged: (_id, _value) => {
+            game.recomputeRanks();
+            draw();
         },
         
         

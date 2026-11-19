@@ -5,7 +5,7 @@
     
     const {
         cfg:{LINK, AI, RANK},
-        cheb, euclid2, PIECE_TYPES
+        hexDist, euclid2, PIECE_TYPES
     } = pkg;
     class EnemyAI {
         // ---- Enemy AI ----
@@ -58,12 +58,12 @@
             const fd = p => field.get(this.key(p.x, p.y)) ?? Infinity;
             const members = this.group(root);
             const cur = Math.min(...members.map(fd));
-            const t = players.reduce((b, q) => cheb(root, q) < cheb(root, b) ? q : b);
-            let best = null, bestKey = [cur, cheb(root, t) * 1000 + euclid2(root, t)];
+            const t = players.reduce((b, q) => hexDist(root, q) < hexDist(root, b) ? q : b);
+            let best = null, bestKey = [cur, hexDist(root, t) * 1000 + euclid2(root, t)];
             for (const m of this.legalMoves(root)) {
                 if (m.attack || !this.canStep(root, m.dx, m.dy, true)) continue;
                 const k = [Math.min(...members.map(g => field.get(this.key(g.x + m.dx, g.y + m.dy)) ?? Infinity)),
-                                      cheb(m, t) * 1000 + euclid2(m, t)];
+                                      hexDist(m, t) * 1000 + euclid2(m, t)];
                 const better = cur !== Infinity
                     ? (k[0] < bestKey[0] || (k[0] === bestKey[0] && best && k[1] < bestKey[1]))
                     : (k[0] < bestKey[0] || (k[0] === Infinity && k[1] < bestKey[1]));
@@ -90,7 +90,7 @@
             const fdist = (x, y) => {
                 const d = field.get(this.key(x, y));
                 if (d !== undefined) return d;
-                let m = Infinity; for (const p of players) m = Math.min(m, cheb(p, { x, y }));
+                let m = Infinity; for (const p of players) m = Math.min(m, hexDist(p, { x, y }));
                 return m;
             };
             
@@ -164,8 +164,8 @@
                         }
                         if (!ok) continue;
                         if (par) {
-                            const d = cheb({x:px + dx, y:py + dy}, {x:par[0], y:par[1]});
-                            if (d > LINK.range && d >= cheb({x:px, y:py}, {x:par[0], y:par[1]})) continue;
+                            const d = hexDist({x:px + dx, y:py + dy}, {x:par[0], y:par[1]});
+                            if (d > LINK.range && d >= hexDist({x:px, y:py}, {x:par[0], y:par[1]})) continue;
                         }
                         const pos = new Map(st.pos);
                         for (const gid of grp) { const [gx, gy] = st.pos.get(gid); pos.set(gid, [gx + dx, gy + dy]);}

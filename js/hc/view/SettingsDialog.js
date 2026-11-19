@@ -5,7 +5,7 @@
         {I18N:{get:i18n}, Text, global:{keys:globalKeys}} = M,
         
         {
-            WideView, ToggleBtn, UnderlineBtn, settings,
+            WideView, UnderlineBtn, settings,
             theme:{
                 spacing, padding, cornerRadius, rowHeight,
                 colorText, colorTextMuted, colorPanel,
@@ -65,8 +65,7 @@
         });
     
     /*  Edits hc.settings. Built from the setting definitions, and changes apply as soon as they 
-        are made. The grid choice comes first, then each group of numbers. The footer resets everything 
-        but the grid. */
+        are made. A note comes first, then each group of numbers. The footer resets everything. */
     pkg.SettingsDialog = new JS.Class('SettingsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -86,25 +85,9 @@
             const container = self._container = new WideView(self.getContentView()),
                 rows = self._rows = [];
             
-            // Grid //
-            const gridDef = settings.getDefinition(pkg.SETTING_GRID),
-                gridRow = new WideView(container, {height:rowHeight + 2*spacing});
-            new Text(gridRow, {x:padding, y:5, text:gridDef.label, fontSize:fontSizeLarge, textColor:colorText});
-            const gridBtns = self._gridBtns = {};
-            let x = PANEL_WIDTH - 2*padding;
-            for (const option of gridDef.options.slice().reverse()) {
-                const btn = gridBtns[option] = new ToggleBtn(gridRow, {
-                    y:2, text:i18n('grid-' + option), fontSize:fontSizeMedium, buttonType:'choice'
-                }, [{
-                    doActivated: () => {if (settings.get(pkg.SETTING_GRID) !== option) settings.set(pkg.SETTING_GRID, option);}
-                }]);
-                x -= btn.width;
-                btn.setX(x);
-                x -= spacing;
-            }
             new Text(container, {
                 x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal',
-                text:i18n('setting-grid-desc') + ' ' + i18n('settings-note'),
+                text:i18n('settings-note'),
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
@@ -131,8 +114,6 @@
         
         refresh: function() {
             for (const row of this._rows) row.refresh();
-            const grid = settings.get(pkg.SETTING_GRID);
-            for (const option in this._gridBtns) this._gridBtns[option].setOn(option === grid);
         },
         
         resetToDefaults: function() {

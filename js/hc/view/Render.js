@@ -5,7 +5,7 @@
     
     const V = pkg.view,
         {
-            ctx, game, cam, FX_MS, css, worldToScreen, screenToWorld, cellCenter, 
+            ctx, game, cam, css, worldToScreen, screenToWorld, cellCenter, 
             inView, addCellPath, strokeCell, strokeRegion, sameCell, draw, fillCell
         } = V,
         
@@ -14,9 +14,101 @@
             PIECE_TYPES
         } = pkg,
         
-        mod = (n, m) => ((n % m) + m) % m;
+        FX_MS = 650,
+        
+        // Where a heal tile's value goes, from its centre, in cells.
+        HEAL_LABEL_OFFSET = [0.3, 0.32],
+        
+        drawTile = (t, now) => {
+            const s = cam.size,
+                [cx, cy] = cellCenter(t.x, t.y),
+                heal = t.kind === 'heal',
+                ink = css(heal ? '--heal' : '--harm'), bg = css(heal ? '--heal-bg' : '--harm-bg');
+            if (t.timer > 0) {
+                // Pending: faint dashed outline and the countdown
+                ctx.globalAlpha = 0.55;
+                strokeCell(t.x, t.y, ink, 1.2, 3.5, [3, 3]);
+                if (s >= 16) {
+                    ctx.fillStyle = ink;
+                    ctx.font = `600 ${Math.round(s * 0.3)}px ui-sans-serif, system-ui, sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(String(t.timer), cx, cy + 1);
+                }
+                ctx.globalAlpha = 1;
+                return;
+            }
+            // Active: pop briefly when it arms
+            const armFx = game.effects.find(f => f.arm && f.x === t.x && f.y === t.y);
+            let k = 1;
+            if (armFx) {
+                const a = Math.min(1, Math.max(0, (now - armFx.t0) / 300));
+                k = 0.4 + 0.6 * a;
+            }
+            ctx.beginPath(); addCellPath(t.x, t.y, 1);
+            ctx.fillStyle = bg; ctx.fill();
+            ctx.fillStyle = ink;
+            const arm = s * 0.22 * k,
+                th = Math.max(2, s * 0.1 * k);
+            if (heal) {
+                ctx.fillRect(cx - th / 2, cy - arm, th, arm * 2);
+                ctx.fillRect(cx - arm, cy - th / 2, arm * 2, th);
+                if (s >= 22) { // current value in the corner
+                    const [lx, ly] = HEAL_LABEL_OFFSET;
+                    ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
+                    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+                    ctx.fillText(String(game.healValue(t.x, t.y)), cx + s * lx, cy + s * ly);
+                }
+            } else {
+                // Harm: a spiky X inside a smaller outline
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
+                ctx.fillRect(-th / 2, -arm, th, arm * 2);
+                ctx.fillRect(-arm, -th / 2, arm * 2, th);
+                ctx.restore();
+                ctx.beginPath(); addCellPath(t.x, t.y, 0, 0.64);
+                ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, s * 0.03); ctx.stroke();
+            }
+        },
+        
+        // Draws a tapered arrow from `from` (thick end) to `to` (arrowhead).
+        // Links are drawn child -> parent.
+        drawLink = (from, to, color) => {
+            const parent = from, child = to; // geometry below: thick at `parent`, tip at `child`
+            const s = cam.size;
+            const [ax, ay] = cellCenter(parent.x, parent.y);
+            const [bx, by] = cellCenter(child.x, child.y);
+            const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy); if (!len) return;
+            const ux = dx / len, uy = dy / len, px = -uy, py = ux;
+            const gap = s * (PIECE_R + 0.05);
+            const sx = ax + ux * gap, sy = ay + uy * gap;          // start: parent edge
+            const ex = bx - ux * gap, ey = by - uy * gap;          // end: child edge (arrow tip)
+            const head = Math.min(s * 0.16, (len - 2 * gap) * 0.5);
+            const hx = ex - ux * head, hy = ey - uy * head;        // arrowhead base
+            const w0 = s * 0.07, w1 = s * 0.015, wh = s * 0.075;
+            ctx.fillStyle = css(color);
+            ctx.beginPath();
+            ctx.moveTo(sx + px * w0, sy + py * w0);
+            ctx.lineTo(hx + px * w1, hy + py * w1);
+            ctx.lineTo(hx + px * wh, hy + py * wh);
+            ctx.lineTo(ex, ey);
+            ctx.lineTo(hx - px * wh, hy - py * wh);
+            ctx.lineTo(hx - px * w1, hy - py * w1);
+            ctx.lineTo(sx - px * w0, sy - py * w0);
+            ctx.closePath();
+            ctx.fill();
+        },
+        
+        drawHpBar = (p, cx, cy, s) => {
+            const w = s * 0.56,
+                h = Math.max(3, s * 0.06),
+                x = cx - w / 2,
+                y = cy + s * 0.37;
+            ctx.fillStyle = css('--grid');
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = css(OWNERS[p.owner].fill);
+            ctx.fillRect(x, y, w * Math.max(0, p.hp) / p.maxHp, h);
+        };
     
-    function render(now) {
+    V.render = (now) => {
         V.rafPending = false;
         ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
         const W = V.W,
@@ -25,21 +117,30 @@
         ctx.fillStyle = css('--bg');
         ctx.fillRect(0, 0, W, H);
         
-        const [x0, y0] = screenToWorld(0, 0);
-        const [x1, y1] = screenToWorld(W, H);
-        const visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)];
-        // chunk key per visible cell (used for the visited tint and quadrant borders)
-        const chunkKeys = new Map();
-        const chunkKey = (x, y) => { const k = x + ',' + y; let v = chunkKeys.get(k); if (v === undefined) { v = pkg.GRID.chunkKey(x, y); chunkKeys.set(k, v); } return v; };
+        const [x0, y0] = screenToWorld(0, 0),
+            [x1, y1] = screenToWorld(W, H),
+            visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)],
+            // chunk key per visible cell (used for the visited tint and quadrant borders)
+            chunkKeys = new Map(),
+            chunkKey = (x, y) => {
+                const k = x + ',' + y;
+                let v = chunkKeys.get(k);
+                if (v === undefined) {
+                    v = pkg.GRID.chunkKey(x, y); chunkKeys.set(k, v);
+                }
+                return v;
+            };
         
         // Visited quadrants
         ctx.beginPath();
         for (const c of visible) if (game.visitedQuads.has(chunkKey(c.x, c.y))) addCellPath(c.x, c.y, 0);
         ctx.fillStyle = css('--visited'); ctx.fill();
-    
+        
         // Heal / harm tiles
-        for (const t of game.tiles.values()) if (inView(t.x, t.y)) drawTile(t, now);
-            
+        for (const t of game.tiles.values()) {
+            if (inView(t.x, t.y)) drawTile(t, now);
+        }
+        
         // Tint occupied cells
         for (const p of game.pieces.values()) {
             if (!inView(p.x, p.y)) continue;
@@ -50,8 +151,8 @@
         let selGroupIds = new Set(), ghost = null, linkTargets = new Set();
         
         if (V.placeMode) {
-            if (V.placeMode.stage === 'square') {
-                for (const q of game.placeSquares()) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
+            if (V.placeMode.stage === 'cell') {
+                for (const q of game.placeCells()) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
             } else {
                 fillCell(V.placeMode.x, V.placeMode.y, '--place-hover');
                 for (const p of game.linkCandidates(V.placeMode.x, V.placeMode.y)) linkTargets.add(p.id);
@@ -71,7 +172,7 @@
                 if (isHover && !m.attack) { hoverMove = m; if (group.length > 1) ghost = { group, dx: m.dx, dy: m.dy }; }
                 if (isHover && m.attack) hoverHits = m.hits;
             }
-            // Where the hovered move lands: harm squares go red, heal squares bright green
+            // Where the hovered move lands: harm cells go red, heal cells bright green
             if (hoverMove) for (const g of group) {
                 const x = g.x + hoverMove.dx, y = g.y + hoverMove.dy;
                 const kind = game.isHarm(x, y) ? 'harm' : game.tileAt(x, y, 'heal') ? 'heal' : null;
@@ -85,33 +186,19 @@
         
         // Grid lines (darker along quadrant borders)
         ctx.lineWidth = 1;
-        if (pkg.GRID.kind === 'square') {
-            const Q = pkg.GRID.chunkSize, QO = pkg.GRID.chunkOffset;
-            for (let gx = Math.floor(x0); gx <= Math.ceil(x1); gx++) {
-                const [sx] = worldToScreen(gx, 0);
-                ctx.strokeStyle = css(mod(gx + QO, Q) === 0 ? '--grid-major' : '--grid');
-                ctx.beginPath(); ctx.moveTo(Math.round(sx) + 0.5, 0); ctx.lineTo(Math.round(sx) + 0.5, H); ctx.stroke();
+        // each hex draws its NE, E and SE edges, so every edge is drawn once
+        const minor = new Path2D(), major = new Path2D();
+        for (const c of visible) {
+            const cs = pkg.GRID.corners(c.x, c.y), mine = chunkKey(c.x, c.y);
+            for (let e = 0; e < 3; e++) {
+                const [dx, dy, a, b] = pkg.GRID.edges[e],
+                    path = chunkKey(c.x + dx, c.y + dy) === mine ? minor : major,
+                    [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
+                path.moveTo(ax, ay); path.lineTo(bx, by);
             }
-            for (let gy = Math.floor(y0); gy <= Math.ceil(y1); gy++) {
-                const [, sy] = worldToScreen(0, gy);
-                ctx.strokeStyle = css(mod(gy + QO, Q) === 0 ? '--grid-major' : '--grid');
-                ctx.beginPath(); ctx.moveTo(0, Math.round(sy) + 0.5); ctx.lineTo(W, Math.round(sy) + 0.5); ctx.stroke();
-            }
-        } else {
-            // each hex draws its NE, E and SE edges, so every edge is drawn once
-            const minor = new Path2D(), major = new Path2D();
-            for (const c of visible) {
-                const cs = pkg.GRID.corners(c.x, c.y), mine = chunkKey(c.x, c.y);
-                for (let e = 0; e < 3; e++) {
-                    const [dx, dy, a, b] = pkg.GRID.edges[e];
-                    const path = chunkKey(c.x + dx, c.y + dy) === mine ? minor : major;
-                    const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
-                    path.moveTo(ax, ay); path.lineTo(bx, by);
-                }
-            }
-            ctx.strokeStyle = css('--grid'); ctx.stroke(minor);
-            ctx.strokeStyle = css('--grid-major'); ctx.lineWidth = 1.5; ctx.stroke(major); ctx.lineWidth = 1;
         }
+        ctx.strokeStyle = css('--grid'); ctx.stroke(minor);
+        ctx.strokeStyle = css('--grid-major'); ctx.lineWidth = 1.5; ctx.stroke(major); ctx.lineWidth = 1;
         
         // Origin marker
         {
@@ -149,7 +236,7 @@
         if (ghost) {
             for (const g of ghost.group) {
                 const [sx, sy] = cellCenter(g.x + ghost.dx, g.y + ghost.dy);
-                PIECE_TYPES[g.type].draw(ctx, sx, sy, s, g, { ghost: true, hl: true, root: g.id === game.playerCoreId });
+                PIECE_TYPES[g.type].draw(ctx, sx, sy, s, g, {ghost:true, hl:true, root:g.id === game.playerCoreId});
             }
         }
         
@@ -240,90 +327,5 @@
         if (game.effects.length) draw();
         
         V.updateHud();
-    }
-    
-    function drawTile(t, now) {
-        const s = cam.size;
-        const [cx, cy] = cellCenter(t.x, t.y);
-        const heal = t.kind === 'heal';
-        const ink = css(heal ? '--heal' : '--harm'), bg = css(heal ? '--heal-bg' : '--harm-bg');
-        if (t.timer > 0) {
-            // Pending: faint dashed outline and the countdown
-            ctx.globalAlpha = 0.55;
-            strokeCell(t.x, t.y, ink, 1.2, 3.5, [3, 3]);
-            if (s >= 16) {
-                ctx.fillStyle = ink;
-                ctx.font = `600 ${Math.round(s * 0.3)}px ui-sans-serif, system-ui, sans-serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(String(t.timer), cx, cy + 1);
-            }
-            ctx.globalAlpha = 1;
-            return;
-        }
-        // Active: pop briefly when it arms
-        const armFx = game.effects.find(f => f.arm && f.x === t.x && f.y === t.y);
-        let k = 1;
-        if (armFx) { const a = Math.min(1, Math.max(0, (now - armFx.t0) / 300)); k = 0.4 + 0.6 * a; }
-        ctx.beginPath(); addCellPath(t.x, t.y, 1);
-        ctx.fillStyle = bg; ctx.fill();
-        ctx.fillStyle = ink;
-        const arm = s * 0.22 * k, th = Math.max(2, s * 0.1 * k);
-        if (heal) {
-            ctx.fillRect(cx - th / 2, cy - arm, th, arm * 2);
-            ctx.fillRect(cx - arm, cy - th / 2, arm * 2, th);
-            if (s >= 22) { // current value in the corner
-                const [lx, ly] = pkg.GRID.labelOffset;
-                ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
-                ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-                ctx.fillText(String(game.healValue(t.x, t.y)), cx + s * lx, cy + s * ly);
-            }
-        } else {
-            // Harm: a spiky X inside a smaller outline
-            ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
-            ctx.fillRect(-th / 2, -arm, th, arm * 2);
-            ctx.fillRect(-arm, -th / 2, arm * 2, th);
-            ctx.restore();
-            ctx.beginPath(); addCellPath(t.x, t.y, 0, 0.64);
-            ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, s * 0.03); ctx.stroke();
-        }
-    }
-    
-    // Draws a tapered arrow from `from` (thick end) to `to` (arrowhead).
-    // Links are drawn child -> parent.
-    function drawLink(from, to, color) {
-        const parent = from, child = to;   // geometry below: thick at `parent`, tip at `child`
-        const s = cam.size;
-        const [ax, ay] = cellCenter(parent.x, parent.y);
-        const [bx, by] = cellCenter(child.x, child.y);
-        const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy); if (!len) return;
-        const ux = dx / len, uy = dy / len, px = -uy, py = ux;
-        const gap = s * (PIECE_R + 0.05);
-        const sx = ax + ux * gap, sy = ay + uy * gap;          // start: parent edge
-        const ex = bx - ux * gap, ey = by - uy * gap;          // end: child edge (arrow tip)
-        const head = Math.min(s * 0.16, (len - 2 * gap) * 0.5);
-        const hx = ex - ux * head, hy = ey - uy * head;        // arrowhead base
-        const w0 = s * 0.07, w1 = s * 0.015, wh = s * 0.075;
-        ctx.fillStyle = css(color);
-        ctx.beginPath();
-        ctx.moveTo(sx + px * w0, sy + py * w0);
-        ctx.lineTo(hx + px * w1, hy + py * w1);
-        ctx.lineTo(hx + px * wh, hy + py * wh);
-        ctx.lineTo(ex, ey);
-        ctx.lineTo(hx - px * wh, hy - py * wh);
-        ctx.lineTo(hx - px * w1, hy - py * w1);
-        ctx.lineTo(sx - px * w0, sy - py * w0);
-        ctx.closePath();
-        ctx.fill();
-    }
-    
-    function drawHpBar(p, cx, cy, s) {
-        const w = s * 0.56, h = Math.max(3, s * 0.06);
-        const x = cx - w / 2, y = cy + s * 0.37;
-        ctx.fillStyle = css('--grid');
-        ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = css(OWNERS[p.owner].fill);
-        ctx.fillRect(x, y, w * Math.max(0, p.hp) / p.maxHp, h);
-    }
-    
-    Object.assign(V, {render, drawTile, drawLink, drawHpBar});
+    };
 })(hc);

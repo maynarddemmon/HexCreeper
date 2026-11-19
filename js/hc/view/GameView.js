@@ -9,13 +9,16 @@
         
         V = pkg.view,
         {
-            canvas, game, cam, MIN_SIZE, MAX_SIZE, screenToWorld, cellAt, cellCenter, sameCell, draw, eventPos
+            canvas, game, cam, screenToWorld, cellAt, cellCenter, sameCell, draw, eventPos
         } = V,
         
         {
             LabeledValue,
             theme:{padding, spacing, cornerRadius, colorPanel, colorText, colorAccent, fontSizeMedium}
         } = pkg,
+        
+        MIN_SIZE = 12,
+        MAX_SIZE = 140,
         
         INFO_WIDTH = 236,
         
@@ -107,7 +110,7 @@
             this.infoPanel.update();
             let status = '';
             if (V.placeMode) {
-                status = i18n(V.placeMode.stage === 'square' ? 'status-place-square' : 'status-place-link');
+                status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
             } else if (V.healMode) {
                 status = i18n('status-heal', game.healAmount());
             }
@@ -174,7 +177,7 @@
             if (V.placeMode) {
                 V.placeMode = null;
             } else if (game.canAffordPlace()) {
-                V.placeMode = {stage:'square'};
+                V.placeMode = {stage:'cell'};
             }
             draw();
         },
@@ -199,9 +202,9 @@
         
         /** @private */
         _handlePlaceClick: function(c) {
-            const isSquare = game.placeSquares().some(q => sameCell(q, c));
-            if (V.placeMode.stage === 'square') {
-                V.placeMode = isSquare ? {stage:'link', x:c.x, y:c.y} : null;
+            const isFree = game.placeCells().some(q => sameCell(q, c));
+            if (V.placeMode.stage === 'cell') {
+                V.placeMode = isFree ? {stage:'link', x:c.x, y:c.y} : null;
             } else {
                 const cand = game.pieceAt(c.x, c.y);
                 if (cand && game.linkCandidates(V.placeMode.x, V.placeMode.y).some(p => p.id === cand.id)) {
@@ -211,10 +214,10 @@
                         this.afterTurn();
                         return;
                     }
-                } else if (isSquare) {
+                } else if (isFree) {
                     V.placeMode = {stage:'link', x:c.x, y:c.y}; // Pick a different cell.
                 } else {
-                    V.placeMode = {stage:'square'}; // Back to choosing a cell.
+                    V.placeMode = {stage:'cell'}; // Back to choosing a cell.
                 }
             }
             draw();

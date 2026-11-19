@@ -38,17 +38,16 @@ test('keys are ignored while a dialog is open', async ({page}) => {
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
 });
 
-test('the Settings dialog switches grids, starting a new game, and is remembered', async ({page}) => {
-    await startGame(page, {grid:'hex'});
+test('a setting marked ✱ applies from the next new game', async ({page}) => {
+    await startGame(page);
     await button(page, '⚙').click();
-    await expect(settingsTitle(page)).toBeVisible();
-    await button(page, '■ Square').click();
-    expect(await page.evaluate(() => [hc.GRID.kind, hc.app.game.turn, JSON.parse(localStorage.getItem('hc.settings')).grid])).toEqual(['square', 1, 'square']);
-
-    // Loads directly: startGame would set the grid again.
-    await page.goto('/index.html');
-    await page.waitForFunction(() => window.hc?.app?.game?.playerCore != null);
-    expect(await page.evaluate(() => hc.GRID.kind)).toBe('square');
+    const input = page.locator('input[data-setting="quadRadius"]');
+    await input.fill('2');
+    await input.press('Enter');
+    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(3);
+    await button(page, 'X Close').click();
+    await button(page, '⌫').click();
+    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);
 });
 
 test('a setting applies at once, is saved only while not the default, and resets', async ({page}) => {
@@ -102,30 +101,28 @@ test('Place and Heal show as on while choosing; Esc cancels', async ({page}) => 
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeHidden();
 });
 
-for (const grid of ['hex', 'square']) {
-    test(`click selects your piece; shift-click moves onto it instead (${grid})`, async ({page}) => {
-        await startGame(page, {grid});
-        await clearBoard(page);
-        await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, [dx, dy] = hc.GRID.dirs[1];
-            g.score = 100; g.playerPlace(dx, dy, c); g.playerWait();
-            g.selectedId = c.id;
-            hc.app.centerOn(c);
-        });
-        const [dx, dy] = await page.evaluate(() => hc.GRID.dirs[1]),
-            pt = await cellOnPage(page, dx, dy);
-        await page.mouse.click(pt[0], pt[1]);
-        expect(await page.evaluate(() => hc.app.game.selectedId !== hc.app.game.playerCoreId && hc.app.game.playerCore.x === 0)).toBe(true);
-        await page.evaluate(() => {hc.app.game.selectedId = hc.app.game.playerCoreId;});
-        await page.keyboard.down('Shift');
-        await page.mouse.click(pt[0], pt[1]);
-        await page.keyboard.up('Shift');
-        expect(await page.evaluate(([dx, dy]) => {const c = hc.app.game.playerCore; return c.x === dx && c.y === dy;}, [dx, dy])).toBe(true);
+test('click selects your piece; shift-click moves onto it instead', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.playerCore, [dx, dy] = hc.GRID.dirs[1];
+        g.score = 100; g.playerPlace(dx, dy, c); g.playerWait();
+        g.selectedId = c.id;
+        hc.app.centerOn(c);
     });
-}
+    const [dx, dy] = await page.evaluate(() => hc.GRID.dirs[1]),
+        pt = await cellOnPage(page, dx, dy);
+    await page.mouse.click(pt[0], pt[1]);
+    expect(await page.evaluate(() => hc.app.game.selectedId !== hc.app.game.playerCoreId && hc.app.game.playerCore.x === 0)).toBe(true);
+    await page.evaluate(() => {hc.app.game.selectedId = hc.app.game.playerCoreId;});
+    await page.keyboard.down('Shift');
+    await page.mouse.click(pt[0], pt[1]);
+    await page.keyboard.up('Shift');
+    expect(await page.evaluate(([dx, dy]) => {const c = hc.app.game.playerCore; return c.x === dx && c.y === dy;}, [dx, dy])).toBe(true);
+});
 
 test('keyboard moves the selected piece; Enter ends the turn', async ({page}) => {
-    await startGame(page, {grid:'hex'});
+    await startGame(page);
     await clearBoard(page);
     await page.keyboard.press('d');   // east
     expect(await page.evaluate(() => [hc.app.game.playerCore.x, hc.app.game.playerCore.y, hc.app.game.turn])).toEqual([1, 0, 2]);

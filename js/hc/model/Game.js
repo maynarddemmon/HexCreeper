@@ -5,9 +5,9 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
+            WORLD_LIMIT, QUAD, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
         },
-        cheb, PIECE_TYPES
+        hexDist, PIECE_TYPES
     } = pkg;
     
     // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@
             this.score = 0;
             this.over = false;
             this.effects = [];              // transient visuals (floating text, flashes)
-            pkg.GRID = pkg.makeGrid();      // square or hex, fixed for the whole game
+            pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
             this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm", timer}
             this.generatedQuads = new Set();
@@ -137,8 +137,8 @@
                 if (hits.length) { out.push({ x, y, dx, dy, attack: true, hits }); continue; }
                 if (!this.groupMoveOk(group, ids, dx, dy)) continue;
                 if (parent) {
-                    const d = cheb({ x, y }, parent);
-                    if (d > LINK.range && d >= cheb(piece, parent)) continue;   // must stay in range (or close the gap)
+                    const d = hexDist({ x, y }, parent);
+                    if (d > LINK.range && d >= hexDist(piece, parent)) continue;   // must stay in range (or close the gap)
                 }
                 out.push({ x, y, dx, dy, attack: false });
             }
@@ -154,13 +154,13 @@
             if (avoidHarm && group.some(g => this.isHarm(g.x + dx, g.y + dy))) return false;
             const parent = this.parent(piece);
             if (parent) {
-                const d = cheb({ x: piece.x + dx, y: piece.y + dy }, parent);
-                if (d > LINK.range && d >= cheb(piece, parent)) return false;
+                const d = hexDist({ x: piece.x + dx, y: piece.y + dy }, parent);
+                if (d > LINK.range && d >= hexDist(piece, parent)) return false;
             }
             return true;
         }
         
-        // Every member of the group must land on a square that is empty or vacated by the group.
+        // Every member of the group must land on a cell that is empty or vacated by the group.
         groupMoveOk(group, ids, dx, dy) {
             for (const g of group) {
                 const x = g.x + dx, y = g.y + dy;
@@ -239,7 +239,7 @@
         }
         
         // ---- Quadrants & tiles ----
-        // Quadrants are the grid's chunks: square blocks, or hexagonal chunks on a hex grid.
+        // Quadrants are the grid's hexagonal chunks.
         quadOf(x, y) { return pkg.GRID.chunkOf(x, y); }
         
         updateQuadrants() {
@@ -327,8 +327,8 @@
             return true;
         }
         
-        // Empty squares adjacent to at least one player piece.
-        placeSquares() {
+        // Empty cells adjacent to at least one player piece.
+        placeCells() {
             const seen = new Set(), out = [];
             for (const p of this.piecesOf('player')) for (const [dx, dy] of pkg.GRID.dirs) {
                 const x = p.x + dx, y = p.y + dy, k = this.key(x, y);
@@ -340,12 +340,12 @@
         
         // Player pieces a new piece at (x, y) could link to.
         linkCandidates(x, y) {
-            return this.piecesOf('player').filter(p => cheb(p, { x, y }) === 1);
+            return this.piecesOf('player').filter(p => hexDist(p, { x, y }) === 1);
         }
         
         playerPlace(x, y, parent) {
             if (this.over || !this.canAffordPlace()) return false;
-            if (this.pieceAt(x, y) || !parent || parent.owner !== 'player' || cheb(parent, { x, y }) !== 1) return false;
+            if (this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
             const cost = this.placeCost();
             this.score -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id);
@@ -365,7 +365,7 @@
         // or down toward the most damaged child. Units alternate up / down, starting
         // up (so with two spare units one goes up and one goes down). Units that find
         // nobody to heal become score: RANK.healScorePer each.
-        // Unvisited quadrants among those around the tile's quadrant (8 square, 6 hex).
+        // Unvisited quadrants among those around the tile's quadrant (6).
         unvisitedAround(x, y) {
             const [qx, qy] = this.quadOf(x, y);
             let n = 0;
@@ -471,7 +471,7 @@
             if (this.turn % SPAWN.every === 0) this.spawnWave();
         }
         
-        // Steps-to-reach-a-player-piece for every square within `radius`, walking
+        // Steps-to-reach-a-player-piece for every cell within `radius`, walking
         // around active harm tiles (other pieces are ignored since they move).
         distanceField(sources, radius = 30) {
             const dist = new Map(), q = [];
@@ -521,7 +521,7 @@
                 const parent = nodes[Math.floor((i - 1) / 2)];
                 const spots = pkg.GRID.dirs.map(([dx, dy]) => ({ x: parent.x + dx, y: parent.y + dy }))
                     .filter(q => this.inBounds(q.x, q.y) && !this.pieceAt(q.x, q.y) && !this.isHarm(q.x, q.y)
-                        && !players.some(p => cheb(p, q) < 2));
+                        && !players.some(p => hexDist(p, q) < 2));
                 if (!spots.length) break;
                 const q = spots[Math.floor(Math.random() * spots.length)];
                 nodes.push(this.addPiece('core', 'enemy', q.x, q.y, parent.id));
@@ -539,7 +539,7 @@
                 const d = SPAWN.minDist + Math.floor(Math.random() * (SPAWN.maxDist - SPAWN.minDist + 1));
                 const { x, y } = pkg.GRID.ring(core.x, core.y, d);
                 if (!this.inBounds(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
-                if (players.some(p => cheb(p, { x, y }) < SPAWN.clearance)) continue;
+                if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                 const p = this.addPiece('core', 'enemy', x, y);
                 p.hp = p.maxHp = ENEMY.hpPer * RANK.base;
                 this.fx(x, y, '', '--enemy', { spawn: true });

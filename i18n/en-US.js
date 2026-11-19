@@ -42,7 +42,7 @@ myt.I18N.setDictionary({
 "info-none":"–",
 
 // Status
-"status-place-square":"Place piece: choose an empty cell next to your pieces. Esc cancels.",
+"status-place-cell":"Place piece: choose an empty cell next to your pieces. Esc cancels.",
 "status-place-link":"Place piece: now click the piece to link it to.",
 "status-heal":"Heal: click the piece to heal from ($0 HP, flowing along links). Esc cancels.",
 
@@ -57,10 +57,6 @@ myt.I18N.setDictionary({
 
 // Settings
 "settings-note":"Changes apply at once. Those marked ✱ apply from the next new game.",
-"setting-grid":"Grid",
-"setting-grid-desc":"Changing it starts a new game.",
-"grid-hex":"⬢ Hex",
-"grid-square":"■ Square",
 "settings-group-waves":"Enemy Waves",
 "settings-group-enemies":"Enemies",
 "settings-group-swarm":"Your Swarm",
@@ -85,8 +81,7 @@ myt.I18N.setDictionary({
 "setting-movesPer":"Moves per turn per top rank",
 "setting-costPer":"Place cost per core rank",
 "setting-rankUpHeals":"Rank-up also adds HP (0/1)",
-"setting-hexRadius":"Hex chunk radius ✱",
-"setting-quadSize":"Square quadrant size ✱",
+"setting-quadRadius":"Quadrant radius ✱",
 "setting-healPerQuad":"Heal tiles per quadrant",
 "setting-harmPerQuad":"Harm tiles per quadrant",
 "setting-timerMin":"Tile countdown min (turns)",

@@ -3,26 +3,18 @@
 Every rule in the game, its default numbers, and why it is the way it is. All the numbers marked *(setting)* can be changed in the in-game Settings panel.
 
 ## Core rules
-- World: a **hex or square grid** (chosen in Settings, which starts a new game; hex is the default), effectively infinite (integer coordinates clamped to ±1,000,000). The core starts at (0,0), the centre of the first quadrant.
+- World: a **hex grid**, effectively infinite (integer coordinates clamped to ±1,000,000). The core starts at (0,0), the centre of the first quadrant.
 - Turn-based. On your turn you may move up to **(highest rank of any of your pieces)** different pieces, each once, in any order. Placing pieces and paid heals are also allowed during the turn and don't use moves. The turn ends with End turn (Enter / `.`), or automatically once no piece can act and you can't afford a placement. Then every enemy squad acts, the turn counter advances, tile countdowns tick (tiles arming under pieces take effect), and enemies may spawn.
 - Pieces have a type (which sets how they move), an owner (player or enemy), HP, a score value, a rank and an optional link parent. Both sides use link trees.
 - Moving onto an opposing piece is an attack: 1 damage.
 - **Advance after a kill** *(setting, on by default)*: if a player attack kills and the whole moving group can then legally step in that direction (every destination cell empty or vacated by the group, link range respected, no active harm tile), the group steps forward as part of the same action, eating any heal tiles it lands on. Otherwise the attackers stay put. Enemies never advance after kills.
 - The game is over when your original core is destroyed.
 
-## Grids
-| | Square | Hex |
-|---|---|---|
-| Neighbours / move directions | 8 (king moves) | 6 |
-| Distance (link range, spawning, pathing) | Chebyshev | hex distance |
-| Link range shape (3) | 7×7 square | hexagon of 37 cells |
-| Quadrants | 5×5 blocks *(setting)*, 8 neighbours | hexagonal chunks of radius 3 = 37 cells *(setting)*, 6 neighbours |
-| Heal tile value max | ⌊8/2⌋+1 = 5 | ⌊6/2⌋+1 = 4 |
-| Harm tiles clear when | all 8 neighbouring quadrants are visited | all 6 neighbouring chunks are visited |
-| Keys | Q W E / A D / Z X C, arrows, numpad | Q E / A D / Z C (NW NE / W E / SW SE), ← / →, numpad 7 9 4 6 1 3 |
-- Hexes are pointy-top, stored in axial coordinates (q, r). Hex chunks of radius k tile the plane on the lattice (2k+1, −k), (k, k+1), and chunk (0,0) is centred on the start cell.
-- The grid choice is remembered in the browser (`hc.grid`).
-- After playtesting, the hex grid "works quite well", and the hex chunk radius default went from 2 to 3.
+## Grid
+- A hex grid: pointy-top hexes in axial coordinates (q, r), 6 neighbours, hex distance (used for link range, spawning and pathing). Link range 3 is a hexagon of 37 cells.
+- Quadrants are hexagonal chunks of radius 3 = 37 cells *(setting)*, each with 6 neighbours. Chunks of radius k tile the plane on the lattice (2k+1, −k), (k, k+1), and chunk (0,0) is centred on the start cell.
+- Keys: Q E / A D / Z C (NW NE / W E / SW SE), ← / →, numpad 7 9 4 6 1 3.
+- History: there was also a square grid (8 neighbours, Chebyshev distance, 5×5 quadrants). After playtesting both, hex "works quite well" and felt better, so as of 2026-11-18 the game is hex only. The chunk radius default went from 2 to 3 along the way.
 
 ## Combos
 - **Kills:** killing n enemies in one move scores n × (their total score value), which is n² for 1-point enemies (1, 4, 9, 16…). Enemies destroyed because a piece they were linked below died **count as kills** for the combo.
@@ -74,7 +66,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Observed against a wall of player pieces: a leader moves the squad in for a 6-hit group strike, then the mid pieces pull their branches back; or a mid piece strikes and the leader pulls everything back, with idle turns at a safe distance in between. Against a lone, surrounded target there is no safe retreat (any step back carries a piece onto the target, which counts as another attack), so squads keep attacking.
 
 ## Quadrants and tiles
-- The world is divided into **quadrants**: hexagonal chunks on hexes, 5×5 blocks on squares, drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
+- The world is divided into **quadrants** (hexagonal chunks), drawn with darker grid lines. The start cell is the centre of quadrant (0,0).
 - When a player piece is in a quadrant, that quadrant and its neighbours get their tiles, **once per quadrant**, never cleaned up. Visited quadrants are tinted light blue.
 - Each quadrant gets **1 heal tile and 1 harm tile** *(setting)* at random empty cells.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
@@ -87,7 +79,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm tile.
 
 ## Settings
-The grid picker (Hex / Square) is at the top of the panel and starts a new game. Every other value applies immediately and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
+Every value applies immediately (those marked "new game" from the next game) and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
 
 | Setting | Default |
 |---|---|
@@ -104,8 +96,7 @@ The grid picker (Hex / Square) is at the top of the panel and starts a new game.
 | Max squad size | 8 |
 | Advance after a kill (0/1) | 1 |
 | Link range | 3 |
-| Hex chunk radius (new game) | 3 |
-| Square quadrant size (new game) | 5 |
+| Quadrant radius (new game) | 3 |
 | Heal tiles per quadrant | 1 |
 | Harm tiles per quadrant | 1 |
 | Tile countdown min / max (turns) | 2 / 8 |
@@ -132,12 +123,12 @@ The grid picker (Hex / Square) is at the top of the panel and starts a new game.
 - A dashed outline shows the link range around the selected piece's parent.
 - Tiles: active heal = green + with its value; active harm = red × in an inner outline; pending = dashed outline with its countdown.
 - A header bar holds the score, rank and moves left, and every button: End Turn, Place, Heal, Center, New game, Settings, Help and GitHub. An info panel at the top left of the board shows core HP, turn, piece counts, the Next wave and the selected piece.
-- Settings live in a dialog (⚙): the grid choice plus every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
+- Settings live in a dialog (⚙): every number, grouped; values outside the allowed range are clamped; only changed values are saved; Reset to Defaults.
 - Help (?) is `data/help.txt`, shown in a dialog; it opens by itself on a first visit.
 
 ## Balance notes
 - See [PLAYTESTS.md](PLAYTESTS.md) for play sessions.
-- With the planning AI, a simulated bot that places pieces whenever it can and attacks with every piece that can, but never moves otherwise, lasted a median 11 turns on squares (1 of 10 runs reached the 400-turn cap) and 26 on hexes (none reached it).
+- (Earlier, with both grids.) With the planning AI, a simulated bot that places pieces whenever it can and attacks with every piece that can, but never moves otherwise, lasted a median 11 turns on squares (1 of 10 runs reached the 400-turn cap) and 26 on hexes (none reached it).
 - With the old AI, where squads moved as one block, the same bot had 1–2 of 10 runs on squares and 3 of 8 on hexes holding out forever (the **turtling** problem: a stationary rank-4 swarm fed on squads that arrived piecemeal). Patience in the planning AI largely fixes this.
 - AI tuning sweep against a wall of pieces over 12 turns: caution 6 → squads brawl (ending exposed 11 of 12 turns); caution 10–15 → a safe strike on 3 turns and exposed on only 3; caution ≥ 9 without patience → squads never commit.
 - Heal value rewards exploring; harm tiles clear out of fully explored areas, so the explored interior becomes safer but less rewarding.
@@ -153,12 +144,12 @@ The grid picker (Hex / Square) is at the top of the panel and starts a new game.
 - Tools to make moving large swarms less tedious.
 
 ## Implementation
-- `js/hc/hc.js`: the `hc` namespace and tunables (`GRIDCFG`, `SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
-- `model/Grid.js`: `makeSquareGrid(S)` / `makeHexGrid(k)` return the `hc.GRID` object: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `cheb()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `GRIDCFG`.
+- `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
+- `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
 - `model/Game.js`: state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `updateQuadrants` / `generateQuad` / `clearSurroundedHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), mixed into `Game.prototype`. Squad state: `root.idle`.
-- `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers that work for both grid shapes (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
+- `view/View.js`: `hc.view`, the shared view state (canvas, camera, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the setting definitions (each maps to a tunable), stored as overrides in localStorage.
 - `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the settings dialog from the definitions; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
 - UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

@@ -18,7 +18,7 @@ JS.Packages(file => {
     ).requires('hc.SquareBtn','hc.UnderlineBtn','hc.Spacer','hc.WideView','hc.Panel');
     
     // Model //
-    file(MODEL_ROOT + 'Grid.js').provides('hc.makeGrid','hc.cheb').requires('hc.cfg');
+    file(MODEL_ROOT + 'Grid.js').provides('hc.makeGrid','hc.hexDist').requires('hc.cfg');
     file(MODEL_ROOT + 'PieceTypes.js').provides('hc.PIECE_TYPES').requires('hc.makeGrid');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.Game.prototype.planSquad').requires('hc.Game');

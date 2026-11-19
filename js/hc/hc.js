@@ -19,12 +19,6 @@
         })(LOCALE_KEY);
     
     pkg.hc = {
-        DIRS_8:[
-            [-1, -1], [0, -1], [1, -1],
-            [-1,  0],          [1,  0],
-            [-1,  1], [0,  1], [1,  1],
-        ],
-        
         app:null, // Holds the App instance.
         
         /*  Colors are the page's CSS variables (see index.html), so the UI follows the same
@@ -83,17 +77,11 @@
             // Gameplay //
             WORLD_LIMIT:1000000,
             
-            // Square or hex grid, and the size of hex chunks. Applies to new games.
-            GRIDCFG:{
-                hex:1,
-                hexRadius:3
-            },
-            
-            // Quadrants: the world is divided into QUAD.size x QUAD.size quadrants.
-            // Whenever a player piece is in a quadrant, that quadrant and its 8 neighbours
+            // Quadrants: the world is divided into hexagonal quadrants of radius QUAD.radius.
+            // Whenever a player piece is in a quadrant, that quadrant and its 6 neighbours
             // get their tiles generated (once each, never cleaned up). Visited quadrants are tinted.
             QUAD:{
-                size:5 // applies to new games; the start square (0,0) is the centre of quadrant (0,0)
+                radius:3 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)
             },
             
             // Links between pieces.
@@ -156,7 +144,7 @@
             // After a player attack that kills, the attacking piece (with its group) steps
             // into the attacked direction if the whole group can legally do so (not onto harm).
             COMBAT:{
-                advance:1 // a linked piece must stay within this many squares (Chebyshev) of its link parent
+                advance:1 // a linked piece must stay within this many steps of its link parent
             },
             
             // Enemy squads: enemies are link trees too (same rank rules as the player).
