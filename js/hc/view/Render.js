@@ -164,12 +164,13 @@
                 return v;
             },
             
-            // Fog of war: sight is null when it's off. Enemies show only on cells in sight.
+            // Fog of war: sight is null when it's off. Enemies show only on cells in sight,
+            // until the game is over, when they all show, to see what came for you.
             // Cells never seen show only as fog, so the board below is drawn only on cells
             // that have been seen ("known"); the ones out of sight now are dimmed after.
             sight = game.cellsInSight(),
             inSight = (x, y) => !sight || sight.has(game.key(x, y)),
-            shown = p => p.owner === 'player' || inSight(p.x, p.y),
+            shown = p => p.owner === 'player' || game.over || inSight(p.x, p.y),
             isKnown = (x, y) => !sight || game.seenCells.has(game.key(x, y)),
             known = sight ? visible.filter(c => isKnown(c.x, c.y)) : visible;
         

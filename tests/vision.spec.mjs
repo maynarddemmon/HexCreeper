@@ -58,6 +58,22 @@ test.describe('fog of war', () => {
     });
 });
 
+test('once the game is over, every cell seen is in sight, and every enemy shows', async ({page}) => {
+    await startGame(page);
+    const before = await page.evaluate(() => {
+        const g = hc.app.game, sight = g.cellsInSight();
+        g.addPiece('core', 'enemy', 30, 0);
+        g.seenCells.add('40,0');
+        return [sight.has('40,0'), sight.has('30,0'), g.seenCells.has('30,0')];
+    });
+    expect(before).toEqual([false, false, false]);
+    await page.evaluate(() => {hc.app.game.damage(hc.app.game.playerCore, 999, null);});
+    expect(await page.evaluate(() => {
+        const sight = hc.app.game.cellsInSight();
+        return [sight.has('40,0'), sight.has('30,0')];
+    })).toEqual([true, false]);
+});
+
 test('fog of war can be turned off and its radius changed in Settings', async ({page}) => {
     await startGame(page);
     await clearBoard(page); // so no random solid tile blocks the cells checked below

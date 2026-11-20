@@ -177,12 +177,14 @@
         
         // ---- Fog of war ----
         // Keys of the cells in sight of a player piece, or null when fog of war is off.
-        // Cells in sight are added to seenCells, so what's on them stays shown after.
+        // Once the game is over, every cell that has been seen counts as in sight, so the
+        // board you'd found can be seen at the end (and Render shows every enemy). Cells in sight are added to seenCells, so what's on them stays shown after.
         // Worked out again only when
         // something it depends on changes: piece positions, the tiles (solid tiles only
         // come with new quadrants, which add tiles) or the settings.
         cellsInSight() {
             if (!VISION.fog) return null;
+            if (this.over) return this.seenCells;
             const players = this.piecesOf('player'),
                 sightKey = [VISION.radius, this.tiles.size, ...players.map(p => this.key(p.x, p.y))].join(';');
             if (sightKey !== this._sightKey) {
