@@ -12,12 +12,14 @@
 			"name":"Explorer",
 			"description":"Visit 12 chambers.",
 			"expression":"quadsVisited >= 12",
+			"progress":"{quadsVisited}/12 chambers",
 			"lockOnSuccess":true
 		},
 		{
 			"name":"Hold Out",
 			"description":"Last until turn 30.",
 			"expression":"turn >= 30",
+			"progress":"Turn {turn}/30",
 			"lockOnSuccess":true
 		}
 	],
@@ -26,6 +28,7 @@
 			"name":"Overrun",
 			"description":"Let 30 enemy pieces be on the board at once.",
 			"expression":"enemies >= 30",
+			"progress":"{enemies}/30 enemies",
 			"lockOnSuccess":true
 		}
 	]

@@ -11,12 +11,13 @@
 			"name":"Far Afield",
 			"description":"Take your core 30 steps from where it started.",
 			"expression":"coreDist >= 30",
+			"progress":"{coreDist}/30 steps",
 			"lockOnSuccess":true
-		},
-		{
+		},{
 			"name":"Cull",
 			"description":"Destroy 40 enemy pieces.",
 			"expression":"kills >= 40",
+			"progress":"{kills}/40 destroyed",
 			"lockOnSuccess":true,
 			"required":false
 		}
@@ -24,8 +25,9 @@
 	"penalties":[
 		{
 			"name":"Attrition",
-			"description":"Lose more than 15 pieces.",
-			"expression":"piecesLost > 15",
+			"description":"Lose more than 5 pieces.",
+			"expression":"piecesLost > 5",
+			"progress":"{piecesLost}/5 lost",
 			"lockOnSuccess":true
 		}
 	]

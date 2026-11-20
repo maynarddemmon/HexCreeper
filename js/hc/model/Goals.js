@@ -49,17 +49,52 @@
             return compiled.get(src);
         },
         
+        /*  A progress template, compiled once: its text, split into strings and the
+            compiled expressions between { and }. Throws if a brace isn't matched or an
+            expression isn't one. */
+        templates = new Map(),
+        compileTemplate = src => {
+            if (!templates.has(src)) {
+                const parts = [];
+                let i = 0;
+                while (i < src.length) {
+                    const open = src.indexOf('{', i), close = src.indexOf('}', i);
+                    if (close >= 0 && (open < 0 || close < open)) throw new Error(`Unmatched "}" at ${close}`);
+                    if (open < 0) {
+                        parts.push(src.slice(i));
+                        break;
+                    }
+                    if (close < 0) throw new Error(`Unmatched "{" at ${open}`);
+                    parts.push(src.slice(i, open));
+                    try {
+                        parts.push(compile(src.slice(open + 1, close)));
+                    } catch (err) {
+                        throw new Error(`In "{${src.slice(open + 1, close)}}": ${err.message}`, {cause:err});
+                    }
+                    i = close + 1;
+                }
+                templates.set(src, parts);
+            }
+            return templates.get(src);
+        },
+        
+        // A value as progress text: whole numbers as they are, others to one decimal place.
+        formatValue = v => typeof v === 'number' && !Number.isInteger(v) && Number.isFinite(v) ? String(Math.round(v * 10) / 10) : String(v),
+        
         isBool = v => v === undefined || typeof v === 'boolean';
     
     pkg.goals = {
         NAMES,
         FUNCTION_NAMES,
         compile,
+        compileTemplate,
         
         /*  A level's goals and penalties, from its file's "goals" and "penalties", as one
             list of objectives: {kind:'goal' | 'penalty', name, description, expression,
-            lockOnSuccess, lockOnFailure, required}, with the defaults filled in. Throws an
-            Error saying what's wrong with the first bad one. */
+            progress, lockOnSuccess, lockOnFailure, required}, with the defaults filled in.
+            progress is text with expressions in braces, e.g. "{kills}/40 destroyed"; it's
+            shown as play goes on (see evaluateObjectives). Throws an Error saying what's
+            wrong with the first bad one. */
         fromLevel: data => {
             const objectives = [];
             for (const kind of ['goal', 'penalty']) {
@@ -75,11 +110,18 @@
                     } catch (err) {
                         throw new Error(`The ${where}'s expression: ${err.message}`, {cause:err});
                     }
+                    if (o.progress !== undefined && typeof o.progress !== 'string') throw new Error(`The ${where}'s progress must be text`);
+                    try {
+                        compileTemplate(o.progress ?? '');
+                    } catch (err) {
+                        throw new Error(`The ${where}'s progress: ${err.message}`, {cause:err});
+                    }
                     objectives.push({
                         kind,
                         name:o.name,
                         description:o.description ?? '',
                         expression:o.expression,
+                        progress:o.progress ?? '',
                         lockOnSuccess:o.lockOnSuccess ?? false,
                         lockOnFailure:o.lockOnFailure ?? false,
                         required:o.required ?? true
@@ -98,7 +140,8 @@
         // The level's objectives (see goals.fromLevel).
         get levelObjectives() { return this.level?.objectives ?? []; }
         
-        /*  Evaluates the objectives that aren't locked, locking any that lock, then ends the
+        /*  Evaluates the objectives that aren't locked, and their progress text (so a locked
+            one's stays as it was when it locked), locking any that lock, then ends the
             game if the level is won (every required goal true and penalty false) or can't
             be won any more (a required one locked the wrong way). A level with nothing
             required can't be won. */
@@ -113,6 +156,7 @@
                 const state = this.objectives[i];
                 if (state.locked) return;
                 state.value = !!compile(o.expression)(scope);
+                state.progress = compileTemplate(o.progress ?? '').map(part => typeof part === 'string' ? part : formatValue(part(scope))).join('');
                 if (state.value ? o.lockOnSuccess : o.lockOnFailure) state.locked = true;
             });
             

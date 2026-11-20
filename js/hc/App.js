@@ -34,7 +34,7 @@
             theme:{
                 spacing, padding,
                 colorAccent, colorText, colorTextMuted, colorError, colorHeaderBg, colorHeaderText, colorBtn,
-                fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
+                fontSizeSmall, fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
                 DATA_BASE_DIR, HEADER_HEIGHT, FOOTER_HEIGHT, GITHUB_URL
@@ -168,21 +168,37 @@
                     self.selected.update(i18n('info-none'));
                 }
                 
-                // A row for each of the level's objectives, made again when the level changes.
+                // For each of the level's objectives, its name and state, then in small text
+                // its description and progress. Made again when the level changes.
                 const list = game.levelObjectives;
                 if (self._rowsFor !== list) {
                     self._rowsFor = list;
-                    for (const r of self.goalRows) r.destroy();
-                    self.goalRows = list.map(() => new PlainText(self, {
-                        x:padding, width:INFO_WIDTH - 2*padding, fontSize:fontSizeMedium, whiteSpace:'nowrap'
+                    for (const r of self.goalRows) {
+                        r.name.destroy();
+                        r.description.destroy();
+                        r.progress.destroy();
+                    }
+                    const textAttrs = {x:padding, width:INFO_WIDTH - 2*padding};
+                    self.goalRows = list.map(o => ({
+                        name:new PlainText(self, {...textAttrs, fontSize:fontSizeMedium, whiteSpace:'nowrap'}),
+                        description:new PlainText(self, {
+                            ...textAttrs, x:2*padding, width:INFO_WIDTH - 3*padding, text:o.description, visible:!!o.description,
+                            fontSize:fontSizeSmall, textColor:colorTextMuted, whiteSpace:'normal'
+                        }),
+                        progress:new PlainText(self, {
+                            ...textAttrs, x:2*padding, width:INFO_WIDTH - 3*padding, visible:!!o.progress,
+                            fontSize:fontSizeSmall, fontFamily:fontFamilyMono, textColor:colorText, whiteSpace:'nowrap'
+                        })
                     }));
                     self.goalsHeader.setVisible(list.length > 0);
                 }
                 list.forEach((o, i) => {
-                    const [text, color] = objectiveLine(o, game.objectives[i]);
-                    self.goalRows[i].setText(text);
-                    self.goalRows[i].setTextColor(color);
-                    self.goalRows[i].setTooltip(o.description);
+                    const state = game.objectives[i],
+                        [text, color] = objectiveLine(o, state),
+                        row = self.goalRows[i];
+                    row.name.setText(text);
+                    row.name.setTextColor(color);
+                    row.progress.setText(state.progress);
                 });
             }
         });

@@ -35,7 +35,7 @@
             this.kills = 0;                  // enemy pieces destroyed
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
-            this.objectives = this.levelObjectives.map(() => ({value:false, locked:false})); // state of each of the level's goals and penalties
+            this.objectives = this.levelObjectives.map(() => ({value:false, locked:false, progress:''})); // state of each of the level's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
@@ -113,7 +113,10 @@
             ) throw new Error('Malformed game data');
             const objectives = o.level?.objectives ?? [];
             try {
-                for (const obj of objectives) pkg.goals.compile(obj.expression);
+                for (const obj of objectives) {
+                    pkg.goals.compile(obj.expression);
+                    pkg.goals.compileTemplate(obj.progress ?? '');
+                }
             } catch (err) {
                 throw new Error('Malformed goal: ' + err.message, {cause:err});
             }
@@ -131,7 +134,10 @@
             this.kills = isNum(o.kills) ? o.kills : 0;
             this.piecesLost = isNum(o.piecesLost) ? o.piecesLost : 0;
             this.piecesPlaced = isNum(o.piecesPlaced) ? o.piecesPlaced : 0;
-            this.objectives = objectives.map((obj, i) => ({value:!!o.objectives?.[i]?.value, locked:!!o.objectives?.[i]?.locked}));
+            this.objectives = objectives.map((obj, i) => {
+                const s = o.objectives?.[i];
+                return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
+            });
             this.effects = [];
             pkg.GRID = pkg.makeGrid(o.quadRadius);
             this.grid = pkg.GRID;

@@ -28,7 +28,7 @@ const wait = page => page.evaluate(() => {
 
 const state = page => page.evaluate(() => {
     const g = hc.app.game;
-    return {over:g.over, outcome:g.outcome, lostBy:g.lostBy, objectives:g.objectives};
+    return {over:g.over, outcome:g.outcome, lostBy:g.lostBy, objectives:g.objectives.map(({value, locked}) => ({value, locked}))};
 });
 
 const goal = (expression, more = {}) => ({name:expression, expression, ...more});
@@ -65,14 +65,18 @@ test('a level\'s goals and penalties get their defaults, and a bad one is refuse
         }
     }, data);
     expect(await read({goals:[{name:'G', expression:'turn > 1'}], penalties:[{name:'P', description:'d', expression:'kills > 1', lockOnSuccess:true, required:false}]})).toEqual([
-        {kind:'goal', name:'G', description:'', expression:'turn > 1', lockOnSuccess:false, lockOnFailure:false, required:true},
-        {kind:'penalty', name:'P', description:'d', expression:'kills > 1', lockOnSuccess:true, lockOnFailure:false, required:false}
+        {kind:'goal', name:'G', description:'', expression:'turn > 1', progress:'', lockOnSuccess:false, lockOnFailure:false, required:true},
+        {kind:'penalty', name:'P', description:'d', expression:'kills > 1', progress:'', lockOnSuccess:true, lockOnFailure:false, required:false}
     ]);
     expect(await read({})).toEqual([]);
     expect(await read({goals:[{expression:'turn'}]})).toBe('error: The goal 1 needs a name');
     expect(await read({penalties:[{name:'P', expression:'tunr > 1'}]})).toBe('error: The penalty 1\'s expression: Unknown name "tunr" at 0');
     expect(await read({goals:[{name:'G', expression:'turn', required:'yes'}]})).toMatch(/must be true or false/);
     expect(await read({goals:{}})).toBe('error: "goals" must be a list');
+    expect(await read({goals:[{name:'G', expression:'turn', progress:'{turn'}]})).toBe('error: The goal 1\'s progress: Unmatched "{" at 0');
+    expect(await read({goals:[{name:'G', expression:'turn', progress:'turn}'}]})).toBe('error: The goal 1\'s progress: Unmatched "}" at 4');
+    expect(await read({goals:[{name:'G', expression:'turn', progress:'{tunr}/3'}]})).toBe('error: The goal 1\'s progress: In "{tunr}": Unknown name "tunr" at 0');
+    expect(await read({goals:[{name:'G', expression:'turn', progress:3}]})).toBe('error: The goal 1\'s progress must be text');
 });
 
 test('every value an expression can use is a number, at the start of a game', async ({page}) => {
@@ -101,6 +105,29 @@ test('kills, pieces lost and placed, and the core\'s distance are counted', asyn
         return [g.kills, g.piecesLost, g.piecesPlaced, g.outcome];
     });
     expect(done).toEqual([1, 1, 1, 'won']);
+});
+
+test('progress text fills in its expressions as play goes on, and stops once locked', async ({page}) => {
+    await startGame(page);
+    await playWith(page, [
+        goal('turn >= 3', {progress:'Turn {turn} of 3 ({turn / 3 * 100}%)', lockOnSuccess:true, required:false}),
+        goal('kills > 0', {progress:'{max(kills, 7)} {kills > 0 ? 1 : 0}', required:false}),
+        goal('turn > 50', {progress:'no braces'})
+    ]);
+    const progress = () => page.evaluate(() => hc.app.game.objectives.map(s => s.progress));
+    expect(await progress()).toEqual(['Turn 1 of 3 (33.3%)', '7 0', 'no braces']);
+    await wait(page);
+    await wait(page);
+    expect(await progress()).toEqual(['Turn 3 of 3 (100%)', '7 0', 'no braces']);
+    await wait(page);
+    expect(await progress()).toEqual(['Turn 3 of 3 (100%)', '7 0', 'no braces']); // locked
+    
+    const kept = await page.evaluate(() => {
+        const copy = new hc.Game();
+        copy.importFromObj(JSON.parse(JSON.stringify(hc.app.game.exportToObj())));
+        return copy.objectives.map(s => s.progress);
+    });
+    expect(kept).toEqual(['Turn 3 of 3 (100%)', '7 0', 'no braces']);
 });
 
 test('a level is won once every required goal is met and no required penalty is', async ({page}) => {
@@ -173,7 +200,7 @@ test('goals, their state and the outcome are saved with the game', async ({page}
         copy.importFromObj(data);
         return [copy.levelObjectives.map(o => o.expression), copy.objectives, copy.outcome];
     });
-    expect(kept).toEqual([['turn == 2', 'turn > 50'], [{value:true, locked:true}, {value:false, locked:false}], null]);
+    expect(kept).toEqual([['turn == 2', 'turn > 50'], [{value:true, locked:true, progress:''}, {value:false, locked:false, progress:''}], null]);
     
     const refused = await page.evaluate(() => {
         const data = hc.app.game.exportToObj();
@@ -206,12 +233,16 @@ test('the brief and the info panel show the level\'s goals and penalties', async
     await expect(visible('○ Far Afield')).toBeVisible();
     await expect(visible('○ Cull (optional)')).toBeVisible();
     await expect(visible('○ Penalty: Attrition')).toBeVisible();
+    await expect(visible('Destroy 40 enemy pieces.')).toBeVisible();
+    await expect(visible('0/40 destroyed')).toBeVisible();
+    await expect(visible('0/30 steps')).toBeVisible();
     await page.evaluate(() => {
         const g = hc.app.game;
         g.kills = 40;
         g.evaluateObjectives();
     });
     await expect(visible('✓ Cull (optional) · locked')).toBeVisible();
+    await expect(visible('40/40 destroyed')).toBeVisible();
 });
 
 test('a level whose goals are bad isn\'t loaded', async ({page}) => {
