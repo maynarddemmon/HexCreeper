@@ -95,6 +95,7 @@ test('every value an expression can use is a number, at the start of a game', as
 test('kills, pieces lost and placed, and the core\'s distance are counted', async ({page}) => {
     await startGame(page);
     await playWith(page, [goal('kills == 1 && piecesLost == 1 && piecesPlaced == 1 && pieces == 1 && dist(3, 0) == 3 && coreDist == 0')]);
+    await clearBoard(page); // so (1, 0) is open
     const done = await page.evaluate(() => {
         const g = hc.app.game;
         g.score = 1000;

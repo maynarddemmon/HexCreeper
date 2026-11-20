@@ -179,6 +179,7 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 - Chess-like piece types via `steps()`: leapers (knight), sliders (rook, bishop). Both have hex equivalents (e.g. Gliński's hex chess). Open question: does a slider carry its subtree several cells, or only one?
 - Varied enemy types (faster, ranged, different movement).
 - Tools to make moving large swarms less tedious.
+- An isometric view (2026-11-20): rows squashed to 60%, the floor a unit thick, solids as raised hex prisms, holes as pits, pieces as upright tokens drawn back to front, clicks on tokens picking their cell. A prototype worked and showed promise, but would need a fair amount of work to feel good to play (readability of distances, solids hiding what's behind them, tuning), so it's set aside.
 
 ## Implementation
 - `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
