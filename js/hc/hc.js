@@ -71,6 +71,11 @@
             // The project's home, linked from the header's GitHub mark.
             GITHUB_URL:'https://github.com/maynarddemmon/HexCreeper',
             
+            // The camera. It pans (animated) to keep your core at least EDGE_MARGIN px from
+            // the edges of the board, one hex at a time, and pans over PAN_MS.
+            EDGE_MARGIN:100,
+            PAN_MS:250,
+            
             // Look //
             PIECE_R:0.25, // piece radius as a fraction of a cell
             CORE_BORDER:0.08, // your core's thick border; the core is bigger by this much

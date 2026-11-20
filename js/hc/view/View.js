@@ -26,6 +26,34 @@
             }
         },
         
+        /*  An animated pan of the camera, or null: {fromX, fromY, toX, toY, t0}. */
+        pan = {current:null},
+        
+        /*  Moves the camera's centre to world point (x, y), animated over PAN_MS unless
+            animate is false. */
+        panTo = (x, y, animate = true) => {
+            if (animate) {
+                pan.current = {fromX:cam.x, fromY:cam.y, toX:x, toY:y, t0:performance.now()};
+            } else {
+                pan.current = null;
+                cam.x = x;
+                cam.y = y;
+            }
+            draw();
+        },
+        
+        /*  Steps the camera's pan to time now. Returns true while it's still going. */
+        stepPan = now => {
+            const p = pan.current;
+            if (!p) return false;
+            const t = Math.min(1, Math.max(0, (now - p.t0) / pkg.cfg.PAN_MS)),
+                ease = 1 - (1 - t) ** 3; // fast, then settling
+            cam.x = p.fromX + (p.toX - p.fromX) * ease;
+            cam.y = p.fromY + (p.toY - p.fromY) * ease;
+            if (t >= 1) pan.current = null;
+            return t < 1;
+        },
+        
         worldToScreen = (wx, wy) => {
             return [
                 (wx - cam.x) * cam.size + V.W / 2,
@@ -79,6 +107,14 @@
             rafPending:false,
             css,
             draw,
+            panTo,
+            stepPan,
+            
+            /*  Where the camera is headed: the end of the pan under way, or where it is. */
+            camTarget: () => pan.current ? [pan.current.toX, pan.current.toY] : [cam.x, cam.y],
+            
+            /*  Stops a pan where it is, e.g. when the player drags or zooms. */
+            stopPan: () => {pan.current = null;},
             worldToScreen,
             screenToWorld,
             cellCenter,

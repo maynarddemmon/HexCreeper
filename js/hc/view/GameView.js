@@ -5,6 +5,7 @@
     
     const V = pkg.view,
         {canvas, game, cam, screenToWorld, cellAt, sameCell, draw, eventPos} = V,
+        {EDGE_MARGIN} = pkg.cfg,
         
         MIN_SIZE = 12,
         MAX_SIZE = 140;
@@ -26,14 +27,29 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  Called after the player acts: keeps the core comfortably on screen. */
+        /*  Called after the player acts: keeps the core on screen. When it comes within
+            EDGE_MARGIN px of an edge, the board pans (animated) by whole hexes until it's
+            clear of it. A core already off screen, e.g. after the player has dragged away,
+            is left alone. */
         afterTurn: function() {
-            // Follow Core
             const c = game.playerCore;
             if (c) {
-                const [sx, sy] = V.cellCenter(c.x, c.y),
-                    margin = cam.size * 3;
-                if (sx < margin || sx > V.W - margin || sy < margin || sy > V.H - margin) pkg.app.centerOn(c);
+                const [tx, ty] = V.camTarget(),
+                    // Where the core will be on screen once any pan under way ends.
+                    [wx, wy] = pkg.GRID.center(c.x, c.y),
+                    sx = (wx - tx) * cam.size + V.W / 2,
+                    sy = (wy - ty) * cam.size + V.H / 2,
+                    margin = Math.min(EDGE_MARGIN, V.W / 2 - 1, V.H / 2 - 1),
+                    // One hex across, and one row of hexes down, in world units.
+                    stepX = 1, stepY = Math.sqrt(3) / 2,
+                    steps = (pos, size, step) => {
+                        if (pos < 0 || pos > size) return 0; // off screen: leave it
+                        if (pos < margin) return -Math.ceil((margin - pos) / (step * cam.size));
+                        if (pos > size - margin) return Math.ceil((pos - (size - margin)) / (step * cam.size));
+                        return 0;
+                    },
+                    nx = steps(sx, V.W, stepX), ny = steps(sy, V.H, stepY);
+                if (nx || ny) V.panTo(tx + nx * stepX, ty + ny * stepY);
             }
             
             draw();
@@ -106,6 +122,7 @@
             
             canvas.addEventListener('pointerdown', e => {
                 canvas.setPointerCapture(e.pointerId);
+                V.stopPan();
                 drag = {sx:e.clientX, sy:e.clientY, camX:cam.x, camY:cam.y, moved:false};
             });
             
@@ -142,6 +159,7 @@
             
             canvas.addEventListener('wheel', e => {
                 e.preventDefault();
+                V.stopPan();
                 const [px, py] = eventPos(e),
                     [wx, wy] = screenToWorld(px, py),
                     factor = Math.exp(-e.deltaY * 0.0015);

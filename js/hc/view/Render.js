@@ -39,7 +39,6 @@
                     ctx.strokeStyle = fade;
                     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx, cy); ctx.stroke();
                 }
-                strokeCell(t.x, t.y, css('--hole-edge'), Math.max(1, cam.size * 0.06), Math.max(2, cam.size * 0.08));
                 return;
             }
             const s = cam.size,
@@ -143,6 +142,7 @@
     
     V.render = (now) => {
         V.rafPending = false;
+        const panning = V.stepPan(now);
         ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
         const W = V.W,
             H = V.H,
@@ -414,7 +414,7 @@
         }
         
         game.effects = game.effects.filter(f => now - f.t0 < FX_MS);
-        if (game.effects.length) draw();
+        if (game.effects.length || panning) draw();
         
         V.updateHud();
     };

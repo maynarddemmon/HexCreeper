@@ -41,7 +41,7 @@
             ICON_SEPARATOR
         } = pkg,
         
-        {game, draw, cam} = V,
+        {game, draw} = V,
         
         I18N_CLOSE_BTN = pkg.ICON_CANCEL + ' ' + i18n('btn-close'),
         GITHUB_MARK_URL = './img/github-mark.svg',
@@ -74,7 +74,7 @@
             gameOverShown = false;
             V.placeMode = null;
             V.healMode = false;
-            centerOn();
+            centerOn(false);
             draw();
         },
         
@@ -100,11 +100,11 @@
             draw();
         },
         
-        // Centres the board on p, or on the start cell if there's no p (e.g. the core is gone).
-        centerOn = () => {
+        // Centres the board on the core, or on the start cell if the core is gone. Animated
+        // unless animate is false.
+        centerOn = (animate = true) => {
             const p = game.playerCore ?? {x:0, y:0};
-            [cam.x, cam.y] = pkg.GRID.center(p.x, p.y);
-            draw();
+            V.panTo(...pkg.GRID.center(p.x, p.y), animate !== false);
         },
         
         INFO_WIDTH = 300,
@@ -223,7 +223,7 @@
             updateLastSaved();
             
             V.resize();
-            centerOn();
+            centerOn(false);
             
             if (!hasSeenHelp()) appView.openHelp();
         },
@@ -316,7 +316,7 @@
             }]);
             
             new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
-                doActivated:centerOn
+                doActivated: () => {centerOn();}
             }]);
             
             new Spacer(ftrView);
@@ -378,7 +378,7 @@
             V.placeMode = null;
             V.healMode = false;
             game.reset();
-            centerOn();
+            centerOn(false);
         },
         
         /*  Replaces this game with the saved one. If the save can't be used, it's cleared,

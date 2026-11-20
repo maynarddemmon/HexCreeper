@@ -100,11 +100,11 @@ test('after losing, recentering goes to the start cell', async ({page}) => {
     });
     await button(page, 'X Close').click();
     await button(page, 'Center').click();
-    expect(await page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]);
+    await expect.poll(() => page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]); // after the pan
     
     await page.evaluate(() => {hc.view.cam.x = 40; hc.view.cam.y = -30;});
     await page.keyboard.press('Space');
-    expect(await page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]);
+    await expect.poll(() => page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]); // after the pan
 });
 
 test('Place and Heal show as on while choosing; Esc cancels', async ({page}) => {
@@ -125,7 +125,7 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
         const g = hc.app.game, c = g.playerCore, [dx, dy] = hc.GRID.dirs[1];
         g.score = 100; g.playerPlace(dx, dy, c); g.playerWait();
         g.selectedId = c.id;
-        hc.app.centerOn(c);
+        hc.app.centerOn(false);
     });
     const [dx, dy] = await page.evaluate(() => hc.GRID.dirs[1]),
         pt = await cellOnPage(page, dx, dy);
@@ -145,4 +145,25 @@ test('keyboard moves the selected piece; Enter ends the turn', async ({page}) =>
     expect(await page.evaluate(() => [hc.app.game.playerCore.x, hc.app.game.playerCore.y, hc.app.game.turn])).toEqual([1, 0, 2]);
     await page.keyboard.press('Enter');
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(3);
+});
+
+test('nearing the edge of the board pans it by one hex; elsewhere it stays put', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    // The core 120px from the right edge, so one step east brings it within 100px.
+    const start = await page.evaluate(() => {
+        const V = hc.view;
+        hc.app.centerOn(false);
+        V.cam.x -= (V.W / 2 - 120) / V.cam.size;
+        V.draw();
+        return V.cam.x;
+    });
+    await page.keyboard.press('a'); // west: away from the edge, so no pan
+    expect(await page.evaluate(() => hc.view.cam.x)).toBe(start);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('d'); // back east
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('d'); // east, within 100px of the edge
+    expect(await page.evaluate(() => hc.view.camTarget()[0])).toBe(start + 1); // panning there...
+    await expect.poll(() => page.evaluate(() => hc.view.cam.x)).toBe(start + 1); // ...and there
 });
