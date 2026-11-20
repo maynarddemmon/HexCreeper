@@ -14,7 +14,10 @@
     // Game state
     // ---------------------------------------------------------------------------
     class Game {
-        constructor() {this.reset();}
+        constructor() {
+            this.level = null; // {id, name, attrs}: the level being played, set by the App
+            this.reset();
+        }
         
         reset() {
             this.turn = 1;
@@ -67,7 +70,8 @@
                 fresh:[...this.fresh],
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
-                corePath:this.corePath.map(c => [...c])
+                corePath:this.corePath.map(c => [...c]),
+                level:this.level
             };
         }
         
@@ -110,6 +114,7 @@
             // Saves from before the path was kept start it where the core is.
             const core = this.playerCore;
             this.corePath = o.corePath?.map(c => [...c]) ?? (core ? [[core.x, core.y]] : []);
+            this.level = o.level ?? null;
             this._sightKey = null;
         }
         

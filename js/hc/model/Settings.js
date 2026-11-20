@@ -138,8 +138,15 @@
             console.warn('Unknown setting', id);
         };
     
+    /*  The values the level being played sets, by setting id. For now a level sets values
+        with the same ids as the settings, and they win over the stored settings. */
+    let levelAttrs = {};
+    
+    /*  The value in effect: the level's if it sets one, otherwise the stored setting. */
+    const effective = id => id in levelAttrs ? levelAttrs[id] : get(id);
+    
     // Start with the stored settings in effect.
-    for (const def of DEFINITIONS) applyValue(def, get(def.id));
+    for (const def of DEFINITIONS) applyValue(def, effective(def.id));
     
     pkg.settings = {
         getDefinitions: () => DEFINITIONS,
@@ -165,17 +172,35 @@
                     overrides[id] = normalized;
                 }
                 writeOverrides(overrides);
-                applyValue(def, normalized);
+                applyValue(def, effective(id));
                 pkg.app?.notifySettingChanged(id, normalized);
             }
             return normalized;
+        },
+        
+        /*  Puts a level's values into effect, in place of any earlier level's. attrs maps
+            setting ids to values; unknown ids and values that can't be used are skipped with
+            a warning. Returns the values put into effect, after rounding and clamping. */
+        applyLevel: attrs => {
+            levelAttrs = {};
+            for (const id in attrs ?? {}) {
+                const def = DEFINITIONS_BY_ID.get(id),
+                    value = def ? normalize(def, attrs[id]) : undefined;
+                if (value === undefined) {
+                    console.warn('Level attr', id, 'cannot be', attrs[id]);
+                } else {
+                    levelAttrs[id] = value;
+                }
+            }
+            for (const def of DEFINITIONS) applyValue(def, effective(def.id));
+            return {...levelAttrs};
         },
         
         /*  Puts every setting back to its default. */
         resetToDefaults: () => {
             for (const def of DEFINITIONS) {
                 delete overrides[def.id];
-                applyValue(def, def.defaultValue);
+                applyValue(def, effective(def.id));
             }
             writeOverrides(overrides);
             pkg.app?.notifySettingChanged(null);

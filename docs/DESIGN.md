@@ -89,6 +89,14 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - A distance field is computed each enemy turn (radius 30 around your pieces, avoiding active harm, solid and hole tiles), over the grid's neighbour directions.
 - Spawns: a random cell 6–9 steps from the core (a ring on either grid), the squad leader at least 4 steps from every player piece and the rest at least 2; never on a harm, solid or hole tile.
 
+## Levels
+- `data/init.json5` lists every level, in order, with what a list of levels needs: `id`, `name`, an optional `number` and a `description`. Its `defaultLevel` is played when there's no saved game. Each level's own file, `data/levels/<id>.json5`, is loaded only when it's played and holds what's needed to play it.
+- For now a level file has only `attrs`: values keyed by setting id (see Settings below), which win over the player's settings while the level is played. Anything a level doesn't set is as set in Settings, or its default. A game remembers its level and those values, and saves them, so a saved game plays the same even if the level file changes.
+- **Endless Play** sets nothing, so it plays as the game always has; it has no goals and no end. Levels don't have to be played in order.
+- The **Levels** dialog (map button in the header) lists them all; Play starts a new game in that level, asking first if a game is under way. The info panel shows the level being played.
+- Example levels: *Open Ground* (no walls, few solids, waves every 2 turns) and *The Warrens* (radius-4 quadrants, 90% walls with 1-cell doors, vision 8).
+- Still to come: goals and failure conditions (as expressions), the level brief and end briefs, going on to the next level, seeds for level generation, moving gameplay settings out of Settings and into levels, and locking levels.
+
 ## Settings
 Every value applies immediately (those marked "new game" from the next game) and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
 

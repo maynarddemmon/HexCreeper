@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, cellOnPage, button} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, button, waitForGame} from './helpers.mjs';
 
 const settingsTitle = page => page.getByText('Settings', {exact:true}).filter({visible:true});
 
@@ -21,7 +21,7 @@ test('help opens on a first visit only, loaded from data/help.txt', async ({page
     await expect(title).toHaveCount(0);
 
     await page.reload();
-    await page.waitForFunction(() => window.hc?.app?.game?.playerCore != null);
+    await waitForGame(page);
     await page.waitForTimeout(300);
     await expect(title).toHaveCount(0);
 

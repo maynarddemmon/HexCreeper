@@ -30,7 +30,7 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
 };
 
 /*  Waits until the App exists and its game has started. */
-export const waitForGame = page => page.waitForFunction(() => window.hc?.app?.game?.playerCore != null);
+export const waitForGame = page => page.waitForFunction(() => window.hc?.app?.ready && window.hc.app.game.playerCore != null);
 
 /*  Clears the board for a rules test: no enemies, no tiles, and no waves, so a test can
     place exactly what it needs. */

@@ -1,0 +1,11 @@
+{
+	// The settings this level changes, by setting id. Anything not listed is as set in
+	// Settings, or its default.
+	"attrs":{
+		"quadRadius":4,
+		"wallChance":90,
+		"doorMin":1,
+		"doorMax":1,
+		"visionRadius":8
+	}
+}

@@ -1,0 +1,27 @@
+{
+	// The level played when there's no saved game.
+	"defaultLevel":"endless",
+	
+	// Every level, in the order the Levels dialog lists them, with what a list of levels
+	// needs. Each level's own file is data/levels/<id>.json5. A level with no "number" is
+	// listed without one.
+	"levels":[
+		{
+			"id":"endless",
+			"name":"Endless Play",
+			"description":"No goals and no end. Grow your swarm and see how long you last."
+		},
+		{
+			"id":"open_ground",
+			"number":1,
+			"name":"Open Ground",
+			"description":"Wide open country with nowhere to hide, and the enemy comes often."
+		},
+		{
+			"id":"warrens",
+			"number":2,
+			"name":"The Warrens",
+			"description":"Small chambers joined by narrow doors. You won't see much coming."
+		}
+	]
+}

@@ -33,7 +33,7 @@
             if (c) {
                 const [sx, sy] = V.cellCenter(c.x, c.y),
                     margin = cam.size * 3;
-                if (sx < margin || sx > V.W - margin || sy < margin || sy > V.H - margin) this.centerOn(c);
+                if (sx < margin || sx > V.W - margin || sy < margin || sy > V.H - margin) pkg.app.centerOn(c);
             }
             
             draw();

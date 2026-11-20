@@ -31,6 +31,8 @@ myt.I18N.setDictionary({
 "tip-export":"Export your game to a save file.",
 "tip-import":"Import a save file and carry on from it.",
 "tip-score":"Score you have to spend / all the score you've earned.",
+"lbl-levels":"Levels",
+"tip-levels":"Choose a level to play.",
 "tip-new-game":"Start a new game.",
 "tip-last-saved":"Save the game. Last saved $0.",
 "tip-not-saved":"Save the game. Not saved yet.",
@@ -39,6 +41,7 @@ myt.I18N.setDictionary({
 "tip-github":"HexCreeper on GitHub",
 
 // Info Panel
+"info-level":"Level",
 "info-core-hp":"Core HP",
 "info-selected":"Selected",
 "info-selected-value":"$0 · rank $1 · $2/$3 HP",
@@ -54,6 +57,15 @@ myt.I18N.setDictionary({
 
 // Dialogs
 "dlg-help-title":"How to Play",
+"dlg-levels-title":"Levels",
+"btn-play":"Play",
+"level-numbered":"$0. $1",
+"level-playing":"(playing)",
+"levels-load-failed":"The list of levels could not be loaded.",
+"dlg-level-failed-title":"Level Not Loaded",
+"dlg-level-failed-msg":"The level \"$0\" could not be loaded.",
+"dlg-start-level-title":"Play Level",
+"dlg-start-level-msg":"Abandon this game and start that level?",
 "dlg-new-game-title":"New Game",
 "dlg-new-game-msg":"Abandon this game and start a new one?",
 "dlg-save-title":"Save Game",
