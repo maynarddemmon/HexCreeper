@@ -197,7 +197,7 @@
             fillCell(p.x, p.y, p.owner === 'player' ? '--core-tint' : '--enemy-tint');
         }
         
-        const sel = game.selected;
+        const sel = game.getSelected();
         let selGroupIds = new Set(), ghost = null, linkTargets = new Set();
         
         if (V.placeMode) {
@@ -412,7 +412,7 @@
         }
         
         // Off-screen indicator for the player's core
-        const core = game.playerCore;
+        const core = game.getPlayerCore();
         if (core) {
             const [sx, sy] = cellCenter(core.x, core.y);
             const pad = 22;

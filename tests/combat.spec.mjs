@@ -4,7 +4,7 @@ import {startGame, clearBoard} from './helpers.mjs';
 /*  Builds a row of three player pieces (left child, core, right child) and moves to the next
     turn so they can all act. Returns the direction perpendicular to the row as [dx, dy]. */
 const setupRow = page => page.evaluate(() => {
-    const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs;
+    const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
     // Pick a direction pair (d, -d) for the row and a "forward" direction not along it.
     const row = D.find(([dx, dy]) => dx === 1 && dy === 0);
     const fwd = D.find(([dx, dy]) => dy === -1 && dx === 1);
@@ -22,7 +22,7 @@ test.beforeEach(async ({page}) => {
 test('a group attack hits with every member in line; n kills score n squared', async ({page}) => {
     const fwd = await setupRow(page);
     const r = await page.evaluate(fwd => {
-        const g = hc.app.game, c = g.playerCore;
+        const g = hc.app.game, c = g.getPlayerCore();
         for (const p of g.piecesOf('player')) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]);
         hc.cfg.COMBAT.advance = false;
         const s0 = g.score, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
@@ -34,7 +34,7 @@ test('a group attack hits with every member in line; n kills score n squared', a
 
 test('killing a squad leader destroys the squad and every piece counts toward the combo', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs, d = D[0];
+        const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs, d = D[0];
         hc.cfg.COMBAT.advance = false;
         const lead = g.addPiece('core', 'enemy', d[0], d[1]);
         const far = D.map(([dx, dy]) => ({x:lead.x + dx, y:lead.y + dy})).filter(q => hc.hexDist(q, c) > 1 && !g.pieceAt(q.x, q.y));
@@ -51,7 +51,7 @@ test('killing a squad leader destroys the squad and every piece counts toward th
 
 test('after a kill the attacker advances, unless that would land on harm', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, d = hc.GRID.dirs[1];
+        const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[1];
         hc.cfg.COMBAT.advance = true;
         g.addPiece('core', 'enemy', d[0], d[1]);
         g.playerAct(c, d[0], d[1]);
@@ -69,7 +69,7 @@ test('after a kill the attacker advances, unless that would land on harm', async
 
 test('with advance off, the attacker stays put', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, d = hc.GRID.dirs[1];
+        const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[1];
         hc.cfg.COMBAT.advance = false;
         g.addPiece('core', 'enemy', d[0], d[1]);
         g.playerAct(c, d[0], d[1]);
@@ -81,7 +81,7 @@ test('with advance off, the attacker stays put', async ({page}) => {
 test('moving a parent carries its subtree, keeping its shape', async ({page}) => {
     const fwd = await setupRow(page);
     const r = await page.evaluate(fwd => {
-        const g = hc.app.game, c = g.playerCore;
+        const g = hc.app.game, c = g.getPlayerCore();
         const shape = () => g.piecesOf('player').map(p => [p.x - c.x, p.y - c.y].join()).sort().join('|');
         const before = shape();
         g.playerAct(c, c.x + fwd[0], c.y + fwd[1]);
@@ -92,7 +92,7 @@ test('moving a parent carries its subtree, keeping its shape', async ({page}) =>
 
 test('a linked piece must stay within link range of its parent', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, d = hc.GRID.dirs[1];
+        const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[1];
         g.score = 100; g.playerPlace(d[0], d[1], c);
         const a = g.pieceAt(d[0], d[1]);
         let steps = 0;
@@ -111,7 +111,7 @@ test('score earned is kept as a total; spending only lowers what you have', asyn
     await startGame(page);
     await clearBoard(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, [a, b] = hc.GRID.dirs;
+        const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.GRID.dirs;
         g.addPiece('core', 'enemy', a[0], a[1]);
         g.playerAct(c, a[0], a[1]);           // a kill: +1
         const afterKill = [g.score, g.scoreEarned];

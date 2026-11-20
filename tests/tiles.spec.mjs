@@ -66,7 +66,7 @@ const wallsOnly = page => page.evaluate(() => {
     T.solidMax = T.holeMax = 0;
     T.wallChance = 100;
     T.wallHoleChance = 0;
-    g.removePiece(g.playerCore);
+    for (const p of [...g.pieces.values()]) g.removePiece(p); // walls skip cells pieces are on
     window.walls = {
         // Makes the seven quadrants again, in the given order of quadrant indexes.
         regenerate: (order = [0, 1, 2, 3, 4, 5, 6]) => {
@@ -186,7 +186,7 @@ test.describe('rules', () => {
     
     test('a harm tile hurts whoever moves onto it, then is gone', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, d = hc.GRID.dirs[0];
+            const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[0];
             g.tiles.set(g.key(d[0], d[1]), {x:d[0], y:d[1], kind:'harm', timer:0});
             const hp = c.hp;
             g.playerAct(c, d[0], d[1]);
@@ -197,7 +197,7 @@ test.describe('rules', () => {
     
     for (const kind of ['solid', 'hole']) test(`nothing can move onto or be placed on a ${kind} tile`, async ({page}) => {
         const r = await page.evaluate(kind => {
-            const g = hc.app.game, c = g.playerCore, [a, b] = hc.GRID.dirs,
+            const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.GRID.dirs,
                 block = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind, timer:0});
             g.score = 100;
             block(a[0], a[1]);
@@ -219,7 +219,7 @@ test.describe('rules', () => {
     
     test('countdown tiles are inert until they arm, then act on a piece standing there', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore;
+            const g = hc.app.game, c = g.getPlayerCore();
             g.tiles.set(g.key(0, 0), {x:0, y:0, kind:'harm', timer:2});
             const inert = !g.isHarm(0, 0);
             g.playerWait(); const after1 = c.hp;
@@ -253,7 +253,7 @@ test.describe('rules', () => {
     
     test('healing flows up to a damaged ancestor first, then down; leftovers become score', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
             g.score = 1000;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const a = g.pieceAt(D[0][0], D[0][1]);
@@ -276,7 +276,7 @@ test.describe('rules', () => {
     
     test('eating n heal tiles in one move makes each worth n times', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
@@ -292,7 +292,7 @@ test.describe('rules', () => {
     
     test('the paid heal costs 5 x core rank, heals core rank, and wastes leftovers', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const cost = g.healCost(), amount = g.healAmount();

@@ -32,7 +32,7 @@
             clear of it. A core already off screen, e.g. after the player has dragged away,
             is left alone. */
         afterTurn: function() {
-            const c = game.playerCore;
+            const c = game.getPlayerCore();
             if (c) {
                 const [tx, ty] = V.camTarget(),
                     // Where the core will be on screen once any pan under way ends.
@@ -71,7 +71,7 @@
                     draw();
                     return;
                 }
-                const sel = game.selected;
+                const sel = game.getSelected();
                 if (force && sel && game.playerAct(sel, c.x, c.y)) {
                     this.afterTurn();
                     return;

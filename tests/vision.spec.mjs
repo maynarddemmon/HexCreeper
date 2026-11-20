@@ -40,9 +40,9 @@ test.describe('fog of war', () => {
             const g = hc.app.game, solid = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind:'solid', timer:0}),
                 target = {x:2, y:-1}; // the line from (0,0) runs between (1,-1) and (1,0)
             solid(1, -1);
-            const one = g.canSee(g.playerCore, target);
+            const one = g.canSee(g.getPlayerCore(), target);
             solid(1, 0);
-            return {one, both:g.canSee(g.playerCore, target)};
+            return {one, both:g.canSee(g.getPlayerCore(), target)};
         });
         expect(r).toEqual({one:true, both:false});
     });
@@ -67,7 +67,7 @@ test('once the game is over, every cell seen is in sight, and every enemy shows'
         return [sight.has('40,0'), sight.has('30,0'), g.seenCells.has('30,0')];
     });
     expect(before).toEqual([false, false, false]);
-    await page.evaluate(() => {hc.app.game.damage(hc.app.game.playerCore, 999, null);});
+    await page.evaluate(() => {hc.app.game.damage(hc.app.game.getPlayerCore(), 999, null);});
     expect(await page.evaluate(() => {
         const sight = hc.app.game.cellsInSight();
         return [sight.has('40,0'), sight.has('30,0')];

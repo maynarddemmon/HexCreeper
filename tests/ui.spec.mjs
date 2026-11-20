@@ -89,7 +89,7 @@ test('losing the core offers to play again', async ({page}) => {
     await startGame(page);
     await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
-        g.damage(g.playerCore, 99, e);
+        g.damage(g.getPlayerCore(), 99, e);
         hc.view.draw();
     });
     await expect(page.getByText('Core Destroyed', {exact:true}).filter({visible:true})).toBeVisible();
@@ -102,7 +102,7 @@ test('after losing, recentering goes to the start cell', async ({page}) => {
     await startGame(page);
     await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
-        g.damage(g.playerCore, 99, e);
+        g.damage(g.getPlayerCore(), 99, e);
         hc.view.cam.x = 40; hc.view.cam.y = -30;
         hc.view.draw();
     });
@@ -130,7 +130,7 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore, [dx, dy] = hc.GRID.dirs[1];
+        const g = hc.app.game, c = g.getPlayerCore(), [dx, dy] = hc.GRID.dirs[1];
         g.score = 100; g.playerPlace(dx, dy, c); g.playerWait();
         g.selectedId = c.id;
         hc.app.centerOn(false);
@@ -138,19 +138,19 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
     const [dx, dy] = await page.evaluate(() => hc.GRID.dirs[1]),
         pt = await cellOnPage(page, dx, dy);
     await page.mouse.click(pt[0], pt[1]);
-    expect(await page.evaluate(() => hc.app.game.selectedId !== hc.app.game.playerCoreId && hc.app.game.playerCore.x === 0)).toBe(true);
+    expect(await page.evaluate(() => hc.app.game.selectedId !== hc.app.game.playerCoreId && hc.app.game.getPlayerCore().x === 0)).toBe(true);
     await page.evaluate(() => {hc.app.game.selectedId = hc.app.game.playerCoreId;});
     await page.keyboard.down('Shift');
     await page.mouse.click(pt[0], pt[1]);
     await page.keyboard.up('Shift');
-    expect(await page.evaluate(([dx, dy]) => {const c = hc.app.game.playerCore; return c.x === dx && c.y === dy;}, [dx, dy])).toBe(true);
+    expect(await page.evaluate(([dx, dy]) => {const c = hc.app.game.getPlayerCore(); return c.x === dx && c.y === dy;}, [dx, dy])).toBe(true);
 });
 
 test('keyboard moves the selected piece; Enter ends the turn', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await page.keyboard.press('d');   // east
-    expect(await page.evaluate(() => [hc.app.game.playerCore.x, hc.app.game.playerCore.y, hc.app.game.turn])).toEqual([1, 0, 2]);
+    expect(await page.evaluate(() => [hc.app.game.getPlayerCore().x, hc.app.game.getPlayerCore().y, hc.app.game.turn])).toEqual([1, 0, 2]);
     await page.keyboard.press('Enter');
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(3);
 });

@@ -88,8 +88,8 @@ test('every value an expression can use is a number, at the start of a game', as
     expect((await state(page)).objectives.every(s => s.value)).toBe(true);
     expect(await page.evaluate(() => {
         const g = hc.app.game;
-        return [hc.goals.compile('turn + coreHp + coreDist + quadsVisited')({value:n => ({turn:g.turn, coreHp:g.playerCore.hp, coreDist:0, quadsVisited:g.visitedQuads.size})[n]})];
-    })).toEqual([await page.evaluate(() => 1 + hc.app.game.playerCore.hp + hc.app.game.visitedQuads.size)]);
+        return [hc.goals.compile('turn + coreHp + coreDist + quadsVisited')({value:n => ({turn:g.turn, coreHp:g.getPlayerCore().hp, coreDist:0, quadsVisited:g.visitedQuads.size})[n]})];
+    })).toEqual([await page.evaluate(() => 1 + hc.app.game.getPlayerCore().hp + hc.app.game.visitedQuads.size)]);
 });
 
 test('kills, pieces lost and placed, and the core\'s distance are counted', async ({page}) => {
@@ -99,7 +99,7 @@ test('kills, pieces lost and placed, and the core\'s distance are counted', asyn
     const done = await page.evaluate(() => {
         const g = hc.app.game;
         g.score = 1000;
-        g.playerPlace(1, 0, g.playerCore);
+        g.playerPlace(1, 0, g.getPlayerCore());
         g.damage(g.pieceAt(1, 0), 99, null);
         g.damage(g.addPiece('core', 'enemy', 4, 4), 99, null);
         g.afterPlayerAction();
@@ -187,7 +187,7 @@ test('optional goals and penalties neither win nor lose; with nothing required, 
 test('losing the core loses the level', async ({page}) => {
     await startGame(page);
     await playWith(page, [goal('turn > 50')]);
-    await page.evaluate(() => {hc.app.game.damage(hc.app.game.playerCore, 999, null);});
+    await page.evaluate(() => {hc.app.game.damage(hc.app.game.getPlayerCore(), 999, null);});
     expect(await state(page)).toMatchObject({over:true, outcome:'lost', lostBy:null});
     await expect(page.getByText('Core Destroyed')).toBeVisible();
 });
@@ -199,7 +199,7 @@ test('goals, their state and the outcome are saved with the game', async ({page}
     const kept = await page.evaluate(() => {
         const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj())), copy = new hc.Game();
         copy.importFromObj(data);
-        return [copy.levelObjectives.map(o => o.expression), copy.objectives, copy.outcome];
+        return [copy.getLevelObjectives().map(o => o.expression), copy.objectives, copy.outcome];
     });
     expect(kept).toEqual([['turn == 2', 'turn > 50'], [{value:true, locked:true, progress:''}, {value:false, locked:false, progress:''}], null]);
     

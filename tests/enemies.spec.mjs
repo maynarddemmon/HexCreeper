@@ -11,7 +11,7 @@ test.beforeEach(async ({page}) => {
 test.describe('waves', () => {
     test('wave size and squad size follow the highest player rank, not the turn', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs, out = [];
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs, out = [];
             out.push([g.waveSize(), g.squadCap()]);
             g.turn = 300;
             out.push([g.waveSize(), g.squadCap()]);
@@ -43,7 +43,7 @@ for (const kind of ['harm', 'solid', 'hole']) {
             for (let i = 0; i < 20 && !hit; i++) {
                 g.playerWait();
                 if (g.pieces.has(e.id) && g.tiles.get(g.key(e.x, e.y))?.kind === kind) stepped = true;
-                hit = g.over || g.playerCore.hp < g.playerCore.maxHp;
+                hit = g.over || g.getPlayerCore().hp < g.getPlayerCore().maxHp;
             }
             return {stepped, hit};
         }, kind);
@@ -53,7 +53,7 @@ for (const kind of ['harm', 'solid', 'hole']) {
 
 test('a squad facing a wall strikes and pulls back out of reach', async ({page}) => {
     const r = await page.evaluate(adjSrc => {
-        const adj = eval(adjSrc), g = hc.app.game, c = g.playerCore;
+        const adj = eval(adjSrc), g = hc.app.game, c = g.getPlayerCore();
         hc.cfg.RANK.hpPer = 25;   // a sturdy wall, so the test is about the AI, not survival
         g.score = 1000;
         let L = c, R = c;
@@ -80,7 +80,7 @@ test('a squad facing a wall strikes and pulls back out of reach', async ({page})
 
 test('patience: a squad that can only wait commits within a few turns', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.playerCore;
+        const g = hc.app.game, c = g.getPlayerCore();
         hc.cfg.RANK.hpPer = 25; g.recomputeRanks(); c.hp = c.maxHp;
         const lead = g.addPiece('core', 'enemy', 0, -4);
         g.addPiece('core', 'enemy', -1, -4, lead.id); g.addPiece('core', 'enemy', 1, -4, lead.id);

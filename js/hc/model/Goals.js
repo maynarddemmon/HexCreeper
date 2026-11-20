@@ -1,6 +1,6 @@
 /*  Level goals and penalties. A goal is something to achieve and a penalty something to
-    avoid; each has an expression (see Expr.js) over the values below. Mixed into
-    Game.prototype: evaluateObjectives. */
+    avoid; each has an expression (see Expr.js) over the values below. pkg.Goals, the
+    module included in Game, evaluates them: evaluateObjectives. */
 (pkg => {
     'use strict';
     
@@ -11,9 +11,9 @@
             turn:g => g.turn,
             score:g => g.score,
             scoreEarned:g => g.scoreEarned,
-            coreHp:g => Math.max(0, g.playerCore?.hp ?? 0),
-            coreMaxHp:g => g.playerCore?.maxHp ?? 0,
-            coreRank:g => g.playerCore?.rank ?? 0,
+            coreHp:g => Math.max(0, g.getPlayerCore()?.hp ?? 0),
+            coreMaxHp:g => g.getPlayerCore()?.maxHp ?? 0,
+            coreRank:g => g.getPlayerCore()?.rank ?? 0,
             coreX:g => corePos(g).x,
             coreY:g => corePos(g).y,
             coreDist:g => hexDist(corePos(g), {x:0, y:0}),
@@ -36,7 +36,7 @@
         
         // Where the core is, or was last.
         corePos = g => {
-            const core = g.playerCore;
+            const core = g.getPlayerCore();
             if (core) return core;
             const [x, y] = g.corePath.at(-1) ?? [0, 0];
             return {x, y};
@@ -136,18 +136,18 @@
         isGood: (objective, state) => state.value === (objective.kind === 'goal')
     };
     
-    class Goals {
+    pkg.Goals = new JS.Module('Goals', {
         // The level's objectives (see goals.fromLevel).
-        get levelObjectives() { return this.level?.objectives ?? []; }
+        getLevelObjectives: function() { return this.level?.objectives ?? []; },
         
         /*  Evaluates the objectives that aren't locked, and their progress text (so a locked
             one's stays as it was when it locked), locking any that lock, then ends the
             game if the level is won (every required goal true and penalty false) or can't
             be won any more (a required one locked the wrong way). A level with nothing
             required can't be won. */
-        evaluateObjectives() {
+        evaluateObjectives: function() {
             if (this.over) return;
-            const list = this.levelObjectives,
+            const list = this.getLevelObjectives(),
                 scope = {
                     value:name => VALUES[name](this),
                     call:(name, args) => FUNCTIONS[name](this, ...args)
@@ -167,19 +167,14 @@
             } else if (required.length && required.every(([o, s]) => pkg.goals.isGood(o, s))) {
                 this.endGame('won');
             }
-        }
+        },
         
         /*  Ends the game: outcome 'won' or 'lost'. lostBy is the index of the objective that
             lost it, or null when the core was destroyed. */
-        endGame(outcome, lostBy = null) {
+        endGame: function(outcome, lostBy = null) {
             this.over = true;
             this.outcome = outcome;
             this.lostBy = lostBy;
         }
-    }
-    
-    const proto = pkg.Game.prototype;
-    for (const name of Object.getOwnPropertyNames(Goals.prototype)) {
-        if (name !== 'constructor') Object.defineProperty(proto, name, Object.getOwnPropertyDescriptor(Goals.prototype, name));
-    }
+    });
 })(hc);

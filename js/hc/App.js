@@ -104,7 +104,7 @@
         // Centres the board on the core, or on the start cell if the core is gone. Animated
         // unless animate is false.
         centerOn = (animate = true) => {
-            const p = game.playerCore ?? {x:0, y:0};
+            const p = game.getPlayerCore() ?? {x:0, y:0};
             V.panTo(...pkg.GRID.center(p.x, p.y), animate !== false);
         },
         
@@ -152,10 +152,10 @@
             
             update: function() {
                 const self = this,
-                    core = game.playerCore,
+                    core = game.getPlayerCore(),
                     hp = Math.max(0, core ? core.hp : 0),
                     max = core ? core.maxHp : 1,
-                    sel = game.selected;
+                    sel = game.getSelected();
                 self.level.update(game.level?.name ?? i18n('info-none'));
                 self.seed.update(game.seed ?? i18n('info-none'));
                 self.hp.update(hp + '/' + max);
@@ -170,7 +170,7 @@
                 
                 // For each of the level's objectives, its name and state, then in small text
                 // its description and progress. Made again when the level changes.
-                const list = game.levelObjectives;
+                const list = game.getLevelObjectives();
                 if (self._rowsFor !== list) {
                     self._rowsFor = list;
                     for (const r of self.goalRows) {
@@ -429,7 +429,7 @@
                         // Lost, to the core being destroyed or to a goal or penalty. With a
                         // save, closing loads it instead.
                         const hasSave = persistenceMgr.hasSave(),
-                            by = game.levelObjectives[game.lostBy];
+                            by = game.getLevelObjectives()[game.lostBy];
                         openConfirmMsgDialog(
                             i18n(by ? 'dlg-lost-title' : 'dlg-game-over-title'),
                             by ? i18n('dlg-lost-' + by.kind + '-msg', by.name, game.scoreEarned, game.turn) : i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
@@ -605,7 +605,7 @@
                 if (!d) return;
                 
                 e.preventDefault();
-                const sel = game.selected;
+                const sel = game.getSelected();
                 if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) gameView.afterTurn();
             }
         }

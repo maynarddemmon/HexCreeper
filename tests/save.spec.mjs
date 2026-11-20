@@ -3,7 +3,7 @@ import {startGame, clearBoard, button, waitForGame} from './helpers.mjs';
 
 // Plays a few turns so there's something worth saving: placed pieces, moves, tiles seen.
 const playABit = page => page.evaluate(() => {
-    const g = hc.app.game, c = g.playerCore, D = hc.GRID.dirs;
+    const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
     g.score = 100;
     g.playerPlace(D[0][0], D[0][1], c);
     g.playerWait();
@@ -23,7 +23,7 @@ const snapshot = page => page.evaluate(() => {
         pieces:[...g.pieces.values()].map(p => JSON.stringify(p)).sort(),
         tiles:[...g.tiles.values()].map(t => JSON.stringify(t)).sort(),
         visitedQuads:sorted(g.visitedQuads), seenCells:sorted(g.seenCells), borders:[...g.borders].map(String).sort(), corePath:g.corePath,
-        coreAt:hc.app.game.pieceAt(g.playerCore.x, g.playerCore.y)?.id === g.playerCoreId,
+        coreAt:hc.app.game.pieceAt(g.getPlayerCore().x, g.getPlayerCore().y)?.id === g.playerCoreId,
         selectedId:g.selectedId
     };
 });
@@ -75,7 +75,7 @@ test('after losing, the last save can be loaded', async ({page}) => {
 
     await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
-        g.damage(g.playerCore, 99, e);
+        g.damage(g.getPlayerCore(), 99, e);
         hc.view.draw();
     });
     await expect(page.getByText('Core Destroyed', {exact:true}).filter({visible:true})).toBeVisible();
