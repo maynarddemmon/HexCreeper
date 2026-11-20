@@ -68,7 +68,7 @@ test('fog of war can be turned off and its radius changed in Settings', async ({
     expect(await page.evaluate(() => hc.app.game.cellsInSight().has('5,0') && !hc.app.game.cellsInSight().has('6,0'))).toBe(true);
     
     await page.getByText('Fog of war', {exact:true}).click();
-    expect(await page.evaluate(() => [hc.app.game.cellsInSight(), JSON.parse(localStorage.getItem('hc.settings')).fog])).toEqual([null, false]);
+    expect(await page.evaluate(() => [hc.app.game.cellsInSight(), JSON.parse(localStorage.getItem('hc.settings')).endless.fog])).toEqual([null, false]);
     
     await button(page, 'Reset to Defaults').click();
     expect(await page.evaluate(() => [hc.cfg.VISION.fog, hc.cfg.VISION.radius])).toEqual([true, 12]);

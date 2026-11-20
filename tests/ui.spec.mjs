@@ -50,14 +50,14 @@ test('a setting marked ✱ applies from the next new game', async ({page}) => {
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);
 });
 
-test('a setting applies at once, is saved only while not the default, and resets', async ({page}) => {
+test('a setting applies at once, is saved (per level) only while not the level\'s value, and resets', async ({page}) => {
     await startGame(page);
     await button(page, 'Settings').click();
     const input = page.locator('input[data-setting="linkRange"]');
     await expect(input).toHaveValue('3');
     await input.fill('5');
     await input.press('Enter');
-    expect(await page.evaluate(() => [hc.cfg.LINK.range, JSON.parse(localStorage.getItem('hc.settings')).linkRange])).toEqual([5, 5]);
+    expect(await page.evaluate(() => [hc.cfg.LINK.range, JSON.parse(localStorage.getItem('hc.settings')).endless.linkRange])).toEqual([5, 5]); // per level
 
     // Out of range values are clamped.
     await input.fill('99');

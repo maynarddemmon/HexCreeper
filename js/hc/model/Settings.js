@@ -4,6 +4,7 @@
     const {I18N:{get:i18n}} = myt,
         
         {
+            isObj,
             cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK}
         } = pkg,
         
@@ -28,8 +29,8 @@
             defaultValue:obj[prop], label:i18n('setting-' + id)
         }),
         
-        /*  Every player setting. The SettingsDialog builds its UI from this list, so adding a
-            setting here is enough to make it appear there. */
+        /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
+            setting here is enough to make it appear there (in a level that shows it). */
         DEFINITIONS = [
         bool('fog',        GROUP_VISION, VISION,  'fog'),
         num('visionRadius', GROUP_VISION, VISION, 'radius', 1, 30),
@@ -102,28 +103,21 @@
             if (TILES.doorMax < TILES.doorMin) TILES.doorMax = TILES.doorMin;
         },
         
-        writeOverrides = overrides => {
-            try {
-                if (Object.keys(overrides).length > 0) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
-                } else {
-                    localStorage.removeItem(STORAGE_KEY);
-                }
-            } catch (err) {
-                console.warn('Unable to store settings', err);
-            }
-        },
-        
-        /*  Unknown or invalid entries, and ones equal to their default, are dropped. */
+        /*  What the player has changed, per level: {levelId:{settingId:value}}. Only values
+            that differ from the level's are kept. Unknown or invalid entries are dropped when
+            read. */
         overrides = (() => {
             const retval = {};
             try {
                 const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-                if (stored && typeof stored === 'object') {
-                    for (const id in stored) {
-                        const def = DEFINITIONS_BY_ID.get(id),
-                            value = def ? normalize(def, stored[id]) : undefined;
-                        if (value !== undefined && value !== def.defaultValue) retval[id] = value;
+                if (isObj(stored)) {
+                    for (const levelId in stored) {
+                        if (!isObj(stored[levelId])) continue;
+                        for (const id in stored[levelId]) {
+                            const def = DEFINITIONS_BY_ID.get(id),
+                                value = def ? normalize(def, stored[levelId][id]) : undefined;
+                            if (value !== undefined) (retval[levelId] ??= {})[id] = value;
+                        }
                     }
                 }
             } catch (err) {
@@ -132,77 +126,122 @@
             return retval;
         })(),
         
-        get = id => {
-            const def = DEFINITIONS_BY_ID.get(id);
-            if (def) return id in overrides ? overrides[id] : def.defaultValue;
-            console.warn('Unknown setting', id);
+        writeOverrides = () => {
+            try {
+                for (const levelId in overrides) if (!Object.keys(overrides[levelId]).length) delete overrides[levelId];
+                if (Object.keys(overrides).length) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+                } else {
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            } catch (err) {
+                console.warn('Unable to store settings', err);
+            }
         };
     
-    /*  The values the level being played sets, by setting id. For now a level sets values
-        with the same ids as the settings, and they win over the stored settings. */
-    let levelAttrs = {};
+    /*  The level being played, and its setting entries by setting id: {value, pref}. A
+        level only lists the settings it changes or shows. */
+    let levelId = null,
+        entries = {};
     
-    /*  The value in effect: the level's if it sets one, otherwise the stored setting. */
-    const effective = id => id in levelAttrs ? levelAttrs[id] : get(id);
+    const
+        /*  The level's value for a setting: its entry's value, or the default. */
+        levelValue = def => entries[def.id]?.value ?? def.defaultValue,
+        
+        /*  Is the setting shown in Settings, for the player to change, in this level? */
+        isShown = id => entries[id]?.pref === true,
+        
+        /*  The value in effect: the player's, if the level shows the setting and they've
+            changed it, otherwise the level's. */
+        get = id => {
+            const def = DEFINITIONS_BY_ID.get(id);
+            if (!def) {
+                console.warn('Unknown setting', id);
+                return;
+            }
+            const mine = overrides[levelId];
+            return isShown(id) && mine && id in mine ? mine[id] : levelValue(def);
+        },
+        
+        applyAll = () => {
+            for (const def of DEFINITIONS) applyValue(def, get(def.id));
+        };
     
-    // Start with the stored settings in effect.
-    for (const def of DEFINITIONS) applyValue(def, effective(def.id));
+    // Start with every default in effect, until a level is applied.
+    applyAll();
     
+    /*  The settings. Every one belongs to the level being played: a level file's "attrs"
+        gives, per setting id, {value, pref}. value (optional) is the level's value, in
+        place of the default. pref (default false) shows the setting in Settings, so the
+        player can change it; their changes are remembered per level. A setting a level
+        doesn't list is at its default and isn't shown. */
     pkg.settings = {
         getDefinitions: () => DEFINITIONS,
         getGroups: () => GROUPS,
         getDefinition: id => DEFINITIONS_BY_ID.get(id),
         
         get,
+        isShown,
         
-        /*  Returns the value set, after rounding and clamping, or undefined if it was refused. */
+        /*  Returns the value set, after rounding and clamping, or undefined if it was refused,
+            including when the level doesn't show the setting. */
         set: (id, value) => {
             const def = DEFINITIONS_BY_ID.get(id);
-            if (!def) {
-                console.warn('Unknown setting', id);
+            if (!def || !isShown(id)) {
+                console.warn('Setting', id, 'cannot be changed in this level');
                 return;
             }
             const normalized = normalize(def, value);
             if (normalized === undefined) {
                 console.warn('Setting', id, 'cannot be', value);
             } else {
-                if (normalized === def.defaultValue) {
-                    delete overrides[id];
+                const mine = overrides[levelId] ??= {};
+                if (normalized === levelValue(def)) {
+                    delete mine[id];
                 } else {
-                    overrides[id] = normalized;
+                    mine[id] = normalized;
                 }
-                writeOverrides(overrides);
-                applyValue(def, effective(id));
+                writeOverrides();
+                applyValue(def, get(id));
                 pkg.app?.notifySettingChanged(id, normalized);
             }
             return normalized;
         },
         
-        /*  Puts a level's values into effect, in place of any earlier level's. attrs maps
-            setting ids to values; unknown ids and values that can't be used are skipped with
-            a warning. Returns the values put into effect, after rounding and clamping. */
-        applyLevel: attrs => {
-            levelAttrs = {};
-            for (const id in attrs ?? {}) {
-                const def = DEFINITIONS_BY_ID.get(id),
-                    value = def ? normalize(def, attrs[id]) : undefined;
-                if (value === undefined) {
-                    console.warn('Level attr', id, 'cannot be', attrs[id]);
-                } else {
-                    levelAttrs[id] = value;
+        /*  Puts a level's settings into effect, with the player's changes for that level, in
+            place of any earlier level's. attrs is the level file's "attrs". Unknown ids, and
+            entries or values that can't be used, are skipped with a warning. Returns the
+            entries put into effect, cleaned up, e.g. for saving with a game. */
+        applyLevel: (id, attrs) => {
+            levelId = id ?? null;
+            entries = {};
+            for (const settingId in attrs ?? {}) {
+                const def = DEFINITIONS_BY_ID.get(settingId),
+                    entry = attrs[settingId];
+                if (!def || !isObj(entry)) {
+                    console.warn('Level attr', settingId, 'cannot be', entry);
+                    continue;
                 }
+                const clean = {pref:entry.pref === true};
+                if ('value' in entry) {
+                    const value = normalize(def, entry.value);
+                    if (value === undefined) {
+                        console.warn('Level attr', settingId, 'cannot have the value', entry.value);
+                    } else {
+                        clean.value = value;
+                    }
+                }
+                entries[settingId] = clean;
             }
-            for (const def of DEFINITIONS) applyValue(def, effective(def.id));
-            return {...levelAttrs};
+            applyAll();
+            return structuredClone(entries);
         },
         
-        /*  Puts every setting back to its default. */
+        /*  Puts every setting the level shows back to the level's value. */
         resetToDefaults: () => {
-            for (const def of DEFINITIONS) {
-                delete overrides[def.id];
-                applyValue(def, effective(def.id));
-            }
-            writeOverrides(overrides);
+            delete overrides[levelId];
+            writeOverrides();
+            applyAll();
             pkg.app?.notifySettingChanged(null);
         }
     };

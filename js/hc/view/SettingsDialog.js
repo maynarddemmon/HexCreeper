@@ -111,17 +111,21 @@
             const container = self._container = new WideView(self.getContentView()),
                 rows = self._rows = [];
             
-            new Text(container, {
+            self._note = new Text(container, {
                 x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal',
                 text:i18n('settings-note'),
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
-            // Settings, by group //
+            // Settings, by group. Every one is built, and only those the level shows are
+            // visible (see refresh). //
+            const headers = self._headers = [];
             for (const group of settings.getGroups()) {
                 const header = new WideView(container, {height:rowHeight + padding});
                 new Text(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
-                for (const def of group.definitions) rows.push(new (def.type === 'boolean' ? BooleanRow : NumberRow)(container, {def}));
+                header.rows = group.definitions.map(def => new (def.type === 'boolean' ? BooleanRow : NumberRow)(container, {def}));
+                headers.push(header);
+                rows.push(...header.rows);
             }
         
             new M.SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});
@@ -138,8 +142,16 @@
             self.setContentHeightToFit(self._container.height);
         },
         
+        /*  Shows the settings the level being played shows, with their values. */
         refresh: function() {
-            for (const row of this._rows) row.refresh();
+            for (const row of this._rows) {
+                row.setVisible(settings.isShown(row.def.id));
+                row.refresh();
+            }
+            for (const header of this._headers) header.setVisible(header.rows.some(row => row.visible));
+            const any = this._rows.some(row => row.visible);
+            this._note.setText(i18n(any ? 'settings-note' : 'settings-none'));
+            this.getFooterView().resetBtn.setVisible(any);
         },
         
         resetToDefaults: function() {

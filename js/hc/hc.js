@@ -223,6 +223,8 @@
             return '<span style="' + css + '">' + txt + '</span>';
         },
         
-        stripMarkup: str => str ? DOM_PARSER.parseFromString(str, 'text/html').body.textContent || '' : ''
+        stripMarkup: str => str ? DOM_PARSER.parseFromString(str, 'text/html').body.textContent || '' : '',
+        
+        isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v)
     };
 })(window);

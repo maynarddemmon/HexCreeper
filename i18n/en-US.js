@@ -89,6 +89,7 @@ myt.I18N.setDictionary({
 "dlg-reset-settings-msg":"Put every setting back to its default? The grid stays as it is.",
 
 // Settings
+"settings-none":"This level has no settings you can change.",
 "settings-note":"Changes apply at once. Those marked ✱ apply from the next new game.",
 "settings-group-vision":"Vision",
 "settings-group-waves":"Enemy Waves",

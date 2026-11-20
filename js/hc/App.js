@@ -70,7 +70,7 @@
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
             // The level's values, as they were when the game was saved.
-            settings.applyLevel(game.level?.attrs);
+            settings.applyLevel(game.level?.id, game.level?.attrs);
             gameOverShown = false;
             V.placeMode = null;
             V.healMode = false;
@@ -435,7 +435,7 @@
         startLevel: (id, callback) => {
             levels.loadLevel(id, level => {
                 if (level) {
-                    game.level = {id, name:level.name, attrs:settings.applyLevel(level.attrs)};
+                    game.level = {id, name:level.name, attrs:settings.applyLevel(id, level.attrs)};
                     appView.newGame();
                 } else {
                     openAckMsgDialog(i18n('dlg-level-failed-title'), i18n('dlg-level-failed-msg', id));

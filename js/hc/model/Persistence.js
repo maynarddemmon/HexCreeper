@@ -3,10 +3,10 @@
     
     const {I18N:{get:i18n}, downloadBlob, prettyFormatJSON} = myt,
         
+        isObj = pkg.isObj,
+        
         SAVE_FORMAT_VERSION = 1,
         DEFAULT_STORAGE_KEY = 'hc.save',
-        
-        isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
         readStorage = key => {
             try {

@@ -91,14 +91,14 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 
 ## Levels
 - `data/init.json5` lists every level, in order, with what a list of levels needs: `id`, `name`, an optional `number` and a `description`. Its `defaultLevel` is played when there's no saved game. Each level's own file, `data/levels/<id>.json5`, is loaded only when it's played and holds what's needed to play it.
-- For now a level file has only `attrs`: values keyed by setting id (see Settings below), which win over the player's settings while the level is played. Anything a level doesn't set is as set in Settings, or its default. A game remembers its level and those values, and saves them, so a saved game plays the same even if the level file changes.
-- **Endless Play** sets nothing, so it plays as the game always has; it has no goals and no end. Levels don't have to be played in order.
+- For now a level file has only `attrs`, keyed by setting id (see Settings below): `{"value":…, "pref":true}`. `value` (optional) is the level's value in place of the default. `pref` (default false) shows the setting in Settings so the player can change it; their changes are kept **per level**. A setting the level doesn't list is at its default and isn't shown, so a level can fix anything, fog of war included. A game remembers its level and those entries, and saves them, so a saved game plays the same even if the level file changes.
+- **Endless Play** sets no values and shows every setting, so it plays as the game always has; it has no goals and no end. Levels don't have to be played in order.
 - The **Levels** dialog (map button in the header) lists them all; Play starts a new game in that level, asking first if a game is under way. The info panel shows the level being played.
-- Example levels: *Open Ground* (no walls, few solids, waves every 2 turns) and *The Warrens* (radius-4 quadrants, 90% walls with 1-cell doors, vision 8).
-- Still to come: goals and failure conditions (as expressions), the level brief and end briefs, going on to the next level, seeds for level generation, moving gameplay settings out of Settings and into levels, and locking levels.
+- Example levels: *Open Ground* (no walls, few solids, waves every 2 turns; shows vision radius, wave frequency and solids) and *The Warrens* (radius-4 quadrants, 90% walls with 1-cell doors, vision 8, fog forced on; shows nothing).
+- Still to come: goals and failure conditions (as expressions), the level brief and end briefs, going on to the next level, seeds for level generation, and locking levels.
 
 ## Settings
-Every value applies immediately (those marked "new game" from the next game) and is saved in the browser (`hc.settings`). "Reset to defaults" restores:
+Every setting belongs to the level being played (see Levels): Settings shows only those the level marks `pref`. A change applies immediately (those marked "new game" from the next game) and is saved in the browser per level (`hc.settings`, `{levelId:{settingId:value}}`). "Reset to Defaults" goes back to the level's values. The defaults are:
 
 | Setting | Default |
 |---|---|
