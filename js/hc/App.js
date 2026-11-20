@@ -19,7 +19,8 @@
         persistenceMgr, // The PersistenceManager.
         gameOverShown = false,
         settingsDialog,
-        levelsDialog;
+        levelsDialog,
+        levelBrief;
     
     const JSClass = JS.Class,
         
@@ -29,7 +30,7 @@
         {
             view:V,
             Btn, ToggleBtn, IconBtn, WideView, Spacer, LabeledValue, levels, settings,
-            dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, isAnyShowing},
+            dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
                 colorAccent, colorText, colorHeaderBg, colorHeaderText, colorBtn, 
@@ -122,6 +123,7 @@
                     width:INFO_WIDTH, whiteSpace:'nowrap'
                 });
                 self.level = row('info-level');
+                self.seed = row('info-seed');
                 self.hp = row('info-core-hp', colorAccent);
                 const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
                 self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
@@ -137,6 +139,7 @@
                     max = core ? core.maxHp : 1,
                     sel = game.selected;
                 self.level.update(game.level?.name ?? i18n('info-none'));
+                self.seed.update(game.seed ?? i18n('info-none'));
                 self.hp.update(hp + '/' + max);
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
                 if (sel) {
@@ -204,19 +207,24 @@
             
             game.reset(); // With the stored settings, now they're in effect.
             
-            // Carry on with the saved game, if there is one, or else start the default level.
-            // ready is true once either has happened; the level loads asynchronously.
+            // Carry on with the saved game, if there is one, or else show the default level's
+            // brief. ready is true once either is done; the level loads asynchronously. Help
+            // follows on a first visit.
+            const whenReady = () => {
+                appView.ready = true;
+                if (!hasSeenHelp()) appView.openHelp();
+            };
             appView.ready = false;
             persistenceMgr = new pkg.PersistenceManager(game);
             if (persistenceMgr.hasSave()) {
                 appView.loadSave();
-                appView.ready = true;
+                whenReady();
             } else {
                 levels.loadIndex(index => {
                     if (index) {
-                        appView.startLevel(index.defaultLevel, () => {appView.ready = true;});
+                        appView.briefLevel(index.defaultLevel, whenReady);
                     } else {
-                        appView.ready = true;
+                        whenReady();
                     }
                 });
             }
@@ -224,8 +232,6 @@
             
             V.resize();
             centerOn(false);
-            
-            if (!hasSeenHelp()) appView.openHelp();
         },
         
         
@@ -258,7 +264,7 @@
                 doActivated:appView.openLevels
             }]);
             new IconBtn(hdrView, {icon:'rotate-ccw', label:i18n('lbl-new-game'), tooltip:i18n('tip-new-game')}, [{
-                doActivated:appView.confirmNewGame
+                doActivated:appView.briefNewGame
             }]);
             
             new PlainText(hdrView, {text:ICON_SEPARATOR});
@@ -363,15 +369,13 @@
                     openConfirmMsgDialog(
                         i18n('dlg-game-over-title'),
                         i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
-                        () => {appView.newGame();},
+                        () => {appView.briefNewGame();},
                         hasSave ? () => {appView.loadSave();} : null,
                         i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
                     );
                 }, 500);
             }
         },
-        
-        handleClick: (c, force) => gameView.handleClick(c, force),
         
         newGame: () => {
             gameOverShown = false;
@@ -429,36 +433,47 @@
             });
         },
         
-        /*  Loads a level and starts a new game in it, with its values in effect. If it can't
-            be loaded, a dialog says so and the game carries on. callback, if given, is called
-            either way, once it's done. */
-        startLevel: (id, callback) => {
+        /*  Loads a level and shows its brief, with the level's values in effect so its
+            settings can be set there. Start begins a new game in it with the seed shown;
+            Cancel puts the game's own level values back and the game carries on. If the
+            level can't be loaded, a dialog says so and the game carries on. callback, if
+            given, is called once it's done, whichever way. */
+        briefLevel: (id, callback) => {
             levels.loadLevel(id, level => {
-                if (level) {
-                    game.level = {id, name:level.name, attrs:settings.applyLevel(id, level.attrs)};
-                    appView.newGame();
-                } else {
+                if (!level) {
                     openAckMsgDialog(i18n('dlg-level-failed-title'), i18n('dlg-level-failed-msg', id));
+                    callback?.();
+                    return;
                 }
-                callback?.();
+                openWhenClear(() => {
+                    const attrs = settings.applyLevel(id, level.attrs);
+                    levelBrief ??= new pkg.LevelBrief(appView);
+                    levelBrief.show(level, {
+                        seed:Number.isInteger(level.seed) ? level.seed : pkg.randomSeed(),
+                        underway:!game.over && game.turn > 1,
+                        onStart: seed => {
+                            game.level = {id, name:level.name, attrs};
+                            game.seed = seed;
+                            appView.newGame();
+                            callback?.();
+                        },
+                        onCancel: () => {
+                            settings.applyLevel(game.level?.id, game.level?.attrs);
+                            draw();
+                            callback?.();
+                        }
+                    });
+                });
             });
         },
         
-        /*  Asks first, unless the game is over or hasn't started. */
-        confirmStartLevel: id => {
-            if (game.over || game.turn === 1) {
-                appView.startLevel(id);
+        /*  The brief for the level being played, or a new game straight away when there are
+            no levels. */
+        briefNewGame: () => {
+            if (game.level) {
+                appView.briefLevel(game.level.id);
             } else {
-                openConfirmMsgDialog(i18n('dlg-start-level-title'), i18n('dlg-start-level-msg'), () => {appView.startLevel(id);});
-            }
-        },
-        
-        /*  Asks first, unless the game is over or hasn't started. */
-        confirmNewGame: () => {
-            if (game.over || game.turn === 1) {
                 appView.newGame();
-            } else {
-                openConfirmMsgDialog(i18n('dlg-new-game-title'), i18n('dlg-new-game-msg'), () => {appView.newGame();});
             }
         },
         
@@ -472,7 +487,7 @@
         
         // Opening Dialogs /////////////////////////////////////////////////////
         openLevels: () => {
-            levelsDialog ??= new pkg.LevelsDialog(appView, {onPlay:appView.confirmStartLevel});
+            levelsDialog ??= new pkg.LevelsDialog(appView, {onPlay:id => {appView.briefLevel(id);}});
             levelsDialog.show(game.level?.id);
             return levelsDialog;
         },
@@ -530,7 +545,4 @@
             }
         }
     });
-
-    // Rendering calls this each frame.
-    V.updateHud = () => {pkg.app?.update();};
 })(hc);

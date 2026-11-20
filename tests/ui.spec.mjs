@@ -41,19 +41,20 @@ test('keys are ignored while a dialog is open', async ({page}) => {
 test('a setting marked ✱ applies from the next new game', async ({page}) => {
     await startGame(page);
     await button(page, 'Settings').click();
-    const input = page.locator('input[data-setting="quadRadius"]');
+    const input = page.locator('input[data-setting="quadRadius"]').filter({visible:true});
     await input.fill('2');
     await input.press('Enter');
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(5);
     await button(page, 'X Close').click();
     await button(page, 'New game').click();
+    await button(page, '✓ Start').click();
     expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);
 });
 
 test('a setting applies at once, is saved (per level) only while not the level\'s value, and resets', async ({page}) => {
     await startGame(page);
     await button(page, 'Settings').click();
-    const input = page.locator('input[data-setting="linkRange"]');
+    const input = page.locator('input[data-setting="linkRange"]').filter({visible:true});
     await expect(input).toHaveValue('3');
     await input.fill('5');
     await input.press('Enter');
@@ -69,12 +70,18 @@ test('a setting applies at once, is saved (per level) only while not the level\'
     expect(await page.evaluate(() => [hc.cfg.LINK.range, localStorage.getItem('hc.settings')])).toEqual([3, null]);
 });
 
-test('New Game asks first once the game has started', async ({page}) => {
+test('New Game shows the level\'s brief, which warns once the game has started', async ({page}) => {
     await startGame(page);
+    const warning = page.getByText('Starting abandons the game in progress.').filter({visible:true});
+    await button(page, 'New game').click();
+    await expect(page.getByRole('textbox', {name:'Seed', exact:true}).filter({visible:true})).toBeVisible();
+    await expect(warning).toHaveCount(0);
+    await button(page, '✗ Cancel').click();
+    
     await button(page, 'End Turn').click();
     await button(page, 'New game').click();
-    await expect(page.getByText('Abandon this game and start a new one?')).toBeVisible();
-    await button(page, '✓ Confirm').click();
+    await expect(warning).toBeVisible();
+    await button(page, '✓ Start').click();
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
 });
 
@@ -87,6 +94,7 @@ test('losing the core offers to play again', async ({page}) => {
     });
     await expect(page.getByText('Core Destroyed', {exact:true}).filter({visible:true})).toBeVisible();
     await button(page, 'Play Again').click();
+    await button(page, '✓ Start').click();
     expect(await page.evaluate(() => [hc.app.game.over, hc.app.game.turn])).toEqual([false, 1]);
 });
 

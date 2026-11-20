@@ -113,14 +113,23 @@
                     const [cq, cr] = chunkCenter(i, j);
                     return disk(cq, cr, k);
                 },
-                ring(cq, cr, d) {
+                ring(cq, cr, d, rng = mathRandom) {
                     // pick a random cell on the ring of radius d: start d steps toward SW,
                     // then walk the six sides (d steps each) in a fixed rotation
-                    const rb = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
-                    const idx = mathFloor(mathRandom() * 6 * d), side = mathFloor(idx / d), step = idx % d;
-                    let q = cq + rb[4][0] * d, r = cr + rb[4][1] * d;
-                    for (let i = 0; i < side; i++) { q += rb[i][0] * d; r += rb[i][1] * d; }
-                    return { x: q + rb[side][0] * step, y: r + rb[side][1] * step };
+                    const rb = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]],
+                        idx = mathFloor(rng() * 6 * d),
+                        side = mathFloor(idx / d),
+                        step = idx % d;
+                    let q = cq + rb[4][0] * d,
+                        r = cr + rb[4][1] * d;
+                    for (let i = 0; i < side; i++) {
+                        q += rb[i][0] * d;
+                        r += rb[i][1] * d;
+                    }
+                    return {
+                        x:q + rb[side][0] * step,
+                        y:r + rb[side][1] * step
+                    };
                 },
                 *visibleCells(wx0, wy0, wx1, wy1) {
                     const h = HALF_SQRT3;

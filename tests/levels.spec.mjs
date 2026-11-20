@@ -22,12 +22,14 @@ test('playing a level starts a new game with its values in effect, and the save 
     await startGame(page);
     await button(page, 'Levels').click();
     await button(page, 'Play The Warrens').click();
+    await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.level?.id === 'warrens');
+    const seed = await page.evaluate(() => hc.app.game.seed);
     const inWarrens = () => page.evaluate(() => ({
-        level:hc.app.game.level.id, turn:hc.app.game.turn,
+        level:hc.app.game.level.id, turn:hc.app.game.turn, seed:hc.app.game.seed,
         wallChance:hc.cfg.TILES.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.cfg.VISION.radius
     }));
-    expect(await inWarrens()).toEqual({level:'warrens', turn:1, wallChance:90, quadRadius:4, vision:8});
+    expect(await inWarrens()).toEqual({level:'warrens', turn:1, seed, wallChance:90, quadRadius:4, vision:8});
     
     // Saved, then reloaded: the level and its values come back with the game.
     await page.evaluate(() => {hc.app.game.playerWait();});
@@ -36,20 +38,84 @@ test('playing a level starts a new game with its values in effect, and the save 
     await button(page, 'Acknowledge').click();
     await page.reload();
     await waitForGame(page);
-    expect(await inWarrens()).toEqual({level:'warrens', turn:2, wallChance:90, quadRadius:4, vision:8});
+    expect(await inWarrens()).toEqual({level:'warrens', turn:2, seed, wallChance:90, quadRadius:4, vision:8});
 });
 
-test('switching levels mid-game asks first; values the new level doesn\'t set go back', async ({page}) => {
+const seedInput = page => page.getByRole('textbox', {name:'Seed', exact:true}).filter({visible:true}),
+    // The map as made so far: tiles, and where the enemies are.
+    mapOf = page => page.evaluate(() => {
+        const g = hc.app.game;
+        return {tiles:[...g.tiles].sort(), enemies:g.piecesOf('enemy').map(e => e.x + ',' + e.y).sort()};
+    });
+
+test('the brief shows the level\'s description, its settings and a seed, and starts with them', async ({page}) => {
+    await startGame(page);
+    await button(page, 'Levels').click();
+    await button(page, 'Play Open Ground').click();
+    await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();
+    await expect(page.getByText('Wide open country with nowhere to hide, and the enemy comes often.').filter({visible:true})).toBeVisible();
+    const shown = await page.locator('input[data-setting]').filter({visible:true}).evaluateAll(inputs => inputs.map(i => i.dataset.setting));
+    expect(shown.sort()).toEqual(['solidMax', 'spawnEvery', 'visionRadius']);
+    await expect(seedInput(page)).toHaveValue(/^\d+$/);
+    
+    const spawn = page.locator('input[data-setting="spawnEvery"]').filter({visible:true});
+    await spawn.fill('3');
+    await spawn.press('Enter');
+    await seedInput(page).fill('1234');
+    await button(page, '✓ Start').click();
+    await page.waitForFunction(() => hc.app.game.level?.id === 'open_ground');
+    expect(await page.evaluate(() => [hc.app.game.seed, hc.cfg.SPAWN.every])).toEqual([1234, 3]);
+    await expect(page.getByText('1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
+});
+
+test('the same seed makes the same map; an empty seed makes a random one', async ({page}) => {
+    await startGame(page);
+    const play = async seed => {
+        await button(page, 'New game').click();
+        await seedInput(page).fill(seed);
+        await button(page, '✓ Start').click();
+        return mapOf(page);
+    };
+    const first = await play('42');
+    expect(first.tiles.length).toBeGreaterThan(0);
+    expect(await play('42')).toEqual(first);
+    expect(await play('43')).not.toEqual(first);
+    await play('');
+    expect(await page.evaluate(() => Number.isInteger(hc.app.game.seed))).toBe(true);
+});
+
+test('a level\'s own seed fills in the brief', async ({page}) => {
+    await page.route('**/data/levels/warrens.json5', route => route.fulfill({status:200, body:'{"seed":777, "attrs":{}}'}));
     await startGame(page);
     await button(page, 'Levels').click();
     await button(page, 'Play The Warrens').click();
+    await expect(seedInput(page)).toHaveValue('777');
+});
+
+test('cancelling the brief keeps the game, and its level\'s values', async ({page}) => {
+    await startGame(page);
+    await page.evaluate(() => {hc.app.game.playerWait();});
+    const before = await page.evaluate(() => [hc.app.game.level.id, hc.app.game.seed, hc.app.game.turn, hc.cfg.TILES.wallChance]);
+    await button(page, 'Levels').click();
+    await button(page, 'Play The Warrens').click();
+    await expect(seedInput(page)).toBeVisible();
+    expect(await page.evaluate(() => hc.cfg.TILES.wallChance)).toBe(90); // the brief's level, while it's open
+    await button(page, '✗ Cancel').click();
+    expect(await page.evaluate(() => [hc.app.game.level.id, hc.app.game.seed, hc.app.game.turn, hc.cfg.TILES.wallChance])).toEqual(before);
+});
+
+test('switching levels mid-game warns in the brief; values the new level doesn\'t set go back', async ({page}) => {
+    await startGame(page);
+    await button(page, 'Levels').click();
+    await button(page, 'Play The Warrens').click();
+    await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.level?.id === 'warrens');
     await page.evaluate(() => {hc.app.game.playerWait();});
     
     await button(page, 'Levels').click();
     await button(page, 'Play Open Ground').click();
-    await expect(page.getByText('Abandon this game and start that level?')).toBeVisible();
-    await button(page, '✓ Confirm').click();
+    await expect(page.getByText('Starting abandons the game in progress.')).toBeVisible();
+    await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.level?.id === 'open_ground');
     expect(await page.evaluate(() => [hc.cfg.TILES.wallChance, hc.cfg.SPAWN.every, hc.cfg.VISION.radius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
 });
@@ -60,7 +126,6 @@ test('a level file that can\'t be loaded says so and the game carries on', async
     await page.evaluate(() => {hc.app.game.playerWait();});
     await button(page, 'Levels').click();
     await button(page, 'Play Open Ground').click();
-    await button(page, '✓ Confirm').click();
     await expect(page.getByText('Level Not Loaded', {exact:true}).filter({visible:true})).toBeVisible();
     expect(await page.evaluate(() => [hc.app.game.level.id, hc.app.game.turn])).toEqual(['endless', 2]);
 });
@@ -68,6 +133,7 @@ test('a level file that can\'t be loaded says so and the game carries on', async
 const playLevel = async (page, name, id) => {
     await button(page, 'Levels').click();
     await button(page, 'Play ' + name).click();
+    await button(page, '✓ Start').click();
     await page.waitForFunction(id => hc.app.game.level?.id === id, id);
 };
 
@@ -79,7 +145,7 @@ test('Settings shows only what the level shows; the level\'s values are used, an
     expect(shown.sort()).toEqual(['solidMax', 'spawnEvery', 'visionRadius']);
     await expect(page.getByText('Fog of war', {exact:true}).filter({visible:true})).toHaveCount(0);
     
-    const spawn = page.locator('input[data-setting="spawnEvery"]');
+    const spawn = page.locator('input[data-setting="spawnEvery"]').filter({visible:true});
     await expect(spawn).toHaveValue('2'); // the level's value
     await spawn.fill('4');
     await spawn.press('Enter');

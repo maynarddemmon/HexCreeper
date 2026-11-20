@@ -4,7 +4,8 @@
 	
 	// Every level, in the order the Levels dialog lists them, with what a list of levels
 	// needs. Each level's own file is data/levels/<id>.json5. A level with no "number" is
-	// listed without one.
+	// listed without one. A level's file may give a "seed", so its map is always the same;
+	// otherwise the brief offers a random one.
 	"levels":[
 		{
 			"id":"endless",

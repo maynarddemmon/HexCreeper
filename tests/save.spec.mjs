@@ -107,7 +107,7 @@ for (const format of ['compact', 'pretty']) {
         expect(contents.includes('\n')).toBe(format === 'pretty');
         
         await button(page, 'New game').click();
-        await button(page, '✓ Confirm').click();
+        await button(page, '✓ Start').click();
         expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
         
         await importFile(page, contents);

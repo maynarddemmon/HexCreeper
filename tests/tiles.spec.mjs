@@ -28,8 +28,11 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
             const g = hc.app.game, G = hc.GRID, sizes = new Set();
             hc.cfg.TILES[other + 'Max'] = 0;
             let ok = true;
+            hc.cfg.TILES.wallChance = 0;
             for (let i = 0; i < 40; i++) {
+                g.seed = i; // a different level each time
                 g.tiles.clear();
+                g.borders.clear();
                 g.terrainQuads.delete('0,0');
                 g.generateTerrain(0, 0);
                 const clump = [...g.tiles.values()].filter(t => t.kind === kind),
@@ -52,102 +55,97 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
     });
 }
 
-// Sets up regenerating quadrant (0,0) with only border walls (no random clumps, no core),
-// walling every border whose neighbour isn't made yet. Helpers go on window.walls.
+// Sets up making quadrant (0,0) and its six neighbours with only border walls (no random
+// clumps, no core), with every border a wall. A wall sits on the side of the quadrant whose
+// key comes first in the border's key. Helpers go on window.walls.
 const wallsOnly = page => page.evaluate(() => {
     const g = hc.app.game, G = hc.GRID, T = hc.cfg.TILES,
-        cells = G.chunkCells(0, 0);
+        quads = [[0, 0], ...G.chunkNeighbours(0, 0)],
+        touching = (side, other) => G.chunkCells(...side.split(',').map(Number))
+            .filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === other));
     T.solidMax = T.holeMax = 0;
     T.wallChance = 100;
     T.wallHoleChance = 0;
     g.removePiece(g.playerCore);
     window.walls = {
-        // Makes quadrant (0,0) again, after the quadrants in `first`.
-        regenerate: (first = []) => {
+        // Makes the seven quadrants again, in the given order of quadrant indexes.
+        regenerate: (order = [0, 1, 2, 3, 4, 5, 6]) => {
             g.tiles.clear();
             g.terrainQuads.clear();
             g.borders.clear();
-            for (const [i, j] of first) g.generateTerrain(i, j);
-            g.generateTerrain(0, 0);
+            for (const n of order) g.generateTerrain(...quads[n]);
         },
-        border: (i, j) => cells.filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === i + ',' + j)),
-        // A border's cells less its two corners, which other borders share.
-        inner: (i, j) => cells.filter(c => {
-            const outside = G.dirs.map(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy)).filter(k => k !== '0,0');
-            return outside.length && outside.every(k => k === i + ',' + j);
+        // (0,0)'s borders, each with the cells of its wall less the two corners, which
+        // other walls share.
+        borders: () => G.chunkNeighbours(0, 0).map(([i, j]) => {
+            const bk = g.borderKey('0,0', i + ',' + j), [side, other] = bk.split('|');
+            return {bk, inner:touching(side, other).filter(c => G.dirs.every(([dx, dy]) => {
+                const k = G.chunkKey(c.x + dx, c.y + dy);
+                return k === side || k === other;
+            }))};
         }),
         solid: c => g.tiles.get(g.key(c.x, c.y))?.kind === 'solid'
     };
 });
 
-test('a wall closes each border but for a door of 1 or 2 cells, reachable from inside', async ({page}) => {
+test('a wall closes each border but for a door of 1 or 2 cells', async ({page}) => {
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, G = hc.GRID, {regenerate, border, solid} = window.walls,
-            inQuad = new Set(G.chunkCells(0, 0).map(c => g.key(c.x, c.y)));
-        let ok = true;
+        const g = hc.app.game, {regenerate, borders, solid} = window.walls,
+            open = new Set();
         for (let t = 0; t < 20; t++) {
+            g.seed = t;
             regenerate();
-            // Everything reachable from the middle without leaving the quadrant.
-            const seen = new Set(['0,0']), todo = [{x:0, y:0}];
-            for (const c of todo) {
-                for (const [dx, dy] of G.dirs) {
-                    const n = {x:c.x + dx, y:c.y + dy}, k = g.key(n.x, n.y);
-                    if (inQuad.has(k) && !seen.has(k) && !solid(n)) {
-                        seen.add(k);
-                        todo.push(n);
-                    }
-                }
-            }
-            for (const [i, j] of G.chunkNeighbours(0, 0)) {
-                const open = border(i, j).filter(c => !solid(c));
-                if (open.length < 1 || open.length > 2 || !open.every(c => seen.has(g.key(c.x, c.y)))) ok = false;
-            }
+            for (const {inner} of borders()) open.add(inner.filter(c => !solid(c)).length);
         }
-        return ok;
+        return [...open].sort();
     });
-    expect(r).toBe(true);
+    expect(r).toEqual([1, 2]);
 });
 
-test('a border is walled only by the first of its two quadrants to be made', async ({page}) => {
+test('the walls come out the same whatever order the quadrants are made in', async ({page}) => {
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        const {regenerate, border, inner, solid} = window.walls,
-            [[i, j], ...others] = hc.GRID.chunkNeighbours(0, 0);
-        regenerate([[i, j]]); // its wall is on its own side
-        return {made:inner(i, j).some(solid), others:others.every(([a, b]) => border(a, b).some(solid))};
+        const g = hc.app.game, {regenerate} = window.walls,
+            tiles = () => JSON.stringify([...g.tiles.keys()].sort());
+        hc.cfg.TILES.doorMin = 0; // so the "never walled in" rule comes into it too
+        regenerate([0, 1, 2, 3, 4, 5, 6]);
+        const forwards = tiles();
+        regenerate([6, 5, 4, 3, 2, 1, 0]);
+        return forwards === tiles() && forwards.length > 2;
     });
-    expect(r).toEqual({made:false, others:true});
+    expect(r).toBe(true);
 });
 
 test('door widths come from the settings; walls with no door never close a quadrant in', async ({page}) => {
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        const {regenerate, inner, solid} = window.walls, T = hc.cfg.TILES, G = hc.GRID,
-            openPerBorder = () => G.chunkNeighbours(0, 0).map(([i, j]) => inner(i, j).filter(c => !solid(c)).length).sort();
+        const {regenerate, borders, solid} = window.walls, T = hc.cfg.TILES,
+            openPerBorder = () => borders().map(({bk, inner}) => [bk, inner.filter(c => !solid(c)).length]);
         T.doorMin = T.doorMax = 3;
         regenerate();
-        const three = openPerBorder();
+        const three = openPerBorder().map(([, n]) => n);
         T.doorMin = T.doorMax = 0;
         regenerate();
-        return {three, none:openPerBorder()};
+        const none = openPerBorder().sort();
+        return {three, first:none[0][1], others:none.slice(1).every(([, n]) => n <= 1)};
     });
-    // With six walls and no doors, the last wall made gets a door of 1.
-    expect(r).toEqual({three:[3, 3, 3, 3, 3, 3], none:[0, 0, 0, 0, 0, 1]});
+    // With six walls and no doors, (0,0)'s first border (by key) gets a door of 1. (Some
+    // others may get one too, for the neighbour on their far side.)
+    expect(r).toEqual({three:[3, 3, 3, 3, 3, 3], first:1, others:true});
 });
 
 test('a share of walls are holes', async ({page}) => {
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, T = hc.cfg.TILES;
-        T.wallHoleChance = 100;
+        const g = hc.app.game;
+        hc.cfg.TILES.wallHoleChance = 100;
         window.walls.regenerate();
-        const kinds = new Set([...g.tiles.values()].map(t => t.kind));
-        return [...kinds];
+        return [...new Set([...g.tiles.values()].map(t => t.kind))];
     });
     expect(r).toEqual(['hole']);
 });
@@ -171,6 +169,7 @@ test('holes are placed after solid tiles and may replace them', async ({page}) =
         T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;
         g.tiles.clear();
+        g.borders.clear();
         g.terrainQuads.delete('0,0');
         g.generateTerrain(0, 0);
         const kinds = [...g.tiles.values()].map(t => t.kind);

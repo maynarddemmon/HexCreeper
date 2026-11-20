@@ -7,6 +7,7 @@
         cfg:{
             WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
         },
+        TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
         hexDist, PIECE_TYPES
     } = pkg;
     
@@ -16,28 +17,30 @@
     class Game {
         constructor() {
             this.level = null; // {id, name, attrs}: the level being played, set by the App
+            this.seed = null;  // the seed the level is made from, set before reset (or random)
             this.reset();
         }
         
         reset() {
+            if (!Number.isInteger(this.seed)) this.seed = pkg.randomSeed();
             this.turn = 1;
             this.nextId = 1;
-            this.pieces = new Map();        // id -> piece
-            this.board = new Map();         // "x,y" -> id
-            this.score = 0;                 // score you have to spend
-            this.scoreEarned = 0;           // all the score you've earned, spent or not
+            this.pieces = new Map();         // id -> piece
+            this.board = new Map();          // "x,y" -> id
+            this.score = 0;                  // score you have to spend
+            this.scoreEarned = 0;            // all the score you've earned, spent or not
             this.over = false;
-            this.effects = [];              // transient visuals (floating text, flashes)
+            this.effects = [];               // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
-            this.tiles = new Map();         // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole", timer}
+            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole", timer}
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
-            this.borders = new Map();       // border key (see borderKey) -> door width of its wall (0: none), or null: no wall
+            this.borders = new Map();        // border key (see borderKey) -> its wall {door, hole, start}, or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
             this.visitedQuads = new Set();
-            this.seenCells = new Set();     // keys of cells that have been in sight (fog of war)
-            this.acted = new Set();         // ids of player pieces moved this turn (counts toward the move limit)
-            this.fresh = new Set();         // ids of pieces placed this turn (can't move until next turn)
+            this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
+            this.acted = new Set();          // ids of player pieces moved this turn (counts toward the move limit)
+            this.fresh = new Set();          // ids of pieces placed this turn (can't move until next turn)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
@@ -45,7 +48,16 @@
             this.selectedId = core.id;
             this.corePath = [[0, 0]];       // every cell the core has been on, in order (the golden path)
             this.updateQuadrants();
-            for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy();
+            const rng = this.rngFor('enemies');
+            for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy(rng);
+        }
+        
+        /*  A generator for one part of the level, seeded from the game's seed and that part's
+            name, so each part comes out the same for a seed whatever order the parts are
+            made in (e.g. which way the player explores). Only the level is made this way:
+            enemy waves, the AI and everything else during play use Math.random. */
+        rngFor(...parts) {
+            return pkg.makeRng(pkg.hashString(this.seed + '|' + parts.join('|')));
         }
         
         // ---- Saving ----
@@ -55,6 +67,7 @@
             return {
                 turn:this.turn,
                 nextId:this.nextId,
+                seed:this.seed,
                 score:this.score,
                 scoreEarned:this.scoreEarned,
                 over:this.over,
@@ -88,6 +101,7 @@
             
             this.turn = o.turn;
             this.nextId = o.nextId;
+            this.seed = Number.isInteger(o.seed) ? o.seed : null;
             this.score = o.score;
             // Saves from before the total was kept only know what's left to spend.
             this.scoreEarned = Number.isFinite(o.scoreEarned) ? o.scoreEarned : o.score;
@@ -124,10 +138,10 @@
         isOpen(x, y) {
             if (Math.abs(x) > WORLD_LIMIT || Math.abs(y) > WORLD_LIMIT) return false;
             const kind = this.tiles.get(this.key(x, y))?.kind;
-            return kind !== 'solid' && kind !== 'hole';
+            return kind !== TILE_TYPE_SOLID && kind !== TILE_TYPE_HOLE;
         }
         // Solid tiles block sight; holes don't.
-        isSolid(x, y) { return this.tiles.get(this.key(x, y))?.kind === 'solid'; }
+        isSolid(x, y) { return this.tiles.get(this.key(x, y))?.kind === TILE_TYPE_SOLID; }
         
         // ---- Fog of war ----
         // Keys of the cells in sight of a player piece, or null when fog of war is off.
@@ -331,7 +345,7 @@
         // heal tiles in one move makes each worth n x HEAL.amount (n^2 in total).
         landOnTiles(pieces) {
             for (const g of pieces) if (this.pieces.has(g.id) && this.isHarm(g.x, g.y)) this.springHarm(g);
-            const eaters = pieces.filter(g => this.pieces.has(g.id) && this.tileAt(g.x, g.y, 'heal'));
+            const eaters = pieces.filter(g => this.pieces.has(g.id) && this.tileAt(g.x, g.y, TILE_TYPE_HEAL));
             const n = eaters.length;
             for (const g of eaters) this.consumeHeal(g, g.x, g.y, n);
             if (n > 1) this.fx(eaters[0].x, eaters[0].y, `${n}× heal combo!`, '--heal', { delay: 260 });
@@ -387,67 +401,88 @@
             const k = qx + ',' + qy;
             if (this.tiledQuads.has(k)) return;
             this.tiledQuads.add(k);
-            const cells = pkg.GRID.chunkCells(qx, qy);
+            const cells = pkg.GRID.chunkCells(qx, qy),
+                rng = this.rngFor('tiles', k);
             const place = kind => {
                 for (let tries = 0; tries < 50; tries++) {
-                    const { x, y } = cells[Math.floor(Math.random() * cells.length)];
+                    const { x, y } = cells[Math.floor(rng() * cells.length)];
                     const kk = this.key(x, y);
                     if (this.tiles.has(kk) || this.pieceAt(x, y)) continue;
-                    const timer = TILES.timerMin + Math.floor(Math.random() * (TILES.timerMax - TILES.timerMin + 1));
+                    const timer = TILES.timerMin + Math.floor(rng() * (TILES.timerMax - TILES.timerMin + 1));
                     this.tiles.set(kk, { x, y, kind, timer });
                     return;
                 }
             };
-            for (let i = 0; i < TILES.healPerQuad; i++) place('heal');
-            for (let i = 0; i < TILES.harmPerQuad; i++) place('harm');
+            for (let i = 0; i < TILES.healPerQuad; i++) place(TILE_TYPE_HEAL);
+            for (let i = 0; i < TILES.harmPerQuad; i++) place(TILE_TYPE_HARM);
         }
         
-        // A quadrant's solid and hole tiles, once: a clump of solidMin to solidMax solid
-        // tiles, then a clump of holeMin to holeMax holes, which may land on (replace)
-        // solid tiles. Both are there from the start (no countdown).
+        // A quadrant's solid and hole tiles, once: the walls on its side of its borders,
+        // then a clump of solidMin to solidMax solid tiles, then a clump of holeMin to
+        // holeMax holes, which may land on (replace) solid tiles. All are there from the
+        // start (no countdown).
         generateTerrain(qx, qy) {
             const k = qx + ',' + qy;
             if (this.terrainQuads.has(k)) return;
             this.terrainQuads.add(k);
-            const cells = pkg.GRID.chunkCells(qx, qy);
+            const cells = pkg.GRID.chunkCells(qx, qy),
+                rng = this.rngFor('terrain', k);
             
-            // Each border is decided once, by whichever of its two quadrants is made first.
+            // A wall sits on the side of the quadrant whose key comes first in the border's
+            // key, so it's placed when that quadrant is made.
             for (const [i, j] of pkg.GRID.chunkNeighbours(qx, qy)) {
-                const bk = this.borderKey(k, i + ',' + j);
-                if (this.borders.has(bk)) continue;
-                if (Math.random() * 100 >= TILES.wallChance) {
-                    this.borders.set(bk, null);
-                    continue;
-                }
-                let door = TILES.doorMin + Math.floor(Math.random() * (TILES.doorMax - TILES.doorMin + 1));
-                // No quadrant gets walled in on every side: the last of its walls gets a door.
-                if (door === 0 && (this.walledIn(k, bk) || this.walledIn(i + ',' + j, bk))) door = 1;
-                this.borders.set(bk, door);
-                this.placeWall(cells, i, j, door);
+                const bk = this.borderKey(k, i + ',' + j), wall = this.borderWall(bk);
+                if (wall && bk.startsWith(k + '|')) this.placeWall(cells, i, j, wall);
             }
-            this.placeClump(cells, 'solid', TILES.solidMin, TILES.solidMax, []);
-            this.placeClump(cells, 'hole', TILES.holeMin, TILES.holeMax, ['solid']);
+            this.placeClump(cells, TILE_TYPE_SOLID, TILES.solidMin, TILES.solidMax, [], rng);
+            this.placeClump(cells, TILE_TYPE_HOLE, TILES.holeMin, TILES.holeMax, [TILE_TYPE_SOLID], rng);
         }
         
         // The key of the border between two quadrants ("i,j" keys), the same either way round.
         borderKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
         
-        // Would quadrant q be walled in, with no door on any side, if border `except` were
-        // a wall with no door?
-        walledIn(q, except) {
+        // The keys of a quadrant's six borders.
+        bordersOf(q) {
             const [i, j] = q.split(',').map(Number);
-            return pkg.GRID.chunkNeighbours(i, j).every(([a, b]) => {
-                const bk = this.borderKey(q, a + ',' + b);
-                return bk === except || this.borders.get(bk) === 0;
-            });
+            return pkg.GRID.chunkNeighbours(i, j).map(([a, b]) => this.borderKey(q, a + ',' + b));
+        }
+        
+        // A border as the seed makes it, on its own: a wall {door, hole, start} or null. The
+        // wall's door is doorMin to doorMax cells, hole says it's made of holes, and start
+        // (0 to 1) says where along the border the door goes.
+        seededBorder(bk) {
+            const rng = this.rngFor('border', bk);
+            if (rng() * 100 >= TILES.wallChance) return null;
+            return {
+                door:TILES.doorMin + Math.floor(rng() * (TILES.doorMax - TILES.doorMin + 1)),
+                hole:rng() * 100 < TILES.wallHoleChance,
+                start:rng()
+            };
+        }
+        
+        // A border's wall {door, hole, start}, or null: decided once and kept. No quadrant
+        // is walled in on every side: if all six of a quadrant's borders would be walls with
+        // no door, the first of them (by key) gets a door of 1. This depends only on the
+        // seed, not on the order quadrants are made in.
+        borderWall(bk) {
+            if (!this.borders.has(bk)) {
+                const wall = this.seededBorder(bk);
+                if (wall?.door === 0) {
+                    for (const q of bk.split('|')) {
+                        const all = this.bordersOf(q).sort();
+                        if (all[0] === bk && all.every(b => this.seededBorder(b)?.door === 0)) wall.door = 1;
+                    }
+                }
+                this.borders.set(bk, wall);
+            }
+            return this.borders.get(bk);
         }
         
         // A wall along the border between a quadrant (its cells) and its neighbour (i, j),
-        // on the quadrant's own side: every cell touching the neighbour, except a door of
-        // doorWidth cells in the middle (not at a corner, where another wall may meet it).
-        // Some walls are holes rather than solid tiles. Cells with a tile or a piece already
-        // are left as they are.
-        placeWall(cells, i, j, doorWidth) {
+        // on the quadrant's own side: every cell touching the neighbour, except a door in
+        // the middle (not at a corner, where another wall may meet it). Some walls are holes
+        // rather than solid tiles. Cells with a tile or a piece already are left as they are.
+        placeWall(cells, i, j, wall) {
             const G = pkg.GRID,
                 middle = cs => {
                     let sx = 0, sy = 0;
@@ -462,10 +497,10 @@
                 border = cells.filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === i + ',' + j))
                     .sort((a, b) => along(a) - along(b)),
                 inner = border.length > 2 ? border.slice(1, -1) : border,
-                width = Math.min(inner.length, doorWidth),
-                start = Math.floor(Math.random() * (inner.length - width + 1)),
+                width = Math.min(inner.length, wall.door),
+                start = Math.floor(wall.start * (inner.length - width + 1)),
                 door = new Set(inner.slice(start, start + width)),
-                kind = Math.random() * 100 < TILES.wallHoleChance ? 'hole' : 'solid';
+                kind = wall.hole ? TILE_TYPE_HOLE : TILE_TYPE_SOLID;
             for (const c of border) {
                 if (!door.has(c) && !this.tiles.has(this.key(c.x, c.y)) && !this.pieceAt(c.x, c.y)) {
                     this.tiles.set(this.key(c.x, c.y), {x:c.x, y:c.y, kind, timer:0});
@@ -476,18 +511,18 @@
         // One connected clump of min to max tiles of a kind within a quadrant's cells: the
         // first on a random free cell, each next one on a free cell touching the clump. A
         // cell is free if no piece is on it and it has no tile, or a tile of a kind in
-        // `replaces`.
-        placeClump(cells, kind, min, max, replaces) {
+        // `replaces`. rng picks the cells.
+        placeClump(cells, kind, min, max, replaces, rng) {
             const inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
                 free = (x, y) => {
                     const k = this.key(x, y), t = this.tiles.get(k);
                     return inQuad.has(k) && (!t || replaces.includes(t.kind)) && !this.pieceAt(x, y);
                 },
-                count = min + Math.floor(Math.random() * (max - min + 1));
+                count = min + Math.floor(rng() * (max - min + 1));
             const edge = new Map(); // free cells touching the clump, by key
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
-                const {x, y} = options[Math.floor(Math.random() * options.length)];
+                const {x, y} = options[Math.floor(rng() * options.length)];
                 this.tiles.set(this.key(x, y), {x, y, kind, timer:0});
                 edge.delete(this.key(x, y));
                 for (const [dx, dy] of pkg.GRID.dirs) {
@@ -497,18 +532,20 @@
                 options = [...edge.values()];
             }
         }
-    
+        
         // Active tile at (x, y), optionally of a given kind.
         tileAt(x, y, kind) {
             const t = this.tiles.get(this.key(x, y));
             return t && t.timer <= 0 && (!kind || t.kind === kind) ? t : null;
         }
-        isHarm(x, y) { return !!this.tileAt(x, y, 'harm'); }
+        isHarm(x, y) {
+            return !!this.tileAt(x, y, TILE_TYPE_HARM);
+        }
         
         // A harm tile damages the piece on it once, then is gone.
         springHarm(piece) {
             this.tiles.delete(this.key(piece.x, piece.y));
-            this.fx(piece.x, piece.y, '', '--harm', { vanish: true });
+            this.fx(piece.x, piece.y, '', '--harm', {vanish: true});
             this.damage(piece, TILES.harmDamage, null);
         }
         
@@ -520,13 +557,16 @@
             for (const t of this.tiles.values()) {
                 if (t.timer <= 0) continue;
                 t.timer--;
-                if (t.timer === 0) { armed.push(t); this.fx(t.x, t.y, '', t.kind === 'heal' ? '--heal' : '--harm', { arm: true }); }
+                if (t.timer === 0) {
+                    armed.push(t);
+                    this.fx(t.x, t.y, '', t.kind === TILE_TYPE_HEAL ? '--heal' : '--harm', {arm: true});
+                }
             }
             for (const t of armed) {
                 if (this.over) return;
                 const p = this.pieceAt(t.x, t.y);
                 if (!p) continue;
-                if (t.kind === 'harm') this.springHarm(p);
+                if (t.kind === TILE_TYPE_HARM) this.springHarm(p);
                 else if (p.owner === 'player') this.consumeHeal(p, t.x, t.y, 1);
             }
         }
@@ -583,7 +623,7 @@
             this.recomputeRanks();
             p.hp = p.maxHp;
             this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
-            if (this.tileAt(x, y, 'heal')) this.consumeHeal(p, x, y, 1);
+            if (this.tileAt(x, y, TILE_TYPE_HEAL)) this.consumeHeal(p, x, y, 1);
             this.updateQuadrants();
             this.afterPlayerAction();
             return true;
@@ -761,12 +801,13 @@
             return root;
         }
         
-        spawnEnemy() {
+        // rng picks where: Math.random for waves, the level's generator at the start.
+        spawnEnemy(rng = Math.random) {
             const core = this.playerCore; if (!core) return;
             const players = this.piecesOf('player');
             for (let tries = 0; tries < 60; tries++) {
-                const d = SPAWN.minDist + Math.floor(Math.random() * (SPAWN.maxDist - SPAWN.minDist + 1));
-                const { x, y } = pkg.GRID.ring(core.x, core.y, d);
+                const d = SPAWN.minDist + Math.floor(rng() * (SPAWN.maxDist - SPAWN.minDist + 1));
+                const { x, y } = pkg.GRID.ring(core.x, core.y, d, rng);
                 if (!this.isOpen(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
                 if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                 const p = this.addPiece('core', 'enemy', x, y);

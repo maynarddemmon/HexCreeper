@@ -31,15 +31,18 @@ JS.Packages(file => {
     file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.Game.prototype.planSquad','hc.settings');
     file(VIEW_ROOT + 'Render.js').provides('hc.view.render').requires('hc.view');
     file(VIEW_ROOT + 'GameView.js').provides('hc.GameView').requires('hc.view.render','hc.LabeledValue');
-    file(VIEW_ROOT + 'SettingsDialog.js').provides('hc.SettingsDialog').requires(
+    file(VIEW_ROOT + 'SettingsDialog.js').provides('hc.SettingsDialog','hc.SettingsList').requires(
         'hc.AckDialog','hc.settings','hc.ToggleBtn','hc.UnderlineBtn','hc.WideView'
     );
     file(VIEW_ROOT + 'LevelsDialog.js').provides('hc.LevelsDialog').requires(
         'hc.AckDialog','hc.levels','hc.UnderlineBtn','hc.WideView'
     );
+    file(VIEW_ROOT + 'LevelBrief.js').provides('hc.LevelBrief').requires(
+        'hc.ConfirmDialog','hc.SettingsList','hc.WideView'
+    );
     
     // Include Everything
     file(HC_ROOT + 'App.js').provides('hc.App').requires(
-        'hc.GameView','hc.SettingsDialog','hc.LevelsDialog','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
+        'hc.GameView','hc.SettingsDialog','hc.LevelsDialog','hc.LevelBrief','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
     );
 });

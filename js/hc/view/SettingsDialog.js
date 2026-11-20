@@ -1,8 +1,9 @@
 (pkg => {
     'use strict';
     
-    const M = myt,
-        {I18N:{get:i18n}, Text, global:{keys:globalKeys}} = M,
+    const JSClass = JS.Class,
+        M = myt,
+        {I18N:{get:i18n}, PlainText, SpacedLayout, global:{keys:globalKeys}} = M,
         
         {
             WideView, UnderlineBtn, settings,
@@ -19,7 +20,7 @@
         
         /*  A label and a number field for one setting. The value is set when the field
             changes or Enter is pressed, and the field then shows what was set. */
-        NumberRow = new JS.Class('NumberRow', WideView, {
+        NumberRow = new JSClass('NumberRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
                     def = self.def = attrs.def;
@@ -28,7 +29,7 @@
                 
                 self.callSuper(parent, attrs);
                 
-                new Text(self, {
+                new PlainText(self, {
                     x:padding, y:5, width:LABEL_WIDTH, text:def.label, fontSize:fontSizeMedium, textColor:colorText
                 }).enableEllipsis();
                 
@@ -65,7 +66,7 @@
         }),
         
         /*  A checkbox for one boolean setting. The value is set as soon as it's toggled. */
-        BooleanRow = new JS.Class('BooleanRow', WideView, {
+        BooleanRow = new JSClass('BooleanRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
                     def = self.def = attrs.def;
@@ -90,9 +91,42 @@
             }
         });
     
-    /*  Edits hc.settings. Built from the setting definitions, and changes apply as soon as they 
-        are made. A note comes first, then each group of settings. The footer resets everything. */
-    pkg.SettingsDialog = new JS.Class('SettingsDialog', pkg.AckDialog, {
+    /*  Every setting, by group, built from the setting definitions; refresh shows only those
+        the level shows. Changes apply as soon as they're made. Used by the SettingsDialog and
+        the LevelBrief. */
+    pkg.SettingsList = new JSClass('SettingsList', WideView, {
+        initNode: function(parent, attrs) {
+            const self = this,
+                rows = self._rows = [],
+                headers = self._headers = [];
+            
+            self.callSuper(parent, attrs);
+            
+            for (const group of settings.getGroups()) {
+                const header = new WideView(self, {height:rowHeight + padding});
+                new PlainText(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
+                header.rows = group.definitions.map(def => new (def.type === 'boolean' ? BooleanRow : NumberRow)(self, {def}));
+                headers.push(header);
+                rows.push(...header.rows);
+            }
+            new SpacedLayout(self, {axis:'y', spacing, collapseParent:true});
+        },
+        
+        /*  Shows the settings the level being played shows, with their values. Returns
+            whether there are any. */
+        refresh: function() {
+            for (const row of this._rows) {
+                row.setVisible(settings.isShown(row.def.id));
+                row.refresh();
+            }
+            for (const header of this._headers) header.setVisible(header.rows.some(row => row.visible));
+            return this._rows.some(row => row.visible);
+        }
+    });
+    
+    /*  Edits hc.settings: a note, then the SettingsList. The footer puts the level's values
+        back. */
+    pkg.SettingsDialog = new JSClass('SettingsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
             const self = this;
@@ -108,27 +142,17 @@
             self.setTitle(i18n('tip-settings'));
             self.getFooterView().ackBtn.setText(pkg.ICON_CANCEL + ' ' + i18n('btn-close'));
             
-            const container = self._container = new WideView(self.getContentView()),
-                rows = self._rows = [];
+            const container = self._container = new WideView(self.getContentView());
             
-            self._note = new Text(container, {
+            self._note = new PlainText(container, {
                 x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal',
                 text:i18n('settings-note'),
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
-            // Settings, by group. Every one is built, and only those the level shows are
-            // visible (see refresh). //
-            const headers = self._headers = [];
-            for (const group of settings.getGroups()) {
-                const header = new WideView(container, {height:rowHeight + padding});
-                new Text(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
-                header.rows = group.definitions.map(def => new (def.type === 'boolean' ? BooleanRow : NumberRow)(container, {def}));
-                headers.push(header);
-                rows.push(...header.rows);
-            }
-        
-            new M.SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});
+            self._list = new pkg.SettingsList(container);
+            
+            new SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});
         },
         
         
@@ -144,12 +168,7 @@
         
         /*  Shows the settings the level being played shows, with their values. */
         refresh: function() {
-            for (const row of this._rows) {
-                row.setVisible(settings.isShown(row.def.id));
-                row.refresh();
-            }
-            for (const header of this._headers) header.setVisible(header.rows.some(row => row.visible));
-            const any = this._rows.some(row => row.visible);
+            const any = this._list.refresh();
             this._note.setText(i18n(any ? 'settings-note' : 'settings-none'));
             this.getFooterView().resetBtn.setVisible(any);
         },

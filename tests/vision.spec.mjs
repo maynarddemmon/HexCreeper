@@ -62,12 +62,12 @@ test('fog of war can be turned off and its radius changed in Settings', async ({
     await startGame(page);
     await clearBoard(page); // so no random solid tile blocks the cells checked below
     await button(page, 'Settings').click();
-    const radius = page.locator('input[data-setting="visionRadius"]');
+    const radius = page.locator('input[data-setting="visionRadius"]').filter({visible:true});
     await radius.fill('5');
     await radius.press('Enter');
     expect(await page.evaluate(() => hc.app.game.cellsInSight().has('5,0') && !hc.app.game.cellsInSight().has('6,0'))).toBe(true);
     
-    await page.getByText('Fog of war', {exact:true}).click();
+    await page.getByText('Fog of war', {exact:true}).filter({visible:true}).click();
     expect(await page.evaluate(() => [hc.app.game.cellsInSight(), JSON.parse(localStorage.getItem('hc.settings')).endless.fog])).toEqual([null, false]);
     
     await button(page, 'Reset to Defaults').click();

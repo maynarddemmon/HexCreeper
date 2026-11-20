@@ -11,6 +11,7 @@
         
         {
             cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK},
+            TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
             PIECE_TYPES
         } = pkg,
         
@@ -20,12 +21,13 @@
         HEAL_LABEL_OFFSET = [0.3, 0.32],
         
         drawTile = (t, now) => {
-            if (t.kind === 'solid') {
+            if (t.kind === TILE_TYPE_SOLID) {
                 fillCell(t.x, t.y, '--solid');
                 strokeCell(t.x, t.y, css('--solid-edge'), Math.max(1, cam.size * 0.03), 1);
                 return;
             }
-            if (t.kind === 'hole') {
+            
+            if (t.kind === TILE_TYPE_HOLE) {
                 fillCell(t.x, t.y, '--hole');
                 // Lines from each corner, fading into the dark towards the centre, so it
                 // reads as a pit rather than a cell in fog.
@@ -41,9 +43,10 @@
                 }
                 return;
             }
+            
             const s = cam.size,
                 [cx, cy] = cellCenter(t.x, t.y),
-                heal = t.kind === 'heal',
+                heal = t.kind === TILE_TYPE_HEAL,
                 ink = css(heal ? '--heal' : '--harm'), bg = css(heal ? '--heal-bg' : '--harm-bg');
             if (t.timer > 0) {
                 // Pending: faint dashed outline and the countdown
@@ -58,6 +61,7 @@
                 ctx.globalAlpha = 1;
                 return;
             }
+            
             // Active: pop briefly when it arms
             const armFx = game.effects.find(f => f.arm && f.x === t.x && f.y === t.y);
             let k = 1;
@@ -144,10 +148,9 @@
         V.rafPending = false;
         const panning = V.stepPan(now);
         ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
-        const W = V.W,
-            H = V.H,
-            s = cam.size;
-        const [x0, y0] = screenToWorld(0, 0),
+        const {W , H}= V,
+            s = cam.size,
+            [x0, y0] = screenToWorld(0, 0),
             [x1, y1] = screenToWorld(W, H),
             visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)],
             // chunk key per visible cell (used for the visited tint and quadrant borders)
@@ -159,12 +162,12 @@
                     v = pkg.GRID.chunkKey(x, y); chunkKeys.set(k, v);
                 }
                 return v;
-            };
-        
-        // Fog of war: sight is null when it's off. Enemies show only on cells in sight.
-        // Cells never seen show only as fog, so the board below is drawn only on cells
-        // that have been seen ("known"); the ones out of sight now are dimmed after.
-        const sight = game.cellsInSight(),
+            },
+            
+            // Fog of war: sight is null when it's off. Enemies show only on cells in sight.
+            // Cells never seen show only as fog, so the board below is drawn only on cells
+            // that have been seen ("known"); the ones out of sight now are dimmed after.
+            sight = game.cellsInSight(),
             inSight = (x, y) => !sight || sight.has(game.key(x, y)),
             shown = p => p.owner === 'player' || inSight(p.x, p.y),
             isKnown = (x, y) => !sight || game.seenCells.has(game.key(x, y)),
@@ -221,10 +224,10 @@
             // Where the hovered move lands: harm cells go red, heal cells bright green
             if (hoverMove) for (const g of group) {
                 const x = g.x + hoverMove.dx, y = g.y + hoverMove.dy;
-                const kind = game.isHarm(x, y) ? 'harm' : game.tileAt(x, y, 'heal') ? 'heal' : null;
+                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : null;
                 if (!kind) continue;
-                fillCell(x, y, kind === 'harm' ? '--harm-hover' : '--heal-hover');
-                strokeCell(x, y, kind === 'harm' ? '--harm' : '--heal', Math.max(2, s * 0.06), 2);
+                fillCell(x, y, kind === TILE_TYPE_HARM ? '--harm-hover' : '--heal-hover');
+                strokeCell(x, y, kind === TILE_TYPE_HARM ? '--harm' : '--heal', Math.max(2, s * 0.06), 2);
             }
             // Show every enemy a group attack would hit
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
@@ -250,16 +253,25 @@
                 path.moveTo(ax, ay); path.lineTo(bx, by);
             }
         }
-        ctx.strokeStyle = css('--grid'); ctx.stroke(minor);
-        ctx.strokeStyle = css('--grid-major'); ctx.stroke(major);
+        ctx.strokeStyle = css('--grid');
+        ctx.stroke(minor);
+        
+        ctx.strokeStyle = css('--grid-major');
+        ctx.stroke(major);
         
         // Origin marker
         {
             const [sx, sy] = cellCenter(0, 0);
             if (sx > -s && sx < W + s && sy > -s && sy < H + s) {
-                ctx.strokeStyle = css('--grid-major'); ctx.lineWidth = 1.5;
+                ctx.strokeStyle = css('--grid-major');
+                ctx.lineWidth = 1.5;
                 const r = s * 0.12;
-                ctx.beginPath(); ctx.moveTo(sx - r, sy); ctx.lineTo(sx + r, sy); ctx.moveTo(sx, sy - r); ctx.lineTo(sx, sy + r); ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(sx - r, sy);
+                ctx.lineTo(sx + r, sy);
+                ctx.moveTo(sx, sy - r);
+                ctx.lineTo(sx, sy + r);
+                ctx.stroke();
             }
         }
         
@@ -416,6 +428,7 @@
         game.effects = game.effects.filter(f => now - f.t0 < FX_MS);
         if (game.effects.length || panning) draw();
         
-        V.updateHud();
+        // Update HUD
+        pkg.app?.update();
     };
 })(hc);

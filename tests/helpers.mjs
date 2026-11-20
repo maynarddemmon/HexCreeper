@@ -29,8 +29,16 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
     return problems;
 };
 
-/*  Waits until the App exists and its game has started. */
-export const waitForGame = page => page.waitForFunction(() => window.hc?.app?.ready && window.hc.app.game.playerCore != null);
+/*  Waits until the App exists and its game has started. Without a save, the game starts
+    from the level brief, so its Start button is clicked when it shows. */
+export const waitForGame = async page => {
+    const isReady = () => window.hc?.app?.ready && window.hc.app.game.playerCore != null,
+        start = button(page, '✓ Start');
+    while (!await page.evaluate(isReady)) {
+        if (await start.count()) await start.click();
+        await page.waitForTimeout(50);
+    }
+};
 
 /*  Clears the board for a rules test: no enemies, no tiles, and no waves, so a test can
     place exactly what it needs. */

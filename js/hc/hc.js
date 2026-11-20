@@ -52,6 +52,12 @@
             colorError:'var(--dmg)'
         },
         
+        // Tile Types
+        TILE_TYPE_HEAL:'heal',
+        TILE_TYPE_HARM:'harm',
+        TILE_TYPE_HOLE:'hole',
+        TILE_TYPE_SOLID:'solid',
+        
         cfg:{
             // Where help.txt is loaded from.
             DATA_BASE_DIR:'./data/',
@@ -224,6 +230,29 @@
         },
         
         stripMarkup: str => str ? DOM_PARSER.parseFromString(str, 'text/html').body.textContent || '' : '',
+        
+        /*  A seeded pseudo-random number generator (mulberry32): a function returning numbers
+            in [0, 1), the same sequence for the same 32-bit seed. */
+        makeRng: seed => {
+            let a = seed >>> 0;
+            return () => {
+                a = (a + 0x6D2B79F5) >>> 0;
+                let t = a;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        },
+        
+        /*  A 32-bit hash of a string (FNV-1a), e.g. to make a seed for one part of a level. */
+        hashString: str => {
+            let h = 0x811C9DC5;
+            for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
+            return h >>> 0;
+        },
+        
+        /*  A new seed for a level: a random whole number below a million, easy to note down. */
+        randomSeed: () => Math.floor(Math.random() * 1000000),
         
         isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v)
     };
