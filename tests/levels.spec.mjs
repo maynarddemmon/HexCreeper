@@ -15,7 +15,9 @@ test('the Levels dialog lists every level in init.json5 and marks the one being 
     for (const name of ['Endless Play (playing)', '1. Open Ground', '2. The Warrens']) {
         await expect(page.getByText(name, {exact:true}).filter({visible:true})).toBeVisible();
     }
-    await expect(button(page, 'Play The Warrens')).toBeVisible();
+    // Each level's name is the button that plays it; there's no separate Play button.
+    await expect(button(page, 'Play The Warrens')).toHaveText('2. The Warrens');
+    await expect(page.getByRole('button', {name:'Play', exact:true}).filter({visible:true})).toHaveCount(0);
 });
 
 test('playing a level starts a new game with its values in effect, and the save keeps them', async ({page}) => {

@@ -10,15 +10,14 @@
             WideView, UnderlineBtn,
             theme:{
                 spacing, padding, rowHeight,
-                colorText, colorTextMuted,
-                fontSizeSmall, fontSizeMedium, fontSizeLarge, fontFamilyMono
+                colorTextMuted,
+                fontSizeSmall, fontSizeLarge, fontFamilyMono
             }
         } = pkg,
         
         PANEL_WIDTH = 480,
-        PLAY_WIDTH = 64,
         
-        /*  One level: its number and name with a Play button beside them, and its description
+        /*  One level: its number and name, as a button that plays it, and its description
             below. */
         LevelRow = new JSClass('LevelRow', WideView, {
             initNode: function(parent, attrs) {
@@ -30,16 +29,13 @@
                 
                 self.callSuper(parent, attrs);
                 
-                const textWidth = PANEL_WIDTH - PLAY_WIDTH - 3*padding,
-                    top = new WideView(self, {height:rowHeight});
-                self._name = new Text(top, {
-                    x:padding, width:textWidth, valign:'middle', fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold',
-                    text:level.number == null ? level.name : i18n('level-numbered', level.number, level.name)
-                });
-                const playBtn = new UnderlineBtn(top, {
-                    x:PANEL_WIDTH - padding - PLAY_WIDTH, valign:'middle', text:i18n('btn-play'), fontSize:fontSizeMedium
+                const top = new WideView(self, {height:rowHeight});
+                self._name = new UnderlineBtn(top, {
+                    x:padding, valign:'middle', fontSize:fontSizeLarge, fontWeight:'bold',
+                    tooltip:i18n('tip-play-level', level.name)
                 }, [{doActivated: () => {onPlay(level.id);}}]);
-                playBtn.getIDE().setAttribute('aria-label', i18n('btn-play') + ' ' + level.name);
+                self._name.getIDE().setAttribute('aria-label', i18n('btn-play') + ' ' + level.name);
+                self.setPlaying(false);
                 if (level.description) {
                     new Text(self, {
                         x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal', text:level.description,
@@ -59,9 +55,9 @@
             }
         });
     
-    /*  Lists every level in data/init.json5, each with a Play button. The list is built the
-        first time it's shown, once init.json5 has loaded. onPlay(levelId) is called when a
-        level's Play button is pressed, after the dialog closes. */
+    /*  Lists every level in data/init.json5; pressing a level's name plays it. The list is
+        built the first time it's shown, once init.json5 has loaded. onPlay(levelId) is
+        called when a level's name is pressed, after the dialog closes. */
     pkg.LevelsDialog = new JSClass('LevelsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {

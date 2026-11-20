@@ -71,6 +71,7 @@ myt.I18N.setDictionary({
 "dlg-help-title":"How to Play",
 "dlg-levels-title":"Levels",
 "btn-play":"Play",
+"tip-play-level":"Play $0.",
 "level-numbered":"$0. $1",
 "level-playing":"(playing)",
 "levels-load-failed":"The list of levels could not be loaded.",
