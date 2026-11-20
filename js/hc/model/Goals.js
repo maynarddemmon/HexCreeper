@@ -1,0 +1,141 @@
+/*  Level goals and penalties. A goal is something to achieve and a penalty something to
+    avoid; each has an expression (see Expr.js) over the values below. Mixed into
+    Game.prototype: evaluateObjectives. */
+(pkg => {
+    'use strict';
+    
+    const {hexDist} = pkg,
+        
+        // The values an expression can use, from the game.
+        VALUES = {
+            turn:g => g.turn,
+            score:g => g.score,
+            scoreEarned:g => g.scoreEarned,
+            coreHp:g => Math.max(0, g.playerCore?.hp ?? 0),
+            coreMaxHp:g => g.playerCore?.maxHp ?? 0,
+            coreRank:g => g.playerCore?.rank ?? 0,
+            coreX:g => corePos(g).x,
+            coreY:g => corePos(g).y,
+            coreDist:g => hexDist(corePos(g), {x:0, y:0}),
+            pieces:g => g.piecesOf('player').length,
+            maxRank:g => g.maxRank(),
+            piecesLost:g => g.piecesLost,
+            piecesPlaced:g => g.piecesPlaced,
+            enemies:g => g.piecesOf('enemy').length,
+            kills:g => g.kills,
+            quadsVisited:g => g.visitedQuads.size
+        },
+        FUNCTIONS = {
+            dist:(g, x, y) => hexDist(corePos(g), {x, y}),
+            min:(g, ...a) => Math.min(...a),
+            max:(g, ...a) => Math.max(...a),
+            abs:(g, a) => Math.abs(a)
+        },
+        NAMES = Object.keys(VALUES),
+        FUNCTION_NAMES = Object.keys(FUNCTIONS),
+        
+        // Where the core is, or was last.
+        corePos = g => {
+            const core = g.playerCore;
+            if (core) return core;
+            const [x, y] = g.corePath.at(-1) ?? [0, 0];
+            return {x, y};
+        },
+        
+        // An expression, compiled once (see Expr.js). Throws if it isn't one.
+        compiled = new Map(),
+        compile = src => {
+            if (!compiled.has(src)) compiled.set(src, pkg.expr.compile(src, NAMES, FUNCTION_NAMES));
+            return compiled.get(src);
+        },
+        
+        isBool = v => v === undefined || typeof v === 'boolean';
+    
+    pkg.goals = {
+        NAMES,
+        FUNCTION_NAMES,
+        compile,
+        
+        /*  A level's goals and penalties, from its file's "goals" and "penalties", as one
+            list of objectives: {kind:'goal' | 'penalty', name, description, expression,
+            lockOnSuccess, lockOnFailure, required}, with the defaults filled in. Throws an
+            Error saying what's wrong with the first bad one. */
+        fromLevel: data => {
+            const objectives = [];
+            for (const kind of ['goal', 'penalty']) {
+                const list = data?.[kind === 'goal' ? 'goals' : 'penalties'] ?? [];
+                if (!Array.isArray(list)) throw new Error(`"${kind === 'goal' ? 'goals' : 'penalties'}" must be a list`);
+                list.forEach((o, i) => {
+                    const where = `${kind} ${i + 1}`;
+                    if (typeof o?.name !== 'string' || !o.name) throw new Error(`The ${where} needs a name`);
+                    if (o.description !== undefined && typeof o.description !== 'string') throw new Error(`The ${where}'s description must be text`);
+                    if (!isBool(o.lockOnSuccess) || !isBool(o.lockOnFailure) || !isBool(o.required)) throw new Error(`The ${where}'s lockOnSuccess, lockOnFailure and required must be true or false`);
+                    try {
+                        compile(o.expression);
+                    } catch (err) {
+                        throw new Error(`The ${where}'s expression: ${err.message}`, {cause:err});
+                    }
+                    objectives.push({
+                        kind,
+                        name:o.name,
+                        description:o.description ?? '',
+                        expression:o.expression,
+                        lockOnSuccess:o.lockOnSuccess ?? false,
+                        lockOnFailure:o.lockOnFailure ?? false,
+                        required:o.required ?? true
+                    });
+                });
+            }
+            return objectives;
+        },
+        
+        /*  Whether an objective in that state is where the player wants it: a goal true or
+            a penalty false. */
+        isGood: (objective, state) => state.value === (objective.kind === 'goal')
+    };
+    
+    class Goals {
+        // The level's objectives (see goals.fromLevel).
+        get levelObjectives() { return this.level?.objectives ?? []; }
+        
+        /*  Evaluates the objectives that aren't locked, locking any that lock, then ends the
+            game if the level is won (every required goal true and penalty false) or can't
+            be won any more (a required one locked the wrong way). A level with nothing
+            required can't be won. */
+        evaluateObjectives() {
+            if (this.over) return;
+            const list = this.levelObjectives,
+                scope = {
+                    value:name => VALUES[name](this),
+                    call:(name, args) => FUNCTIONS[name](this, ...args)
+                };
+            list.forEach((o, i) => {
+                const state = this.objectives[i];
+                if (state.locked) return;
+                state.value = !!compile(o.expression)(scope);
+                if (state.value ? o.lockOnSuccess : o.lockOnFailure) state.locked = true;
+            });
+            
+            const required = list.map((o, i) => [o, this.objectives[i]]).filter(([o]) => o.required),
+                lostBy = required.findIndex(([o, s]) => s.locked && !pkg.goals.isGood(o, s));
+            if (lostBy >= 0) {
+                this.endGame('lost', list.indexOf(required[lostBy][0]));
+            } else if (required.length && required.every(([o, s]) => pkg.goals.isGood(o, s))) {
+                this.endGame('won');
+            }
+        }
+        
+        /*  Ends the game: outcome 'won' or 'lost'. lostBy is the index of the objective that
+            lost it, or null when the core was destroyed. */
+        endGame(outcome, lostBy = null) {
+            this.over = true;
+            this.outcome = outcome;
+            this.lostBy = lostBy;
+        }
+    }
+    
+    const proto = pkg.Game.prototype;
+    for (const name of Object.getOwnPropertyNames(Goals.prototype)) {
+        if (name !== 'constructor') Object.defineProperty(proto, name, Object.getOwnPropertyDescriptor(Goals.prototype, name));
+    }
+})(hc);

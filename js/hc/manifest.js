@@ -22,13 +22,15 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'PieceTypes.js').provides('hc.PIECE_TYPES').requires('hc.makeGrid');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.Game.prototype.planSquad').requires('hc.Game');
+    file(MODEL_ROOT + 'Expr.js').provides('hc.expr').requires('hc');
+    file(MODEL_ROOT + 'Goals.js').provides('hc.goals').requires('hc.Game','hc.expr');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
-    file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5');
+    file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5','hc.goals');
     
     // View //
-    file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.Game.prototype.planSquad','hc.settings');
+    file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.Game.prototype.planSquad','hc.goals','hc.settings');
     file(VIEW_ROOT + 'Render.js').provides('hc.view.render').requires('hc.view');
     file(VIEW_ROOT + 'GameView.js').provides('hc.GameView').requires('hc.view.render','hc.LabeledValue');
     file(VIEW_ROOT + 'SettingsDialog.js').provides('hc.SettingsDialog','hc.SettingsList').requires(

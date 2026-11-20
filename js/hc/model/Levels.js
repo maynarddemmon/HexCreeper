@@ -30,7 +30,8 @@
         and is loaded only when it's played.
         
         A level, once loaded, is its entry in init.json5 merged with its file:
-            {id, name, number, description, attrs:{<setting id>:value, ...}} */
+            {id, name, number, description, attrs:{<setting id>:value, ...}, objectives:[...]}
+        where objectives are its goals and penalties (see goals.fromLevel). */
     pkg.levels = {
         /*  Calls back with init.json5's contents, {defaultLevel, levels:[...]}, or null if it
             couldn't be loaded. It's loaded once. */
@@ -64,7 +65,15 @@
                         callback(null);
                         return;
                     }
-                    const level = {...entry, ...data, id, attrs:data.attrs ?? {}};
+                    let objectives;
+                    try {
+                        objectives = pkg.goals.fromLevel(data);
+                    } catch (err) {
+                        console.error('Bad goals in level', id, err.message);
+                        callback(null);
+                        return;
+                    }
+                    const level = {...entry, ...data, id, attrs:data.attrs ?? {}, objectives};
                     loaded.set(id, level);
                     callback(level);
                 });

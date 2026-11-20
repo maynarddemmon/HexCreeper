@@ -30,6 +30,12 @@
             this.score = 0;                  // score you have to spend
             this.scoreEarned = 0;            // all the score you've earned, spent or not
             this.over = false;
+            this.outcome = null;             // once over: 'won' or 'lost'
+            this.lostBy = null;              // when lost: the index of the objective that lost it, or null for the core
+            this.kills = 0;                  // enemy pieces destroyed
+            this.piecesLost = 0;             // player pieces destroyed
+            this.piecesPlaced = 0;
+            this.objectives = this.levelObjectives.map(() => ({value:false, locked:false})); // state of each of the level's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
@@ -50,6 +56,7 @@
             this.updateQuadrants();
             const rng = this.rngFor('enemies');
             for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy(rng);
+            this.evaluateObjectives();
         }
         
         /*  A generator for one part of the level, seeded from the game's seed and that part's
@@ -71,6 +78,12 @@
                 score:this.score,
                 scoreEarned:this.scoreEarned,
                 over:this.over,
+                outcome:this.outcome,
+                lostBy:this.lostBy,
+                kills:this.kills,
+                piecesLost:this.piecesLost,
+                piecesPlaced:this.piecesPlaced,
+                objectives:this.objectives.map(s => ({...s})),
                 quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
@@ -98,6 +111,12 @@
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && isNum(t.timer) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
+            const objectives = o.level?.objectives ?? [];
+            try {
+                for (const obj of objectives) pkg.goals.compile(obj.expression);
+            } catch (err) {
+                throw new Error('Malformed goal: ' + err.message, {cause:err});
+            }
             
             this.turn = o.turn;
             this.nextId = o.nextId;
@@ -106,6 +125,13 @@
             // Saves from before the total was kept only know what's left to spend.
             this.scoreEarned = Number.isFinite(o.scoreEarned) ? o.scoreEarned : o.score;
             this.over = !!o.over;
+            this.outcome = this.over ? (o.outcome === 'won' ? 'won' : 'lost') : null;
+            this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
+            // Saves from before these were kept start them at 0.
+            this.kills = isNum(o.kills) ? o.kills : 0;
+            this.piecesLost = isNum(o.piecesLost) ? o.piecesLost : 0;
+            this.piecesPlaced = isNum(o.piecesPlaced) ? o.piecesPlaced : 0;
+            this.objectives = objectives.map((obj, i) => ({value:!!o.objectives?.[i]?.value, locked:!!o.objectives?.[i]?.locked}));
             this.effects = [];
             pkg.GRID = pkg.makeGrid(o.quadRadius);
             this.grid = pkg.GRID;
@@ -359,10 +385,17 @@
             if (target.hp > 0) return [];
             const lost = this.group(target);
             const col = target.owner === 'player' ? '--core' : '--enemy';
-            for (const g of lost) this.removePiece(g);
+            for (const g of lost) {
+                this.removePiece(g);
+                if (g.owner === 'player') {
+                    this.piecesLost++;
+                } else {
+                    this.kills++;
+                }
+            }
             for (const g of lost.slice(1)) this.fx(g.x, g.y, '', col, { burst: true, delay: 80 });
             this.fx(target.x, target.y, '', col, { burst: true });
-            if (lost.some(g => g.id === this.playerCoreId)) this.over = true;
+            if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
             return lost;
         }
@@ -619,6 +652,7 @@
             const cost = this.placeCost();
             this.score -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id);
+            this.piecesPlaced++;
             this.fresh.add(p.id);           // a newly placed piece can't move until next turn
             this.recomputeRanks();
             p.hp = p.maxHp;
@@ -711,6 +745,7 @@
         }
         
         afterPlayerAction() {
+            this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length);
@@ -739,6 +774,7 @@
             this.tickTiles();
             if (this.over) return;
             if (this.turn % SPAWN.every === 0) this.spawnWave();
+            this.evaluateObjectives();
         }
         
         // Steps-to-reach-a-player-piece for every cell within `radius`, walking

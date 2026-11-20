@@ -5,5 +5,28 @@
 		"holeMax":{"value":0},
 		"spawnEvery":{"value":2, "pref":true},
 		"visionRadius":{"pref":true}
-	}
+	},
+	"goals":[
+		{
+			"name":"Far Afield",
+			"description":"Take your core 30 steps from where it started.",
+			"expression":"coreDist >= 30",
+			"lockOnSuccess":true
+		},
+		{
+			"name":"Cull",
+			"description":"Destroy 40 enemy pieces.",
+			"expression":"kills >= 40",
+			"lockOnSuccess":true,
+			"required":false
+		}
+	],
+	"penalties":[
+		{
+			"name":"Attrition",
+			"description":"Lose more than 15 pieces.",
+			"expression":"piecesLost > 15",
+			"lockOnSuccess":true
+		}
+	]
 }

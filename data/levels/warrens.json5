@@ -6,5 +6,27 @@
 		"doorMax":{"value":1},
 		"visionRadius":{"value":8},
 		"fog":{"value":true}
-	}
+	},
+	"goals":[
+		{
+			"name":"Explorer",
+			"description":"Visit 12 chambers.",
+			"expression":"quadsVisited >= 12",
+			"lockOnSuccess":true
+		},
+		{
+			"name":"Hold Out",
+			"description":"Last until turn 30.",
+			"expression":"turn >= 30",
+			"lockOnSuccess":true
+		}
+	],
+	"penalties":[
+		{
+			"name":"Overrun",
+			"description":"Let 30 enemy pieces be on the board at once.",
+			"expression":"enemies >= 30",
+			"lockOnSuccess":true
+		}
+	]
 }

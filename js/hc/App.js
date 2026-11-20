@@ -33,7 +33,7 @@
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
-                colorAccent, colorText, colorHeaderBg, colorHeaderText, colorBtn, 
+                colorAccent, colorText, colorTextMuted, colorError, colorHeaderBg, colorHeaderText, colorBtn,
                 fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
@@ -110,13 +110,29 @@
         
         INFO_WIDTH = 300,
         
-        /*  The stats that don't fit in the header: core HP, turn, piece counts, the next wave
-            and the selected piece. */
+        /*  A goal or penalty as a line of the info panel, with its state: [text, colour].
+            Good is a goal met or a penalty avoided; bad and locked can't be put right. */
+        objectiveLine = (o, state) => {
+            const good = pkg.goals.isGood(o, state),
+                status = o.kind === 'goal' ? (good ? 'met' : state.locked ? 'failed' : 'unmet') : (good ? 'avoided' : state.locked ? 'failed' : 'incurred');
+            let text = o.kind === 'goal' ? o.name : i18n('objective-penalty', o.name);
+            if (!o.required) text = i18n('objective-optional', text);
+            if (state.locked) text = i18n('objective-locked', text);
+            return [
+                i18n('objective-' + o.kind + '-' + status) + ' ' + text,
+                good ? colorText : state.locked || o.kind === 'penalty' ? colorError : colorTextMuted
+            ];
+        },
+        
+        /*  The stats that don't fit in the header: the level and seed, core HP, the selected
+            piece, and the level's goals and penalties with how each stands. */
         InfoPanel = new JSClass('InfoPanel', View, {
             initNode: function(parent, attrs) {
                 const self = this;
                 attrs.width ??= INFO_WIDTH;
                 self.callSuper(parent, attrs);
+                
+                self.getIDS().pointerEvents = 'none'; // Let clicks go through to the map.
                 
                 const row = (key, valueColor=colorText) => new LabeledValue(self, {
                     label:i18n(key), fontSize:fontSizeMedium, valueTextColor:valueColor,
@@ -128,6 +144,8 @@
                 const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
                 self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
                 self.selected = row('info-selected');
+                self.goalsHeader = new PlainText(self, {x:padding, text:i18n('info-goals'), fontSize:fontSizeMedium, textColor:colorTextMuted});
+                self.goalRows = [];
                 
                 new M.SpacedLayout(self, {axis:'y', inset:padding/2, spacing, outset:padding/2, collapseParent:true});
             },
@@ -149,6 +167,23 @@
                 } else {
                     self.selected.update(i18n('info-none'));
                 }
+                
+                // A row for each of the level's objectives, made again when the level changes.
+                const list = game.levelObjectives;
+                if (self._rowsFor !== list) {
+                    self._rowsFor = list;
+                    for (const r of self.goalRows) r.destroy();
+                    self.goalRows = list.map(() => new PlainText(self, {
+                        x:padding, width:INFO_WIDTH - 2*padding, fontSize:fontSizeMedium, whiteSpace:'nowrap'
+                    }));
+                    self.goalsHeader.setVisible(list.length > 0);
+                }
+                list.forEach((o, i) => {
+                    const [text, color] = objectiveLine(o, game.objectives[i]);
+                    self.goalRows[i].setText(text);
+                    self.goalRows[i].setTextColor(color);
+                    self.goalRows[i].setTooltip(o.description);
+                });
             }
         });
     
@@ -363,16 +398,30 @@
             
             if (game.over && !gameOverShown) {
                 gameOverShown = true;
+                // Use a timeout to give any animations or other gameplay effects a chance to
+                // finish. It's a more appealing UX this way.
                 setTimeout(() => {
-                    // With a save, closing loads it instead.
-                    const hasSave = persistenceMgr.hasSave();
-                    openConfirmMsgDialog(
-                        i18n('dlg-game-over-title'),
-                        i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
-                        () => {appView.briefNewGame();},
-                        hasSave ? () => {appView.loadSave();} : null,
-                        i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
-                    );
+                    if (game.outcome === 'won') {
+                        openConfirmMsgDialog(
+                            i18n('dlg-won-title'),
+                            i18n('dlg-won-msg', game.level.name, game.turn, game.scoreEarned),
+                            () => {appView.briefNewGame();},
+                            () => {appView.openLevels();},
+                            i18n('btn-play-again'), i18n('btn-levels')
+                        );
+                    } else {
+                        // Lost, to the core being destroyed or to a goal or penalty. With a
+                        // save, closing loads it instead.
+                        const hasSave = persistenceMgr.hasSave(),
+                            by = game.levelObjectives[game.lostBy];
+                        openConfirmMsgDialog(
+                            i18n(by ? 'dlg-lost-title' : 'dlg-game-over-title'),
+                            by ? i18n('dlg-lost-' + by.kind + '-msg', by.name, game.scoreEarned, game.turn) : i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
+                            () => {appView.briefNewGame();},
+                            hasSave ? () => {appView.loadSave();} : null,
+                            i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
+                        );
+                    }
                 }, 500);
             }
         },
@@ -452,7 +501,7 @@
                         seed:Number.isInteger(level.seed) ? level.seed : pkg.randomSeed(),
                         underway:!game.over && game.turn > 1,
                         onStart: seed => {
-                            game.level = {id, name:level.name, attrs};
+                            game.level = {id, name:level.name, attrs, objectives:level.objectives};
                             game.seed = seed;
                             appView.newGame();
                             callback?.();

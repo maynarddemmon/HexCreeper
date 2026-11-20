@@ -22,8 +22,8 @@
             return /^\d{1,9}$/.test(s) ? Number(s) : null;
         };
     
-    /*  Shown before a level starts: its description, the settings it shows (so they can be
-        set first) and the seed its map is made from, filled in with the level's seed or a
+    /*  Shown before a level starts: its description, its goals and penalties, the settings
+        it shows (so they can be set first) and the seed its map is made from, filled in with the level's seed or a
         random one. Start calls onStart(seed). Cancel (or closing it) calls onCancel. When
         a game is under way, a note says starting will end it. */
     pkg.LevelBrief = new JS.Class('LevelBrief', pkg.ConfirmDialog, {
@@ -43,6 +43,11 @@
             
             self._description = new Text(container, {...textAttrs, fontSize:fontSizeMedium, textColor:colorText});
             self._warning = new Text(container, {...textAttrs, text:i18n('brief-abandons'), fontSize:fontSizeSmall, textColor:colorError, fontFamily:fontFamilyMono});
+            
+            // Goals and penalties: a name and description for each, made in show. //
+            self._goalsHeader = new Text(container, {...textAttrs, fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono});
+            self._goals = new WideView(container);
+            new M.SpacedLayout(self._goals, {axis:'y', spacing:padding/2, collapseParent:true});
             
             self._settingsHeader = new Text(container, {...textAttrs, text:i18n('brief-settings'), fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono});
             self._list = new pkg.SettingsList(container);
@@ -81,6 +86,19 @@
             self._description.setText(level.description ?? '');
             self._description.setVisible(!!level.description);
             self._warning.setVisible(!!underway);
+            
+            const objectives = level.objectives ?? [],
+                textAttrs = {x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal'};
+            self._goalsHeader.setText(i18n(objectives.length ? 'brief-goals' : 'brief-no-goals'));
+            for (const view of [...self._goals.getSubviews()]) view.destroy();
+            for (const o of objectives) {
+                let label = o.kind === 'goal' ? o.name : i18n('objective-penalty', o.name);
+                if (!o.required) label = i18n('objective-optional', label);
+                new Text(self._goals, {...textAttrs, text:label, fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
+                if (o.description) new Text(self._goals, {...textAttrs, text:o.description, fontSize:fontSizeSmall, textColor:colorTextMuted});
+            }
+            self._goals.setVisible(objectives.length > 0);
+            
             const any = self._list.refresh();
             self._settingsHeader.setVisible(any);
             self._seedInput.setValue(String(seed));
