@@ -113,11 +113,15 @@
             ctx.beginPath(); addCellPath(t.x, t.y, 1);
             ctx.fillStyle = bg; ctx.fill();
             ctx.fillStyle = ink;
-            const arm = s * 0.22 * k,
-                th = Math.max(2, s * 0.1 * k);
+            const arm = s * 0.22 * k;
             if (heal) {
-                ctx.fillRect(cx - th / 2, cy - arm, th, arm * 2);
-                ctx.fillRect(cx - arm, cy - th / 2, arm * 2, th);
+                // A heart: two lobes meeting at a point below.
+                const w = arm * 1.05;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + w * 0.95);
+                ctx.bezierCurveTo(cx - w * 1.45, cy + w * 0.1, cx - w * 0.95, cy - w * 1.1, cx, cy - w * 0.35);
+                ctx.bezierCurveTo(cx + w * 0.95, cy - w * 1.1, cx + w * 1.45, cy + w * 0.1, cx, cy + w * 0.95);
+                ctx.fill();
                 if (s >= 22) { // current value in the corner
                     const [lx, ly] = HEAL_LABEL_OFFSET;
                     ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
@@ -125,13 +129,16 @@
                     ctx.fillText(String(game.healValue(t.x, t.y)), cx + s * lx, cy + s * ly);
                 }
             } else {
-                // Harm: a spiky X inside a smaller outline
-                ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
-                ctx.fillRect(-th / 2, -arm, th, arm * 2);
-                ctx.fillRect(-arm, -th / 2, arm * 2, th);
-                ctx.restore();
-                ctx.beginPath(); addCellPath(t.x, t.y, 0, 0.64);
-                ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, s * 0.03); ctx.stroke();
+                // Harm: a drop of blood, pointed at the top and round below.
+                const r = arm * 0.68,
+                    by = cy + arm * 0.3,
+                    tip = cy - arm * 1.1;
+                ctx.beginPath();
+                ctx.moveTo(cx, tip);
+                ctx.bezierCurveTo(cx + r * 0.3, by - r * 1.5, cx + r, by - r * 0.85, cx + r, by);
+                ctx.arc(cx, by, r, 0, Math.PI);
+                ctx.bezierCurveTo(cx - r, by - r * 0.85, cx - r * 0.3, by - r * 1.5, cx, tip);
+                ctx.fill();
             }
         },
         
@@ -269,9 +276,7 @@
             // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
             if (hoverMove) for (const [, x, y] of hoverMove.moves) {
                 const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
-                if (!kind) continue;
-                fillCell(x, y, '--' + kind + '-hover');
-                strokeCell(x, y, '--' + kind, Math.max(2, s * 0.06), 2);
+                if (kind) fillCell(x, y, '--' + kind + '-hover');
             }
             // Show every enemy a group attack would hit
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
