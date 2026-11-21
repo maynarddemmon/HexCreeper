@@ -174,3 +174,20 @@ test('nearing the edge of the board pans it by one hex; elsewhere it stays put',
     expect(await page.evaluate(() => hc.view.camTarget()[0])).toBe(start + 1); // panning there...
     await expect.poll(() => page.evaluate(() => hc.view.cam.x)).toBe(start + 1); // ...and there
 });
+
+test('the selection stays on a piece after it moves', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        g.score = 100;
+        g.playerPlace(1, 0, core);
+        g.playerPlace(-1, 0, core);
+        g.playerWait();
+        const a = g.pieceAt(1, 0);
+        g.selectedId = a.id;
+        g.playerAct(a, 2, 0);
+        return [g.selectedId === a.id, g.canMove(a), g.turn];
+    });
+    expect(r).toEqual([true, false, 2]); // a can't move again, but stays selected
+});

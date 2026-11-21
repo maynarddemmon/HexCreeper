@@ -23,11 +23,9 @@
                 onPick = attrs.onPick;
             delete attrs.items;
             delete attrs.onPick;
-            attrs.width = MENU_WIDTH + 2*padding;
+            attrs.width = MENU_WIDTH;
             attrs.bgColor = colorPanel;
-            attrs.border = [1, 'solid', colorTextMuted];
             attrs.roundedCorners = cornerRadius;
-            attrs.boxShadow = [0, 4, 12, 0, '#0008'];
             attrs.visible = false;
             
             self.callSuper(parent, attrs);
