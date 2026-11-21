@@ -84,11 +84,23 @@ test('the turn doesn\'t end by itself while a recover could still be used', asyn
 test('Recover in the menu (or R) recovers the selected piece; it\'s disabled when it can\'t be', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await setUp(page, 2, 10);
+    // A real rank-2 swarm (two pieces linked to the core), so no recomputing of ranks can
+    // take its second move away.
+    await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        g.score = 100;
+        g.playerPlace(-1, 0, core);
+        g.playerPlace(0, -1, core);
+        g.playerWait();
+        g.score = 10;
+        g.selectedId = core.id;
+    });
+    expect(await page.evaluate(() => [hc.app.game.getPlayerCore().rank, hc.app.game.moveLimit()])).toEqual([2, 2]);
     await openMenu(page);
     const recover = menuItem(page, 'Recover · 2');
     await expect(recover).toHaveClass(/\bdisabled\b/);       // hasn't moved
-    await page.keyboard.press('Escape');
+    await openMenu(page);                                     // closes it
+    await expect(recover).toHaveCount(0);
     await move(page, 1, 0);
     await openMenu(page);
     await expect(recover).not.toHaveClass(/\bdisabled\b/);
