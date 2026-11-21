@@ -97,7 +97,7 @@
             refresh: function() {
                 const select = this.select,
                     options = this.def.options();
-                if (select.getOptions().length !== options.length) select.setOptions(options);
+                if (select.getOptions().map(o => o.value).join('|') !== options.map(o => o.value).join('|')) select.setOptions(options);
                 select.getIDE().value = settings.get(this.def.id);
             },
             

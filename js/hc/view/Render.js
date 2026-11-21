@@ -22,10 +22,16 @@
         
         drawTile = (t, now) => {
             if (t.kind === TILE_TYPE_SOLID) {
-                fillCell(t.x, t.y, '--solid');
-                strokeCell(t.x, t.y, css('--solid-edge'), Math.max(1, cam.size * 0.03), 1);
+                // In its subtype's colours, if it has them.
+                const solid = pkg.solids.get(t.subtype),
+                    color = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback);
+                ctx.beginPath();
+                addCellPath(t.x, t.y, 1);
+                ctx.fillStyle = color(solid?.fillColor, '--solid');
+                ctx.fill();
+                strokeCell(t.x, t.y, color(solid?.borderColor, '--solid-edge'), Math.max(1, cam.size * 0.03), 1);
                 // Once damaged, a bar shows how much it has left.
-                const maxHp = pkg.solids.get(t.subtype)?.hp ?? t.hp;
+                const maxHp = solid?.hp ?? t.hp;
                 if (t.hp < maxHp && cam.size >= 22) {
                     const s = cam.size,
                         [cx, cy] = cellCenter(t.x, t.y),

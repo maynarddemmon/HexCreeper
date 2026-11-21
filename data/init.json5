@@ -41,17 +41,19 @@
 	},
 	
 	// Kinds of solid tile: what each is made of ("composition", a material above) and its
-	// hit points. Settings (and so levels) choose which kinds walls and clumps are made of.
+	// hit points, and optionally the colours it's drawn in ("fillColor" and "borderColor":
+	// any CSS colour, or a --variable from index.html); without them it's the usual grey.
+	// Settings (and so levels) choose which kinds walls and clumps are made of.
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
 		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12},
 		"wall_of_stone":   {"name":"Stone wall",       "composition":"basalt",    "hp":12},
-		"sandstone_wall":  {"name":"Sandstone wall",   "composition":"sandstone", "hp":20},
-		"wooden_barricade":{"name":"Wooden barricade", "composition":"pinewood",  "hp":8},
-		"wall_of_iron":    {"name":"Wall of iron",     "composition":"iron",      "hp":15},
-		"wall_of fungus":  {"name":"Wall of fungus",   "composition":"fungus",    "hp":3},
-		"wall_of_flesh":   {"name":"Wall of flesh",    "composition":"flesh",     "hp":6},
-		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4}
+		"sandstone_wall":  {"name":"Sandstone wall",   "composition":"sandstone", "hp":20, "fillColor":"#b49870", "borderColor":"#c9ae86"},
+		"wooden_barricade":{"name":"Wooden barricade", "composition":"pinewood",  "hp":8,  "fillColor":"#7a5a3c", "borderColor":"#92704f"},
+		"wall_of_iron":    {"name":"Wall of iron",     "composition":"iron",      "hp":15, "fillColor":"#5c6168", "borderColor":"#7c838c"},
+		"wall_of fungus":  {"name":"Wall of fungus",   "composition":"fungus",    "hp":3,  "fillColor":"#6e5c7e", "borderColor":"#8a76a0"},
+		"wall_of_flesh":   {"name":"Wall of flesh",    "composition":"flesh",     "hp":6,  "fillColor":"#9c5058", "borderColor":"#b6666f"},
+		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447"}
 	},
 	
 	// Every level, in the order the Levels dialog lists them, with what a list of levels
