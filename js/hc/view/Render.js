@@ -11,7 +11,7 @@
         
         {
             cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK},
-            TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
+            TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
             PIECE_TYPES
         } = pkg,
         
@@ -58,6 +58,29 @@
                     fade.addColorStop(0.8, css('--hole'));
                     ctx.strokeStyle = fade;
                     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx, cy); ctx.stroke();
+                }
+                return;
+            }
+            
+            if (t.kind === TILE_TYPE_LOOT) {
+                // Gold, with a coin, and its score in the corner.
+                const s = cam.size,
+                    [cx, cy] = cellCenter(t.x, t.y),
+                    r = s * 0.17;
+                ctx.beginPath(); addCellPath(t.x, t.y, 1);
+                ctx.fillStyle = css('--loot-bg'); ctx.fill();
+                strokeCell(t.x, t.y, css('--loot'), Math.max(1, s * 0.03), 1);
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = css('--loot'); ctx.fill();
+                ctx.lineWidth = Math.max(1, s * 0.035);
+                ctx.strokeStyle = css('--loot-ink');
+                ctx.beginPath(); ctx.arc(cx, cy, r * 0.68, 0, Math.PI * 2); ctx.stroke();
+                if (s >= 22) {
+                    const [lx, ly] = HEAL_LABEL_OFFSET;
+                    ctx.fillStyle = css('--loot');
+                    ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
+                    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+                    ctx.fillText(String(t.value), cx + s * lx, cy + s * ly);
                 }
                 return;
             }
@@ -244,13 +267,13 @@
                 if (isHover && !m.attack) { hoverMove = m; if (group.length > 1) ghost = { group, dx: m.dx, dy: m.dy }; }
                 if (isHover && m.attack) hoverHits = m.hits;
             }
-            // Where the hovered move lands: harm cells go red, heal cells bright green
+            // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
             if (hoverMove) for (const g of group) {
                 const x = g.x + hoverMove.dx, y = g.y + hoverMove.dy;
-                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : null;
+                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
                 if (!kind) continue;
-                fillCell(x, y, kind === TILE_TYPE_HARM ? '--harm-hover' : '--heal-hover');
-                strokeCell(x, y, kind === TILE_TYPE_HARM ? '--harm' : '--heal', Math.max(2, s * 0.06), 2);
+                fillCell(x, y, '--' + kind + '-hover');
+                strokeCell(x, y, '--' + kind, Math.max(2, s * 0.06), 2);
             }
             // Show every enemy a group attack would hit
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');

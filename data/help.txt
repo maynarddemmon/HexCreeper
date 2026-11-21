@@ -23,6 +23,7 @@ Enemies arrive in waves of linked squads, and waves grow with your rank. A squad
 
 <span style="font-size:16px;">TILES</span>
 - Green + heals the piece that steps on it; spare healing flows along links (up first, then down), and any left over becomes score. Its value, shown on the tile, is higher near unexplored quadrants.
+- Gold coins are loot: step on one (or place a piece on it) to take its score, shown on the tile.
 - Red × deals damage to the first piece that moves onto it, then it's gone. Enemies walk around them.
 - The trail of gold dots is the path your core has taken; it's darker where you've gone that way more than once.
 - Grey hexes are solid: nothing can move onto them or see past them. Point at one to see what it's made of. A piece whose rank is more than a solid's DR can attack it, doing its rank less the DR in damage, and break through.

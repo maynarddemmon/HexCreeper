@@ -8,6 +8,7 @@ test('solids and holes go out to the vision radius; heal and harm tiles only 1 q
         // from the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
         // neighbours.
         hc.cfg.QUAD.radius = 3;
+        hc.cfg.TILES.lootChance = 0; // or some heal tiles are loot
         hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
             inReach = tiles.every(t => {

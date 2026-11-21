@@ -57,6 +57,7 @@
         TILE_TYPE_HARM:'harm',
         TILE_TYPE_HOLE:'hole',
         TILE_TYPE_SOLID:'solid',
+        TILE_TYPE_LOOT:'loot',
         
         cfg:{
             // Where help.txt is loaded from.
@@ -150,6 +151,9 @@
             TILES:{
                 healPerQuad:1,
                 harmPerQuad:1,
+                lootChance:10, // % chance a heal tile is a loot tile instead
+                lootMin:10, // score for taking a loot tile, rolled when it's made
+                lootMax:30,
                 wallChance:50, // % chance a border between quadrants is a wall
                 wallHoleChance:25, // % of walls made of holes rather than solid tiles
                 doorMin:1, // cells left open in the middle of a wall

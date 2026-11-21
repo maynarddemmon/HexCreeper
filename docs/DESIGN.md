@@ -75,6 +75,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Each quadrant gets **1 heal tile and 1 harm tile** *(settings)* at random empty cells, **0–3 solid tiles** *(settings)* in one connected clump (the first on a random free cell, each next one on a free cell of the quadrant touching the clump), and then **0–3 hole tiles** *(settings)* in a clump the same way. Holes may land on solid tiles and replace them, so they can break up a solid clump.
 - Every tile starts with a **countdown** (random 2–8 turns), shown as a number in a dashed outline. It becomes active at 0. **If a piece is standing on it when it activates**, it takes effect at once.
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
+- **Loot tile** (gold, a coin, 2026-11-20): a heal tile is a loot tile instead at **10%** *(setting)*. It's active at once (no countdown) and worth **10–30 score** *(settings, rolled from the seed when its quadrant is made, from its own generator so the other tiles don't change, and shown on the tile)*. A player piece that lands on it, or is placed on it, takes it: the score is earned and the tile is gone. Enemies leave it alone.
 - **Harm tile** (red ×): 1 damage to a piece that moves onto it or is standing on it when it activates, and then it's **gone**. (It used to stay, and clear once every neighbouring quadrant had been visited; it was what forced the swarm to change shape. Solid tiles do that better now, so as of 2026-11-19 harm tiles are one-shot.)
 - Enemies never step onto active harm tiles, and they path around them.
 - **Solid tile** (dark grey hex): no piece can move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown).
@@ -131,6 +132,8 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 | Quadrant radius (new game) | 5 |
 | Heal tiles per quadrant | 1 |
 | Harm tiles per quadrant | 1 |
+| Chance a heal tile is loot instead | 10% |
+| Loot score | 10–30 |
 | Chance a quadrant border is a wall | 50% |
 | Walls made of holes | 25% |
 | Door width | 1–2 |

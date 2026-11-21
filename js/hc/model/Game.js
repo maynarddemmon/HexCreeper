@@ -8,7 +8,7 @@
         cfg:{
             WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
         },
-        TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
+        TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
         hexDist, PIECE_TYPES
     } = pkg;
     
@@ -42,7 +42,7 @@
             this.effects = [];               // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
-            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole", timer}
+            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", timer}
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
             this.borders = new Map();        // border key (see borderKey) -> its wall {door, hole, start}, or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
@@ -434,6 +434,20 @@
                 n = eaters.length;
             for (const g of eaters) this.consumeHeal(g, g.x, g.y, n);
             if (n > 1) this.fx(eaters[0].x, eaters[0].y, `${n}× heal combo!`, '--heal', {delay:260});
+            for (const g of pieces) {
+                if (this.pieces.has(g.id)) this.takeLoot(g);
+            }
+        },
+        
+        // A player piece on a loot tile takes it: its score is earned and it's gone.
+        // Enemies leave loot where it is.
+        takeLoot: function(piece) {
+            const t = piece.owner === 'player' ? this.tileAt(piece.x, piece.y, TILE_TYPE_LOOT) : null;
+            if (t) {
+                this.tiles.delete(this.key(t.x, t.y));
+                this.earn(t.value);
+                this.fx(t.x, t.y, `+${t.value}`, '--loot', {});
+            }
         },
         
         // Damage a piece; returns the list of pieces destroyed (empty if it survived).
@@ -518,15 +532,23 @@
             const k = qx + ',' + qy;
             if (this.tiledQuads.has(k)) return;
             this.tiledQuads.add(k);
+            // A loot tile replaces a heal tile at lootChance. It's active at once, and its
+            // score is rolled now. (Loot has its own generator, so the rest of the
+            // quadrant's tiles come out as they would without it.)
             const cells = pkg.GRID.chunkCells(qx, qy),
                 rng = this.rngFor('tiles', k),
+                lootRng = this.rngFor('loot', k),
+                lootLo = Math.min(TILES.lootMin, TILES.lootMax),
+                lootHi = Math.max(TILES.lootMin, TILES.lootMax),
                 place = kind => {
+                    const loot = kind === TILE_TYPE_HEAL && lootRng() * 100 < TILES.lootChance,
+                        value = lootLo + Math.floor(lootRng() * (lootHi - lootLo + 1));
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = this.key(x, y);
                         if (this.tiles.has(kk) || this.pieceAt(x, y)) continue;
                         const timer = TILES.timerMin + Math.floor(rng() * (TILES.timerMax - TILES.timerMin + 1));
-                        this.tiles.set(kk, { x, y, kind, timer });
+                        this.tiles.set(kk, loot ? {x, y, kind:TILE_TYPE_LOOT, timer:0, value} : { x, y, kind, timer });
                         return;
                     }
                 };
@@ -767,6 +789,7 @@
             p.hp = p.maxHp;
             this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
             if (this.tileAt(x, y, TILE_TYPE_HEAL)) this.consumeHeal(p, x, y, 1);
+            this.takeLoot(p);
             this.updateQuadrants();
             this.afterPlayerAction();
             return true;
