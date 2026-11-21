@@ -196,6 +196,65 @@
             return after;
         },
         
+        /*  Whether pieces a and b (ids), next to each other and on the same side, can swap
+            cells on view: every link either has ends in range after, or got shorter. What's
+            linked to them stays where it is. */
+        swapOk: function(view, a, b) {
+            const {posOf, kidsOf, parentOf} = view,
+                range = pkg.cfg.LINK.range,
+                pa = posOf(a), pb = posOf(b),
+                after = id => id === a ? pb : id === b ? pa : posOf(id);
+            if (dist(pa, pb) !== 1) return false;
+            for (const id of [a, b]) {
+                const par = parentOf(id);
+                for (const other of [...kidsOf(id), ...(par != null ? [par] : [])]) {
+                    const d = dist(after(id), after(other));
+                    if (d > range && d >= dist(posOf(id), posOf(other))) return false;
+                }
+            }
+            return true;
+        },
+        
+        /*  Swaps two pieces' cells (each lands on the other's tiles). */
+        swapPieces: function(a, b) {
+            const [ax, ay, bx, by] = [a.x, a.y, b.x, b.y];
+            a.x = bx;
+            a.y = by;
+            b.x = ax;
+            b.y = ay;
+            this.board.set(this.key(a.x, a.y), a.id);
+            this.board.set(this.key(b.x, b.y), b.id);
+            const core = [a, b].find(p => p.id === this.playerCoreId);
+            if (core) this.corePath.push([core.x, core.y]);
+            this.landOnTiles([a, b]);
+            if (a.owner === 'player') this.updateQuadrants();
+        },
+        
+        // ---- Swap ----
+        // Two of your pieces next to each other can swap cells. It uses a move, and both
+        // pieces are done for the turn. Enemies can swap too (see planSquad).
+        swapTargets: function(p) {
+            let out = [];
+            if (!this.over && p?.owner === 'player' && this.canMove(p)) {
+                const view = this.boardView();
+                out = this.piecesOf('player').filter(q => q !== p && this.canMove(q) && this.swapOk(view, p.id, q.id));
+            }
+            return out;
+        },
+        canSwap: function(p) {return this.swapTargets(p).length > 0;},
+        playerSwap: function(p, q) {
+            let done = false;
+            if (this.swapTargets(p).includes(q)) {
+                this.swapPieces(p, q);
+                this.useMove(p);
+                this.acted.add(q.id);
+                this.fx(p.x, p.y, 'swap', '--place-ink', {});
+                this.afterPlayerAction();
+                done = true;
+            }
+            return done;
+        },
+        
         /*  A view of the board as it is, for resolveStep. With avoidHarm, active harm
             tiles count as closed. */
         boardView: function(avoidHarm = false) {

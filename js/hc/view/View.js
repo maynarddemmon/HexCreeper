@@ -107,6 +107,7 @@
             healMode:false, // choosing which piece a paid heal starts from
             recoverMode:false, // choosing which piece to recover
             attachMode:false, // choosing which piece to attach the selected piece to
+            swapMode:false, // choosing which piece the selected piece swaps with
             rafPending:false,
             css,
             draw,

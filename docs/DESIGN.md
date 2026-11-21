@@ -45,6 +45,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
   - Otherwise every member must land on an empty cell or one vacated by the group.
 - Link range: a linked piece must end within 3 steps of its parent *(setting)*. The root is unrestricted.
 - When a piece is destroyed, every descendant is destroyed too (both sides).
+- **Swap** (S, 2026-11-21): two pieces of the same side next to each other swap cells (any two, linked or not). Their links stay with them, and nothing else moves; it's allowed only if every link of either ends in range, or got shorter. It uses one move, and both pieces are done for the turn. Each lands on the other's cell's tiles. Enemies can swap too: the planner considers swapping any two squad pieces that haven't acted, though its scoring rarely has a reason to (it doesn't value which piece is where).
 - **Detach and attach** (X and L, 2026-11-20): a piece other than the core can be **detached** from its parent, however far apart they are, keeping what's linked below it; a piece with no parent (not the core) can be **attached** to any adjacent piece of yours, in the core's group or another detached one, but not one linked below it (no loops). Either is that piece's action for the turn and uses a move (`useMove`); ranks are recomputed. A detached group acts like any other: it moves and attacks, carrying what's below it, and isn't held by link range. Detached pieces still count for the swarm's rank (the highest rank of any piece), so detaching lowers the moves a turn only when it lowers some piece's rank, e.g. the parent's. Enemies can't detach or attach. Later piece types may not allow either.
 
 ## Enemy pressure (tied to player rank)
@@ -165,6 +166,7 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 - Legal moves are highlighted; attacks in indigo. Hovering a move shows a faint copy of the whole group at its destination, and marks landing cells that are active harm tiles in strong red and active heal tiles in bright green. Hovering an attack highlights every enemy that would be hit.
 - **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
+- **Swap mode** (S): with a piece selected, the pieces it can swap with get a ring; click one to swap.
 - **Attach mode** (L): with a piece selected, the pieces it can attach to get a ring; click one to attach it. **Detach** (X) acts at once on the selected piece. The info panel shows a piece with no parent as "Detached".
 - **Recover mode** (R): every piece that can be recovered gets a cyan ring (`--recover`); click one to recover it.
 - A dashed outline shows the link range around the selected piece's parent.

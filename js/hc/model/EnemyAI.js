@@ -45,7 +45,13 @@
                             for (const a of this.planSquad(squad, budget, field, caution)) {
                                 if (this.over) return;
                                 const pc = this.pieces.get(a.id);
-                                if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
+                                if (a.swap) {
+                                    const other = this.pieces.get(a.swap);
+                                    if (!pc || !other || !this.swapOk(this.boardView(), pc.id, other.id)) break;
+                                    this.swapPieces(pc, other);
+                                } else if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) {
+                                    break;
+                                }
                             }
                             const hit = this.piecesOf('player').length < nBefore || this.piecesOf('player').reduce((a, q) => a + q.hp, 0) < hpBefore;
                             if (this.pieces.has(root.id)) root.idle = hit ? 0 : idle + 1;
@@ -187,6 +193,23 @@
                     for (const id of ids) {
                         if (st.acted.has(id)) continue;
                         const pc = byId.get(id);
+                        // Swapping with a squad piece next to it that hasn't acted: both are
+                        // then done.
+                        for (const other of ids) {
+                            if (other > id && !st.acted.has(other) && this.swapOk(view, id, other)) {
+                                const pos = new Map(st.pos);
+                                pos.set(id, st.pos.get(other));
+                                pos.set(other, st.pos.get(id));
+                                out.push({
+                                    pos,
+                                    acted:new Set(st.acted).add(id).add(other),
+                                    dmg:st.dmg,
+                                    dead:st.dead,
+                                    gain:st.gain,
+                                    actions:[...st.actions, {id, swap:other}]
+                                });
+                            }
+                        }
                         for (const [dx, dy] of PIECE_TYPES[pc.type].steps(pc)) {
                             const seen = new Set();
                             for (const mode of PLAN_MODES) {

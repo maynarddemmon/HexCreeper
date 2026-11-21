@@ -17,6 +17,7 @@
         detachBtn,
         modeBtn,
         attachBtn,
+        swapBtn,
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -82,6 +83,7 @@
             V.healMode = false;
             V.recoverMode = false;
             V.attachMode = false;
+            V.swapMode = false;
             centerOn(false);
             draw();
         },
@@ -100,6 +102,7 @@
             V.healMode = false;
             V.recoverMode = false;
             V.attachMode = false;
+            V.swapMode = false;
             game.playerWait();
             gameView.afterTurn();
         },
@@ -109,6 +112,7 @@
             V.healMode = false;
             V.recoverMode = false;
             V.attachMode = false;
+            V.swapMode = false;
             draw();
         },
         
@@ -258,6 +262,8 @@
                         status = i18n('status-recover');
                     } else if (V.attachMode) {
                         status = i18n('status-attach');
+                    } else if (V.swapMode) {
+                        status = i18n('status-swap');
                     } else if (V.hover) {
                         // A solid under the pointer: what it is and how tough.
                         const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
@@ -374,6 +380,7 @@
                         V.healMode = false;
                         V.recoverMode = false;
                         V.attachMode = false;
+                        V.swapMode = false;
                         if (V.placeMode) {
                             V.placeMode = null;
                         } else if (game.canAffordPlace()) {
@@ -389,6 +396,7 @@
                         V.placeMode = null;
                         V.recoverMode = false;
                         V.attachMode = false;
+                        V.swapMode = false;
                         V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
                         draw();
                     }
@@ -400,6 +408,7 @@
                         V.placeMode = null;
                         V.healMode = false;
                         V.attachMode = false;
+                        V.swapMode = false;
                         V.recoverMode = !V.recoverMode && game.anyRecoverable();
                         draw();
                     }
@@ -423,6 +432,14 @@
                     const on = !V.attachMode && game.canAttach(game.getSelected());
                     cancelModes();
                     V.attachMode = on;
+                    draw();
+                }
+            }]);
+            swapBtn = new ToggleBtn(ftrView, {text:i18n('btn-swap'), fontSize:fontSizeMedium, tooltip:i18n('tip-swap')}, [{
+                doActivated: () => {
+                    const on = !V.swapMode && game.canSwap(game.getSelected());
+                    cancelModes();
+                    V.swapMode = on;
                     draw();
                 }
             }]);
@@ -485,6 +502,8 @@
             detachBtn.setDisabled(!game.canDetach(sel));
             attachBtn.setDisabled(!V.attachMode && !game.canAttach(sel));
             attachBtn.setOn(V.attachMode);
+            swapBtn.setDisabled(!V.swapMode && !game.canSwap(sel));
+            swapBtn.setOn(V.swapMode);
             
             const quickenCost = game.quickenCost();
             quickenBtn.setTextAndFit(i18n('btn-quicken', quickenCost));
@@ -531,6 +550,7 @@
             V.healMode = false;
             V.recoverMode = false;
             V.attachMode = false;
+            V.swapMode = false;
             game.reset();
             centerOn(false);
         },
@@ -676,6 +696,7 @@
                 if (k === 'x') {detachBtn.doActivated(); return;}
                 if (k === 'm') {modeBtn.doActivated(); return;}
                 if (k === 'l') {attachBtn.doActivated(); return;}
+                if (k === 's') {swapBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');
@@ -685,7 +706,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.healMode || V.recoverMode || V.attachMode) return;
+                if (V.placeMode || V.healMode || V.recoverMode || V.attachMode || V.swapMode) return;
                 if (k === '.' || k === 'Numpad5' || k === 'Enter') {
                     e.preventDefault();
                     endTurn();
