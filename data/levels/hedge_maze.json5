@@ -1,0 +1,26 @@
+{
+	"attrs":{
+		"quadRadius":{"value":2},
+		"wallChance":{"value":90},
+		"wallHoleChance":{"value":0},
+		"doorMin":{"value":1},
+		"doorMax":{"value":1},
+		"solidMin":{"value":0},
+		"solidMax":{"value":3},
+		"holeMin":{"value":0},
+		"holeMax":{"value":0},
+		"wallSolid":{"value":"hedge"},
+		"clumpSolid":{"value":"boulder"},
+		"visionRadius":{"value":8},
+		"fog":{"value":true}
+	},
+	"goals":[
+		{
+			"name":"Explorer",
+			"description":"Visit 24 chambers.",
+			"expression":"quadsVisited >= 24",
+			"progress":"{quadsVisited}/24 chambers",
+			"lockOnSuccess":true
+		}
+	]
+}

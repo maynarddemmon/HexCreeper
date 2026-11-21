@@ -309,13 +309,18 @@
                 out = [];
             for (const [dx, dy] of PIECE_TYPES[piece.type].steps(piece)) {
                 const x = piece.x + dx, y = piece.y + dy;
-                if (!this.isOpen(x, y)) continue;
+                if (!this.isOpen(x, y) && !this.canBreak(piece, this.tiles.get(this.key(x, y)))) continue;
                 const occ = this.pieceAt(x, y);
                 if (occ && occ.owner === piece.owner && !ids.has(occ.id)) continue;
                 const hits = [];
                 for (const g of group) {
-                    const t = this.pieceAt(g.x + dx, g.y + dy);
-                    if (t && t.owner !== g.owner) hits.push({ attacker: g, target: t });
+                    const t = this.pieceAt(g.x + dx, g.y + dy),
+                        tile = this.tiles.get(this.key(g.x + dx, g.y + dy));
+                    if (t && t.owner !== g.owner) {
+                        hits.push({attacker:g, target:t});
+                    } else if (this.canBreak(g, tile)) {
+                        hits.push({attacker:g, target:tile, solid:true});
+                    }
                 }
                 if (hits.length) {
                     out.push({x, y, dx, dy, attack:true, hits});
@@ -368,17 +373,25 @@
             const m = this.findMove(piece, x, y);
             if (!m) return false;
             if (m.attack) {
-                let kills = 0, value = 0;
+                let kills = 0, value = 0, broken = 0;
                 for (const h of m.hits) {
-                    if (!this.pieces.has(h.attacker.id) || !this.pieces.has(h.target.id)) continue;
-                    const lost = this.damage(h.target, 1, h.attacker);   // includes pieces linked below the target
-                    for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
+                    if (this.pieces.has(h.attacker.id)) {
+                        if (h.solid) {
+                            if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
+                        } else if (this.pieces.has(h.target.id)) {
+                            const lost = this.damage(h.target, 1, h.attacker);   // includes pieces linked below the target
+                            for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
+                        }
+                    }
                 }
                 if (kills && piece.owner === 'player') {
                     const gain = kills * value;
                     this.earn(gain);
                     this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
-                    if (COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true)) this.moveGroup(piece, m.dx, m.dy);
+                }
+                // Advance into the space cleared, if a piece was destroyed or a solid broken.
+                if ((kills || broken) && piece.owner === 'player' && COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true)) {
+                    this.moveGroup(piece, m.dx, m.dy);
                 }
             } else {
                 this.moveGroup(piece, m.dx, m.dy);
@@ -434,6 +447,31 @@
             if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
             return lost;
+        },
+        
+        /*  Whether a piece can break the tile: only player pieces can attack solids, and only
+            if they'd do damage, i.e. their rank is more than the solid's DR (its material's
+            hardness). A solid of an unknown subtype can't be broken. */
+        canBreak: function(piece, tile) {
+            return piece.owner === 'player' && tile?.kind === TILE_TYPE_SOLID && piece.rank > (pkg.solids.get(tile.subtype)?.dr ?? Infinity);
+        },
+        
+        /*  An attack on a solid tile: it takes the attacker's rank less its DR in damage.
+            Returns whether that broke it, leaving open floor. */
+        damageSolid: function(tile, attacker) {
+            const dmg = attacker.rank - (pkg.solids.get(tile.subtype)?.dr ?? Infinity);
+            let broken = false;
+            if (dmg > 0) {
+                tile.hp -= dmg;
+                this.fx(tile.x, tile.y, `-${dmg}`, '--dmg', {bump:{from:attacker}});
+                if (tile.hp <= 0) {
+                    this.tiles.delete(this.key(tile.x, tile.y));
+                    this._sightKey = null; // it no longer blocks sight
+                    this.fx(tile.x, tile.y, '', '--solid', {burst:true});
+                    broken = true;
+                }
+            }
+            return broken;
         },
         
         // Back-compat helper (single hit, scored as a 1-kill move).
@@ -574,7 +612,7 @@
                 kind = wall.hole ? TILE_TYPE_HOLE : TILE_TYPE_SOLID;
             for (const c of border) {
                 if (!door.has(c) && !this.tiles.has(this.key(c.x, c.y)) && !this.pieceAt(c.x, c.y)) {
-                    this.tiles.set(this.key(c.x, c.y), {x:c.x, y:c.y, kind, timer:0});
+                    this.tiles.set(this.key(c.x, c.y), this.makeTile(c.x, c.y, kind, TILES.wallSolid));
                 }
             }
         },
@@ -583,6 +621,17 @@
         // first on a random free cell, each next one on a free cell touching the clump. A
         // cell is free if no piece is on it and it has no tile, or a tile of a kind in
         // `replaces`. rng picks the cells.
+        /*  A terrain tile, there from the start. A solid is of the given subtype (see
+            Solids.js), with its hit points. */
+        makeTile: function(x, y, kind, subtype) {
+            const tile = {x, y, kind, timer:0};
+            if (kind === TILE_TYPE_SOLID) {
+                tile.subtype = subtype;
+                tile.hp = pkg.solids.get(subtype)?.hp ?? 1;
+            }
+            return tile;
+        },
+        
         placeClump: function(cells, kind, min, max, replaces, rng) {
             const inQuad = new Set(cells.map(c => this.key(c.x, c.y))),
                 free = (x, y) => {
@@ -594,7 +643,7 @@
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
                 const {x, y} = options[Math.floor(rng() * options.length)];
-                this.tiles.set(this.key(x, y), {x, y, kind, timer:0});
+                this.tiles.set(this.key(x, y), this.makeTile(x, y, kind, TILES.clumpSolid));
                 edge.delete(this.key(x, y));
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const nx = x + dx,

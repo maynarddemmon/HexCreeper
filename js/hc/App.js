@@ -243,6 +243,12 @@
                         status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
                     } else if (V.healMode) {
                         status = i18n('status-heal', game.healAmount());
+                    } else if (V.hover) {
+                        // A solid under the pointer: what it is and how tough.
+                        const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
+                            solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
+                            known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
+                        if (solid && known) status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
                     }
                     if (this.text !== status) {
                         this.setText(status);
@@ -258,27 +264,25 @@
             
             game.reset(); // With the stored settings, now they're in effect.
             
-            // Carry on with the saved game, if there is one, or else show the default level's
-            // brief. ready is true once either is done; the level loads asynchronously. Help
-            // follows on a first visit.
+            // Once init.json5 has loaded (it has the materials and solids a game needs), carry on 
+            // with the saved game, if there is one, or else show the default level's brief. ready 
+            // is true once either is done. Help follows on a first visit.
             const whenReady = () => {
                 appView.ready = true;
                 if (!hasSeenHelp()) appView.openHelp();
             };
             appView.ready = false;
             persistenceMgr = new pkg.PersistenceManager(game);
-            if (persistenceMgr.hasSave()) {
-                appView.loadSave();
-                whenReady();
-            } else {
-                levels.loadIndex(index => {
-                    if (index) {
-                        appView.briefLevel(index.defaultLevel, whenReady);
-                    } else {
-                        whenReady();
-                    }
-                });
-            }
+            levels.loadIndex(index => {
+                if (persistenceMgr.hasSave()) {
+                    appView.loadSave();
+                    whenReady();
+                } else if (index) {
+                    appView.briefLevel(index.defaultLevel, whenReady);
+                } else {
+                    whenReady();
+                }
+            });
             updateLastSaved();
             
             V.resize();

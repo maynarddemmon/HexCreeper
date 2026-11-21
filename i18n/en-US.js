@@ -66,6 +66,7 @@ myt.I18N.setDictionary({
 "status-place-cell":"Place piece: choose an empty cell next to your pieces. Esc cancels.",
 "status-place-link":"Place piece: now click the piece to link it to.",
 "status-heal":"Heal: click the piece to heal from ($0 HP, flowing along links). Esc cancels.",
+"status-solid":"$0 ($1) · HP $2/$3 · DR $4",
 
 // Dialogs
 "dlg-help-title":"How to Play",
@@ -150,6 +151,8 @@ myt.I18N.setDictionary({
 "setting-solidMax":"Solid tiles per quadrant (max)",
 "setting-holeMin":"Hole tiles per quadrant (min)",
 "setting-holeMax":"Hole tiles per quadrant (max)",
+"setting-wallSolid":"Walls are made of",
+"setting-clumpSolid":"Solid clumps are made of",
 "setting-timerMin":"Tile countdown min (turns)",
 "setting-timerMax":"Tile countdown max (turns)",
 "setting-harmDamage":"Harm tile damage",

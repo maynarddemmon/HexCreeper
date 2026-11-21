@@ -74,7 +74,9 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - **Heal tile** (green +): value = ⌊unvisited neighbouring quadrants ÷ 2⌋ + 1. Live; shown as a small number on the tile, so it drops as you explore around it. It heals the piece that ate it first, then flows along links, alternating up (nearest damaged ancestor) and down (most damaged child, or the branch with the most missing HP). Unused healing becomes **1 score** per point.
 - **Harm tile** (red ×): 1 damage to a piece that moves onto it or is standing on it when it activates, and then it's **gone**. (It used to stay, and clear once every neighbouring quadrant had been visited; it was what forced the swarm to change shape. Solid tiles do that better now, so as of 2026-11-19 harm tiles are one-shot.)
 - Enemies never step onto active harm tiles, and they path around them.
-- **Solid tile** (dark grey hex): no piece can ever move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown) and never go away.
+- **Solid tile** (dark grey hex): no piece can move onto it or be placed on it, and nothing spawns there; a group can't move if any member would land on one. Solid tiles are there as soon as their quadrant is generated (no countdown).
+- **Solids are made of materials** (2026-11-20, `model/Solids.js`). `data/init.json5` lists `"materials"` (`name`, `hardness`, `density`, `description`; density isn't used yet) and solid subtypes, `"solids"` (`name`, `composition`: a material, `hp`). A subtype's **DR** is its material's hardness; its HP is its own, since that depends on how much material there is. Walls are made of the `wallSolid` subtype and clumps of `clumpSolid` *(settings, so levels choose them)*; each solid tile keeps its `subtype` and its `hp` (saved). Before init.json5 has loaded there are no subtypes, so the App loads it before any game (a saved one too).
+- **Breaking solids:** your pieces (not enemies) can attack a solid like an enemy, by moving into it, but only if their rank is more than its DR. A hit does the attacker's rank less the DR; at 0 HP the solid is gone, leaving open floor, and the attacker advances into it (with `advance` on). In a group move, each piece that would land on a breakable solid hits it. A solid that's too hard just blocks, as before. A damaged solid shows a bar of its HP left, and pointing at a solid says what it is, its material, HP and DR. Solids from saves made before this have no subtype and can't be broken.
 - **Hole tile** (near-black hex with lines fading in from its corners): blocks movement, placing and spawning exactly like a solid tile, but **doesn't block sight**.
 
 ## Fog of war
@@ -131,6 +133,8 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 | Door width | 1–2 |
 | Solid tiles per quadrant | 0–5 |
 | Hole tiles per quadrant | 0–3 |
+| Walls are made of | Stone wall (granite, DR 13, 30 HP) |
+| Solid clumps are made of | Boulder (basalt, DR 8, 12 HP) |
 | Tile countdown min / max (turns) | 2 / 8 |
 | Harm tile damage | 1 |
 | Base rank | 1 |
@@ -186,6 +190,7 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 - `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
 - `model/Game.js`: `hc.Game`, a JS.Class (the getters are methods: `getPlayerCore`, `getSelected`); state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `rngFor`, `updateQuadrants` / `generateTerrain` (→ `borderWall` / `seededBorder`, `placeWall`, `placeClump`) / `generateTiles`, `springHarm`, `tickTiles`, `distanceField`, `waveSize` / `squadCap` / `spawnWave` / `spawnSquad` / `spawnEnemy`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal`, `unvisitedAround` / `healValue` / `consumeHeal` → `applyHeal`.
+- `model/Solids.js`: `hc.solids` (`define`, `get`, `list`, `getMaterial`), the materials and solid subtypes from init.json5.
 - `model/Expr.js`: `hc.expr.compile`, the expression language. `model/Goals.js`: `hc.goals` (`fromLevel`, `compile`, `isGood`, the values and functions) and `hc.Goals`, a JS.Module included in Game: `getLevelObjectives`, `evaluateObjectives` / `endGame`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), in `hc.EnemyAI`, a JS.Module included in Game. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera and its animated pans `panTo` / `stepPan`, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).

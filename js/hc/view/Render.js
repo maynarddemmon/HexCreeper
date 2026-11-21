@@ -24,6 +24,18 @@
             if (t.kind === TILE_TYPE_SOLID) {
                 fillCell(t.x, t.y, '--solid');
                 strokeCell(t.x, t.y, css('--solid-edge'), Math.max(1, cam.size * 0.03), 1);
+                // Once damaged, a bar shows how much it has left.
+                const maxHp = pkg.solids.get(t.subtype)?.hp ?? t.hp;
+                if (t.hp < maxHp && cam.size >= 22) {
+                    const s = cam.size,
+                        [cx, cy] = cellCenter(t.x, t.y),
+                        w = s * 0.56,
+                        h = Math.max(3, s * 0.06);
+                    ctx.fillStyle = css('--grid');
+                    ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+                    ctx.fillStyle = css('--dmg');
+                    ctx.fillRect(cx - w / 2, cy - h / 2, w * Math.max(0, t.hp) / maxHp, h);
+                }
                 return;
             }
             

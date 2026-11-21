@@ -33,14 +33,18 @@
             {id, name, number, description, attrs:{<setting id>:value, ...}, objectives:[...]}
         where objectives are its goals and penalties (see goals.fromLevel). */
     pkg.levels = {
-        /*  Calls back with init.json5's contents, {defaultLevel, levels:[...]}, or null if it
-            couldn't be loaded. It's loaded once. */
+        /*  Calls back with init.json5's contents, {defaultLevel, levels:[...], materials,
+            solids}, or null if it couldn't be loaded. It's loaded once, and its materials
+            and solid subtypes go to pkg.solids. */
         loadIndex: callback => {
             if (index) {
                 callback(index);
             } else {
                 loadJSON5(DATA_BASE_DIR + 'init.json5', data => {
-                    if (data && Array.isArray(data.levels)) index = data;
+                    if (data && Array.isArray(data.levels)) {
+                        index = data;
+                        pkg.solids.define(data.materials, data.solids);
+                    }
                     callback(index);
                 });
             }

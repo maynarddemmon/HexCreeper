@@ -29,6 +29,16 @@
             defaultValue:obj[prop], label:i18n('setting-' + id)
         }),
         
+        // Each choice setting edits obj[prop] too, and holds one of the values options()
+        // gives: [{value, label}]. It's shown as a drop-down list.
+        choice = (id, group, obj, prop, options) => ({
+            id, type:'choice', group, obj, prop, options,
+            defaultValue:obj[prop], label:i18n('setting-' + id)
+        }),
+        
+        // The solid subtypes, as choices. They're known once init.json5 has loaded.
+        solidOptions = () => pkg.solids.list().map(s => ({value:s.id, label:s.name})),
+        
         /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
             setting here is enough to make it appear there (in a level that shows it). */
         DEFINITIONS = [
@@ -68,6 +78,8 @@
         num('solidMax',    GROUP_TILES, TILES,    'solidMax', 0, 20),
         num('holeMin',     GROUP_TILES, TILES,    'holeMin', 0, 20),
         num('holeMax',     GROUP_TILES, TILES,    'holeMax', 0, 20),
+        choice('wallSolid', GROUP_TILES, TILES,   'wallSolid', solidOptions),
+        choice('clumpSolid', GROUP_TILES, TILES,  'clumpSolid', solidOptions),
         num('timerMin',    GROUP_TILES, TILES,    'timerMin', 0, 50),
         num('timerMax',    GROUP_TILES, TILES,    'timerMax', 0, 50),
         num('harmDamage',  GROUP_TILES, TILES,    'harmDamage', 0, 10),
@@ -84,10 +96,15 @@
         
         DEFINITIONS_BY_ID = new Map(DEFINITIONS.map(def => [def.id, def])),
         
-        /*  A value the setting can hold, or undefined: booleans must be booleans, and
-            numbers are rounded and clamped. */
+        /*  A value the setting can hold, or undefined: booleans must be booleans, choices
+            one of the options (any text, before the options are known), and numbers are
+            rounded and clamped. */
         normalize = (def, value) => {
             if (def.type === 'boolean') return typeof value === 'boolean' ? value : undefined;
+            if (def.type === 'choice') {
+                const options = def.options();
+                return typeof value === 'string' && (!options.length || options.some(o => o.value === value)) ? value : undefined;
+            }
             const n = Math.round(Number(value));
             return Number.isFinite(n) ? Math.min(def.max, Math.max(def.min, n)) : undefined;
         },

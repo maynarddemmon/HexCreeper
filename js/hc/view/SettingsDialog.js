@@ -16,6 +16,7 @@
         
         PANEL_WIDTH = 480,
         INPUT_WIDTH = 64,
+        SELECT_WIDTH = 160,
         LABEL_WIDTH = PANEL_WIDTH - INPUT_WIDTH - 4*padding,
         
         /*  A label and a number field for one setting. The value is set when the field
@@ -65,6 +66,48 @@
             }
         }),
         
+        /*  A label and a drop-down list for one choice setting. The value is set as soon as
+            another is chosen. The options are filled in when it's refreshed, since some
+            (the solid subtypes) are only known once data/init.json5 has loaded. */
+        ChoiceRow = new JSClass('ChoiceRow', WideView, {
+            initNode: function(parent, attrs) {
+                const self = this,
+                    def = self.def = attrs.def;
+                delete attrs.def;
+                attrs.height ??= rowHeight;
+                
+                self.callSuper(parent, attrs);
+                
+                new PlainText(self, {
+                    x:padding, y:5, width:PANEL_WIDTH - SELECT_WIDTH - 4*padding, text:def.label, fontSize:fontSizeMedium, textColor:colorText
+                }).enableEllipsis();
+                
+                const select = self.select = new M.InputSelect(self, {
+                    x:PANEL_WIDTH - SELECT_WIDTH - 2*padding, y:2, width:SELECT_WIDTH, height:rowHeight - 4,
+                    fontSize:fontSizeMedium, bgColor:colorPanel, textColor:colorText,
+                    border:[1, 'solid', colorTextMuted], roundedCorners:cornerRadius/2
+                });
+                select.getIDE().dataset.setting = def.id;
+                select.getIDE().setAttribute('aria-label', def.label);
+                
+                self.attachToDom(select, '_commit', 'change');
+                self.refresh();
+            },
+            
+            refresh: function() {
+                const select = this.select,
+                    options = this.def.options();
+                if (select.getOptions().length !== options.length) select.setOptions(options);
+                select.getIDE().value = settings.get(this.def.id);
+            },
+            
+            /** @private */
+            _commit: function(_event) {
+                settings.set(this.def.id, this.select.getIDE().value);
+                this.refresh();
+            }
+        }),
+        
         /*  A checkbox for one boolean setting. The value is set as soon as it's toggled. */
         BooleanRow = new JSClass('BooleanRow', WideView, {
             initNode: function(parent, attrs) {
@@ -105,7 +148,7 @@
             for (const group of settings.getGroups()) {
                 const header = new WideView(self, {height:rowHeight + padding});
                 new PlainText(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
-                header.rows = group.definitions.map(def => new (def.type === 'boolean' ? BooleanRow : NumberRow)(self, {def}));
+                header.rows = group.definitions.map(def => new ({boolean:BooleanRow, choice:ChoiceRow}[def.type] ?? NumberRow)(self, {def}));
                 headers.push(header);
                 rows.push(...header.rows);
             }
