@@ -20,12 +20,13 @@ JS.Packages(file => {
     // Model //
     file(MODEL_ROOT + 'Grid.js').provides('hc.makeGrid','hc.hexDist').requires('hc.cfg');
     file(MODEL_ROOT + 'PieceTypes.js').provides('hc.PIECE_TYPES').requires('hc.makeGrid');
+    file(MODEL_ROOT + 'Movement.js').provides('hc.Movement','hc.MOVE_MODES').requires('hc.makeGrid');
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'Expr.js').provides('hc.expr').requires('hc');
     file(MODEL_ROOT + 'Goals.js').provides('hc.goals','hc.Goals').requires('hc.makeGrid','hc.expr');
     file(MODEL_ROOT + 'Solids.js').provides('hc.solids').requires('hc');
-    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.EnemyAI','hc.Goals','hc.solids');
-    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids');
+    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids');
+    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
     file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5','hc.goals','hc.solids');

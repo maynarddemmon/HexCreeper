@@ -16,7 +16,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.EnemyAI, pkg.Goals],
+        include:[pkg.Movement, pkg.EnemyAI, pkg.Goals],
         
         initialize: function() {
             this.level = null; // {id, name, attrs}: the level being played, set by the App
@@ -54,6 +54,7 @@
             this.movesUsed = 0;              // moves made this turn (counts toward the move limit)
             this.recoverUsed = false;        // whether Recover has been used this turn (once a turn)
             this.quickenUsed = false;        // whether Quicken has been used this turn (once a turn: a move more)
+            this.moveMode = pkg.MOVE_MODES.includes(LINK.mode) ? LINK.mode : 'fixed'; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
@@ -105,6 +106,7 @@
                 movesUsed:this.movesUsed,
                 recoverUsed:this.recoverUsed,
                 quickenUsed:this.quickenUsed,
+                moveMode:this.moveMode,
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
@@ -171,6 +173,7 @@
             this.movesUsed = Number.isInteger(o.movesUsed) ? o.movesUsed : this.acted.size;
             this.recoverUsed = !!o.recoverUsed;
             this.quickenUsed = !!o.quickenUsed;
+            this.moveMode = pkg.MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             // Saves from before the path was kept start it where the core is.
@@ -315,77 +318,33 @@
         // The piece and its whole group step together. If any group member would
         // step onto an opposing piece, the action is an attack instead: every such
         // member hits its target and nobody moves.
-        legalMoves: function(piece) {
+        legalMoves: function(piece, mode = this.modeFor(piece)) {
             if (!piece || this.over) return [];
             if (piece.owner === 'player' && !this.canMove(piece)) return [];
-            const group = this.group(piece),
-                ids = new Set(group.map(g => g.id)),
-                parent = this.parent(piece),
+            const view = this.boardView(),
                 out = [];
             for (const [dx, dy] of PIECE_TYPES[piece.type].steps(piece)) {
-                const x = piece.x + dx, y = piece.y + dy;
-                if (!this.isOpen(x, y) && !this.canBreak(piece, this.tiles.get(this.key(x, y)))) continue;
-                const occ = this.pieceAt(x, y);
-                if (occ && occ.owner === piece.owner && !ids.has(occ.id)) continue;
-                const hits = [];
-                for (const g of group) {
-                    const t = this.pieceAt(g.x + dx, g.y + dy),
-                        tile = this.tiles.get(this.key(g.x + dx, g.y + dy));
-                    if (t && t.owner !== g.owner) {
-                        hits.push({attacker:g, target:t});
-                    } else if (this.canBreak(g, tile)) {
-                        hits.push({attacker:g, target:tile, solid:true});
-                    }
-                }
-                if (hits.length) {
-                    out.push({x, y, dx, dy, attack:true, hits});
-                    continue;
-                }
-                if (!this.groupMoveOk(group, ids, dx, dy)) continue;
-                if (parent) {
-                    const d = hexDist({ x, y }, parent);
-                    if (d > LINK.range && d >= hexDist(piece, parent)) continue;   // must stay in range (or close the gap)
-                }
-                out.push({ x, y, dx, dy, attack: false });
+                const r = this.resolveStep(view, piece.id, dx, dy, mode);
+                if (r) out.push({x:piece.x + dx, y:piece.y + dy, dx, dy, mode, ...r});
             }
             return out;
         },
         
-        // Could `piece` (with its group) step by (dx, dy) right now? Same rules as a
-        // normal move; optionally refuse to step any member onto an active harm tile.
-        canStep: function(piece, dx, dy, avoidHarm = false) {
-            const group = this.group(piece),
-                ids = new Set(group.map(g => g.id));
-            if (!this.groupMoveOk(group, ids, dx, dy)) return false;
-            if (avoidHarm && group.some(g => this.isHarm(g.x + dx, g.y + dy))) return false;
-            const parent = this.parent(piece);
-            if (parent) {
-                const d = hexDist({x:piece.x + dx, y:piece.y + dy}, parent);
-                if (d > LINK.range && d >= hexDist(piece, parent)) return false;
-            }
-            return true;
+        // Could `piece` step by (dx, dy) right now, in mode? Same rules as a normal move;
+        // optionally refuse to step any piece that moves onto an active harm tile.
+        canStep: function(piece, dx, dy, avoidHarm = false, mode = this.modeFor(piece)) {
+            const r = this.resolveStep(this.boardView(avoidHarm), piece.id, dx, dy, mode);
+            return !!r && !r.attack;
         },
         
-        // Every member of the group must land on a cell that is empty or vacated by the group.
-        groupMoveOk: function(group, ids, dx, dy) {
-            for (const g of group) {
-                const x = g.x + dx,
-                    y = g.y + dy;
-                if (!this.isOpen(x, y)) return false;
-                const o = this.pieceAt(x, y);
-                if (o && !ids.has(o.id)) return false;
-            }
-            return true;
-        },
-        
-        findMove: function(piece, x, y) {
-            return this.legalMoves(piece).find(m => m.x === x && m.y === y) || null;
+        findMove: function(piece, x, y, mode = this.modeFor(piece)) {
+            return this.legalMoves(piece, mode).find(m => m.x === x && m.y === y) || null;
         },
         
         // Combo rule: killing n enemies in one move scores n x (their total value),
         // i.e. n^2 for 1-point enemies.
-        act: function(piece, x, y) {
-            const m = this.findMove(piece, x, y);
+        act: function(piece, x, y, mode = this.modeFor(piece)) {
+            const m = this.findMove(piece, x, y, mode);
             if (!m) return false;
             if (m.attack) {
                 let kills = 0, value = 0, broken = 0;
@@ -405,28 +364,21 @@
                     this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
                 }
                 // Advance into the space cleared, if a piece was destroyed or a solid broken.
-                if ((kills || broken) && piece.owner === 'player' && COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true)) {
-                    this.moveGroup(piece, m.dx, m.dy);
+                if ((kills || broken) && piece.owner === 'player' && COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
+                    this.moveGroup(piece, m.dx, m.dy, mode);
                 }
             } else {
-                this.moveGroup(piece, m.dx, m.dy);
+                this.applyMoves(piece, m.moves);
             }
             return true;
         },
         
-        moveGroup: function(piece, dx, dy) {
-            const group = this.group(piece);
-            for (const g of group) this.board.delete(this.key(g.x, g.y));
-            for (const g of group) {
-                g.x += dx;
-                g.y += dy;
-                this.board.set(this.key(g.x, g.y), g.id);
-            }
-            if (piece.id === this.playerCoreId) this.corePath.push([piece.x, piece.y]);
-            if (piece.owner === 'player') {
-                this.landOnTiles(group);
-                this.updateQuadrants();
-            }
+        // Moves a piece by (dx, dy) in mode (as resolveStep says), if it can. Returns
+        // whether it did.
+        moveGroup: function(piece, dx, dy, mode = this.modeFor(piece)) {
+            const r = this.resolveStep(this.boardView(), piece.id, dx, dy, mode);
+            if (r && !r.attack) this.applyMoves(piece, r.moves);
+            return !!r && !r.attack;
         },
         
         // Apply tiles under pieces that just moved. Harm first, then heals. Eating n

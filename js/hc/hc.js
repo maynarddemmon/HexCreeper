@@ -106,7 +106,8 @@
             
             // Links between pieces.
             LINK:{
-                range:3 // The maximum distance a linked piece can get from another one.
+                range:3, // The maximum distance a linked piece can get from another one.
+                mode:'fixed' // how the player's pieces move at the start: fixed, free or follow (see Movement.js)
             },
             
             // Enemy squad planning (see Game.planSquad).

@@ -15,6 +15,7 @@
         recoverBtn,
         quickenBtn,
         detachBtn,
+        modeBtn,
         attachBtn,
         saveBtn,
         exportBtn,
@@ -404,6 +405,13 @@
                     }
                 }
             }]);
+            modeBtn = new Btn(ftrView, {text:i18n('btn-mode', i18n('mode-fixed')), fontSize:fontSizeMedium, tooltip:i18n('tip-mode')}, [{
+                doActivated: () => {
+                    const modes = pkg.MOVE_MODES;
+                    game.moveMode = modes[(modes.indexOf(game.moveMode) + 1) % modes.length];
+                    draw();
+                }
+            }]);
             detachBtn = new Btn(ftrView, {text:i18n('btn-detach'), fontSize:fontSizeMedium, tooltip:i18n('tip-detach')}, [{
                 doActivated: () => {
                     cancelModes();
@@ -470,6 +478,8 @@
             
             recoverBtn.setDisabled(gameOver || (!V.recoverMode && !game.anyRecoverable()));
             recoverBtn.setOn(V.recoverMode);
+            
+            modeBtn.setTextAndFit(i18n('btn-mode', i18n('mode-' + game.moveMode)));
             
             const sel = game.getSelected();
             detachBtn.setDisabled(!game.canDetach(sel));
@@ -664,6 +674,7 @@
                 if (k === 'r') {recoverBtn.doActivated(); return;}
                 if (k === 'u') {quickenBtn.doActivated(); return;}
                 if (k === 'x') {detachBtn.doActivated(); return;}
+                if (k === 'm') {modeBtn.doActivated(); return;}
                 if (k === 'l') {attachBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();

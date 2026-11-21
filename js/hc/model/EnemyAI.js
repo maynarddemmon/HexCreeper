@@ -4,9 +4,12 @@
     'use strict';
     
     const {
-        cfg:{LINK, AI, RANK},
+        cfg:{AI, RANK},
         hexDist, euclid2, PIECE_TYPES
-    } = pkg;
+    } = pkg,
+        
+        // The movement modes squads plan with near the player (see expand, in planSquad).
+        PLAN_MODES = ['fixed', 'free'];
     
     pkg.EnemyAI = new JS.Module('EnemyAI', {
         // ---- Enemy AI ----
@@ -42,7 +45,7 @@
                             for (const a of this.planSquad(squad, budget, field, caution)) {
                                 if (this.over) return;
                                 const pc = this.pieces.get(a.id);
-                                if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy)) break;
+                                if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
                             }
                             const hit = this.piecesOf('player').length < nBefore || this.piecesOf('player').reduce((a, q) => a + q.hp, 0) < hpBefore;
                             if (this.pieces.has(root.id)) root.idle = hit ? 0 : idle + 1;
@@ -54,8 +57,9 @@
             }
         },
         
-        // Far from the player: step the whole squad one cell along the shortest
-        // harm-free path, keeping its shape.
+        // Far from the player: step the squad one cell along the shortest harm-free path,
+        // keeping its shape (fixed) if that gets it closer, or else letting it give (follow,
+        // then free) to get through tight places.
         marchSquad: function(root, field) {
             const players = this.piecesOf('player'),
                 fd = p => field.get(this.key(p.x, p.y)) ?? Infinity,
@@ -64,21 +68,28 @@
                 t = players.reduce((b, q) => hexDist(root, q) < hexDist(root, b) ? q : b);
             let best = null,
                 bestKey = [cur, hexDist(root, t) * 1000 + euclid2(root, t)];
-            for (const m of this.legalMoves(root)) {
-                if (m.attack || !this.canStep(root, m.dx, m.dy, true)) continue;
-                const k = [
-                        Math.min(...members.map(g => field.get(this.key(g.x + m.dx, g.y + m.dy)) ?? Infinity)),
-                        hexDist(m, t) * 1000 + euclid2(m, t)
-                    ],
-                    better = cur !== Infinity
-                        ? (k[0] < bestKey[0] || (k[0] === bestKey[0] && best && k[1] < bestKey[1]))
-                        : (k[0] < bestKey[0] || (k[0] === Infinity && k[1] < bestKey[1]));
-                if (better) {
-                    best = m;
-                    bestKey = k;
+            for (const mode of ['fixed', 'follow', 'free']) {
+                for (const m of this.legalMoves(root, mode)) {
+                    if (!m.attack && this.canStep(root, m.dx, m.dy, true, mode)) {
+                        const moved = new Map(m.moves.map(([id, x, y]) => [id, [x, y]])),
+                            k = [
+                                Math.min(...members.map(g => {
+                                    const [x, y] = moved.get(g.id) ?? [g.x, g.y];
+                                    return field.get(this.key(x, y)) ?? Infinity;
+                                })),
+                                hexDist(m, t) * 1000 + euclid2(m, t)
+                            ],
+                            better = cur !== Infinity
+                                ? (k[0] < bestKey[0] || (k[0] === bestKey[0] && best && k[1] < bestKey[1]))
+                                : (k[0] < bestKey[0] || (k[0] === Infinity && k[1] < bestKey[1]));
+                        if (better) {
+                            best = m;
+                            bestKey = k;
+                        }
+                    }
                 }
             }
-            if (best) this.act(root, best.x, best.y);
+            if (best) this.act(root, best.x, best.y, best.mode);
         },
         
         // Plan a squad's turn. Returns [{ id, dx, dy }] to execute in order.
@@ -148,86 +159,78 @@
                     return v;
                 },
                 
+                // Every action an unacted piece could take next, in fixed and free
+                // (resolveStep, on the positions being tried; the same result in both is
+                // kept once). Follow is only for marching: near the player it would let one
+                // piece bring the whole squad in and still leave the leader's group attack,
+                // which beats striking and pulling back out of reach.
                 expand = st => {
                     const out = [],
-                        occ = occupiedBySquad(st);
+                        occ = occupiedBySquad(st),
+                        view = {
+                            posOf: id => st.pos.get(id),
+                            kidsOf: id => kids.get(id),
+                            parentOf: id => {
+                                const pid = byId.get(id).parentId;
+                                return pid && inSquad.has(pid) ? pid : null;
+                            },
+                            occupant: (x, y) => {
+                                const sq = occ.get(x + ',' + y),
+                                    other = sq === undefined ? this.pieceAt(x, y) : null;
+                                return sq ?? (other && !inSquad.has(other.id) ? other.id : undefined);
+                            },
+                            open: (x, y) => this.isOpen(x, y) && !this.isHarm(x, y),
+                            passable: (x, y) => this.isOpen(x, y),
+                            harm: (x, y) => this.tiles.get(this.key(x, y))?.kind === pkg.TILE_TYPE_HARM,
+                            target: (id, x, y) => livePlayerAt(st, x, y)
+                        };
                     for (const id of ids) {
                         if (st.acted.has(id)) continue;
-                        const pc = byId.get(id),
-                            [px, py] = st.pos.get(id),
-                            grp = sub(id),
-                            gset = new Set(grp),
-                            par = pc.parentId && inSquad.has(pc.parentId) ? st.pos.get(pc.parentId) : null;
+                        const pc = byId.get(id);
                         for (const [dx, dy] of PIECE_TYPES[pc.type].steps(pc)) {
-                            // attack if any member would land on a live player piece
-                            const hits = [];
-                            for (const gid of grp) {
-                                const [gx, gy] = st.pos.get(gid),
-                                    t = livePlayerAt(st, gx + dx, gy + dy);
-                                if (t) hits.push(t);
-                            }
-                            if (hits.length) {
-                                const n = {
-                                    pos:st.pos,
-                                    acted:new Set(st.acted).add(id),
-                                    dmg: new Map(st.dmg),
-                                    dead:new Set(st.dead),
-                                    gain:st.gain,
-                                    actions:[...st.actions, {id, dx, dy}]
-                                };
-                                for (const t of hits) {
-                                    if (n.dead.has(t.id)) continue;
-                                    const d = (n.dmg.get(t.id) || 0) + 1;
-                                    n.dmg.set(t.id, d);
-                                    n.gain += AI.hit + (t.id === this.playerCoreId ? AI.coreHit : 0);
-                                    if (t.hp - d <= 0) {
-                                        const lost = pGroup.get(t.id).filter(x => !n.dead.has(x));
-                                        lost.forEach(x => n.dead.add(x));
-                                        n.gain += AI.killPer * lost.length + (lost.includes(this.playerCoreId) ? AI.coreKill : 0);
+                            const seen = new Set();
+                            for (const mode of PLAN_MODES) {
+                                const r = this.resolveStep(view, id, dx, dy, mode),
+                                    sig = r ? (r.attack ? 'a' + r.hits.map(t => t.id).sort() : 'm' + r.moves.map(m => m.join(',')).sort().join(';')) : null;
+                                if (r && !seen.has(sig)) {
+                                    seen.add(sig);
+                                    const action = {id, dx, dy, mode};
+                                    if (r.attack) {
+                                        // Every hit does 1 damage; a piece at 0 HP takes what's below it.
+                                        const n = {
+                                            pos:st.pos,
+                                            acted:new Set(st.acted).add(id),
+                                            dmg:new Map(st.dmg),
+                                            dead:new Set(st.dead),
+                                            gain:st.gain,
+                                            actions:[...st.actions, action]
+                                        };
+                                        for (const t of r.hits) {
+                                            if (!n.dead.has(t.id)) {
+                                                const d = (n.dmg.get(t.id) || 0) + 1;
+                                                n.dmg.set(t.id, d);
+                                                n.gain += AI.hit + (t.id === this.playerCoreId ? AI.coreHit : 0);
+                                                if (t.hp - d <= 0) {
+                                                    const lost = pGroup.get(t.id).filter(x => !n.dead.has(x));
+                                                    lost.forEach(x => n.dead.add(x));
+                                                    n.gain += AI.killPer * lost.length + (lost.includes(this.playerCoreId) ? AI.coreKill : 0);
+                                                }
+                                            }
+                                        }
+                                        out.push(n);
+                                    } else {
+                                        const pos = new Map(st.pos);
+                                        for (const [gid, x, y] of r.moves) pos.set(gid, [x, y]);
+                                        out.push({
+                                            pos,
+                                            acted:new Set(st.acted).add(id),
+                                            dmg:st.dmg,
+                                            dead:st.dead,
+                                            gain:st.gain,
+                                            actions:[...st.actions, action]
+                                        });
                                     }
                                 }
-                                out.push(n);
-                                continue;
-                            }
-                            // otherwise a move: every member lands on a free, harm-free cell
-                            let ok = true;
-                            for (const gid of grp) {
-                                const [gx, gy] = st.pos.get(gid),
-                                    nx = gx + dx, ny = gy + dy;
-                                if (!this.isOpen(nx, ny) || this.isHarm(nx, ny)) {
-                                    ok = false; break;
-                                }
-                                const sq = occ.get(nx + ',' + ny);
-                                if (sq !== undefined && !gset.has(sq)) {
-                                    ok = false;
-                                    break;
-                                }
-                                if (sq === undefined) {
-                                    const other = this.pieceAt(nx, ny);
-                                    if (other && !inSquad.has(other.id)) {
-                                        ok = false;
-                                        break;
-                                    } // other squads / player pieces
-                                }
-                            }
-                            if (ok) {
-                                if (par) {
-                                    const d = hexDist({x:px + dx, y:py + dy}, {x:par[0], y:par[1]});
-                                    if (d > LINK.range && d >= hexDist({x:px, y:py}, {x:par[0], y:par[1]})) continue;
-                                }
-                                const pos = new Map(st.pos);
-                                for (const gid of grp) {
-                                    const [gx, gy] = st.pos.get(gid);
-                                    pos.set(gid, [gx + dx, gy + dy]);
-                                }
-                                out.push({
-                                    pos,
-                                    acted:new Set(st.acted).add(id),
-                                    dmg:st.dmg,
-                                    dead:st.dead,
-                                    gain:st.gain,
-                                    actions:[...st.actions, {id, dx, dy}]
-                                });
                             }
                         }
                     }

@@ -61,6 +61,7 @@
         
         bool('advance',    GROUP_SWARM, COMBAT,   'advance'),
         num('linkRange',   GROUP_SWARM, LINK,     'range', 1, 20),
+        choice('moveMode', GROUP_SWARM, LINK,     'mode', () => pkg.MOVE_MODES.map(m => ({value:m, label:i18n('mode-' + m)}))),
         num('rankBase',    GROUP_SWARM, RANK,     'base', 1, 10),
         num('hpPer',       GROUP_SWARM, RANK,     'hpPer', 1, 20),
         num('movesPer',    GROUP_SWARM, RANK,     'movesPer', 1, 10),

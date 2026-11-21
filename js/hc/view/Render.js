@@ -264,12 +264,14 @@
             for (const m of game.legalMoves(sel)) {
                 const isHover = sameCell(V.hover, m);
                 fillCell(m.x, m.y, m.attack ? (isHover ? '--attack-hover' : '--attack') : (isHover ? '--move-hover' : '--move'));
-                if (isHover && !m.attack) { hoverMove = m; if (group.length > 1) ghost = { group, dx: m.dx, dy: m.dy }; }
+                if (isHover && !m.attack) {
+                    hoverMove = m;
+                    if (group.length > 1) ghost = m.moves; // where each piece that moves would go
+                }
                 if (isHover && m.attack) hoverHits = m.hits;
             }
             // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
-            if (hoverMove) for (const g of group) {
-                const x = g.x + hoverMove.dx, y = g.y + hoverMove.dy;
+            if (hoverMove) for (const [, x, y] of hoverMove.moves) {
                 const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
                 if (!kind) continue;
                 fillCell(x, y, '--' + kind + '-hover');
@@ -382,8 +384,9 @@
         
         // Ghost preview of a group move
         if (ghost) {
-            for (const g of ghost.group) {
-                const [sx, sy] = cellCenter(g.x + ghost.dx, g.y + ghost.dy);
+            for (const [id, x, y] of ghost) {
+                const g = game.pieces.get(id),
+                    [sx, sy] = cellCenter(x, y);
                 PIECE_TYPES[g.type].draw(ctx, sx, sy, s, g, {ghost:true, hl:true, root:g.id === game.playerCoreId});
             }
         }

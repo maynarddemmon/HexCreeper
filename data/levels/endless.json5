@@ -21,6 +21,7 @@
 		
 		"advance":       {"pref":true},
 		"linkRange":     {"pref":true},
+		"moveMode":      {"pref":true},
 		"rankBase":      {"pref":true},
 		"hpPer":         {"pref":true},
 		"movesPer":      {"pref":true},
