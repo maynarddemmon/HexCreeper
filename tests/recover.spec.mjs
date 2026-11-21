@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button, cellOnPage} from './helpers.mjs';
+import {startGame, clearBoard, menuItem, openMenu} from './helpers.mjs';
 
 /*  A lone core of the given rank (so that many moves a turn) with the given score, on an
     empty board. */
@@ -81,21 +81,29 @@ test('the turn doesn\'t end by itself while a recover could still be used', asyn
     expect((await state(page)).turn).toBe(1);
 });
 
-test('R, then clicking a ringed piece, recovers it; the button is disabled when nothing can be', async ({page}) => {
+test('Recover in the menu (or R) recovers the selected piece; it\'s disabled when it can\'t be', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await setUp(page, 2, 10);
-    const recover = button(page, 'Recover');
-    await page.evaluate(() => {hc.view.draw();});
-    await expect(recover).toHaveClass(/\bdisabled\b/);
+    await openMenu(page);
+    const recover = menuItem(page, 'Recover · 2');
+    await expect(recover).toHaveClass(/\bdisabled\b/);       // hasn't moved
+    await page.keyboard.press('Escape');
     await move(page, 1, 0);
-    await page.evaluate(() => {hc.view.draw();});
+    await openMenu(page);
     await expect(recover).not.toHaveClass(/\bdisabled\b/);
-    await page.keyboard.press('r');
-    await expect(page.getByText('Recover: click a ringed piece to let it move again (costs its rank in score). Esc cancels.')).toBeVisible();
-    await page.mouse.click(...await cellOnPage(page, 1, 0));
+    await recover.click();
     expect(await state(page)).toMatchObject({score:8, canMove:true, recoverUsed:true});
-    await expect(recover).toHaveClass(/\bdisabled\b/);
+    await expect(recover).toHaveCount(0);                     // the menu closes
+    
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.playerWait();
+        g.score = 10;
+        g.playerAct(g.getPlayerCore(), 2, 0);
+    });
+    await page.keyboard.press('r');
+    expect(await state(page)).toMatchObject({score:8, canMove:true, recoverUsed:true});
 });
 
 test('moves used and Recover are saved with the game', async ({page}) => {

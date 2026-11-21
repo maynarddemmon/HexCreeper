@@ -41,12 +41,13 @@ JS.Packages(file => {
     file(VIEW_ROOT + 'LevelsDialog.js').provides('hc.LevelsDialog').requires(
         'hc.AckDialog','hc.levels','hc.UnderlineBtn','hc.WideView'
     );
+    file(VIEW_ROOT + 'PieceMenu.js').provides('hc.PieceMenu').requires('hc.Btn','hc.theme');
     file(VIEW_ROOT + 'LevelBrief.js').provides('hc.LevelBrief').requires(
         'hc.ConfirmDialog','hc.SettingsList','hc.WideView'
     );
     
     // Include Everything
     file(HC_ROOT + 'App.js').provides('hc.App').requires(
-        'hc.GameView','hc.SettingsDialog','hc.LevelsDialog','hc.LevelBrief','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
+        'hc.GameView','hc.SettingsDialog','hc.LevelsDialog','hc.LevelBrief','hc.PieceMenu','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
     );
 });

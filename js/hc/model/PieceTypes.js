@@ -89,9 +89,7 @@
                 
                 ctx.globalAlpha = 1;
                 if (opts.selected) ring(o.stroke, mathMax(2, size * 0.045));
-                if (opts.healTarget) ring('--heal', mathMax(2, size * (piece.hp < piece.maxHp ? 0.07 : 0.035)));
                 if (opts.linkTarget) ring('--place-ink', mathMax(2, size * 0.05));
-                if (opts.recoverTarget) ring('--recover', mathMax(2, size * 0.05));
             }
         }
     };

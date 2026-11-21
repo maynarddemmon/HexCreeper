@@ -5,7 +5,7 @@ const settingsTitle = page => page.getByText('Settings', {exact:true}).filter({v
 
 test('the header has every button, and End Turn ends the turn', async ({page}) => {
     await startGame(page);
-    for (const name of ['End Turn', 'Place · 5', 'Heal 1 · 5', 'Center', 'Save', 'Export', 'Import', 'New game', 'Settings', 'Help']) {
+    for (const name of ['End Turn', 'Move: Fixed', 'Center', 'Save', 'Export', 'Import', 'New game', 'Settings', 'Help']) {
         await expect(button(page, name)).toBeVisible();
     }
     await button(page, 'End Turn').click();
@@ -115,13 +115,12 @@ test('after losing, recentering goes to the start cell', async ({page}) => {
     await expect.poll(() => page.evaluate(() => [hc.view.cam.x, hc.view.cam.y])).toEqual([0, 0]); // after the pan
 });
 
-test('Place and Heal show as on while choosing; Esc cancels', async ({page}) => {
+test('Esc cancels choosing where to place', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {hc.app.game.score = 100; hc.view.draw();});
-    await button(page, 'Place · 5').click();
+    await page.keyboard.press('p');
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeVisible();
-    await expect(button(page, 'Place · 5')).toHaveClass(/\bon\b/);
     await page.keyboard.press('Escape');
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeHidden();
 });

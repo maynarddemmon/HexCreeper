@@ -714,10 +714,12 @@
         },
         
         // Empty cells adjacent to at least one player piece.
-        placeCells: function() {
+        // Empty cells a piece could be placed on: next to any of your pieces, or with from
+        // given, next to that piece.
+        placeCells: function(from = null) {
             const seen = new Set(),
                 out = [];
-            for (const p of this.piecesOf('player')) {
+            for (const p of from ? [from] : this.piecesOf('player')) {
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const x = p.x + dx,
                         y = p.y + dy,
@@ -731,9 +733,6 @@
         },
         
         // Player pieces a new piece at (x, y) could link to.
-        linkCandidates: function(x, y) {
-            return this.piecesOf('player').filter(p => hexDist(p, { x, y }) === 1);
-        },
         
         playerPlace: function(x, y, parent) {
             if (this.over || !this.canAffordPlace()) return false;

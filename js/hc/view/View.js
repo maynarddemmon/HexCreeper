@@ -103,9 +103,8 @@
             dpr:1,
             W:1, // the canvas size in CSS pixels.
             H:1,
-            placeMode:null, // Place mode: null, {stage:"cell"}, or {stage:"link", x, y}
-            healMode:false, // choosing which piece a paid heal starts from
-            recoverMode:false, // choosing which piece to recover
+            placeMode:false, // choosing the cell to place a piece on, next to the selected piece
+            menuOpen:false, // whether the selected piece's menu is open
             attachMode:false, // choosing which piece to attach the selected piece to
             swapMode:false, // choosing which piece the selected piece swaps with
             rafPending:false,

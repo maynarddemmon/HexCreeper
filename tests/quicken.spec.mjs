@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button} from './helpers.mjs';
+import {startGame, clearBoard, menuItem, openMenu} from './helpers.mjs';
 
 const state = page => page.evaluate(() => {
     const g = hc.app.game;
@@ -43,17 +43,19 @@ test('with Quicken and Recover, a lone core can move twice; the turn waits while
     expect(r).toEqual([1, 2, 2]);
 });
 
-test('the Quicken button (and U) quickens, and is disabled once used', async ({page}) => {
+test('Quicken in the menu (and U) quickens, and is disabled once used', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
         hc.app.game.score = 10;
         hc.view.draw();
     });
-    const quicken = button(page, 'Quicken · 1');
+    await openMenu(page);
+    const quicken = menuItem(page, 'Quicken · 1');
     await expect(quicken).not.toHaveClass(/\bdisabled\b/);
     await page.keyboard.press('u');
     expect(await state(page)).toMatchObject({score:9, limit:2, quickenUsed:true});
+    await openMenu(page);
     await expect(quicken).toHaveClass(/\bdisabled\b/);
     await quicken.click({force:true});
     expect((await state(page)).score).toBe(9);

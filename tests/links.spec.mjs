@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button, cellOnPage} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
 /*  The core with two children, a (east) and c (west), and b linked below a, one step
     further east; then a new turn, so they can all move. Lots of score, so the turn never
@@ -134,7 +134,9 @@ test('X detaches the selected piece; L, then a ringed piece, attaches it', async
         hc.view.draw();
     });
     await expect(page.getByText('Detached · rank 1', {exact:false})).toBeVisible();
-    await expect(button(page, 'Detach')).toHaveClass(/\bdisabled\b/);
+    await openMenu(page);
+    await expect(menuItem(page, 'Detach')).toHaveClass(/\bdisabled\b/);
+    await page.keyboard.press('Escape');
     await page.keyboard.press('l');
     await expect(page.getByText('Attach: click a ringed piece to link the selected piece to. Esc cancels.')).toBeVisible();
     await page.mouse.click(...await cellOnPage(page, 0, 0));

@@ -1,5 +1,6 @@
 /*  The game area: a myt view that holds the canvas (see View.js and Render.js), handles
-    the mouse (select, move, attack, drag to pan, scroll to zoom, place and heal modes) */
+    the mouse (select, move, attack, drag to pan, scroll to zoom, place, swap and attach
+    modes; clicking the selected piece again opens its menu) */
 (pkg => {
     'use strict';
     
@@ -52,22 +53,15 @@
             move to the clicked cell (e.g. onto a cell one of its own carried pieces is
             vacating), it moves instead of selecting the piece there. */
         handleClick: function(c, force=false) {
+            // With the menu open, a click anywhere on the board just closes it.
+            if (V.menuOpen) {
+                V.menuOpen = false;
+                draw();
+                return;
+            }
             if (!game.over) {
                 if (V.placeMode) {
                     this._handlePlaceClick(c);
-                    return;
-                }
-                if (V.healMode) {
-                    const t = game.pieceAt(c.x, c.y);
-                    V.healMode = false;
-                    if (t && t.owner === 'player') game.playerHeal(t);
-                    draw();
-                    return;
-                }
-                if (V.recoverMode) {
-                    V.recoverMode = false;
-                    game.playerRecover(game.pieceAt(c.x, c.y));
-                    draw();
                     return;
                 }
                 if (V.swapMode) {
@@ -95,6 +89,8 @@
                 }
                 const clicked = game.pieceAt(c.x, c.y);
                 if (clicked && clicked.owner === 'player') {
+                    // The selected piece again: its menu.
+                    if (clicked.id === game.selectedId) V.menuOpen = true;
                     game.selectedId = clicked.id;
                     draw();
                     return;
@@ -103,27 +99,16 @@
             }
         },
         
-        /** @private */
+        /*  Place mode: a click on a cell next to the selected piece places a piece there,
+            linked to it; anywhere else cancels. @private */
         _handlePlaceClick: function(c) {
-            const isFree = game.placeCells().some(q => sameCell(q, c));
-            if (V.placeMode.stage === 'cell') {
-                V.placeMode = isFree ? {stage:'link', x:c.x, y:c.y} : null;
+            const sel = game.getSelected();
+            V.placeMode = false;
+            if (sel && game.placeCells(sel).some(q => sameCell(q, c)) && game.playerPlace(c.x, c.y, sel)) {
+                this.afterTurn();
             } else {
-                const cand = game.pieceAt(c.x, c.y);
-                if (cand && game.linkCandidates(V.placeMode.x, V.placeMode.y).some(p => p.id === cand.id)) {
-                    const {x, y} = V.placeMode;
-                    V.placeMode = null;
-                    if (game.playerPlace(x, y, cand)) {
-                        this.afterTurn();
-                        return;
-                    }
-                } else if (isFree) {
-                    V.placeMode = {stage:'link', x:c.x, y:c.y}; // Pick a different cell.
-                } else {
-                    V.placeMode = {stage:'cell'}; // Back to choosing a cell.
-                }
+                draw();
             }
-            draw();
         },
         
         /*  Mouse handling on the canvas: click, drag to pan and scroll to zoom.

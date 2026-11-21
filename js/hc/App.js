@@ -10,14 +10,8 @@
         movesView,
         turnView,
         endTurnBtn,
-        placeBtn,
-        healBtn,
-        recoverBtn,
-        quickenBtn,
-        detachBtn,
         modeBtn,
-        attachBtn,
-        swapBtn,
+        pieceMenu,
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -35,7 +29,7 @@
         
         {
             view:V,
-            Btn, ToggleBtn, IconBtn, WideView, Spacer, LabeledValue, levels, settings,
+            Btn, IconBtn, WideView, Spacer, LabeledValue, levels, settings,
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
@@ -79,11 +73,10 @@
             // The level's values, as they were when the game was saved.
             settings.applyLevel(game.level?.id, game.level?.attrs);
             gameOverShown = false;
-            V.placeMode = null;
-            V.healMode = false;
-            V.recoverMode = false;
+            V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.menuOpen = false;
             centerOn(false);
             draw();
         },
@@ -98,21 +91,79 @@
         
         endTurn = () => {
             if (game.over) return;
-            V.placeMode = null;
-            V.healMode = false;
-            V.recoverMode = false;
+            V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.menuOpen = false;
             game.playerWait();
             gameView.afterTurn();
         },
         
+        /*  What the selected piece's menu offers, in its order: place (next to it), swap
+            and attach (which then ask for the cell, or the piece to swap with or attach to),
+            detach, heal (flowing from it), recover (it), and quicken (the swarm). */
+        menuItems = () => {
+            const sel = () => game.getSelected(),
+                choose = mode => () => {
+                    cancelModes();
+                    V[mode] = true;
+                    draw();
+                };
+            return [
+                {
+                    id:'place',
+                    label:() => i18n('btn-place', game.placeCost()),
+                    tip:() => i18n('tip-place', game.placeCost()),
+                    enabled:() => !game.over && game.canAffordPlace() && !!sel() && game.placeCells(sel()).length > 0,
+                    run:choose('placeMode')
+                },
+                {id:'swap', label:() => i18n('btn-swap'), tip:() => i18n('tip-swap'), enabled:() => game.canSwap(sel()), run:choose('swapMode')},
+                {id:'attach', label:() => i18n('btn-attach'), tip:() => i18n('tip-attach'), enabled:() => game.canAttach(sel()), run:choose('attachMode')},
+                {id:'detach', label:() => i18n('btn-detach'), tip:() => i18n('tip-detach'), enabled:() => game.canDetach(sel()), run:() => {
+                    if (game.playerDetach(sel())) gameView.afterTurn();
+                    draw();
+                }},
+                {
+                    id:'heal',
+                    label:() => i18n('btn-heal', game.healAmount(), game.healCost()),
+                    tip:() => i18n('tip-heal', game.healCost(), game.healAmount()),
+                    enabled:() => !game.over && game.canAffordHeal() && game.anyDamaged(),
+                    run:() => {
+                        game.playerHeal(sel());
+                        draw();
+                    }
+                },
+                {
+                    id:'recover',
+                    label:() => i18n('btn-recover', sel() ? game.recoverCost(sel()) : 0),
+                    tip:() => i18n('tip-recover'),
+                    enabled:() => game.canRecover(sel()),
+                    run:() => {
+                        game.playerRecover(sel());
+                        draw();
+                    }
+                },
+                {
+                    id:'quicken',
+                    label:() => i18n('btn-quicken', game.quickenCost()),
+                    tip:() => i18n('tip-quicken', game.quickenCost()),
+                    enabled:() => game.canQuicken(),
+                    run:() => {
+                        game.playerQuicken();
+                        draw();
+                    }
+                }
+            ];
+        },
+        
+        // Keys for the menu's items, which act on the selected piece.
+        MENU_KEYS = {p:'place', s:'swap', l:'attach', x:'detach', h:'heal', r:'recover', u:'quicken'},
+        
         cancelModes = () => {
-            V.placeMode = null;
-            V.healMode = false;
-            V.recoverMode = false;
+            V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.menuOpen = false;
             draw();
         },
         
@@ -245,6 +296,7 @@
             appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
             
             infoPanel = new InfoPanel(appView, {x:padding, y:HEADER_HEIGHT + padding});
+            pieceMenu = new pkg.PieceMenu(gameView, {items:menuItems(), onPick:() => {V.menuOpen = false;}});
             
             statusTxt = new PaddedPlainText(appView, {
                 align:'center', valign:'bottom',
@@ -255,11 +307,7 @@
                 update: function() {
                     let status = '';
                     if (V.placeMode) {
-                        status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
-                    } else if (V.healMode) {
-                        status = i18n('status-heal', game.healAmount());
-                    } else if (V.recoverMode) {
-                        status = i18n('status-recover');
+                        status = i18n('status-place');
                     } else if (V.attachMode) {
                         status = i18n('status-attach');
                     } else if (V.swapMode) {
@@ -374,86 +422,11 @@
             endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
                 doActivated:endTurn
             }]);
-            placeBtn = new ToggleBtn(ftrView, {text:i18n('btn-place', 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {
-                    if (!game.over) {
-                        V.healMode = false;
-                        V.recoverMode = false;
-                        V.attachMode = false;
-                        V.swapMode = false;
-                        if (V.placeMode) {
-                            V.placeMode = null;
-                        } else if (game.canAffordPlace()) {
-                            V.placeMode = {stage:'cell'};
-                        }
-                        draw();
-                    }
-                }
-            }]);
-            healBtn = new ToggleBtn(ftrView, {text:i18n('btn-heal', 1, 5), fontSize:fontSizeMedium}, [{
-                doActivated: () => {
-                    if (!game.over) {
-                        V.placeMode = null;
-                        V.recoverMode = false;
-                        V.attachMode = false;
-                        V.swapMode = false;
-                        V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
-                        draw();
-                    }
-                }
-            }]);
-            recoverBtn = new ToggleBtn(ftrView, {text:i18n('btn-recover'), fontSize:fontSizeMedium, tooltip:i18n('tip-recover')}, [{
-                doActivated: () => {
-                    if (!game.over) {
-                        V.placeMode = null;
-                        V.healMode = false;
-                        V.attachMode = false;
-                        V.swapMode = false;
-                        V.recoverMode = !V.recoverMode && game.anyRecoverable();
-                        draw();
-                    }
-                }
-            }]);
             modeBtn = new Btn(ftrView, {text:i18n('btn-mode', i18n('mode-fixed')), fontSize:fontSizeMedium, tooltip:i18n('tip-mode')}, [{
                 doActivated: () => {
                     const modes = pkg.MOVE_MODES;
                     game.moveMode = modes[(modes.indexOf(game.moveMode) + 1) % modes.length];
                     draw();
-                }
-            }]);
-            detachBtn = new Btn(ftrView, {text:i18n('btn-detach'), fontSize:fontSizeMedium, tooltip:i18n('tip-detach')}, [{
-                doActivated: () => {
-                    cancelModes();
-                    if (game.playerDetach(game.getSelected())) gameView.afterTurn();
-                }
-            }]);
-            attachBtn = new ToggleBtn(ftrView, {text:i18n('btn-attach'), fontSize:fontSizeMedium, tooltip:i18n('tip-attach')}, [{
-                doActivated: () => {
-                    const on = !V.attachMode && game.canAttach(game.getSelected());
-                    cancelModes();
-                    V.attachMode = on;
-                    draw();
-                }
-            }]);
-            swapBtn = new ToggleBtn(ftrView, {text:i18n('btn-swap'), fontSize:fontSizeMedium, tooltip:i18n('tip-swap')}, [{
-                doActivated: () => {
-                    const on = !V.swapMode && game.canSwap(game.getSelected());
-                    cancelModes();
-                    V.swapMode = on;
-                    draw();
-                }
-            }]);
-            quickenBtn = new Btn(ftrView, {text:i18n('btn-quicken', 1), fontSize:fontSizeMedium}, [{
-                doActivated: () => {
-                    if (game.playerQuicken()) {
-                        // A move more may let a piece act now.
-                        const sel = game.getSelected();
-                        if (!sel || !game.canMove(sel)) {
-                            const next = game.piecesOf('player').find(p => game.canMove(p));
-                            if (next) game.selectedId = next.id;
-                        }
-                        draw();
-                    }
                 }
             }]);
             
@@ -472,43 +445,25 @@
         update: () => {
             turnView.update(game.turn);
             scoreView.update(game.score + '/' + game.scoreEarned); // to spend/earned in all
-            const gameOver = game.over,
-                placeCost = game.placeCost(),
-                healCost = game.healCost(),
-                healAmount = game.healAmount();
+            const gameOver = game.over;
             
             movesView.update(game.movesLeft() + '/' + game.moveLimit());
             
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
             exportBtn.setDisabled(gameOver);
-            
-            placeBtn.setTextAndFit(i18n('btn-place', placeCost));
-            placeBtn.setTooltip(i18n('tip-place', placeCost));
-            placeBtn.setDisabled(gameOver || (!V.placeMode && !game.canAffordPlace()));
-            placeBtn.setOn(!!V.placeMode);
-            
-            healBtn.setTextAndFit(i18n('btn-heal', healAmount, healCost));
-            healBtn.setTooltip(i18n('tip-heal', healCost, healAmount));
-            healBtn.setDisabled(gameOver || (!V.healMode && (!game.canAffordHeal() || !game.anyDamaged())));
-            healBtn.setOn(V.healMode);
-            
-            recoverBtn.setDisabled(gameOver || (!V.recoverMode && !game.anyRecoverable()));
-            recoverBtn.setOn(V.recoverMode);
+
             
             modeBtn.setTextAndFit(i18n('btn-mode', i18n('mode-' + game.moveMode)));
             
+            // The selected piece's menu, beside it while it's open.
             const sel = game.getSelected();
-            detachBtn.setDisabled(!game.canDetach(sel));
-            attachBtn.setDisabled(!V.attachMode && !game.canAttach(sel));
-            attachBtn.setOn(V.attachMode);
-            swapBtn.setDisabled(!V.swapMode && !game.canSwap(sel));
-            swapBtn.setOn(V.swapMode);
-            
-            const quickenCost = game.quickenCost();
-            quickenBtn.setTextAndFit(i18n('btn-quicken', quickenCost));
-            quickenBtn.setTooltip(i18n('tip-quicken', quickenCost));
-            quickenBtn.setDisabled(!game.canQuicken());
+            if (V.menuOpen && (!sel || gameOver)) V.menuOpen = false;
+            pieceMenu.setVisible(V.menuOpen);
+            if (V.menuOpen) {
+                pieceMenu.refresh();
+                pieceMenu.placeNear(...V.cellCenter(sel.x, sel.y), V.cam.size);
+            }
             
             
             infoPanel.update();
@@ -546,11 +501,10 @@
         
         newGame: () => {
             gameOverShown = false;
-            V.placeMode = null;
-            V.healMode = false;
-            V.recoverMode = false;
+            V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.menuOpen = false;
             game.reset();
             centerOn(false);
         },
@@ -689,14 +643,16 @@
                 centerOn();
             } else if (!game.over) {
                 if (k === 'Escape') {cancelModes(); return;}
-                if (k === 'p') {placeBtn.doActivated(); return;}
-                if (k === 'h') {healBtn.doActivated(); return;}
-                if (k === 'r') {recoverBtn.doActivated(); return;}
-                if (k === 'u') {quickenBtn.doActivated(); return;}
-                if (k === 'x') {detachBtn.doActivated(); return;}
+                // The selected piece's menu items, by key.
+                const item = MENU_KEYS[k] && menuItems().find(it => it.id === MENU_KEYS[k]);
+                if (item) {
+                    if (item.enabled()) {
+                        V.menuOpen = false;
+                        item.run();
+                    }
+                    return;
+                }
                 if (k === 'm') {modeBtn.doActivated(); return;}
-                if (k === 'l') {attachBtn.doActivated(); return;}
-                if (k === 's') {swapBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');
@@ -706,7 +662,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.healMode || V.recoverMode || V.attachMode || V.swapMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode) return;
                 if (k === '.' || k === 'Numpad5' || k === 'Enter') {
                     e.preventDefault();
                     endTurn();

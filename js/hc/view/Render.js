@@ -241,18 +241,14 @@
         const sel = game.getSelected();
         let selGroupIds = new Set(), ghost = null, linkTargets = new Set();
         
-        if (V.placeMode) {
-            if (V.placeMode.stage === 'cell') {
-                for (const q of game.placeCells()) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
-            } else {
-                fillCell(V.placeMode.x, V.placeMode.y, '--place-hover');
-                for (const p of game.linkCandidates(V.placeMode.x, V.placeMode.y)) linkTargets.add(p.id);
-            }
+        if (V.placeMode && sel) {
+            // The cells next to the selected piece a piece could be placed on.
+            for (const q of game.placeCells(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
         } else if ((V.attachMode || V.swapMode) && sel) {
             // The pieces the selected one can attach to, or swap with.
             fillCell(sel.x, sel.y, '--sel-bg');
             for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) linkTargets.add(p.id);
-        } else if (sel && !V.healMode && !V.recoverMode) {
+        } else if (sel) {
             // Link-range box around the selected piece's parent
             const par = game.parent(sel);
             if (par) strokeRegion(par, LINK.range, '--range');
@@ -368,10 +364,9 @@
             const par = game.parent(p); if (!par) continue;
             drawLink(p, par, selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p));
         }
-        // Pending placement link preview
-        if (V.placeMode && V.placeMode.stage === 'link' && V.hover) {
-            const cand = game.pieceAt(V.hover.x, V.hover.y);
-            if (cand && linkTargets.has(cand.id)) drawLink({x:V.placeMode.x, y:V.placeMode.y}, cand, '--place-ink', 1);
+        // The link a piece placed on the hovered cell would have
+        if (V.placeMode && sel && V.hover && game.placeCells(sel).some(q => sameCell(q, V.hover))) {
+            drawLink(V.hover, sel, '--place-ink', 1);
         }
         
         // Effects state per cell (flash)
@@ -410,12 +405,10 @@
             ctx.save();
             ctx.translate(sx, sy); ctx.scale(scale, scale);
             PIECE_TYPES[p.type].draw(ctx, 0, 0, s, p, {
-                selected: !V.placeMode && !V.healMode && !V.recoverMode && p.id === game.selectedId,
-                hl: !V.placeMode && !V.healMode && !V.recoverMode && selGroupIds.has(p.id),
+                selected: !V.placeMode && p.id === game.selectedId,
+                hl: !V.placeMode && selGroupIds.has(p.id),
                 root: p.id === game.playerCoreId,
                 linkTarget: linkTargets.has(p.id),
-                healTarget: V.healMode && p.owner === 'player',
-                recoverTarget: V.recoverMode && game.canRecover(p),
                 moved: p.owner === 'player' && (game.acted.has(p.id) || game.fresh.has(p.id)),
                 spent: p.owner === 'player' && !game.acted.has(p.id) && !game.fresh.has(p.id) && !game.canMove(p),
             });

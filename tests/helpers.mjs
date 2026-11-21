@@ -58,3 +58,15 @@ export const cellOnPage = (page, x, y) => page.evaluate(([x, y]) => {
 
 /*  A visible button by its exact text. */
 export const button = (page, text) => page.getByRole('button', {name:text, exact:true}).filter({visible:true});
+
+// An item of the selected piece's menu, while it's open.
+export const menuItem = (page, text) => page.getByRole('menuitem', {name:text, exact:true}).filter({visible:true});
+
+// Opens the selected piece's menu, by clicking the piece again.
+export const openMenu = async page => {
+    const [x, y] = await page.evaluate(() => {
+        const s = hc.app.game.getSelected();
+        return [s.x, s.y];
+    });
+    await page.mouse.click(...await cellOnPage(page, x, y));
+};
