@@ -35,6 +35,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 ## Actions that cost score
 - **Place piece** (P): costs 5 × core rank. Choose an empty cell next to any of your pieces (not an active harm tile), then the neighbouring piece it links to. New pieces start at full HP and can't move until next turn.
 - **Heal** (H): costs 5 × core rank, the same as placing. Heals **core rank** HP, starting from a piece you click, and flows along links exactly like a heal tile. **Unused healing is lost.** Only available when some piece is damaged. Doesn't use a move or end the turn.
+- **Recover** (R, 2026-11-20): once a turn, a piece that has moved, or was placed, this turn can move again, for **its rank** in score. It doesn't add a move: moving it again uses one of the turn's moves left (so it's only offered while there's one). Moves used are counted apart from the pieces that moved (`Game.movesUsed`, saved, as is `recoverUsed`), so freeing a piece doesn't give back its move. The turn doesn't end by itself while a Recover could still be used. (Planned: **Quicken**, once a turn, adds a move for the swarm's rank in score.)
 
 ## The swarm
 - Moving a piece moves its whole subtree by the same step. Only the chosen piece spends a move, so pieces it carries can still move themselves afterward. Order matters: reshape the children first, then carry the formation with the parent, or the other way round.
@@ -156,6 +157,7 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 - Legal moves are highlighted; attacks in indigo. Hovering a move shows a faint copy of the whole group at its destination, and marks landing cells that are active harm tiles in strong red and active heal tiles in bright green. Hovering an attack highlights every enemy that would be hit.
 - **Click** one of your pieces to select it; **shift-click** a cell held by your own piece to move there instead (it falls back to selecting if the move isn't legal).
 - **Heal mode** (H): every player piece gets a green ring, thicker if damaged; click one to heal from it.
+- **Recover mode** (R): every piece that can be recovered gets a cyan ring (`--recover`); click one to recover it.
 - A dashed outline shows the link range around the selected piece's parent.
 - **Golden path:** a trail of small gold dots (`--path`, 50% opacity; kept small so it doesn't clutter the board) through every cell your core has been on, in order (`Game.corePath`, saved with the game). Each step starts at the centre of its cell and stops a gap short of the next cell's centre, where the next step starts, so steps don't overlap; the last step runs all the way to the core. Each step is drawn separately, so steps you retrace stack up and look darker. It's drawn under the fog, so it dims out of sight like the board.
 - With fog of war on, cells out of sight are dimmed and enemies there aren't drawn. Once the game is over, won or lost, every cell you've seen counts as in sight and every enemy is drawn, wherever it is, so you can see what came for you; cells never seen stay in fog.

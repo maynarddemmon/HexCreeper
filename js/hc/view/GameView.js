@@ -71,6 +71,12 @@
                     draw();
                     return;
                 }
+                if (V.recoverMode) {
+                    V.recoverMode = false;
+                    game.playerRecover(game.pieceAt(c.x, c.y));
+                    draw();
+                    return;
+                }
                 const sel = game.getSelected();
                 if (force && sel && game.playerAct(sel, c.x, c.y)) {
                     this.afterTurn();

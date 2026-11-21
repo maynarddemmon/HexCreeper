@@ -12,6 +12,7 @@
         endTurnBtn,
         placeBtn,
         healBtn,
+        recoverBtn,
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -75,6 +76,7 @@
             gameOverShown = false;
             V.placeMode = null;
             V.healMode = false;
+            V.recoverMode = false;
             centerOn(false);
             draw();
         },
@@ -91,6 +93,7 @@
             if (game.over) return;
             V.placeMode = null;
             V.healMode = false;
+            V.recoverMode = false;
             game.playerWait();
             gameView.afterTurn();
         },
@@ -98,6 +101,7 @@
         cancelModes = () => {
             V.placeMode = null;
             V.healMode = false;
+            V.recoverMode = false;
             draw();
         },
         
@@ -243,6 +247,8 @@
                         status = i18n(V.placeMode.stage === 'cell' ? 'status-place-cell' : 'status-place-link');
                     } else if (V.healMode) {
                         status = i18n('status-heal', game.healAmount());
+                    } else if (V.recoverMode) {
+                        status = i18n('status-recover');
                     } else if (V.hover) {
                         // A solid under the pointer: what it is and how tough.
                         const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
@@ -357,6 +363,7 @@
                 doActivated: () => {
                     if (!game.over) {
                         V.healMode = false;
+                        V.recoverMode = false;
                         if (V.placeMode) {
                             V.placeMode = null;
                         } else if (game.canAffordPlace()) {
@@ -370,7 +377,18 @@
                 doActivated: () => {
                     if (!game.over) {
                         V.placeMode = null;
+                        V.recoverMode = false;
                         V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
+                        draw();
+                    }
+                }
+            }]);
+            recoverBtn = new ToggleBtn(ftrView, {text:i18n('btn-recover'), fontSize:fontSizeMedium, tooltip:i18n('tip-recover')}, [{
+                doActivated: () => {
+                    if (!game.over) {
+                        V.placeMode = null;
+                        V.healMode = false;
+                        V.recoverMode = !V.recoverMode && game.anyRecoverable();
                         draw();
                     }
                 }
@@ -412,6 +430,9 @@
             healBtn.setDisabled(gameOver || (!V.healMode && (!game.canAffordHeal() || !game.anyDamaged())));
             healBtn.setOn(V.healMode);
             
+            recoverBtn.setDisabled(gameOver || (!V.recoverMode && !game.anyRecoverable()));
+            recoverBtn.setOn(V.recoverMode);
+            
             
             infoPanel.update();
             statusTxt.update();
@@ -450,6 +471,7 @@
             gameOverShown = false;
             V.placeMode = null;
             V.healMode = false;
+            V.recoverMode = false;
             game.reset();
             centerOn(false);
         },
@@ -590,6 +612,7 @@
                 if (k === 'Escape') {cancelModes(); return;}
                 if (k === 'p') {placeBtn.doActivated(); return;}
                 if (k === 'h') {healBtn.doActivated(); return;}
+                if (k === 'r') {recoverBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');
@@ -599,7 +622,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.healMode) return;
+                if (V.placeMode || V.healMode || V.recoverMode) return;
                 if (k === '.' || k === 'Numpad5' || k === 'Enter') {
                     e.preventDefault();
                     endTurn();

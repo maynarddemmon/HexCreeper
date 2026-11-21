@@ -104,6 +104,7 @@
             H:1,
             placeMode:null, // Place mode: null, {stage:"cell"}, or {stage:"link", x, y}
             healMode:false, // choosing which piece a paid heal starts from
+            recoverMode:false, // choosing which piece to recover
             rafPending:false,
             css,
             draw,

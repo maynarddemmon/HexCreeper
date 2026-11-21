@@ -48,8 +48,10 @@
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
             this.visitedQuads = new Set();
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
-            this.acted = new Set();          // ids of player pieces moved this turn (counts toward the move limit)
+            this.acted = new Set();          // ids of player pieces moved this turn (each can move once a turn)
             this.fresh = new Set();          // ids of pieces placed this turn (can't move until next turn)
+            this.movesUsed = 0;              // moves made this turn (counts toward the move limit)
+            this.recoverUsed = false;        // whether Recover has been used this turn (once a turn)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
@@ -97,6 +99,8 @@
                 seenCells:[...this.seenCells],
                 acted:[...this.acted],
                 fresh:[...this.fresh],
+                movesUsed:this.movesUsed,
+                recoverUsed:this.recoverUsed,
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
@@ -158,6 +162,9 @@
             this.seenCells = new Set(o.seenCells);
             this.acted = new Set(o.acted);
             this.fresh = new Set(o.fresh);
+            // Saves from before moves were counted apart from the pieces that moved.
+            this.movesUsed = Number.isInteger(o.movesUsed) ? o.movesUsed : this.acted.size;
+            this.recoverUsed = !!o.recoverUsed;
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             // Saves from before the path was kept start it where the core is.
@@ -286,7 +293,7 @@
         
         // Can this player piece still move this turn?
         canMove: function(p) {
-            return !this.acted.has(p.id) && !this.fresh.has(p.id) && this.acted.size < this.moveLimit();
+            return !this.acted.has(p.id) && !this.fresh.has(p.id) && this.movesUsed < this.moveLimit();
         },
         
         // The piece plus everything linked below it.
@@ -837,20 +844,49 @@
         },
         
         // ---- Turn flow ----
-        // Each turn you may move up to moveLimit() different pieces (= core rank),
-        // each at most once, in any order. Only the piece you choose spends a move;
+        // Each turn you may make up to moveLimit() moves, each piece moving at most once
+        // (unless it's recovered), in any order. Only the piece you choose spends a move;
         // pieces it carries keep theirs.
         playerAct: function(piece, x, y) {
             if (this.over || !piece || piece.owner !== 'player' || !this.canMove(piece)) return false;
             if (!this.act(piece, x, y)) return false;
-            if (this.pieces.has(piece.id)) this.acted.add(piece.id);
+            if (this.pieces.has(piece.id)) {
+                this.acted.add(piece.id);
+                this.movesUsed++;
+            }
             this.afterPlayerAction();
             return true;
         },
         
         movesLeft: function() {
             const eligible = this.piecesOf('player').filter(p => !this.acted.has(p.id) && !this.fresh.has(p.id)).length;
-            return Math.max(0, Math.min(this.moveLimit() - this.acted.size, eligible));
+            return Math.max(0, Math.min(this.moveLimit() - this.movesUsed, eligible));
+        },
+        
+        // ---- Recover ----
+        // Once a turn, a piece that has moved, or was placed, this turn can be made ready to
+        // move again, for its rank in score. It doesn't add a move: moving it again uses one
+        // of the turn's moves left, so it's only offered while there's one.
+        recoverCost: function(p) {return p.rank;},
+        canRecover: function(p) {
+            return !this.over && !this.recoverUsed && p?.owner === 'player' &&
+                (this.acted.has(p.id) || this.fresh.has(p.id)) &&
+                this.movesUsed < this.moveLimit() && this.score >= this.recoverCost(p);
+        },
+        anyRecoverable: function() {return this.piecesOf('player').some(p => this.canRecover(p));},
+        playerRecover: function(p) {
+            let recovered = false;
+            if (this.canRecover(p)) {
+                const cost = this.recoverCost(p);
+                this.score -= cost;
+                this.acted.delete(p.id);
+                this.fresh.delete(p.id);
+                this.recoverUsed = true;
+                this.selectedId = p.id;
+                this.fx(p.x, p.y, `-${cost} score`, '--place-ink', {});
+                recovered = true;
+            }
+            return recovered;
         },
         
         afterPlayerAction: function() {
@@ -858,7 +894,7 @@
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length);
-            if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }
+            if (!canAct && !this.canAffordPlace() && !this.anyRecoverable()) { this.endPlayerTurn(); return; }
             // Keep a piece that can still move selected.
             const sel = this.getSelected();
             if (!sel || !this.canMove(sel)) {
@@ -877,6 +913,8 @@
             if (this.over) return;
             this.acted.clear();
             this.fresh.clear();
+            this.movesUsed = 0;
+            this.recoverUsed = false;
             const core = this.getPlayerCore();
             if (core && !this.getSelected()) this.selectedId = core.id;
             this.turn++;

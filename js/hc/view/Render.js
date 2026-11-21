@@ -225,7 +225,7 @@
                 fillCell(V.placeMode.x, V.placeMode.y, '--place-hover');
                 for (const p of game.linkCandidates(V.placeMode.x, V.placeMode.y)) linkTargets.add(p.id);
             }
-        } else if (sel && !V.healMode) {
+        } else if (sel && !V.healMode && !V.recoverMode) {
             // Link-range box around the selected piece's parent
             const par = game.parent(sel);
             if (par) strokeRegion(par, LINK.range, '--range');
@@ -380,11 +380,12 @@
             ctx.save();
             ctx.translate(sx, sy); ctx.scale(scale, scale);
             PIECE_TYPES[p.type].draw(ctx, 0, 0, s, p, {
-                selected: !V.placeMode && !V.healMode && p.id === game.selectedId,
-                hl: !V.placeMode && !V.healMode && selGroupIds.has(p.id),
+                selected: !V.placeMode && !V.healMode && !V.recoverMode && p.id === game.selectedId,
+                hl: !V.placeMode && !V.healMode && !V.recoverMode && selGroupIds.has(p.id),
                 root: p.id === game.playerCoreId,
                 linkTarget: linkTargets.has(p.id),
                 healTarget: V.healMode && p.owner === 'player',
+                recoverTarget: V.recoverMode && game.canRecover(p),
                 moved: p.owner === 'player' && (game.acted.has(p.id) || game.fresh.has(p.id)),
                 spent: p.owner === 'player' && !game.acted.has(p.id) && !game.fresh.has(p.id) && !game.canMove(p),
             });

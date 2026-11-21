@@ -9,6 +9,7 @@ myt.I18N.setDictionary({
 "btn-end-turn":"End Turn",
 "btn-place":"Place · $0",
 "btn-heal":"Heal $0 · $1",
+"btn-recover":"Recover",
 "btn-load-save":"Load Last Save",
 "btn-start":"Start",
 "btn-play-again":"Play Again",
@@ -22,6 +23,7 @@ myt.I18N.setDictionary({
 "tip-end-turn":"End your turn and let the enemies act. (Enter)",
 "tip-place":"Place a linked piece: choose an empty cell next to your pieces, then the piece to link it to. Costs $0 score. (P)",
 "tip-heal":"Spend $0 score to heal $1 HP, starting from a piece you pick and flowing along its links. (H)",
+"tip-recover":"Once a turn, let a piece that has moved (or was placed) this turn move again, for its rank in score. It still uses one of your moves left. (R)",
 "tip-center":"Center on your core. (Space)",
 "lbl-center":"Center",
 "lbl-save":"Save",
@@ -66,6 +68,7 @@ myt.I18N.setDictionary({
 "status-place-cell":"Place piece: choose an empty cell next to your pieces. Esc cancels.",
 "status-place-link":"Place piece: now click the piece to link it to.",
 "status-heal":"Heal: click the piece to heal from ($0 HP, flowing along links). Esc cancels.",
+"status-recover":"Recover: click a ringed piece to let it move again (costs its rank in score). Esc cancels.",
 "status-solid":"$0 ($1) · HP $2/$3 · DR $4",
 
 // Dialogs

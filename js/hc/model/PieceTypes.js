@@ -3,7 +3,8 @@
     
     const {cfg:{PIECE_R, CORE_BORDER, RING_GAP, OWNERS}} = pkg,
         
-        {PI, sin, cos, max} = Math,
+        {PI, sin:mathSin, cos:mathCos, max:mathMax} = Math,
+        TWO_PI = 2*PI,
         
         /*  Draws a piece's rank as a symbol inside a circle of radius R (the inside of its
             border), centred on (cx, cy), in the current fill and stroke styles:
@@ -14,7 +15,7 @@
             starting with the vertical. */
         drawRankSymbol = (ctx, cx, cy, R, rank) => {
             if (rank <= 1) return;
-            const at = (radius, angle) => [cx + radius * sin(angle), cy - radius * cos(angle)];
+            const at = (radius, angle) => [cx + radius * mathSin(angle), cy - radius * mathCos(angle)];
             ctx.beginPath();
             if (rank % 2 === 0 && rank <= 8) {
                 const lines = rank / 2;
@@ -25,7 +26,7 @@
                 }
                 ctx.stroke();
             } else if (rank === 3) {
-                for (let i = 0; i < 3; i++) ctx.lineTo(...at(R * 0.8, i * 2 * PI / 3));
+                for (let i = 0; i < 3; i++) ctx.lineTo(...at(R * 0.8, i * TWO_PI / 3));
                 ctx.closePath();
                 ctx.stroke();
             } else {
@@ -63,33 +64,34 @@
                     ring = (color, width) => {
                         ctx.strokeStyle = pkg.view.css(color);
                         ctx.lineWidth = width;
-                        ctx.beginPath(); ctx.arc(cx, cy, r + size * RING_GAP + width / 2, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(cx, cy, r + size * RING_GAP + width / 2, 0, TWO_PI); ctx.stroke();
                     };
                 
                 // Moved this turn: inverted (light fill, coloured ring and rank symbol).
                 const inv = opts.moved && !opts.ghost;
                 ctx.globalAlpha = opts.ghost ? 0.3 : opts.spent ? 0.5 : 1;
                 ctx.fillStyle = pkg.view.css(inv ? '--bg' : o.fill);
-                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.fill();
                 
                 // The border: thick on your core, thin on everything else, and a little thicker
                 // when inverted so the ring still reads. It's drawn inside the edge.
-                const border = opts.root ? Math.max(3, size * CORE_BORDER) : Math.max(1, size * (inv ? 0.045 : 0.03));
+                const border = opts.root ? mathMax(3, size * CORE_BORDER) : mathMax(1, size * (inv ? 0.045 : 0.03));
                 ctx.lineWidth = border;
                 ctx.strokeStyle = pkg.view.css(inv ? o.fill : o.stroke);
-                ctx.beginPath(); ctx.arc(cx, cy, r - border / 2, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, r - border / 2, 0, TWO_PI); ctx.stroke();
                 
                 // The rank, as a symbol filling the inside of the border.
                 ctx.fillStyle = ctx.strokeStyle = pkg.view.css(inv ? o.stroke : '--bg');
-                ctx.lineWidth = max(1, size * 0.035);
+                ctx.lineWidth = mathMax(1, size * 0.035);
                 ctx.lineJoin = 'round';
                 drawRankSymbol(ctx, cx, cy, r - border, piece.rank);
                 ctx.lineJoin = 'miter';
                 
                 ctx.globalAlpha = 1;
-                if (opts.selected) ring(o.stroke, Math.max(2, size * 0.045));
-                if (opts.healTarget) ring('--heal', Math.max(2, size * (piece.hp < piece.maxHp ? 0.07 : 0.035)));
-                if (opts.linkTarget) ring('--place-ink', Math.max(2, size * 0.05));
+                if (opts.selected) ring(o.stroke, mathMax(2, size * 0.045));
+                if (opts.healTarget) ring('--heal', mathMax(2, size * (piece.hp < piece.maxHp ? 0.07 : 0.035)));
+                if (opts.linkTarget) ring('--place-ink', mathMax(2, size * 0.05));
+                if (opts.recoverTarget) ring('--recover', mathMax(2, size * 0.05));
             }
         }
     };
