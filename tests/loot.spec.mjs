@@ -85,3 +85,23 @@ test('loot tiles are saved with their value', async ({page}) => {
     });
     expect(kept).toEqual({x:2, y:0, kind:'loot', timer:0, value:17});
 });
+
+test('opening loot tiles counts toward goals, and the count is saved', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await putLoot(page, 1, 0, 5);
+    await putLoot(page, 2, 0, 5);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        g.level = {...g.level, objectives:hc.goals.fromLevel({goals:[{name:'Looter', expression:'lootOpened >= 2', progress:'{lootOpened}/2'}]})};
+        g.objectives = [{value:false, locked:false, progress:''}];
+        g.playerAct(core, 1, 0);
+        const after1 = [g.lootOpened, g.objectives[0].progress, g.outcome];
+        g.playerWait();
+        g.playerAct(core, 2, 0);
+        const copy = new hc.Game();
+        copy.importFromObj(JSON.parse(JSON.stringify(g.exportToObj())));
+        return [after1, [g.lootOpened, g.objectives[0].progress, g.outcome], copy.lootOpened];
+    });
+    expect(r).toEqual([[1, '1/2', null], [2, '2/2', 'won'], 2]);
+});

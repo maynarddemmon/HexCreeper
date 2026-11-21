@@ -82,7 +82,7 @@ test('a level\'s goals and penalties get their defaults, and a bad one is refuse
 test('every value an expression can use is a number, at the start of a game', async ({page}) => {
     await startGame(page);
     const names = await page.evaluate(() => hc.goals.NAMES);
-    expect([...names].sort()).toEqual(['coreDist', 'coreHp', 'coreMaxHp', 'coreRank', 'coreX', 'coreY', 'enemies', 'kills', 'maxRank', 'pieces', 'piecesLost', 'piecesPlaced', 'quadsVisited', 'score', 'scoreEarned', 'turn']);
+    expect([...names].sort()).toEqual(['coreDist', 'coreHp', 'coreMaxHp', 'coreRank', 'coreX', 'coreY', 'enemies', 'kills', 'lootOpened', 'maxRank', 'pieces', 'piecesLost', 'piecesPlaced', 'quadsVisited', 'score', 'scoreEarned', 'turn']);
     // n == n is false for NaN and undefined. Optional, so they don't end the game.
     await playWith(page, names.map(name => goal(`${name} == ${name} && ${name} * 0 == 0`, {required:false})));
     expect((await state(page)).objectives.every(s => s.value)).toBe(true);

@@ -21,6 +21,7 @@
             maxRank:g => g.maxRank(),
             piecesLost:g => g.piecesLost,
             piecesPlaced:g => g.piecesPlaced,
+            lootOpened:g => g.lootOpened,
             enemies:g => g.piecesOf('enemy').length,
             kills:g => g.kills,
             quadsVisited:g => g.visitedQuads.size

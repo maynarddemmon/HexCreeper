@@ -38,6 +38,7 @@
             this.kills = 0;                  // enemy pieces destroyed
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
+            this.lootOpened = 0;             // loot tiles taken
             this.objectives = this.getLevelObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the level's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
@@ -89,6 +90,7 @@
                 kills:this.kills,
                 piecesLost:this.piecesLost,
                 piecesPlaced:this.piecesPlaced,
+                lootOpened:this.lootOpened,
                 objectives:this.objectives.map(s => ({...s})),
                 quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
@@ -143,6 +145,7 @@
             this.kills = isNum(o.kills) ? o.kills : 0;
             this.piecesLost = isNum(o.piecesLost) ? o.piecesLost : 0;
             this.piecesPlaced = isNum(o.piecesPlaced) ? o.piecesPlaced : 0;
+            this.lootOpened = isNum(o.lootOpened) ? o.lootOpened : 0;
             this.objectives = objectives.map((obj, i) => {
                 const s = o.objectives?.[i];
                 return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
@@ -445,6 +448,7 @@
             const t = piece.owner === 'player' ? this.tileAt(piece.x, piece.y, TILE_TYPE_LOOT) : null;
             if (t) {
                 this.tiles.delete(this.key(t.x, t.y));
+                this.lootOpened++;
                 this.earn(t.value);
                 this.fx(t.x, t.y, `+${t.value}`, '--loot', {});
             }

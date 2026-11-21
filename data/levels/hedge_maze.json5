@@ -21,6 +21,13 @@
 			"expression":"quadsVisited >= 24",
 			"progress":"{quadsVisited}/24 chambers",
 			"lockOnSuccess":true
+		},{
+			"name":"Find Treasure",
+			"description":"Loot 3 Chests.",
+			"expression":"lootOpened >= 3",
+			"progress":"{lootOpened}/3 chests",
+			"lockOnSuccess":true
 		}
+		
 	]
 }
