@@ -22,7 +22,7 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 
 ## Rank (both sides)
 - Each piece's rank = max(base, 1 + min(rank of its two highest-ranked children)); a missing child counts as 0. Base = 1. So a piece needs **two** children to rank up, and a full binary tree maximises rank but is the most fragile.
-- Player: **max HP = 2 × rank**. When max HP rises, current HP does not *(setting)*: the new capacity has to be healed. When it falls, HP is clamped. **Moves per turn = highest rank among your pieces. Place cost = 5 × core rank.**
+- Player: **max HP = 2 × rank**. When max HP rises, current HP does not *(setting)*: the new capacity has to be healed. When it falls, HP is clamped. **Moves per turn = highest rank among your pieces. Place cost = 4 + ⌈your pieces ÷ 2⌉** *(settings)*: it follows how many pieces you have, the core and detached ones included, not rank (2026-11-20; it was 5 × core rank, which detaching to keep ranks low made cheap).
 - Enemy: **max HP = 1 × rank** *(setting)*. A squad's **actions per turn = its highest rank**.
 - Ranks are recomputed whenever a piece is placed, spawned or destroyed.
 
@@ -33,8 +33,8 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 | core | enemy  | 1 × rank | 1 | 1 cell, any neighbour direction |
 
 ## Actions that cost score
-- **Place piece** (P): costs 5 × core rank. Choose an empty cell next to any of your pieces (not an active harm tile), then the neighbouring piece it links to. New pieces start at full HP and can't move until next turn.
-- **Heal** (H): costs 5 × core rank, the same as placing. Heals **core rank** HP, starting from a piece you click, and flows along links exactly like a heal tile. **Unused healing is lost.** Only available when some piece is damaged. Doesn't use a move or end the turn.
+- **Place piece** (P): costs 4 + ⌈your pieces ÷ 2⌉. Choose an empty cell next to any of your pieces (not an active harm tile), then the neighbouring piece it links to. New pieces start at full HP and can't move until next turn.
+- **Heal** (H): costs 5 × core rank. Heals **core rank** HP, starting from a piece you click, and flows along links exactly like a heal tile. **Unused healing is lost.** Only available when some piece is damaged. Doesn't use a move or end the turn.
 - **Recover** (R, 2026-11-20): once a turn, a piece that has moved, or was placed, this turn can move again, for **its rank** in score. It doesn't add a move: moving it again uses one of the turn's moves left (so it's only offered while there's one). Moves used are counted apart from the pieces that moved (`Game.movesUsed`, saved, as is `recoverUsed`), so freeing a piece doesn't give back its move. The turn doesn't end by itself while a Recover could still be used.
 - **Quicken** (U, 2026-11-20): once a turn, **one more move** this turn, for the swarm's rank (its highest, which sets the moves a turn) in score. It's done at once (no piece to pick), and adds to `moveLimit()` until the turn ends (`Game.quickenUsed`, saved). With Recover, it lets a piece that has moved go again even when every move was used. The turn doesn't end by itself while Quicken could be used, as with Place.
 
@@ -146,7 +146,8 @@ Every setting belongs to the level being played (see Levels): Settings shows onl
 | Base rank | 1 |
 | Max HP per rank | 2 |
 | Moves per turn per top rank | 1 |
-| Place cost per core rank | 5 |
+| Place cost, base | 4 |
+| Place cost: +1 per this many pieces | 2 |
 | Heal action cost per core rank | 5 |
 | Heal action HP per core rank | 1 |
 | Heal tile: base value | 1 |

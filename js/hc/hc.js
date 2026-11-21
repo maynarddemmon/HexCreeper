@@ -129,7 +129,8 @@
                 base:1,         // rank of a piece without two children
                 hpPer:2,        // max HP = hpPer x the piece's own rank
                 movesPer:1,     // pieces you may move per turn = movesPer x highest rank of any piece
-                costPer:5,      // cost to place a piece = costPer x core rank
+                placeBase:4,    // cost to place a piece = placeBase + 1 per placePerPieces of your pieces (rounded up)
+                placePerPieces:2,
                 healScorePer:1, // each unused heal unit becomes this much score
                 rankUpHeals:false, // true: when max HP rises with rank, HP rises too; false: the new HP must be healed
                 healCostPer:5,  // Heal action cost = healCostPer x core rank

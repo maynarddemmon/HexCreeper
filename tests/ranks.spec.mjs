@@ -6,7 +6,7 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
-test('rank needs two children; it sets max HP, moves and place cost', async ({page}) => {
+test('rank needs two children; it sets max HP and moves', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.GRID.dirs[0], hc.GRID.dirs[3]];
         g.score = 100;
@@ -18,9 +18,25 @@ test('rank needs two children; it sets max HP, moves and place cost', async ({pa
     });
     expect(r.before).toEqual({rank:1, hp:2, max:2, moves:1, cost:5});
     expect(r.oneChild).toBe(1);
-    // Rank 2: max HP 4, but ranking up doesn't add HP.
-    expect(r.after).toEqual({rank:2, hp:2, max:4, moves:2, cost:10});
+    // Rank 2: max HP 4, but ranking up doesn't add HP. Place cost follows the 3 pieces.
+    expect(r.after).toEqual({rank:2, hp:2, max:4, moves:2, cost:6});
     expect(r.score).toBe(90);
+});
+
+test('placing costs 4, plus 1 for every 2 of your pieces (rounded up), whatever their ranks', async ({page}) => {
+    const costs = await page.evaluate(() => {
+        const g = hc.app.game, out = [g.placeCost()];
+        g.score = 1000;
+        for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1]]) {
+            g.playerPlace(x, y, g.getPlayerCore());
+            out.push(g.placeCost());
+        }
+        g.playerWait();
+        g.playerDetach(g.pieceAt(1, 0));       // detaching changes ranks, not the cost
+        out.push(g.getPlayerCore().rank, g.placeCost());
+        return out;
+    });
+    expect(costs).toEqual([5, 5, 6, 6, 7, 7, 2, 7]);
 });
 
 test('moves per turn follow the highest rank of any piece, not the core', async ({page}) => {
@@ -34,7 +50,7 @@ test('moves per turn follow the highest rank of any piece, not the core', async 
         g.playerPlace(free[1].x, free[1].y, a);
         return {core:c.rank, child:a.rank, moves:g.moveLimit(), cost:g.placeCost()};
     });
-    expect(r).toEqual({core:1, child:2, moves:2, cost:5});
+    expect(r).toEqual({core:1, child:2, moves:2, cost:6});
 });
 
 test('each piece moves at most once per turn; new pieces wait a turn', async ({page}) => {

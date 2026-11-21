@@ -64,7 +64,8 @@
         num('rankBase',    GROUP_SWARM, RANK,     'base', 1, 10),
         num('hpPer',       GROUP_SWARM, RANK,     'hpPer', 1, 20),
         num('movesPer',    GROUP_SWARM, RANK,     'movesPer', 1, 10),
-        num('costPer',     GROUP_SWARM, RANK,     'costPer', 0, 100),
+        num('placeBase',   GROUP_SWARM, RANK,     'placeBase', 0, 100),
+        num('placePerPieces', GROUP_SWARM, RANK,  'placePerPieces', 1, 100),
         bool('rankUpHeals', GROUP_SWARM, RANK,    'rankUpHeals'),
         
         num('quadRadius',  GROUP_TILES, QUAD,     'radius', 1, 6, true),

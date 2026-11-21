@@ -24,7 +24,8 @@
 		"rankBase":      {"pref":true},
 		"hpPer":         {"pref":true},
 		"movesPer":      {"pref":true},
-		"costPer":       {"pref":true},
+		"placeBase":     {"pref":true},
+		"placePerPieces":{"pref":true},
 		"rankUpHeals":   {"pref":true},
 		
 		"quadRadius":    {"pref":true},

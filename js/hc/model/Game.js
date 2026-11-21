@@ -295,7 +295,9 @@
         },
         maxRank: function() {return Math.max(0, ...this.piecesOf('player').map(p => p.rank)); },
         moveLimit: function() {return RANK.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
-        placeCost: function() {return RANK.costPer * this.coreRank(); },
+        // Placing costs more the more pieces you have (the core and detached ones too), but
+        // not with rank, so detaching to keep ranks down doesn't make pieces cheaper.
+        placeCost: function() {return RANK.placeBase + Math.ceil(this.piecesOf('player').length / Math.max(1, RANK.placePerPieces));},
         
         // Can this player piece still move this turn?
         canMove: function(p) {
