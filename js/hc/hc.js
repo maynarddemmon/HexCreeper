@@ -42,6 +42,7 @@
             colorHeaderBg:'var(--header-bg)',
             colorHeaderText:'var(--header-text)',
             colorPanel:'var(--dlg-bg)',
+            colorMenu:'var(--menu-bg)',
             colorPanelHeader:'var(--dlg-header)',
             colorPanelFooter:'var(--dlg-footer)',
             colorText:'var(--ink)',

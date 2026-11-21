@@ -9,7 +9,7 @@
         
         ICON_DIR = './img/icons/',
         
-        Btn = pkg.Btn = new JSClass('Btn', M.PaddedText, {
+        Btn = pkg.Btn = new JSClass('Btn', M.PlainText, {
             include: [M.Button],
             
             
@@ -23,9 +23,6 @@
                 attrs.focusable ??= true;
                 attrs.focusIndicator ??= false;
                 attrs.height ??= btnHeight;
-                
-                attrs.paddingLeft ??= 8;
-                attrs.paddingRight ??= 8;
                 
                 const buttonType = attrs.buttonType || '';
                 delete attrs.buttonType;
@@ -66,8 +63,6 @@
         initNode: function(parent, attrs) {
             attrs.buttonType ??= 'underline';
             attrs.textColor ??= colorBtn;
-            attrs.paddingLeft ??= 0;
-            attrs.paddingRight ??= 0;
             this.callSuper(parent, attrs);
         }
     });
@@ -75,8 +70,6 @@
     pkg.SquareBtn = new JSClass('SquareBtn', Btn, {
         initNode: function(parent, attrs) {
             attrs.width ??= btnHeight;
-            attrs.paddingLeft ??= 0;
-            attrs.paddingRight ??= 0;
             attrs.lineHeight ??= '0px';
             
             this.callSuper(parent, attrs);

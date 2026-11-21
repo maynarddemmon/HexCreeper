@@ -5,10 +5,10 @@
         
         {
             Btn,
-            theme:{padding, cornerRadius, colorPanel, colorTextMuted, fontSizeMedium}
+            theme:{spacing, cornerRadius, colorMenu, colorTextMuted, fontSizeMedium}
         } = pkg,
         
-        MENU_WIDTH = 170;
+        MENU_WIDTH = 120;
     
     /*  A small menu that floats beside the selected piece, listing what can be done on or by
         it (opened by clicking the piece again). items: [{label(), tip(), enabled(), run()}];
@@ -24,27 +24,29 @@
             delete attrs.items;
             delete attrs.onPick;
             attrs.width = MENU_WIDTH;
-            attrs.bgColor = colorPanel;
-            attrs.roundedCorners = cornerRadius;
             attrs.visible = false;
             
             self.callSuper(parent, attrs);
             
             self.getIDE().setAttribute('role', 'menu');
             self._buttons = items.map(item => {
-                const btn = new Btn(self, {x:padding, width:MENU_WIDTH, text:item.label(), fontSize:fontSizeMedium}, [{
+                const btn = new Btn(self, {width:MENU_WIDTH, text:item.label(), fontSize:fontSizeMedium}, [{
                     doActivated: () => {
                         if (item.enabled()) {
                             onPick();
                             item.run();
                         }
+                    },
+                    setWidth: function(v) {
+                        console.log(v);
+                        this.callSuper(v);
                     }
                 }]);
                 btn.getIDE().setAttribute('role', 'menuitem');
                 btn.item = item;
                 return btn;
             });
-            new M.SpacedLayout(self, {axis:'y', inset:padding, spacing:padding/2, outset:padding, collapseParent:true});
+            new M.SpacedLayout(self, {axis:'y', spacing, collapseParent:true});
         },
         
         
@@ -64,7 +66,8 @@
         placeNear: function(sx, sy, size) {
             const parent = this.parent,
                 gap = size * 0.6,
-                w = this.width, h = this.height,
+                w = this.width,
+                h = this.height,
                 x = sx + gap + w <= parent.width ? sx + gap : sx - gap - w;
             this.setX(Math.max(0, Math.min(parent.width - w, x)));
             this.setY(Math.max(0, Math.min(parent.height - h, sy - h / 2)));
