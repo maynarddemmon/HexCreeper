@@ -3,7 +3,8 @@
 (pkg => {
     'use strict';
     
-    const
+    const {min:mathMin, max:mathMax, round:mathRound, hypot:mathHypot} = Math,
+        
         // The canvas is made here and placed into the page by GameView.
         canvas = document.createElement('canvas'),
         ctx = canvas.getContext('2d'),
@@ -46,7 +47,7 @@
         stepPan = now => {
             const p = pan.current;
             if (!p) return false;
-            const t = Math.min(1, Math.max(0, (now - p.t0) / pkg.cfg.PAN_MS)),
+            const t = mathMin(1, mathMax(0, (now - p.t0) / pkg.cfg.PAN_MS)),
                 ease = 1 - (1 - t) ** 3; // fast, then settling
             cam.x = p.fromX + (p.toX - p.fromX) * ease;
             cam.y = p.fromY + (p.toY - p.fromY) * ease;
@@ -79,8 +80,8 @@
         addCellPath = (x, y, insetPx = 0, scale = null) => {
             const [cx, cy] = cellCenter(x, y),
                 pts = pkg.GRID.corners(x, y).map(([wx, wy]) => worldToScreen(wx, wy)),
-                rad = Math.hypot(pts[0][0] - cx, pts[0][1] - cy) || 1,
-                f = scale != null ? scale : Math.max(0, 1 - insetPx / rad);
+                rad = mathHypot(pts[0][0] - cx, pts[0][1] - cy) || 1,
+                f = scale != null ? scale : mathMax(0, 1 - insetPx / rad);
             pts.forEach(([px, py], i) => {
                 const X = cx + (px - cx) * f,
                     Y = cy + (py - cy) * f;
@@ -105,6 +106,7 @@
             placeMode:null, // Place mode: null, {stage:"cell"}, or {stage:"link", x, y}
             healMode:false, // choosing which piece a paid heal starts from
             recoverMode:false, // choosing which piece to recover
+            attachMode:false, // choosing which piece to attach the selected piece to
             rafPending:false,
             css,
             draw,
@@ -141,11 +143,11 @@
             // Matches the canvas's backing store to its size on the page.
             resize: () => {
                 const r = canvas.getBoundingClientRect();
-                V.W = Math.max(1, r.width);
-                V.H = Math.max(1, r.height);
+                V.W = mathMax(1, r.width);
+                V.H = mathMax(1, r.height);
                 V.dpr = window.devicePixelRatio || 1;
-                canvas.width = Math.round(V.W * V.dpr);
-                canvas.height = Math.round(V.H * V.dpr);
+                canvas.width = mathRound(V.W * V.dpr);
+                canvas.height = mathRound(V.H * V.dpr);
                 draw();
             },
             

@@ -31,6 +31,33 @@
             Numpad1: [-1, 1], Numpad3: [0, 1],
         },
         
+        hexDist = (dq, dr) => (mathAbs(dq) + mathAbs(dr) + mathAbs(dq + dr)) / 2,
+        
+        // The cell holding fractional axial coordinates (q, r).
+        cubeRound = (q, r) => {
+            let rx = mathRound(q), rz = mathRound(r), ry = mathRound(-q - r);
+            const dx = mathAbs(rx - q), dz = mathAbs(rz - r), dy = mathAbs(ry - (-q - r));
+            if (dx > dy && dx > dz) rx = -ry - rz;
+            else if (dz > dy) rz = -rx - ry;
+            return {x:rx, y:rz};
+        },
+        
+        cornerOff = [0, 1, 2, 3, 4, 5].map(i => {
+            const a = (-90 + 60 * i) * PI_OVER_180;
+            return [INV_SQRT3 * mathCos(a), INV_SQRT3 * mathSin(a)];
+        }),
+        
+        // Cells within n steps of (cq, cr).
+        disk = (cq, cr, n) => {
+            const out = [];
+            for (let dq = -n; dq <= n; dq++) {
+                for (let dr = mathMax(-n, -dq - n); dr <= mathMin(n, -dq + n); dr++) {
+                    out.push({x:cq + dq, y:cr + dr});
+                }
+            }
+            return out;
+        },
+        
         // Hex grid geometry: axial (q, r) cells stored as (x, y), pointy-top, 6
         // neighbours, hex distance. Quadrants are hexagonal chunks of radius k
         // (3k^2+3k+1 cells) that tile the plane, each with 6 neighbours.
@@ -38,27 +65,6 @@
         makeGrid = pkg.makeGrid = k => {
             // neighbour order matches edge order: edge i joins corner i and i+1
             const dirs = [[1, -1], [1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1]],
-                R = INV_SQRT3, // circumradius when flat-to-flat = 1
-                cornerOff = [0, 1, 2, 3, 4, 5].map(i => {
-                    const a = (-90 + 60 * i) * PI_OVER_180;
-                    return [R * mathCos(a), R * mathSin(a)];
-                }),
-                hexDist = (dq, dr) => (mathAbs(dq) + mathAbs(dr) + mathAbs(dq + dr)) / 2,
-                // The cell holding fractional axial coordinates (q, r).
-                cubeRound = (q, r) => {
-                    let rx = mathRound(q), rz = mathRound(r), ry = mathRound(-q - r);
-                    const dx = mathAbs(rx - q), dz = mathAbs(rz - r), dy = mathAbs(ry - (-q - r));
-                    if (dx > dy && dx > dz) rx = -ry - rz;
-                    else if (dz > dy) rz = -rx - ry;
-                    return {x:rx, y:rz};
-                },
-                // Cells within n steps of (cq, cr).
-                disk = (cq, cr, n) => {
-                    const out = [];
-                    for (let dq = -n; dq <= n; dq++)
-                        for (let dr = mathMax(-n, -dq - n); dr <= mathMin(n, -dq + n); dr++) out.push({ x: cq + dq, y: cr + dr });
-                    return out;
-                },
                 // Chunk lattice: hexagons of radius k tile the plane with these basis vectors.
                 A = [2 * k + 1, -k], B = [k, k + 1], det = 3 * k * k + 3 * k + 1,
                 chunkCenter = (i, j) => [i * A[0] + j * B[0], i * A[1] + j * B[1]],
@@ -132,18 +138,22 @@
                     };
                 },
                 *visibleCells(wx0, wy0, wx1, wy1) {
-                    const h = HALF_SQRT3;
-                    for (let r = mathFloor(wy0 / h) - 1; r <= mathCeil(wy1 / h) + 1; r++)
-                        for (let q = mathFloor(wx0 - r / 2) - 1; q <= mathCeil(wx1 - r / 2) + 1; q++) yield { x: q, y: r };
-                },
+                    const yLim = mathCeil(wy1 / HALF_SQRT3) + 1;
+                    for (let r = mathFloor(wy0 / HALF_SQRT3) - 1; r <= yLim; r++) {
+                        const halfR = r / 2,
+                            xLim = mathCeil(wx1 - halfR) + 1;
+                        for (let q = mathFloor(wx0 - halfR) - 1; q <= xLim; q++) {
+                            yield {x:q, y:r};
+                        }
+                    }
+                }
             };
         };
     
     pkg.GRID = makeGrid(QUAD.radius); // replaced by Game.reset
     
-    
-    // Grid distance (steps between cells) and straight-line distance².
-    pkg.hexDist = (a, b) => pkg.GRID.dist(a, b);
+    // Grid distance (steps between cells) and straight-line distance squared.
+    pkg.hexDist = (a, b) => hexDist(a.x - b.x, a.y - b.y);
     pkg.euclid2 = (a, b) => {
         const [ax, ay] = pkg.GRID.center(a.x, a.y), [bx, by] = pkg.GRID.center(b.x, b.y);
         return (ax - bx) ** 2 + (ay - by) ** 2;

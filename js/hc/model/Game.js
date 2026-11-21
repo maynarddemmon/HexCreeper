@@ -853,10 +853,7 @@
         playerAct: function(piece, x, y) {
             if (this.over || !piece || piece.owner !== 'player' || !this.canMove(piece)) return false;
             if (!this.act(piece, x, y)) return false;
-            if (this.pieces.has(piece.id)) {
-                this.acted.add(piece.id);
-                this.movesUsed++;
-            }
+            if (this.pieces.has(piece.id)) this.useMove(piece);
             this.afterPlayerAction();
             return true;
         },
@@ -864,6 +861,57 @@
         movesLeft: function() {
             const eligible = this.piecesOf('player').filter(p => !this.acted.has(p.id) && !this.fresh.has(p.id)).length;
             return Math.max(0, Math.min(this.moveLimit() - this.movesUsed, eligible));
+        },
+        
+        // A piece has acted: it's done for the turn, and a move is used.
+        useMove: function(p) {
+            this.acted.add(p.id);
+            this.movesUsed++;
+        },
+        
+        // ---- Detach and attach ----
+        // A piece other than the core can be detached from its parent, however far apart
+        // they are, or, with no parent, attached to an adjacent piece of yours (in any
+        // group, but not one linked below it, which would make a loop). Either is the
+        // piece's action for the turn, and uses a move. Ranks change to suit: a detached
+        // piece keeps its own, but what it was linked to may drop, and with it the swarm's
+        // rank (the highest of any piece) and the moves a turn. Only player pieces can do
+        // either.
+        canDetach: function(p) {
+            return !this.over && p?.owner === 'player' && p.id !== this.playerCoreId && !!p.parentId && this.canMove(p);
+        },
+        attachTargets: function(p) {
+            let targets = [];
+            if (!this.over && p?.owner === 'player' && p.id !== this.playerCoreId && !p.parentId && this.canMove(p)) {
+                const below = new Set(this.group(p).map(g => g.id));
+                targets = this.piecesOf('player').filter(t => !below.has(t.id) && hexDist(t, p) === 1);
+            }
+            return targets;
+        },
+        canAttach: function(p) {return this.attachTargets(p).length > 0;},
+        playerDetach: function(p) {
+            let done = false;
+            if (this.canDetach(p)) {
+                p.parentId = null;
+                this.afterLinkChange(p, 'detached');
+                done = true;
+            }
+            return done;
+        },
+        playerAttach: function(p, target) {
+            let done = false;
+            if (this.attachTargets(p).includes(target)) {
+                p.parentId = target.id;
+                this.afterLinkChange(p, 'attached');
+                done = true;
+            }
+            return done;
+        },
+        afterLinkChange: function(p, text) {
+            this.useMove(p);
+            this.recomputeRanks();
+            this.fx(p.x, p.y, text, '--place-ink', {});
+            this.afterPlayerAction();
         },
         
         // ---- Recover ----
@@ -913,7 +961,7 @@
             this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
-            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length);
+            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p));
             if (!canAct && !this.canAffordPlace() && !this.anyRecoverable() && !this.canQuicken()) { this.endPlayerTurn(); return; }
             // Keep a piece that can still move selected.
             const sel = this.getSelected();

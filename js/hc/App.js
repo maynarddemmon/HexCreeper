@@ -14,6 +14,8 @@
         healBtn,
         recoverBtn,
         quickenBtn,
+        detachBtn,
+        attachBtn,
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -78,6 +80,7 @@
             V.placeMode = null;
             V.healMode = false;
             V.recoverMode = false;
+            V.attachMode = false;
             centerOn(false);
             draw();
         },
@@ -95,6 +98,7 @@
             V.placeMode = null;
             V.healMode = false;
             V.recoverMode = false;
+            V.attachMode = false;
             game.playerWait();
             gameView.afterTurn();
         },
@@ -103,6 +107,7 @@
             V.placeMode = null;
             V.healMode = false;
             V.recoverMode = false;
+            V.attachMode = false;
             draw();
         },
         
@@ -167,7 +172,7 @@
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
                 if (sel) {
                     self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : 'info-linked'), sel.rank, sel.hp, sel.maxHp)
+                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.rank, sel.hp, sel.maxHp)
                     );
                 } else {
                     self.selected.update(i18n('info-none'));
@@ -250,6 +255,8 @@
                         status = i18n('status-heal', game.healAmount());
                     } else if (V.recoverMode) {
                         status = i18n('status-recover');
+                    } else if (V.attachMode) {
+                        status = i18n('status-attach');
                     } else if (V.hover) {
                         // A solid under the pointer: what it is and how tough.
                         const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
@@ -365,6 +372,7 @@
                     if (!game.over) {
                         V.healMode = false;
                         V.recoverMode = false;
+                        V.attachMode = false;
                         if (V.placeMode) {
                             V.placeMode = null;
                         } else if (game.canAffordPlace()) {
@@ -379,6 +387,7 @@
                     if (!game.over) {
                         V.placeMode = null;
                         V.recoverMode = false;
+                        V.attachMode = false;
                         V.healMode = !V.healMode && game.canAffordHeal() && game.anyDamaged();
                         draw();
                     }
@@ -389,9 +398,24 @@
                     if (!game.over) {
                         V.placeMode = null;
                         V.healMode = false;
+                        V.attachMode = false;
                         V.recoverMode = !V.recoverMode && game.anyRecoverable();
                         draw();
                     }
+                }
+            }]);
+            detachBtn = new Btn(ftrView, {text:i18n('btn-detach'), fontSize:fontSizeMedium, tooltip:i18n('tip-detach')}, [{
+                doActivated: () => {
+                    cancelModes();
+                    if (game.playerDetach(game.getSelected())) gameView.afterTurn();
+                }
+            }]);
+            attachBtn = new ToggleBtn(ftrView, {text:i18n('btn-attach'), fontSize:fontSizeMedium, tooltip:i18n('tip-attach')}, [{
+                doActivated: () => {
+                    const on = !V.attachMode && game.canAttach(game.getSelected());
+                    cancelModes();
+                    V.attachMode = on;
+                    draw();
                 }
             }]);
             quickenBtn = new Btn(ftrView, {text:i18n('btn-quicken', 1), fontSize:fontSizeMedium}, [{
@@ -447,6 +471,11 @@
             recoverBtn.setDisabled(gameOver || (!V.recoverMode && !game.anyRecoverable()));
             recoverBtn.setOn(V.recoverMode);
             
+            const sel = game.getSelected();
+            detachBtn.setDisabled(!game.canDetach(sel));
+            attachBtn.setDisabled(!V.attachMode && !game.canAttach(sel));
+            attachBtn.setOn(V.attachMode);
+            
             const quickenCost = game.quickenCost();
             quickenBtn.setTextAndFit(i18n('btn-quicken', quickenCost));
             quickenBtn.setTooltip(i18n('tip-quicken', quickenCost));
@@ -491,6 +520,7 @@
             V.placeMode = null;
             V.healMode = false;
             V.recoverMode = false;
+            V.attachMode = false;
             game.reset();
             centerOn(false);
         },
@@ -633,6 +663,8 @@
                 if (k === 'h') {healBtn.doActivated(); return;}
                 if (k === 'r') {recoverBtn.doActivated(); return;}
                 if (k === 'u') {quickenBtn.doActivated(); return;}
+                if (k === 'x') {detachBtn.doActivated(); return;}
+                if (k === 'l') {attachBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');
@@ -642,7 +674,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.healMode || V.recoverMode) return;
+                if (V.placeMode || V.healMode || V.recoverMode || V.attachMode) return;
                 if (k === '.' || k === 'Numpad5' || k === 'Enter') {
                     e.preventDefault();
                     endTurn();

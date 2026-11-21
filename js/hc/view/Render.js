@@ -225,6 +225,10 @@
                 fillCell(V.placeMode.x, V.placeMode.y, '--place-hover');
                 for (const p of game.linkCandidates(V.placeMode.x, V.placeMode.y)) linkTargets.add(p.id);
             }
+        } else if (V.attachMode && sel) {
+            // The pieces the selected one can attach to.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const p of game.attachTargets(sel)) linkTargets.add(p.id);
         } else if (sel && !V.healMode && !V.recoverMode) {
             // Link-range box around the selected piece's parent
             const par = game.parent(sel);

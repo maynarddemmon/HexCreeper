@@ -13,16 +13,9 @@
     pkg.GameView = new JS.Class('GameView', myt.View, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
-            const self = this;
-            
-            self.callSuper(parent, attrs);
-            
-            self.getIDE().appendChild(canvas);
-            
-            self.syncTo(self, '_onResize', 'width');
-            self.syncTo(self, '_onResize', 'height');
-            
-            self._listen();
+            this.callSuper(parent, attrs);
+            this.getIDE().appendChild(canvas);
+            this._listen();
         },
         
         
@@ -77,6 +70,15 @@
                     draw();
                     return;
                 }
+                if (V.attachMode) {
+                    V.attachMode = false;
+                    if (game.playerAttach(game.getSelected(), game.pieceAt(c.x, c.y))) {
+                        this.afterTurn();
+                    } else {
+                        draw();
+                    }
+                    return;
+                }
                 const sel = game.getSelected();
                 if (force && sel && game.playerAct(sel, c.x, c.y)) {
                     this.afterTurn();
@@ -90,11 +92,6 @@
                 }
                 if (sel && game.playerAct(sel, c.x, c.y)) this.afterTurn();
             }
-        },
-        
-        /** @private */
-        _onResize: function(_event) {
-            V.resize();
         },
         
         /** @private */

@@ -8,6 +8,7 @@ Each turn you may move as many pieces as your highest rank, each once, in any or
 - Moving a piece carries everything linked below it, keeping its shape. Move the core to shift the whole swarm, or move a branch to reshape it.
 - A linked piece must stay within 3 steps of its parent.
 - If a piece is destroyed, everything linked below it goes too.
+- Detach (X) breaks the selected piece's link to its parent, however far apart they are; it keeps what's linked below it and moves on its own. Attach (L) links a piece with no parent to one of your pieces next to it. Either uses that piece's move, and changes ranks.
 - Shift-click a cell held by one of your own pieces to move onto it instead of selecting it.
 
 <span style="font-size:16px;">RANK</span>
