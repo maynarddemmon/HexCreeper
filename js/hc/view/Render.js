@@ -20,16 +20,57 @@
         // Where a heal tile's value goes, from its centre, in cells.
         HEAL_LABEL_OFFSET = [0.3, 0.32],
         
+        // Whether (x, y) holds a solid of the same subtype as solid tile t.
+        sameSolid = (t, x, y) => {
+            const n = t.kind === TILE_TYPE_SOLID && game.tiles.get(game.key(x, y));
+            return !!n && n.kind === TILE_TYPE_SOLID && n.subtype === t.subtype;
+        },
+        
         drawTile = (t, now) => {
             if (t.kind === TILE_TYPE_SOLID) {
-                // In its subtype's colours, if it has them.
+                // In its subtype's colours, if it has them, filling the whole hex so solids of
+                // a kind run together: the outline is only on edges that don't meet a solid of
+                // the same subtype (sameSolid).
                 const solid = pkg.solids.get(t.subtype),
-                    color = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback);
+                    color = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback),
+                    [cx, cy] = cellCenter(t.x, t.y),
+                    inset = 1,
+                    pts = pkg.GRID.corners(t.x, t.y).map(([wx, wy]) => {
+                        const [px, py] = worldToScreen(wx, wy),
+                            d = Math.hypot(px - cx, py - cy) || 1;
+                        return [px - (px - cx) * inset / d, py - (py - cy) * inset / d];
+                    });
+                // Half a pixel bigger, so neighbouring fills overlap rather than leave a faint
+                // antialiased seam between them.
                 ctx.beginPath();
-                addCellPath(t.x, t.y, 1);
+                addCellPath(t.x, t.y, -0.5);
                 ctx.fillStyle = color(solid?.fillColor, '--solid');
                 ctx.fill();
-                strokeCell(t.x, t.y, color(solid?.borderColor, '--solid-edge'), Math.max(1, cam.size * 0.03), 1);
+                // Where an edge's neighbour isn't drawn, the corner is an outside corner of
+                // the joined shape, and this hex's line and the next hex's stop short of each
+                // other (each is inset into its own hex): run the line on past the corner, by
+                // the inset, to where it meets the neighbour's line; round caps then join the two.
+                const lineWidth = Math.max(1, cam.size * 0.03),
+                    ext = inset,
+                    edges = pkg.GRID.edges,
+                    drawn = edges.map(([dx, dy]) => !sameSolid(t, t.x + dx, t.y + dy));
+                ctx.beginPath();
+                edges.forEach(([, , a, b], i) => {
+                    if (drawn[i]) {
+                        const [ax, ay] = pts[a], [bx, by] = pts[b],
+                            len = Math.hypot(bx - ax, by - ay) || 1,
+                            ux = (bx - ax) / len, uy = (by - ay) / len,
+                            pre = drawn[(i + 5) % 6] ? 0 : ext,
+                            post = drawn[(i + 1) % 6] ? 0 : ext;
+                        ctx.moveTo(ax - ux * pre, ay - uy * pre);
+                        ctx.lineTo(bx + ux * post, by + uy * post);
+                    }
+                });
+                ctx.strokeStyle = color(solid?.borderColor, '--solid-edge');
+                ctx.lineWidth = lineWidth;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.lineCap = 'butt';
                 // Once damaged, a bar shows how much it has left.
                 const maxHp = solid?.hp ?? t.hp;
                 if (t.hp < maxHp && cam.size >= 22) {
@@ -69,7 +110,6 @@
                     r = s * 0.17;
                 ctx.beginPath(); addCellPath(t.x, t.y, 1);
                 ctx.fillStyle = css('--loot-bg'); ctx.fill();
-                strokeCell(t.x, t.y, css('--loot'), Math.max(1, s * 0.03), 1);
                 ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
                 ctx.fillStyle = css('--loot'); ctx.fill();
                 ctx.lineWidth = Math.max(1, s * 0.035);
@@ -201,7 +241,7 @@
             [x0, y0] = screenToWorld(0, 0),
             [x1, y1] = screenToWorld(W, H),
             visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)],
-            // chunk key per visible cell (used for the visited tint and quadrant borders)
+            // chunk key per visible cell (for the visited tint)
             chunkKeys = new Map(),
             chunkKey = (x, y) => {
                 const k = x + ',' + y;
@@ -282,31 +322,27 @@
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
         }
         
-        // Grid lines (lighter along quadrant borders)
+        // Grid lines: the same everywhere (quadrants show only as the visited tint), and
+        // none between solids of the same subtype, which run together.
         ctx.lineWidth = 1;
         // each hex draws its NE, E and SE edges, so every edge is drawn once; only edges
         // touching a known cell
-        const minor = new Path2D(), major = new Path2D();
+        const grid = new Path2D();
         for (const c of visible) {
-            const cKnown = isKnown(c.x, c.y);
-            let cs = null, mine;
+            const cKnown = isKnown(c.x, c.y),
+                tile = game.tiles.get(game.key(c.x, c.y));
+            let cs = null;
             for (let e = 0; e < 3; e++) {
                 const [dx, dy, a, b] = pkg.GRID.edges[e];
-                if (!cKnown && !isKnown(c.x + dx, c.y + dy)) continue;
-                if (!cs) {
-                    cs = pkg.GRID.corners(c.x, c.y);
-                    mine = chunkKey(c.x, c.y);
+                if ((cKnown || isKnown(c.x + dx, c.y + dy)) && !(tile && sameSolid(tile, c.x + dx, c.y + dy))) {
+                    cs ??= pkg.GRID.corners(c.x, c.y);
+                    const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
+                    grid.moveTo(ax, ay); grid.lineTo(bx, by);
                 }
-                const path = chunkKey(c.x + dx, c.y + dy) === mine ? minor : major,
-                    [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
-                path.moveTo(ax, ay); path.lineTo(bx, by);
             }
         }
         ctx.strokeStyle = css('--grid');
-        ctx.stroke(minor);
-        
-        ctx.strokeStyle = css('--grid-major');
-        ctx.stroke(major);
+        ctx.stroke(grid);
         
         // Origin marker
         {
