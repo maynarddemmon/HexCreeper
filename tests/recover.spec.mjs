@@ -29,9 +29,11 @@ test('recovering a piece that has moved lets it move again, for its rank, using 
     expect(await page.evaluate(() => hc.app.game.playerRecover(hc.app.game.getPlayerCore()))).toBe(true);
     expect(await state(page)).toEqual({turn:1, score:8, movesUsed:1, canMove:true, canRecover:false, recoverUsed:true});
     
-    expect(await move(page, 1, 0)).toBe(true);   // the second, and last, move: the turn ends
-    expect(await state(page)).toMatchObject({turn:2, movesUsed:0, canMove:true, recoverUsed:false});
+    expect(await move(page, 1, 0)).toBe(true);   // the second, and last, move (Quicken could still add one)
+    expect(await state(page)).toMatchObject({turn:1, movesUsed:2, canMove:false, canRecover:false});
     expect(await page.evaluate(() => hc.app.game.getPlayerCore().x)).toBe(2);
+    await page.evaluate(() => {hc.app.game.playerWait();});
+    expect(await state(page)).toMatchObject({turn:2, movesUsed:0, canMove:true, recoverUsed:false});
 });
 
 test('Recover is once a turn, needs a move left and enough score, and isn\'t for pieces that haven\'t moved', async ({page}) => {

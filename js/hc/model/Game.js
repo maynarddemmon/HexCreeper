@@ -52,6 +52,7 @@
             this.fresh = new Set();          // ids of pieces placed this turn (can't move until next turn)
             this.movesUsed = 0;              // moves made this turn (counts toward the move limit)
             this.recoverUsed = false;        // whether Recover has been used this turn (once a turn)
+            this.quickenUsed = false;        // whether Quicken has been used this turn (once a turn: a move more)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
@@ -101,6 +102,7 @@
                 fresh:[...this.fresh],
                 movesUsed:this.movesUsed,
                 recoverUsed:this.recoverUsed,
+                quickenUsed:this.quickenUsed,
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
@@ -165,6 +167,7 @@
             // Saves from before moves were counted apart from the pieces that moved.
             this.movesUsed = Number.isInteger(o.movesUsed) ? o.movesUsed : this.acted.size;
             this.recoverUsed = !!o.recoverUsed;
+            this.quickenUsed = !!o.quickenUsed;
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             // Saves from before the path was kept start it where the core is.
@@ -288,7 +291,7 @@
             return c ? c.rank : 0;
         },
         maxRank: function() {return Math.max(0, ...this.piecesOf('player').map(p => p.rank)); },
-        moveLimit: function() {return RANK.movesPer * this.maxRank(); },
+        moveLimit: function() {return RANK.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
         placeCost: function() {return RANK.costPer * this.coreRank(); },
         
         // Can this player piece still move this turn?
@@ -874,6 +877,23 @@
                 this.movesUsed < this.moveLimit() && this.score >= this.recoverCost(p);
         },
         anyRecoverable: function() {return this.piecesOf('player').some(p => this.canRecover(p));},
+        
+        // ---- Quicken ----
+        // Once a turn, one more move this turn, for the swarm's rank (its highest) in score.
+        quickenCost: function() {return this.maxRank();},
+        canQuicken: function() {return !this.over && !this.quickenUsed && this.score >= this.quickenCost();},
+        playerQuicken: function() {
+            let quickened = false;
+            if (this.canQuicken()) {
+                const cost = this.quickenCost(),
+                    core = this.getPlayerCore();
+                this.score -= cost;
+                this.quickenUsed = true;
+                if (core) this.fx(core.x, core.y, `-${cost} score`, '--place-ink', {});
+                quickened = true;
+            }
+            return quickened;
+        },
         playerRecover: function(p) {
             let recovered = false;
             if (this.canRecover(p)) {
@@ -894,7 +914,7 @@
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length);
-            if (!canAct && !this.canAffordPlace() && !this.anyRecoverable()) { this.endPlayerTurn(); return; }
+            if (!canAct && !this.canAffordPlace() && !this.anyRecoverable() && !this.canQuicken()) { this.endPlayerTurn(); return; }
             // Keep a piece that can still move selected.
             const sel = this.getSelected();
             if (!sel || !this.canMove(sel)) {
@@ -915,6 +935,7 @@
             this.fresh.clear();
             this.movesUsed = 0;
             this.recoverUsed = false;
+            this.quickenUsed = false;
             const core = this.getPlayerCore();
             if (core && !this.getSelected()) this.selectedId = core.id;
             this.turn++;

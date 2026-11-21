@@ -13,6 +13,7 @@
         placeBtn,
         healBtn,
         recoverBtn,
+        quickenBtn,
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -393,6 +394,19 @@
                     }
                 }
             }]);
+            quickenBtn = new Btn(ftrView, {text:i18n('btn-quicken', 1), fontSize:fontSizeMedium}, [{
+                doActivated: () => {
+                    if (game.playerQuicken()) {
+                        // A move more may let a piece act now.
+                        const sel = game.getSelected();
+                        if (!sel || !game.canMove(sel)) {
+                            const next = game.piecesOf('player').find(p => game.canMove(p));
+                            if (next) game.selectedId = next.id;
+                        }
+                        draw();
+                    }
+                }
+            }]);
             
             new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
                 doActivated: () => {centerOn();}
@@ -432,6 +446,11 @@
             
             recoverBtn.setDisabled(gameOver || (!V.recoverMode && !game.anyRecoverable()));
             recoverBtn.setOn(V.recoverMode);
+            
+            const quickenCost = game.quickenCost();
+            quickenBtn.setTextAndFit(i18n('btn-quicken', quickenCost));
+            quickenBtn.setTooltip(i18n('tip-quicken', quickenCost));
+            quickenBtn.setDisabled(!game.canQuicken());
             
             
             infoPanel.update();
@@ -613,6 +632,7 @@
                 if (k === 'p') {placeBtn.doActivated(); return;}
                 if (k === 'h') {healBtn.doActivated(); return;}
                 if (k === 'r') {recoverBtn.doActivated(); return;}
+                if (k === 'u') {quickenBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');

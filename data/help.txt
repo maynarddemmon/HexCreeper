@@ -35,5 +35,6 @@ You only see enemies within sight of your pieces: up to 12 steps away, with soli
 - Place (P): pick an empty cell next to your pieces, then the piece to link it to.
 - Heal (H): heal HP equal to your core's rank, starting from a piece you pick.
 - Recover (R): once a turn, let a piece that has already moved (or was placed) this turn move again, for its rank in score. It still uses one of your moves.
+- Quicken (U): once a turn, one more move this turn, for your swarm's highest rank in score.
 
 Save your game with the save button at the top right; it carries on from there the next time you open HexCreeper, and you can go back to it if your core is destroyed. The buttons next to it export your game to a file and import one, and the map button lists the levels you can play. Levels other than Endless Play have goals to achieve and penalties to avoid, listed in the brief and at the top left as you play; meet every goal that isn't optional, without incurring a penalty, to win. Each game starts with the level's brief, where you can change its settings and the seed: the same seed makes the same map. Drag to pan, scroll to zoom, Space to recenter, Esc to cancel. Settings has whatever the level lets you change. Open this help again with the ? button at the top right.
