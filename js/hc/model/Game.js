@@ -602,7 +602,7 @@
                 kind = wall.hole ? TILE_TYPE_HOLE : TILE_TYPE_SOLID;
             for (const c of border) {
                 if (!door.has(c) && !this.tiles.has(this.key(c.x, c.y)) && !this.pieceAt(c.x, c.y)) {
-                    this.tiles.set(this.key(c.x, c.y), this.makeTile(c.x, c.y, kind, TILES.wallSolid));
+                    this.tiles.set(this.key(c.x, c.y), this.makeTile(c.x, c.y, kind, wall.hole ? TILES.wallHole : TILES.wallSolid));
                 }
             }
         },
@@ -611,13 +611,15 @@
         // first on a random free cell, each next one on a free cell touching the clump. A
         // cell is free if no piece is on it and it has no tile, or a tile of a kind in
         // `replaces`. rng picks the cells.
-        /*  A terrain tile, there from the start. A solid is of the given subtype (see
-            Solids.js), with its hit points. */
+        /*  A terrain tile, there from the start. A solid or hole is of the given subtype
+            (see Solids.js), and a solid has its hit points. */
         makeTile: function(x, y, kind, subtype) {
             const tile = {x, y, kind, timer:0};
             if (kind === TILE_TYPE_SOLID) {
                 tile.subtype = subtype;
                 tile.hp = pkg.solids.get(subtype)?.hp ?? 1;
+            } else if (kind === TILE_TYPE_HOLE) {
+                tile.subtype = subtype;
             }
             return tile;
         },
@@ -633,7 +635,7 @@
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
                 const {x, y} = options[Math.floor(rng() * options.length)];
-                this.tiles.set(this.key(x, y), this.makeTile(x, y, kind, TILES.clumpSolid));
+                this.tiles.set(this.key(x, y), this.makeTile(x, y, kind, kind === TILE_TYPE_HOLE ? TILES.clumpHole : TILES.clumpSolid));
                 edge.delete(this.key(x, y));
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const nx = x + dx,

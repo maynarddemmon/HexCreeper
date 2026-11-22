@@ -83,6 +83,7 @@ myt.I18N.setDictionary({
 "status-swap":"Swap: click a ringed piece to swap the selected piece with. Esc cancels.",
 "status-attach":"Attach: click a ringed piece to link the selected piece to. Esc cancels.",
 "status-solid":"$0 ($1) · HP $2/$3 · DR $4",
+"status-hole":"$0 · $1",
 
 // Dialogs
 "dlg-help-title":"How to Play",
@@ -174,6 +175,8 @@ myt.I18N.setDictionary({
 "setting-holeMax":"Hole tiles per quadrant (max)",
 "setting-wallSolid":"Walls are made of",
 "setting-clumpSolid":"Solid clumps are made of",
+"setting-wallHole":"Hole walls are made of",
+"setting-clumpHole":"Hole clumps are made of",
 "setting-timerMin":"Tile countdown min (turns)",
 "setting-timerMax":"Tile countdown max (turns)",
 "setting-harmDamage":"Harm tile damage",

@@ -56,6 +56,15 @@
 		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447"}
 	},
 	
+	// Kinds of hole tile: a name, a description and optionally the colour it's filled with
+	// ("fillColor": any CSS colour, or a --variable from index.html); without it it's the
+	// usual near-black.
+	"holes":{
+		"pit":     {"name":"Pit",      "description":"A deep pit. Nothing can cross it, but you can see over it.", "fillColor":"#201606"},
+		"chasm":   {"name":"Chasm",    "description":"A crack in the ground too wide to jump.", "fillColor":"#0c0e16"},
+		"sinkhole":{"name":"Sinkhole", "description":"The ground has fallen away here.",        "fillColor":"#1a140e"}
+	},
+	
 	// Every level, in the order the Levels dialog lists them, with what a list of levels
 	// needs. Each level's own file is data/levels/<id>.json5. A level with no "number" is
 	// listed without one. A level's file may give a "seed", so its map is always the same;

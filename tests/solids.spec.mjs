@@ -35,11 +35,14 @@ test('materials and solid subtypes come from init.json5; a subtype\'s DR is its 
         return {
             some:list.length > 0,
             made:list.every(s => s.material === hc.solids.getMaterial(s.composition) && s.dr === s.material.hardness && s.hp > 0),
-            defaults:[T.wallSolid, T.clumpSolid].every(id => hc.solids.get(id))
+            defaults:[T.wallSolid, T.clumpSolid].every(id => hc.solids.get(id)),
+            holes:hc.holes.list().length > 0 && hc.holes.list().every(h => h.name && typeof h.description === 'string'),
+            holeDefaults:[T.wallHole, T.clumpHole].every(id => hc.holes.get(id)),
+            holeTile:hc.app.game.makeTile(0, 0, 'hole', T.clumpHole).subtype === T.clumpHole
         };
     });
-    expect(r).toEqual({some:true, made:true, defaults:true});
-    expect(problems.errors.filter(e => /^Bad (material|solid)/.test(e))).toEqual([]);
+    expect(r).toEqual({some:true, made:true, defaults:true, holes:true, holeDefaults:true, holeTile:true});
+    expect(problems.errors.filter(e => /^Bad (material|solid|hole)/.test(e))).toEqual([]);
     
     await useTestSolids(page);
     expect(await page.evaluate(() => {

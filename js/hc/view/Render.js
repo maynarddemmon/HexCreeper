@@ -20,17 +20,18 @@
         // Where a heal tile's value goes, from its centre, in cells.
         HEAL_LABEL_OFFSET = [0.3, 0.32],
         
-        // Whether (x, y) holds a solid of the same subtype as solid tile t.
-        sameSolid = (t, x, y) => {
-            const n = t.kind === TILE_TYPE_SOLID && game.tiles.get(game.key(x, y));
-            return !!n && n.kind === TILE_TYPE_SOLID && n.subtype === t.subtype;
+        // Whether (x, y) holds a tile of the same kind and subtype as t, if t is a solid or
+        // a hole: tiles like that run together.
+        sameTerrain = (t, x, y) => {
+            const n = (t.kind === TILE_TYPE_SOLID || t.kind === TILE_TYPE_HOLE) && game.tiles.get(game.key(x, y));
+            return !!n && n.kind === t.kind && n.subtype === t.subtype;
         },
         
         drawTile = (t, now) => {
             if (t.kind === TILE_TYPE_SOLID) {
                 // In its subtype's colours, if it has them, filling the whole hex so solids of
                 // a kind run together: the outline is only on edges that don't meet a solid of
-                // the same subtype (sameSolid).
+                // the same subtype (sameTerrain).
                 const solid = pkg.solids.get(t.subtype),
                     color = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback),
                     [cx, cy] = cellCenter(t.x, t.y),
@@ -53,7 +54,7 @@
                 const lineWidth = Math.max(1, cam.size * 0.03),
                     ext = inset,
                     edges = pkg.GRID.edges,
-                    drawn = edges.map(([dx, dy]) => !sameSolid(t, t.x + dx, t.y + dy));
+                    drawn = edges.map(([dx, dy]) => !sameTerrain(t, t.x + dx, t.y + dy));
                 ctx.beginPath();
                 edges.forEach(([, , a, b], i) => {
                     if (drawn[i]) {
@@ -87,19 +88,47 @@
             }
             
             if (t.kind === TILE_TYPE_HOLE) {
-                fillCell(t.x, t.y, '--hole');
-                // Lines from each corner, fading into the dark towards the centre, so it
-                // reads as a pit rather than a cell in fog.
-                const [cx, cy] = cellCenter(t.x, t.y);
-                ctx.lineWidth = Math.max(1, cam.size * 0.03);
-                for (const [wx, wy] of pkg.GRID.corners(t.x, t.y)) {
-                    const [px, py] = worldToScreen(wx, wy),
-                        fade = ctx.createLinearGradient(px, py, cx, cy);
-                    fade.addColorStop(0, css('--hole-line'));
-                    fade.addColorStop(0.8, css('--hole'));
-                    ctx.strokeStyle = fade;
-                    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx, cy); ctx.stroke();
-                }
+                // In its subtype's colour, if it has one, filling the whole hex (and half a
+                // pixel more, so there's no seam), so holes of a kind run together into one
+                // bigger hole, with no grid line between them (sameTerrain).
+                const fillColor = pkg.holes.get(t.subtype)?.fillColor,
+                    fill = fillColor ? (fillColor.startsWith('--') ? css(fillColor) : fillColor) : css('--hole');
+                ctx.beginPath();
+                addCellPath(t.x, t.y, -0.5);
+                ctx.fillStyle = fill;
+                ctx.fill();
+                // Lines in from the corners on the hole's rim, as thin as the grid, fading into
+                // the dark, so it reads as a pit rather than a cell in fog. Corner i is between
+                // edges i - 1 and i. From a corner that sticks out (no neighbour of the hole at
+                // it) the line heads for the centre. From one the rim turns in at (more than
+                // 180°: one neighbour of the hole at it) it heads along the edge shared with that
+                // neighbour, following the grid; the neighbour draws the same line. Where the
+                // rim turns in at both ends of that edge (a choke point), the lines from either
+                // end go only halfway, so they don't run over each other. A corner inside the
+                // bigger hole gets none.
+                const [cx, cy] = cellCenter(t.x, t.y),
+                    pts = pkg.GRID.corners(t.x, t.y).map(([wx, wy]) => worldToScreen(wx, wy)),
+                    same = pkg.GRID.edges.map(([dx, dy]) => sameTerrain(t, t.x + dx, t.y + dy));
+                ctx.lineWidth = 1;
+                pts.forEach(([px, py], i) => {
+                    const before = same[(i + 5) % 6],
+                        after = same[i];
+                    if (!(before && after)) {
+                        const [hx, hy] = before ? pts[(i + 5) % 6] : after ? pts[(i + 1) % 6] : [cx, cy],
+                            choke = before ? !same[(i + 4) % 6] : after && !same[(i + 1) % 6],
+                            len = choke ? 0.5 : 1,
+                            tx = px + (hx - px) * len,
+                            ty = py + (hy - py) * len,
+                            fade = ctx.createLinearGradient(px, py, tx, ty);
+                        fade.addColorStop(0, css('--hole-line'));
+                        fade.addColorStop(0.8, fill);
+                        ctx.strokeStyle = fade;
+                        ctx.beginPath();
+                        ctx.moveTo(px, py);
+                        ctx.lineTo(tx, ty);
+                        ctx.stroke();
+                    }
+                });
                 return;
             }
             
@@ -323,7 +352,7 @@
         }
         
         // Grid lines: the same everywhere (quadrants show only as the visited tint), and
-        // none between solids of the same subtype, which run together.
+        // none between solids or holes of the same subtype, which run together.
         ctx.lineWidth = 1;
         // each hex draws its NE, E and SE edges, so every edge is drawn once; only edges
         // touching a known cell
@@ -334,7 +363,7 @@
             let cs = null;
             for (let e = 0; e < 3; e++) {
                 const [dx, dy, a, b] = pkg.GRID.edges[e];
-                if ((cKnown || isKnown(c.x + dx, c.y + dy)) && !(tile && sameSolid(tile, c.x + dx, c.y + dy))) {
+                if ((cKnown || isKnown(c.x + dx, c.y + dy)) && !(tile && sameTerrain(tile, c.x + dx, c.y + dy))) {
                     cs ??= pkg.GRID.corners(c.x, c.y);
                     const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
                     grid.moveTo(ax, ay); grid.lineTo(bx, by);

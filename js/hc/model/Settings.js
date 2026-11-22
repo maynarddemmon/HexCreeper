@@ -39,6 +39,9 @@
         // The solid subtypes, as choices. They're known once init.json5 has loaded.
         solidOptions = () => pkg.solids.list().map(s => ({value:s.id, label:s.name})),
         
+        // The hole subtypes, as choices, likewise.
+        holeOptions = () => pkg.holes.list().map(h => ({value:h.id, label:h.name})),
+        
         /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
             setting here is enough to make it appear there (in a level that shows it). */
         DEFINITIONS = [
@@ -85,6 +88,8 @@
         num('holeMax',     GROUP_TILES, TILES,    'holeMax', 0, 20),
         choice('wallSolid', GROUP_TILES, TILES,   'wallSolid', solidOptions),
         choice('clumpSolid', GROUP_TILES, TILES,  'clumpSolid', solidOptions),
+        choice('wallHole', GROUP_TILES, TILES,    'wallHole', holeOptions),
+        choice('clumpHole', GROUP_TILES, TILES,   'clumpHole', holeOptions),
         num('timerMin',    GROUP_TILES, TILES,    'timerMin', 0, 50),
         num('timerMax',    GROUP_TILES, TILES,    'timerMax', 0, 50),
         num('harmDamage',  GROUP_TILES, TILES,    'harmDamage', 0, 10),

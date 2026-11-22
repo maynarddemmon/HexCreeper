@@ -167,6 +167,8 @@
                 holeMax:3,
                 wallSolid:'stone_wall', // the solid subtypes (data/init.json5) walls and clumps are made of
                 clumpSolid:'boulder',
+                wallHole:'chasm', // the hole subtypes (data/init.json5) walls and clumps are made of
+                clumpHole:'pit',
                 timerMin:2,
                 timerMax:8,
                 harmDamage:1, // damage to any piece that moves onto an active harm tile

@@ -313,11 +313,18 @@
                     } else if (V.swapMode) {
                         status = i18n('status-swap');
                     } else if (V.hover) {
-                        // A solid under the pointer: what it is and how tough.
+                        // A solid under the pointer: what it is and how tough. A hole: what it is.
                         const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
                             solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
+                            hole = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
-                        if (solid && known) status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
+                        if (known) {
+                            if (solid) {
+                                status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
+                            } else if (hole) {
+                                status = hole.description ? i18n('status-hole', hole.name, hole.description) : hole.name;
+                            }
+                        }
                     }
                     if (this.text !== status) {
                         this.setText(status);

@@ -3,7 +3,10 @@
     solid subtype is a kind of solid tile: its name, its composition (a material) and its
     hit points, since how much a solid can take depends on how much material is in it, and
     optionally the colours it's drawn in, fillColor and borderColor (any CSS colour, or a
-    --variable from index.html), in place of the usual solid colours. */
+    --variable from index.html), in place of the usual solid colours.
+    
+    Hole subtypes, also from init.json5, are kinds of hole tile: a name, a description and
+    optionally a fillColor, drawn in place of the usual hole colour. */
 (pkg => {
     'use strict';
     
@@ -11,7 +14,8 @@
         isText = v => v === undefined || typeof v === 'string';
     
     let materials = new Map(), // id -> {id, name, hardness, density, description}
-        subtypes = new Map();  // id -> {id, name, composition, hp, description, fillColor, borderColor, material, dr}
+        subtypes = new Map(),  // id -> {id, name, composition, hp, description, fillColor, borderColor, material, dr}
+        holeTypes = new Map(); // id -> {id, name, description, fillColor}
     
     pkg.solids = {
         /*  Replaces the materials and subtypes with those given, as init.json5 has them:
@@ -50,5 +54,27 @@
         
         /*  A material by id, or undefined. */
         getMaterial: id => materials.get(id)
+    };
+    
+    pkg.holes = {
+        /*  Replaces the hole subtypes with those given, as init.json5 has them:
+            {id:{name, description, fillColor}}. An entry that isn't usable is left out, with a console
+            error saying why. */
+        define: data => {
+            holeTypes = new Map();
+            for (const [id, h] of Object.entries(data ?? {})) {
+                if (typeof h?.name !== 'string' || !isText(h.description) || !isText(h.fillColor)) {
+                    console.error('Bad hole', id);
+                } else {
+                    holeTypes.set(id, {id, name:h.name, description:h.description ?? '', fillColor:h.fillColor || null});
+                }
+            }
+        },
+        
+        /*  A hole subtype by id, or undefined. */
+        get: id => holeTypes.get(id),
+        
+        /*  Every hole subtype, in the order init.json5 lists them. */
+        list: () => [...holeTypes.values()]
     };
 })(hc);

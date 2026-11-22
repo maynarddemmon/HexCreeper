@@ -24,7 +24,7 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'Expr.js').provides('hc.expr').requires('hc');
     file(MODEL_ROOT + 'Goals.js').provides('hc.goals','hc.Goals').requires('hc.makeGrid','hc.expr');
-    file(MODEL_ROOT + 'Solids.js').provides('hc.solids').requires('hc');
+    file(MODEL_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
