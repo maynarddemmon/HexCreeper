@@ -173,7 +173,7 @@
         // unless animate is false.
         centerOn = (animate = true) => {
             const p = game.getPlayerCore() ?? {x:0, y:0};
-            V.panTo(...pkg.GRID.center(p.x, p.y), animate !== false);
+            V.panTo(...pkg.hex.center(p.x, p.y), animate !== false);
         },
         
         INFO_WIDTH = 300,
@@ -680,7 +680,7 @@
                     endTurn();
                     return;
                 }
-                const d = pkg.GRID.keyDirs[k];
+                const d = pkg.hex.keyDirs[k];
                 if (!d) return;
                 
                 e.preventDefault();

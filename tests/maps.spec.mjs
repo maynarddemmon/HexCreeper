@@ -32,7 +32,7 @@ test('playing a map starts a new game with its values in effect, and the save ke
     const seed = await page.evaluate(() => hc.app.game.seed);
     const inWarrens = () => page.evaluate(() => ({
         gameMap:hc.app.game.gameMap.id, turn:hc.app.game.turn, seed:hc.app.game.seed,
-        wallChance:hc.app.game.tileGenerator.attrs.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.app.game.rules.visionRadius
+        wallChance:hc.app.game.tileGenerator.attrs.wallChance, quadRadius:hc.app.game.tileGenerator.quads.radius, vision:hc.app.game.rules.visionRadius
     }));
     expect(await inWarrens()).toEqual({gameMap:'warrens', turn:1, seed, wallChance:90, quadRadius:4, vision:8});
     

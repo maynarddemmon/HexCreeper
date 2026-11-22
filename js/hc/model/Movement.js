@@ -178,7 +178,7 @@
                 } else {
                     const oldLink = dist([gx, gy], [px, py]);
                     let best = null, bestKey = null;
-                    [[0, 0], ...pkg.GRID.dirs].forEach(([ddx, ddy], i) => {
+                    [[0, 0], ...pkg.hex.dirs].forEach(([ddx, ddy], i) => {
                         const c = [gx + ddx, gy + ddy];
                         if (free(c, gid, false)) {
                             const link = dist(c, after.get(guide)),
@@ -288,7 +288,7 @@
         /*  The twelve jumps from a cell, [{dx, dy, over}]: two steps away, straight over one
             cell or between two, with the offsets of the cells passed over. */
         jumpOffsets: function() {
-            const dirs = pkg.GRID.dirs;
+            const dirs = pkg.hex.dirs;
             return dirs.flatMap(([ax, ay], i) => {
                 const [bx, by] = dirs[(i + 1) % 6];
                 return [

@@ -30,7 +30,7 @@
             if (c) {
                 const [tx, ty] = V.camTarget(),
                     // Where the core will be on screen once any pan under way ends.
-                    [wx, wy] = pkg.GRID.center(c.x, c.y),
+                    [wx, wy] = pkg.hex.center(c.x, c.y),
                     sx = (wx - tx) * cam.size + V.W / 2,
                     sy = (wy - ty) * cam.size + V.H / 2,
                     margin = Math.min(EDGE_MARGIN, V.W / 2 - 1, V.H / 2 - 1),

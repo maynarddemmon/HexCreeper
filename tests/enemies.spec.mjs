@@ -11,7 +11,7 @@ test.beforeEach(async ({page}) => {
 test.describe('waves', () => {
     test('wave size and squad size follow the highest player rank, not the turn', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs, out = [];
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs, out = [];
             out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             g.turn = 300;
             out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);

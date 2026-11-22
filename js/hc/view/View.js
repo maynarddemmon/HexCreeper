@@ -71,7 +71,7 @@
         
         // Screen position of a cell's centre.
         cellCenter = (x, y) => {
-            const [wx, wy] = pkg.GRID.center(x, y);
+            const [wx, wy] = pkg.hex.center(x, y);
             return worldToScreen(wx, wy);
         },
         
@@ -79,7 +79,7 @@
         // `insetPx` pixels (or scaled by `scale` if given).
         addCellPath = (x, y, insetPx = 0, scale = null) => {
             const [cx, cy] = cellCenter(x, y),
-                pts = pkg.GRID.corners(x, y).map(([wx, wy]) => worldToScreen(wx, wy)),
+                pts = pkg.hex.corners(x, y).map(([wx, wy]) => worldToScreen(wx, wy)),
                 rad = mathHypot(pts[0][0] - cx, pts[0][1] - cy) || 1,
                 f = scale != null ? scale : mathMax(0, 1 - insetPx / rad);
             pts.forEach(([px, py], i) => {
@@ -132,7 +132,7 @@
             
             cellAt: (sx, sy) => {
                 const [wx, wy] = screenToWorld(sx, sy);
-                return pkg.GRID.cellAtWorld(wx, wy);
+                return pkg.hex.cellAtWorld(wx, wy);
             },
             
             // A pointer event's position on the canvas.
@@ -169,15 +169,15 @@
                 for (let i = 0; i < q.length; i++) {
                     const [x, y, d] = q[i]; cells.push([x, y]);
                     if (d >= range) continue;
-                    for (const [dx, dy] of pkg.GRID.dirs) {
+                    for (const [dx, dy] of pkg.hex.dirs) {
                         const k = (x + dx) + ',' + (y + dy);
                         if (!inR.has(k)) { inR.add(k); q.push([x + dx, y + dy, d + 1]); }
                     }
                 }
                 ctx.beginPath();
                 for (const [x, y] of cells) {
-                    const cs = pkg.GRID.corners(x, y);
-                    for (const [dx, dy, a, b] of pkg.GRID.edges) {
+                    const cs = pkg.hex.corners(x, y);
+                    for (const [dx, dy, a, b] of pkg.hex.edges) {
                         if (inR.has((x + dx) + ',' + (y + dy))) continue;
                         const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
                         ctx.moveTo(ax, ay); ctx.lineTo(bx, by);

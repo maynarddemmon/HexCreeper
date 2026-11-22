@@ -8,7 +8,7 @@ test.beforeEach(async ({page}) => {
 
 test('the golden path records every cell the core moves to, in order, retraced steps too', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, [a, b] = hc.GRID.dirs;
+        const g = hc.app.game, [a, b] = hc.hex.dirs;
         g.playerAct(g.getPlayerCore(), a[0], a[1]);
         g.playerWait();
         g.playerAct(g.getPlayerCore(), a[0] + b[0], a[1] + b[1]);
@@ -21,7 +21,7 @@ test('the golden path records every cell the core moves to, in order, retraced s
 
 test('moving another piece leaves the golden path alone', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.GRID.dirs;
+        const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs;
         g.score = 100;
         g.playerPlace(a[0], a[1], c);
         g.playerWait();

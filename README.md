@@ -79,7 +79,7 @@ The tests start their own static server and load the real `index.html`, then dri
 
 Each file is wrapped as `(pkg => { 'use strict'; … })(hc);` and adds what it provides to the `hc` namespace. `manifest.js` lists those names, so the loader can load files in dependency order. The game itself draws on one canvas for speed; everything around it (header, info panel, dialogs) is myt. All UI text comes from `i18n/en-US.js` via `myt.I18N`. The view files share mutable state (the camera, the hover cell and the current input mode) through `hc.view`.
 
-The game rules only use `GRID.dirs` (the neighbour offsets) and `hexDist()` (grid distance), so the hex geometry lives in `model/Grid.js`.
+The game rules only use `hex.dirs` (the neighbour offsets) and `hexDist()` (grid distance), so the hex geometry lives in `model/Grid.js`.
 
 ## License
 

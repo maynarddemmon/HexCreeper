@@ -61,8 +61,6 @@
             this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
             this.spawnGenerator = pkg.SpawnGenerator.make(spawns.type, this, spawns.attrs); // and its enemies
             this.enemyAI = pkg.EnemyAI.make(ai.type, this, ai.attrs);                       // which it plays
-            pkg.GRID = pkg.makeGrid(this.tileGenerator.chunkRadius()); // fixed for the whole game
-            this.grid = pkg.GRID;
             this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
             this.acted = new Set();          // ids of player pieces moved this turn (each can move once a turn)
@@ -110,7 +108,6 @@
                 lootOpened:this.lootOpened,
                 lootTaken:this.lootTaken,
                 objectives:this.objectives.map(s => ({...s})),
-                quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
@@ -136,7 +133,7 @@
         importFromObj: function(o) {
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
-            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) || !isNum(o.quadRadius) ||
+            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !Number.isInteger(o.movesUsed) || !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.acted, o.fresh, o.corePath].every(isArr) ||
@@ -187,8 +184,6 @@
             });
             this.effects = [];
             this.clearAnimation();
-            pkg.GRID = pkg.makeGrid(o.quadRadius);
-            this.grid = pkg.GRID;
             this.pieces = new Map();
             this.board = new Map();
             for (const p of o.pieces) {
@@ -241,7 +236,7 @@
             if (sightKey !== this._sightKey) {
                 const sight = new Set();
                 for (const p of players) {
-                    for (const c of pkg.GRID.disk(p.x, p.y, this.rules.visionRadius)) {
+                    for (const c of pkg.hex.disk(p.x, p.y, this.rules.visionRadius)) {
                         const k = this.key(c.x, c.y);
                         if (!sight.has(k) && this.canSee(p, c)) sight.add(k);
                     }
@@ -260,8 +255,8 @@
         // the clearer of the cells on either side counts. The end cells don't count, so
         // solid cells themselves can be seen.
         canSee: function(a, b) {
-            const left = pkg.GRID.line(a, b, 1),
-                right = pkg.GRID.line(a, b, -1),
+            const left = pkg.hex.line(a, b, 1),
+                right = pkg.hex.line(a, b, -1),
                 dist = left.length - 1;
             let range = this.rules.visionRadius;
             for (let i = 1; i < dist && range >= dist; i++) {
@@ -552,7 +547,7 @@
             const seen = new Set(),
                 out = [];
             for (const p of from ? [from] : this.piecesOf('player')) {
-                for (const [dx, dy] of pkg.GRID.dirs) {
+                for (const [dx, dy] of pkg.hex.dirs) {
                     const x = p.x + dx,
                         y = p.y + dy,
                         k = this.key(x, y);
@@ -821,7 +816,7 @@
                         y = cells[i + 1];
                     // Reached more cheaply since it was put here: skip it.
                     if (dist.get(this.key(x, y)) === d && d < radius) {
-                        for (const [dx, dy] of pkg.GRID.dirs) reach(x + dx, y + dy, d + 1);
+                        for (const [dx, dy] of pkg.hex.dirs) reach(x + dx, y + dy, d + 1);
                         // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is as quick.
                         for (const {dx, dy, over} of jumps) {
                             if (this.canJumpOver(x, y, over) && !over.some(([ox, oy]) => this.isOpen(x + ox, y + oy) && !this.isHarm(x + ox, y + oy))) {

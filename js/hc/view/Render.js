@@ -69,7 +69,7 @@
                 const solid = pkg.solids.get(t.subtype),
                     [cx, cy] = cellCenter(t.x, t.y),
                     inset = 1,
-                    pts = pkg.GRID.corners(t.x, t.y).map(([wx, wy]) => {
+                    pts = pkg.hex.corners(t.x, t.y).map(([wx, wy]) => {
                         const [px, py] = worldToScreen(wx, wy),
                             d = Math.hypot(px - cx, py - cy) || 1;
                         return [px - (px - cx) * inset / d, py - (py - cy) * inset / d];
@@ -88,7 +88,7 @@
                 // the inset, to where it meets the neighbour's line; round caps then join the two.
                 const lineWidth = Math.max(1, cam.size * 0.03),
                     ext = inset,
-                    edges = pkg.GRID.edges,
+                    edges = pkg.hex.edges,
                     drawn = edges.map(([dx, dy]) => !sameTerrain(t, t.x + dx, t.y + dy));
                 ctx.beginPath();
                 edges.forEach(([, , a, b], i) => {
@@ -142,8 +142,8 @@
                 // end go only halfway, so they don't run over each other. A corner inside the
                 // bigger hole gets none.
                 const [cx, cy] = cellCenter(t.x, t.y),
-                    pts = pkg.GRID.corners(t.x, t.y).map(([wx, wy]) => worldToScreen(wx, wy)),
-                    same = pkg.GRID.edges.map(([dx, dy]) => sameTerrain(t, t.x + dx, t.y + dy));
+                    pts = pkg.hex.corners(t.x, t.y).map(([wx, wy]) => worldToScreen(wx, wy)),
+                    same = pkg.hex.edges.map(([dx, dy]) => sameTerrain(t, t.x + dx, t.y + dy));
                 ctx.lineWidth = 1;
                 pts.forEach(([px, py], i) => {
                     const before = same[(i + 5) % 6],
@@ -326,17 +326,7 @@
             s = cam.size,
             [x0, y0] = screenToWorld(0, 0),
             [x1, y1] = screenToWorld(W, H),
-            visible = [...pkg.GRID.visibleCells(x0, y0, x1, y1)],
-            // chunk key per visible cell (for the visited tint)
-            chunkKeys = new Map(),
-            chunkKey = (x, y) => {
-                const k = x + ',' + y;
-                let v = chunkKeys.get(k);
-                if (v === undefined) {
-                    v = pkg.GRID.chunkKey(x, y); chunkKeys.set(k, v);
-                }
-                return v;
-            },
+            visible = [...pkg.hex.visibleCells(x0, y0, x1, y1)],
             
             // Fog of war: sight is null when it's off. Enemies show only on cells in sight,
             // until the game is over, when they all show, to see what came for you.
@@ -395,9 +385,9 @@
             fillCells(known, '--bg');
         }
         
-        // Visited quadrants
-        const visited = game.tileGenerator.visitedQuads; // with a generator that has quadrants
-        if (visited) fillCells(known.filter(c => visited.has(chunkKey(c.x, c.y))), '--visited');
+        // Visited quadrants, with a tile generator that has them
+        const {visitedQuads:visited, quads} = game.tileGenerator;
+        if (visited) fillCells(known.filter(c => visited.has(quads.key(c.x, c.y))), '--visited');
         
         // Heal, harm, solid and hole tiles
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
@@ -468,9 +458,9 @@
                 tile = game.tiles.get(game.key(c.x, c.y));
             let cs = null;
             for (let e = 0; e < 3; e++) {
-                const [dx, dy, a, b] = pkg.GRID.edges[e];
+                const [dx, dy, a, b] = pkg.hex.edges[e];
                 if ((cKnown || isKnown(c.x + dx, c.y + dy)) && !(tile && sameTerrain(tile, c.x + dx, c.y + dy))) {
-                    cs ??= pkg.GRID.corners(c.x, c.y);
+                    cs ??= pkg.hex.corners(c.x, c.y);
                     const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
                     grid.moveTo(ax, ay); grid.lineTo(bx, by);
                 }

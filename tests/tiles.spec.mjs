@@ -11,8 +11,8 @@ test('solids and holes go out to the vision radius; heal and harm tiles only 1 q
         hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
             inReach = tiles.every(t => {
-                const [i, j] = hc.GRID.chunkOf(t.x, t.y);
-                return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
+                const [i, j] = hc.app.game.tileGenerator.quads.of(t.x, t.y);
+                return hc.hex.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
         return {terrainQuads:g.tileGenerator.terrainQuads.size, tiledQuads:g.tileGenerator.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
             harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === g.tileGenerator.attrs[t.kind + 'Type'])};
@@ -25,7 +25,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
     test(`each quadrant gets one connected clump of 0-${max} ${kind} tiles, there at once`, async ({page}) => {
         await startGame(page);
         const r = await page.evaluate(([kind, max, other]) => {
-            const g = hc.app.game, G = hc.GRID, sizes = new Set();
+            const g = hc.app.game, G = hc.hex, Q = g.tileGenerator.quads, sizes = new Set();
             hc.app.game.tileGenerator.attrs[other + 'Max'] = 0;
             let ok = true;
             hc.app.game.tileGenerator.attrs.wallChance = 0;
@@ -38,7 +38,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
                 const clump = [...g.tiles.values()].filter(t => t.kind === kind),
                     keys = new Set(clump.map(t => g.key(t.x, t.y)));
                 sizes.add(clump.length);
-                if (clump.length > max || g.tiles.size !== clump.length || clump.some(t => G.chunkOf(t.x, t.y).join() !== '0,0')) ok = false;
+                if (clump.length > max || g.tiles.size !== clump.length || clump.some(t => Q.of(t.x, t.y).join() !== '0,0')) ok = false;
                 // Connected: everything is reachable from the first one.
                 const seen = new Set(), todo = clump.slice(0, 1);
                 for (const t of todo) {
@@ -59,10 +59,10 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
 // clumps, no core), with every border a wall. A wall sits on the side of the quadrant whose
 // key comes first in the border's key. Helpers go on window.walls.
 const wallsOnly = page => page.evaluate(() => {
-    const g = hc.app.game, G = hc.GRID, T = hc.app.game.tileGenerator.attrs,
-        quads = [[0, 0], ...G.chunkNeighbours(0, 0)],
-        touching = (side, other) => G.chunkCells(...side.split(',').map(Number))
-            .filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === other));
+    const g = hc.app.game, G = hc.hex, Q = g.tileGenerator.quads, T = hc.app.game.tileGenerator.attrs,
+        quads = [[0, 0], ...Q.neighbours(0, 0)],
+        touching = (side, other) => Q.cells(...side.split(',').map(Number))
+            .filter(c => G.dirs.some(([dx, dy]) => Q.key(c.x + dx, c.y + dy) === other));
     T.solidMax = T.holeMax = 0;
     T.wallChance = 100;
     T.wallHoleChance = 0;
@@ -77,10 +77,10 @@ const wallsOnly = page => page.evaluate(() => {
         },
         // (0,0)'s borders, each with the cells of its wall less the two corners, which
         // other walls share.
-        borders: () => G.chunkNeighbours(0, 0).map(([i, j]) => {
+        borders: () => Q.neighbours(0, 0).map(([i, j]) => {
             const bk = hc.ProximityTileGenerator.borderKey('0,0', i + ',' + j), [side, other] = bk.split('|');
             return {bk, inner:touching(side, other).filter(c => G.dirs.every(([dx, dy]) => {
-                const k = G.chunkKey(c.x + dx, c.y + dy);
+                const k = Q.key(c.x + dx, c.y + dy);
                 return k === side || k === other;
             }))};
         }),
@@ -164,7 +164,7 @@ test('no walls at a 0% chance', async ({page}) => {
 test('holes are placed after solid tiles and may replace them', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, T = hc.app.game.tileGenerator.attrs, free = hc.GRID.chunkCells(0, 0).length - 1; // less the core's
+        const g = hc.app.game, T = hc.app.game.tileGenerator.attrs, free = hc.app.game.tileGenerator.quads.cells(0, 0).length - 1; // less the core's
         T.wallChance = 0;
         T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;
@@ -185,10 +185,10 @@ test.describe('rules', () => {
     });
     
     test('a harm tile hurts whoever moves onto it, then is gone', async ({page}) => {
-        const d = await page.evaluate(() => hc.GRID.dirs[0]);
+        const d = await page.evaluate(() => hc.hex.dirs[0]);
         await putTile(page, d[0], d[1], 'harm', 'harm');
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[0];
+            const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[0];
             const hp = c.hp;
             g.playerAct(c, d[0], d[1]);
             return {lost:hp - c.hp, gone:!g.tiles.has(g.key(d[0], d[1]))};
@@ -198,7 +198,7 @@ test.describe('rules', () => {
     
     for (const kind of ['solid', 'hole']) test(`nothing can move onto or be placed on a ${kind} tile`, async ({page}) => {
         const r = await page.evaluate(kind => {
-            const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.GRID.dirs,
+            const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs,
                 block = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind, timer:0});
             g.score = 100;
             block(a[0], a[1]);
@@ -219,11 +219,11 @@ test.describe('rules', () => {
     });
     
     test('harm tiles stay once every neighbouring quadrant is visited', async ({page}) => {
-        const d = await page.evaluate(() => hc.GRID.dirs[0]);
+        const d = await page.evaluate(() => hc.hex.dirs[0]);
         await putTile(page, d[0], d[1], 'harm', 'harm');
         const r = await page.evaluate(() => {
-            const g = hc.app.game, d = hc.GRID.dirs[0];
-            for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.tileGenerator.visitedQuads.add(i + ',' + j);
+            const g = hc.app.game, d = hc.hex.dirs[0];
+            for (const [i, j] of hc.app.game.tileGenerator.quads.neighbours(0, 0)) g.tileGenerator.visitedQuads.add(i + ',' + j);
             g.piecesMoved();
             return g.isHarm(d[0], d[1]);
         });
@@ -232,7 +232,7 @@ test.describe('rules', () => {
     
     test('healing flows up to a damaged ancestor first, then down; leftovers become score', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
             g.score = 1000;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const a = g.pieceAt(D[0][0], D[0][1]);
@@ -255,7 +255,7 @@ test.describe('rules', () => {
     
     test('eating two heal tiles in one move: each gives its own, with no combo', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
@@ -270,7 +270,7 @@ test.describe('rules', () => {
     
     test('the paid heal costs 5 x core rank, heals core rank, and wastes leftovers', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+            const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const cost = g.healCost(), amount = g.healAmount();

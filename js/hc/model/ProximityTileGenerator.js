@@ -1,6 +1,6 @@
 /*  The "proximity" tile generator: the map is made around your pieces as they go. The world
-    is divided into quadrants (the grid's chunks, of radius quadRadius). When a piece of yours
-    is in a quadrant, it's visited, and the quadrants around it get their tiles, once each:
+    is divided into quadrants (chunks of cells, of radius quadRadius: see makeChunks, in
+    Grid.js). When a piece of yours is in a quadrant, it's visited, and the quadrants around it get their tiles, once each:
     solid and hole tiles (border walls and clumps) out to where you could see, and heal,
     harm and loot tiles in it and its 6 neighbours. Everything comes from the game's seed
     (Game.rngFor), so a quadrant comes out the same whatever order it's made in. */
@@ -46,18 +46,9 @@
                 choice('clumpHole', 'pit', optionsOf(pkg.holes))
             ],
             
-            // The quadrant [i, j] cell (x, y) is in.
-            quadOf: (x, y) => pkg.GRID.chunkOf(x, y),
-            
             // The key of the border between two quadrants ("i,j" keys), the same either way
             // round.
-            borderKey: (a, b) => a < b ? a + '|' + b : b + '|' + a,
-            
-            // The keys of a quadrant's six borders.
-            bordersOf: q => {
-                const [i, j] = q.split(',').map(Number);
-                return pkg.GRID.chunkNeighbours(i, j).map(([a, b]) => ProximityTileGenerator.borderKey(q, a + ',' + b));
-            }
+            borderKey: (a, b) => a < b ? a + '|' + b : b + '|' + a
         },
         
         // Life Cycle //////////////////////////////////////////////////////////
@@ -69,6 +60,7 @@
             a.solidMax = Math.max(a.solidMin, a.solidMax);
             a.holeMax = Math.max(a.holeMin, a.holeMax);
             
+            this.quads = pkg.makeChunks(a.quadRadius); // the quadrants' geometry
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
             this.borders = new Map();        // border key (see ProximityTileGenerator.borderKey) -> its wall {door, hole, start}, or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal, harm and loot tiles have been placed
@@ -76,8 +68,6 @@
         },
         
         // Methods /////////////////////////////////////////////////////////////
-        chunkRadius: function() {return this.attrs.quadRadius;},
-        
         start: function() {this.piecesMoved();},
         
         exportState: function() {
@@ -104,12 +94,12 @@
         // of war is on, so turning it off and on doesn't change the world. Heal, harm and
         // loot tiles are placed only 1 quadrant out.
         piecesMoved: function() {
-            const reach = Math.max(1, Math.ceil(this.game.rules.visionRadius / (3 * pkg.GRID.chunkRadius + 2)));
+            const reach = Math.max(1, Math.ceil(this.game.rules.visionRadius / (3 * this.quads.radius + 2)));
             for (const p of this.game.piecesOf('player')) {
-                const [qx, qy] = ProximityTileGenerator.quadOf(p.x, p.y);
+                const [qx, qy] = this.quads.of(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);
-                for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateTerrain(q.x, q.y);
-                for (const q of pkg.GRID.disk(qx, qy, 1)) this.generateTiles(q.x, q.y);
+                for (const q of pkg.hex.disk(qx, qy, reach)) this.generateTerrain(q.x, q.y);
+                for (const q of pkg.hex.disk(qx, qy, 1)) this.generateTiles(q.x, q.y);
             }
         },
         
@@ -123,7 +113,7 @@
             // A loot tile replaces a heal tile at lootChance. (Loot and the tiles' pools and
             // magnitudes have their own generators, so the cells come out as they would
             // without them.)
-            const cells = pkg.GRID.chunkCells(qx, qy),
+            const cells = this.quads.cells(qx, qy),
                 rng = game.rngFor('tiles', k),
                 lootRng = game.rngFor('loot', k),
                 rollRng = game.rngFor('rolls', k),
@@ -149,12 +139,12 @@
             const k = qx + ',' + qy;
             if (this.terrainQuads.has(k)) return;
             this.terrainQuads.add(k);
-            const cells = pkg.GRID.chunkCells(qx, qy),
+            const cells = this.quads.cells(qx, qy),
                 rng = this.game.rngFor('terrain', k);
             
             // A wall sits on the side of the quadrant whose key comes first in the border's
             // key, so it's placed when that quadrant is made.
-            for (const [i, j] of pkg.GRID.chunkNeighbours(qx, qy)) {
+            for (const [i, j] of this.quads.neighbours(qx, qy)) {
                 const bk = ProximityTileGenerator.borderKey(k, i + ',' + j), wall = this.borderWall(bk);
                 if (wall && bk.startsWith(k + '|')) this.placeWall(cells, i, j, wall);
             }
@@ -184,7 +174,7 @@
                 const wall = this.seededBorder(bk);
                 if (wall?.door === 0) {
                     for (const q of bk.split('|')) {
-                        const all = ProximityTileGenerator.bordersOf(q).sort();
+                        const all = this.bordersOf(q).sort();
                         if (all[0] === bk && all.every(b => this.seededBorder(b)?.door === 0)) wall.door = 1;
                     }
                 }
@@ -193,13 +183,20 @@
             return this.borders.get(bk);
         },
         
+        // The keys of a quadrant's six borders.
+        bordersOf: function(q) {
+            const [i, j] = q.split(',').map(Number);
+            return this.quads.neighbours(i, j).map(([a, b]) => ProximityTileGenerator.borderKey(q, a + ',' + b));
+        },
+        
         // A wall along the border between a quadrant (its cells) and its neighbour (i, j),
         // on the quadrant's own side: every cell touching the neighbour, except a door in
         // the middle (not at a corner, where another wall may meet it). Some walls are holes
         // rather than solid tiles. Cells with a tile or a piece already are left as they are.
         placeWall: function(cells, i, j, wall) {
             const game = this.game,
-                G = pkg.GRID,
+                G = pkg.hex,
+                Q = this.quads,
                 middle = cs => {
                     let sx = 0, sy = 0;
                     for (const c of cs) {
@@ -208,9 +205,9 @@
                     }
                     return [sx / cs.length, sy / cs.length];
                 },
-                [ax, ay] = middle(cells), [bx, by] = middle(G.chunkCells(i, j)),
+                [ax, ay] = middle(cells), [bx, by] = middle(Q.cells(i, j)),
                 along = c => {const [x, y] = G.center(c.x, c.y); return (x - ax) * (ay - by) + (y - ay) * (bx - ax);},
-                border = cells.filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === i + ',' + j))
+                border = cells.filter(c => G.dirs.some(([dx, dy]) => Q.key(c.x + dx, c.y + dy) === i + ',' + j))
                     .sort((a, b) => along(a) - along(b)),
                 inner = border.length > 2 ? border.slice(1, -1) : border,
                 width = Math.min(inner.length, wall.door),
@@ -242,7 +239,7 @@
                 const {x, y} = options[Math.floor(rng() * options.length)];
                 game.tiles.set(game.key(x, y), game.makeTile(x, y, kind, kind === TILE_TYPE_HOLE ? this.attrs.clumpHole : this.attrs.clumpSolid));
                 edge.delete(game.key(x, y));
-                for (const [dx, dy] of pkg.GRID.dirs) {
+                for (const [dx, dy] of pkg.hex.dirs) {
                     const nx = x + dx,
                         ny = y + dy;
                     if (free(nx, ny)) edge.set(game.key(nx, ny), {x:nx, y:ny});

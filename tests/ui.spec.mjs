@@ -97,12 +97,12 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), [dx, dy] = hc.GRID.dirs[1];
+        const g = hc.app.game, c = g.getPlayerCore(), [dx, dy] = hc.hex.dirs[1];
         g.score = 100; g.playerPlace(dx, dy, c); g.playerWait();
         g.selectedId = c.id;
         hc.app.centerOn(false);
     });
-    const [dx, dy] = await page.evaluate(() => hc.GRID.dirs[1]),
+    const [dx, dy] = await page.evaluate(() => hc.hex.dirs[1]),
         pt = await cellOnPage(page, dx, dy);
     await page.mouse.click(pt[0], pt[1]);
     expect(await page.evaluate(() => hc.app.game.selectedId !== hc.app.game.playerCoreId && hc.app.game.getPlayerCore().x === 0)).toBe(true);

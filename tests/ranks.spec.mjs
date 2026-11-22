@@ -8,7 +8,7 @@ test.beforeEach(async ({page}) => {
 
 test('rank needs two children; it sets max HP and moves', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.GRID.dirs[0], hc.GRID.dirs[3]];
+        const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.hex.dirs[0], hc.hex.dirs[3]];
         g.score = 100;
         const before = {rank:c.rank, hp:c.hp, max:c.maxHp, moves:g.moveLimit(), cost:g.placeCost()};
         g.playerPlace(d0[0], d0[1], c);
@@ -41,7 +41,7 @@ test('placing costs 4, plus 1 for every 2 of your pieces (rounded up), whatever 
 
 test('moves per turn follow the highest rank of any piece, not the core', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+        const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
         g.score = 1000;
         g.playerPlace(D[0][0], D[0][1], c);
         const a = g.pieceAt(D[0][0], D[0][1]);
@@ -55,7 +55,7 @@ test('moves per turn follow the highest rank of any piece, not the core', async 
 
 test('each piece moves at most once per turn; new pieces wait a turn', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+        const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
         g.score = 100;
         g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
         const a = g.pieceAt(D[0][0], D[0][1]);
@@ -71,7 +71,7 @@ test('each piece moves at most once per turn; new pieces wait a turn', async ({p
 
 test('destroying a piece destroys everything linked below it and lowers ranks', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
+        const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
         g.score = 1000;
         g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
         const a = g.pieceAt(D[0][0], D[0][1]);

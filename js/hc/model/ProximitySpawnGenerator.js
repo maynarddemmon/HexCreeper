@@ -85,7 +85,7 @@
             const nodes = [root];
             for (let i = 1; i < size; i++) {
                 const parent = nodes[Math.floor((i - 1) / 2)];
-                const spots = pkg.GRID.dirs.map(([dx, dy]) => ({ x: parent.x + dx, y: parent.y + dy }))
+                const spots = pkg.hex.dirs.map(([dx, dy]) => ({ x: parent.x + dx, y: parent.y + dy }))
                     .filter(q => game.isOpen(q.x, q.y) && !game.pieceAt(q.x, q.y) && !game.isHarm(q.x, q.y)
                         && !players.some(p => hexDist(p, q) < 2));
                 if (!spots.length) break;
@@ -107,7 +107,7 @@
                 for (let tries = 0; tries < 60; tries++) {
                     const {minDist, maxDist} = this.attrs,
                         d = minDist + Math.floor(rng() * (maxDist - minDist + 1)),
-                        {x, y} = pkg.GRID.ring(core.x, core.y, d, rng);
+                        {x, y} = pkg.hex.ring(core.x, core.y, d, rng);
                     if (!game.isOpen(x, y) || game.pieceAt(x, y) || game.isHarm(x, y)) continue;
                     if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                     const p = game.addPiece('core', 'enemy', x, y);

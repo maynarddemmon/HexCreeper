@@ -19,10 +19,6 @@
         },
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  The radius of the grid's chunks (quadrants) in this map, fixed for the whole game
-            (see Grid.js). Only a generator that uses quadrants cares. */
-        chunkRadius: () => 1,
-        
         /*  A new game: the tiles there from the start. Your core is in place. */
         start: NOOP, // function() {},
         

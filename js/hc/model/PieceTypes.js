@@ -52,7 +52,7 @@
             },
             
             steps() {
-                return pkg.GRID.dirs;
+                return pkg.hex.dirs;
             },
             
             draw(ctx, cx, cy, size, piece, opts) {

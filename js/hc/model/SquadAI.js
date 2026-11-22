@@ -207,7 +207,7 @@
                     for (const id of ids) {
                         const [x, y] = st.pos.get(id);
                         let adj = 0;
-                        for (const [dx, dy] of pkg.GRID.dirs) if (livePlayerAt(st, x + dx, y + dy)) adj++;
+                        for (const [dx, dy] of pkg.hex.dirs) if (livePlayerAt(st, x + dx, y + dy)) adj++;
                         if (adj) {
                             const pc = byId.get(id);
                             v -= caution * A.expose * sub(id).length * (pc.hp <= 1 ? 1 : 0.6);
@@ -345,7 +345,7 @@
                     for (const id of ids) {
                         if (st.acted.has(id)) continue;
                         const [x, y] = st.pos.get(id);
-                        if (pkg.GRID.dirs.some(([dx, dy]) => livePlayerAt(st, x + dx, y + dy))) k++;
+                        if (pkg.hex.dirs.some(([dx, dy]) => livePlayerAt(st, x + dx, y + dy))) k++;
                     }
                     return Math.min(k, left) * A.hit;
                 };

@@ -159,7 +159,7 @@ test('a squad far off that can\'t get through keeping its shape squeezes through
         const g = hc.app.game, root = g.addPiece('core', 'enemy', 20, 0), kid = g.addPiece('core', 'enemy', 20, 1, root.id);
         g.recomputeRanks();
         // Walls all round, but for the way west for the leader; the follower's way west is blocked.
-        for (const [dx, dy] of hc.GRID.dirs) {
+        for (const [dx, dy] of hc.hex.dirs) {
             for (const p of [root, kid]) {
                 const x = p.x + dx, y = p.y + dy;
                 if (!g.pieceAt(x, y) && !(x === 19 && y === 0)) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.app.game.tileGenerator.attrs.clumpSolid));
