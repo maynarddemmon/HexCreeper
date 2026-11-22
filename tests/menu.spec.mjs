@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Place · 5', 'Swap', 'Attach', 'Detach', 'Heal 1 · 5', 'Recover · 1', 'Quicken · 1'];
+const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 1 · 5', 'Recover · 1', 'Quicken · 1'];
 
 /*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. */
 const setUp = async page => {
@@ -26,9 +26,9 @@ test('clicking the selected piece again opens its menu beside it, with what it c
     await openMenu(page);
     await expect(items(page)).toHaveText(ITEMS);
     const disabled = await items(page).evaluateAll(els => els.map(e => e.classList.contains('disabled')));
-    // A piece can go next to a; a can swap with the core and be detached; it has a parent,
-    // so it can't attach; nothing is hurt, so no heal; it hasn't moved, so no recover.
-    expect(disabled).toEqual([false, false, true, false, true, true, false]);
+    // A piece can go next to a; a can swap with the core, jump and be detached; it has a
+    // parent, so it can't attach; nothing is hurt, so no heal; it hasn't moved, so no recover.
+    expect(disabled).toEqual([false, false, false, true, false, true, true, false]);
     // Beside the piece.
     const [px, py] = await cellOnPage(page, 1, 0),
         box = await page.getByRole('menu').filter({visible:true}).boundingBox();
@@ -38,7 +38,7 @@ test('clicking the selected piece again opens its menu beside it, with what it c
 
 test('the actions are no longer in the footer', async ({page}) => {
     await setUp(page);
-    for (const name of ['Place · 5', 'Swap', 'Attach', 'Detach', 'Recover', 'Heal 1 · 5', 'Quicken · 1']) {
+    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Recover', 'Heal 1 · 5', 'Quicken · 1']) {
         await expect(button(page, name)).toHaveCount(0);
     }
 });

@@ -107,6 +107,7 @@
             menuOpen:false, // whether the selected piece's menu is open
             attachMode:false, // choosing which piece to attach the selected piece to
             swapMode:false, // choosing which piece the selected piece swaps with
+            jumpMode:false, // choosing the cell the selected piece jumps to
             rafPending:false,
             css,
             draw,

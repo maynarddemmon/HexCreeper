@@ -49,6 +49,8 @@
                                     const other = this.pieces.get(a.swap);
                                     if (!pc || !other || !this.swapOk(this.boardView(), pc.id, other.id)) break;
                                     this.swapPieces(pc, other);
+                                } else if (a.jump) {
+                                    if (!pc || !this.jumpPiece(pc, ...a.jump)) break;
                                 } else if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) {
                                     break;
                                 }
@@ -65,8 +67,10 @@
         
         // Far from the player: step the squad one cell along the shortest harm-free path,
         // keeping its shape (fixed) if that gets it closer, or else letting it give (follow,
-        // then free) to get through tight places.
+        // then free) to get through tight places. A squad whose leader is tired from a jump
+        // stays put.
         marchSquad: function(root, field) {
+            if (this.isTired(root)) return;
             const players = this.piecesOf('player'),
                 fd = p => field.get(this.key(p.x, p.y)) ?? Infinity,
                 members = this.group(root),
@@ -98,7 +102,9 @@
             if (best) this.act(root, best.x, best.y, best.mode);
         },
         
-        // Plan a squad's turn. Returns [{ id, dx, dy }] to execute in order.
+        // Plan a squad's turn. Returns the actions to carry out in order: {id, dx, dy, mode}
+        // to step, {id, swap} to swap with another squad piece, or {id, jump:[x, y]}. Pieces
+        // tired from a jump last turn can't act.
         planSquad: function(squad, budget, field, caution = 1) {
             const ids = squad.map(p => p.id),
                 byId = new Map(squad.map(p => [p.id, p])),
@@ -131,7 +137,7 @@
                 },
                 initial = {
                     pos:new Map(squad.map(p => [p.id, [p.x, p.y]])),
-                    acted:new Set(),
+                    acted:new Set(ids.filter(id => this.isTired(byId.get(id)))),
                     dmg:new Map(),
                     dead:new Set(),
                     gain:0,
@@ -255,6 +261,20 @@
                                     }
                                 }
                             }
+                        }
+                        // Jumping: only it moves, two cells, and it's then done, and tired next
+                        // turn, which costs AI.jump. After the steps, so a step wins a tie.
+                        for (const {x, y} of this.jumpCells(view, id)) {
+                            const pos = new Map(st.pos);
+                            pos.set(id, [x, y]);
+                            out.push({
+                                pos,
+                                acted:new Set(st.acted).add(id),
+                                dmg:st.dmg,
+                                dead:st.dead,
+                                gain:st.gain - AI.jump,
+                                actions:[...st.actions, {id, jump:[x, y]}]
+                            });
                         }
                     }
                     return out;

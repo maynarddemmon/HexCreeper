@@ -17,6 +17,7 @@ myt.I18N.setDictionary({
 "mode-follow":"Follow",
 "btn-attach":"Attach",
 "btn-swap":"Swap",
+"btn-jump":"Jump",
 "btn-quicken":"Quicken · $0",
 "btn-load-save":"Load Last Save",
 "btn-start":"Start",
@@ -35,6 +36,7 @@ myt.I18N.setDictionary({
 "tip-mode":"How a piece's linked pieces move with it. Fixed: they all move with it, keeping their shape. Free: they stay put, unless the move would take one out of link range, which drags it along. Follow: it leads and the whole swarm it's linked to follows, flowing around obstacles; only it attacks. (M)",
 "tip-detach":"Break the selected piece's link to its parent, however far apart they are. Uses its move. (X)",
 "tip-swap":"Swap the selected piece with one of your pieces next to it. Their links stay with them. Uses a move, and both pieces are done for the turn. (S)",
+"tip-jump":"Jump the selected piece two cells, over holes and pieces but not solids. Nothing linked to it moves, so its links must stay in range. Uses its move, and it can't act this turn or next. Not in Follow mode. (J)",
 "tip-attach":"Link the selected piece, if it has no parent, to one of your pieces next to it. Uses its move. (L)",
 "tip-recover":"Once a turn, let this piece move again if it has moved (or was placed) this turn, for its rank in score. It still uses one of your moves left. (R)",
 "tip-center":"Center on your core. (Space)",
@@ -81,6 +83,7 @@ myt.I18N.setDictionary({
 // Status
 "status-place":"Place piece: choose an empty cell next to the selected piece. Esc cancels.",
 "status-swap":"Swap: click a ringed piece to swap the selected piece with. Esc cancels.",
+"status-jump":"Jump: click a highlighted cell to jump the selected piece to. Esc cancels.",
 "status-attach":"Attach: click a ringed piece to link the selected piece to. Esc cancels.",
 "status-solid":"$0 ($1) · HP $2/$3 · DR $4",
 "status-hole":"$0 · $1",

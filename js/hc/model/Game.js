@@ -304,8 +304,11 @@
         
         // Can this player piece still move this turn?
         canMove: function(p) {
-            return !this.acted.has(p.id) && !this.fresh.has(p.id) && this.movesUsed < this.moveLimit();
+            return !this.acted.has(p.id) && !this.fresh.has(p.id) && !this.isTired(p) && this.movesUsed < this.moveLimit();
         },
+        
+        // Is the piece tired from a jump: one this turn, or last turn (see jumpPiece)?
+        isTired: function(p) {return (p?.tiredUntil ?? -1) >= this.turn;},
         
         // The piece plus everything linked below it.
         group: function(p) {
@@ -841,7 +844,7 @@
         },
         
         movesLeft: function() {
-            const eligible = this.piecesOf('player').filter(p => !this.acted.has(p.id) && !this.fresh.has(p.id)).length;
+            const eligible = this.piecesOf('player').filter(p => !this.acted.has(p.id) && !this.fresh.has(p.id) && !this.isTired(p)).length;
             return Math.max(0, Math.min(this.moveLimit() - this.movesUsed, eligible));
         },
         
@@ -899,10 +902,11 @@
         // ---- Recover ----
         // Once a turn, a piece that has moved, or was placed, this turn can be made ready to
         // move again, for its rank in score. It doesn't add a move: moving it again uses one
-        // of the turn's moves left, so it's only offered while there's one.
+        // of the turn's moves left, so it's only offered while there's one. A piece tired
+        // from a jump can't be recovered.
         recoverCost: function(p) {return p.rank;},
         canRecover: function(p) {
-            return !this.over && !this.recoverUsed && p?.owner === 'player' &&
+            return !this.over && !this.recoverUsed && p?.owner === 'player' && !this.isTired(p) &&
                 (this.acted.has(p.id) || this.fresh.has(p.id)) &&
                 this.movesUsed < this.moveLimit() && this.score >= this.recoverCost(p);
         },
@@ -943,7 +947,7 @@
             this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
-            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p));
+            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p));
             if (!canAct && !this.canAffordPlace() && !this.anyRecoverable() && !this.canQuicken()) { this.endPlayerTurn(); return; }
             // The selection stays where it is, even on a piece that has acted.
         },

@@ -76,6 +76,7 @@
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.jumpMode = false;
             V.menuOpen = false;
             centerOn(false);
             draw();
@@ -94,13 +95,14 @@
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.jumpMode = false;
             V.menuOpen = false;
             game.playerWait();
             gameView.afterTurn();
         },
         
-        /*  What the selected piece's menu offers, in its order: place (next to it), swap
-            and attach (which then ask for the cell, or the piece to swap with or attach to),
+        /*  What the selected piece's menu offers, in its order: place (next to it), swap,
+            jump and attach (which then ask for the cell, or the piece to swap with or attach to),
             detach, heal (flowing from it), recover (it), and quicken (the swarm). */
         menuItems = () => {
             const sel = () => game.getSelected(),
@@ -118,6 +120,7 @@
                     run:choose('placeMode')
                 },
                 {id:'swap', label:() => i18n('btn-swap'), tip:() => i18n('tip-swap'), enabled:() => game.canSwap(sel()), run:choose('swapMode')},
+                {id:'jump', label:() => i18n('btn-jump'), tip:() => i18n('tip-jump'), enabled:() => game.canJump(sel()), run:choose('jumpMode')},
                 {id:'attach', label:() => i18n('btn-attach'), tip:() => i18n('tip-attach'), enabled:() => game.canAttach(sel()), run:choose('attachMode')},
                 {id:'detach', label:() => i18n('btn-detach'), tip:() => i18n('tip-detach'), enabled:() => game.canDetach(sel()), run:() => {
                     if (game.playerDetach(sel())) gameView.afterTurn();
@@ -157,12 +160,13 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', s:'swap', l:'attach', x:'detach', h:'heal', r:'recover', u:'quicken'},
+        MENU_KEYS = {p:'place', s:'swap', j:'jump', l:'attach', x:'detach', h:'heal', r:'recover', u:'quicken'},
         
         cancelModes = () => {
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.jumpMode = false;
             V.menuOpen = false;
             draw();
         },
@@ -312,6 +316,8 @@
                         status = i18n('status-attach');
                     } else if (V.swapMode) {
                         status = i18n('status-swap');
+                    } else if (V.jumpMode) {
+                        status = i18n('status-jump');
                     } else if (V.hover) {
                         // A solid under the pointer: what it is and how tough. A hole: what it is.
                         const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
@@ -511,6 +517,7 @@
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
+            V.jumpMode = false;
             V.menuOpen = false;
             game.reset();
             centerOn(false);
@@ -669,7 +676,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.attachMode || V.swapMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode) return;
                 if (k === '.' || k === 'Numpad5' || k === 'Enter') {
                     e.preventDefault();
                     endTurn();

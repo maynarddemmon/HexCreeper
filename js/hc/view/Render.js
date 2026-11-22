@@ -320,6 +320,10 @@
         if (V.placeMode && sel) {
             // The cells next to the selected piece a piece could be placed on.
             for (const q of game.placeCells(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
+        } else if (V.jumpMode && sel) {
+            // The cells the selected piece can jump to.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
         } else if ((V.attachMode || V.swapMode) && sel) {
             // The pieces the selected one can attach to, or swap with.
             fillCell(sel.x, sel.y, '--sel-bg');
@@ -479,8 +483,8 @@
                 hl: !V.placeMode && selGroupIds.has(p.id),
                 root: p.id === game.playerCoreId,
                 linkTarget: linkTargets.has(p.id),
-                moved: p.owner === 'player' && (game.acted.has(p.id) || game.fresh.has(p.id)),
-                spent: p.owner === 'player' && !game.acted.has(p.id) && !game.fresh.has(p.id) && !game.canMove(p),
+                moved: p.owner === 'player' && (game.acted.has(p.id) || game.fresh.has(p.id) || game.isTired(p)),
+                spent: p.owner === 'player' && !game.acted.has(p.id) && !game.fresh.has(p.id) && !game.isTired(p) && !game.canMove(p),
             });
             ctx.restore();
             

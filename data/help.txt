@@ -9,6 +9,7 @@ Each turn you may move as many pieces as your highest rank, each once, in any or
 - A linked piece must stay within 3 steps of its parent.
 - If a piece is destroyed, everything linked below it goes too.
 - Swap (S) swaps the selected piece with one of your pieces next to it; their links stay with them. It uses a move, and both are done for the turn.
+- Jump (J) moves the selected piece two cells, over holes and pieces but not solids, onto an empty cell. Nothing linked to it moves, so its links must stay in range. It uses a move, and the piece can't act this turn or the next. You can't jump in Follow mode. Enemies jump too.
 - Detach (X) breaks the selected piece's link to its parent, however far apart they are; it keeps what's linked below it and moves on its own. Attach (L) links a piece with no parent to one of your pieces next to it. Either uses that piece's move, and changes ranks.
 - Shift-click a cell held by one of your own pieces to move onto it instead of selecting it.
 
@@ -36,7 +37,7 @@ You only see enemies within sight of your pieces: up to 12 steps away, with soli
 
 <span style="font-size:16px;">SPENDING SCORE</span>
 - Place (P): pick an empty cell next to the selected piece; the new piece is linked to it.
-- Click the selected piece again for its menu: Place, Swap, Attach, Detach, Heal, Recover and Quicken. Each has a key too, which works on the selected piece.
+- Click the selected piece again for its menu: Place, Swap, Jump, Attach, Detach, Heal, Recover and Quicken. Each has a key too, which works on the selected piece.
 - Heal (H): heal HP equal to your core's rank, starting from the selected piece.
 - Recover (R): once a turn, let the selected piece move again if it has already moved (or was placed) this turn, for its rank in score. It still uses one of your moves.
 - Quicken (U): once a turn, one more move this turn, for your swarm's highest rank in score.
