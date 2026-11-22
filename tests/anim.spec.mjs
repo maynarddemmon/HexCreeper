@@ -31,10 +31,10 @@ test('in the enemies\' turn a squad\'s actions play one after another, and squad
         const a = g.addPiece('core', 'enemy', -6, -6), a2 = g.addPiece('core', 'enemy', -5, -6, a.id),
             b = g.addPiece('core', 'enemy', 6, -6);
         g.recomputeRanks();
-        g.planSquad = squad => squad[0] === a
+        g.enemyAI.planSquad = squad => squad[0] === a
             ? [{id:a2.id, dx:1, dy:0, mode:'fixed'}, {id:a.id, dx:1, dy:0, mode:'free'}]
             : [{id:b.id, dx:-1, dy:0, mode:'fixed'}];
-        hc.cfg.AI.planRange = 100;
+        g.enemyAI.attrs.planRange = 100;
         g.motions = [];
         g.enemyPhase();
         const t = id => g.motions.filter(m => m.id === id).map(m => m.t0);
@@ -73,8 +73,8 @@ test('a piece destroyed in a squad\'s later action stays drawn until then', asyn
         // The squad steps its leader, then strikes your piece with the other.
         const e = g.addPiece('core', 'enemy', 2, -3), e2 = g.addPiece('core', 'enemy', 1, -2, e.id);
         g.recomputeRanks();
-        g.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
-        hc.cfg.AI.planRange = 100;
+        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
+        g.enemyAI.attrs.planRange = 100;
         g.effects = [];
         const now = performance.now();
         g.enemyPhase();
@@ -97,8 +97,8 @@ test('with Animate pieces off, nothing is animated, and the enemies\' turn shows
         kid.hp = 1;
         const e = g.addPiece('core', 'enemy', 3, -3), e2 = g.addPiece('core', 'enemy', 2, -2, e.id);
         g.recomputeRanks();
-        g.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
-        hc.cfg.AI.planRange = 100;
+        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
+        g.enemyAI.attrs.planRange = 100;
         g.effects = [];
         g.enemyPhase();
         // At once: nothing is put off till after the enemies' turn is over.

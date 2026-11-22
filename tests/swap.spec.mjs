@@ -70,8 +70,8 @@ test('enemies can swap: a planned swap is carried out in their turn', async ({pa
     const r = await page.evaluate(() => {
         const g = hc.app.game, lead = g.addPiece('core', 'enemy', 0, -3), kid = g.addPiece('core', 'enemy', 1, -3, lead.id);
         g.recomputeRanks();
-        g.planSquad = () => [{id:lead.id, swap:kid.id}];
-        g.marchSquad = () => {};
+        g.enemyAI.planSquad = () => [{id:lead.id, swap:kid.id}];
+        g.enemyAI.marchSquad = () => {};
         g.enemyPhase();
         return [[lead.x, lead.y], [kid.x, kid.y], kid.parentId === lead.id];
     });

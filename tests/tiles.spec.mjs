@@ -1,12 +1,12 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, putTile, setGeneratorAttrs} from './helpers.mjs';
+import {startGame, clearBoard, putTile, setComponentAttrs} from './helpers.mjs';
 
 test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
     // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from
     // the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
     // neighbours. No loot, or some heal tiles are loot.
-    await setGeneratorAttrs(page, {tile:{quadRadius:3, lootChance:0}});
+    await setComponentAttrs(page, {tile:{quadRadius:3, lootChance:0}});
     const r = await page.evaluate(() => {
         hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),

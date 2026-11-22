@@ -48,6 +48,7 @@
             onto(LINK,   'mode',         choice, 'moveMode', () => pkg.MOVE_MODES.map(m => ({value:m, label:m}))), // at the start of a game
             onto(RANK,   'base',         num,    'rankBase', 1, 10),
             onto(RANK,   'hpPer',        num,    'hpPer', 1, 20),          // max HP per rank
+            onto(RANK,   'enemyHpPer',   num,    'enemyHpPer', 1, 20),     // enemy max HP per rank
             onto(RANK,   'movesPer',     num,    'movesPer', 1, 10),       // moves per turn per top rank
             onto(RANK,   'placeBase',    num,    'placeBase', 0, 100),     // place cost, base
             onto(RANK,   'placePerPieces', num,  'placePerPieces', 1, 100), // place cost: +1 per this many pieces

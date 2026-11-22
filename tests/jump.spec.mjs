@@ -105,19 +105,19 @@ test('enemies jump: a planned jump is carried out, and the piece sits out its ne
     const r = await page.evaluate(() => {
         const g = hc.app.game,
             lead = g.addPiece('core', 'enemy', 0, -4),
-            planSquad = g.planSquad;
+            planSquad = g.enemyAI.planSquad;
         g.recomputeRanks();
-        g.planSquad = () => [{id:lead.id, jump:[0, -6]}];
-        g.marchSquad = () => {};
+        g.enemyAI.planSquad = () => [{id:lead.id, jump:[0, -6]}];
+        g.enemyAI.marchSquad = () => {};
         g.enemyPhase();
         const out = {at:[lead.x, lead.y], tired:g.isTired(lead)};
         // Its next turn: the planner has nothing for it to do, and it doesn't march.
         g.turn++;
-        g.planSquad = planSquad;
+        g.enemyAI.planSquad = planSquad;
         const field = g.distanceField(g.piecesOf('player'));
-        out.planned = g.planSquad([lead], 1, field).length;
-        delete g.marchSquad;
-        g.marchSquad(lead, field);
+        out.planned = g.enemyAI.planSquad([lead], 1, field).length;
+        delete g.enemyAI.marchSquad;
+        g.enemyAI.marchSquad(lead, field);
         out.marched = lead.x !== 0 || lead.y !== -6;
         g.turn++;
         out.later = g.isTired(lead);

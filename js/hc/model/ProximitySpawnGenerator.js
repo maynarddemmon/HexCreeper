@@ -21,11 +21,11 @@
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
             ATTRS:[
-                ...pkg.SpawnGenerator.ATTRS,
                 num('spawnEvery', 3, 1, 50),  // a wave every this many turns
                 num('pBase', 1, 0, 50),       // enemies per wave at rank 1
                 num('pPerRank', 2, 0, 20),    // extra enemies per wave for each rank above 1
                 num('pSquadExtra', 1, 0, 10), // largest squad = rank + this
+                num('maxSquad', 16, 1, 31),   // but never larger than this
                 num('pTime', 0, 0, 500),      // optional slow clock ramp: +1 enemy per wave every this many turns (0: off)
                 num('initial', 3, 0, 50),     // enemies at the start
                 num('minDist', 6, 2, 40),     // the ring they spawn in: steps from your core
@@ -111,7 +111,7 @@
                     if (!game.isOpen(x, y) || game.pieceAt(x, y) || game.isHarm(x, y)) continue;
                     if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                     const p = game.addPiece('core', 'enemy', x, y);
-                    p.hp = p.maxHp = this.attrs.enemyHpPer * RANK.base;
+                    p.hp = p.maxHp = RANK.enemyHpPer * RANK.base;
                     game.fx(x, y, '', '--enemy', { spawn: true });
                     return p;
                 }

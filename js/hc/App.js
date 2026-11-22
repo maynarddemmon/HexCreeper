@@ -593,8 +593,8 @@
                         seed:Number.isInteger(gameMap.seed) ? gameMap.seed : pkg.randomSeed(),
                         underway:!game.over && game.turn > 1,
                         onStart: seed => {
-                            const {name, rules, tileGenerator, spawnGenerator, objectives} = gameMap;
-                            game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, objectives};
+                            const {name, rules, tileGenerator, spawnGenerator, enemyAI, objectives} = gameMap;
+                            game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives};
                             settings.applyRules(rules);
                             game.seed = seed;
                             appView.newGame();

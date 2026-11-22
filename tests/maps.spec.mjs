@@ -86,7 +86,7 @@ test('the same seed makes the same map; an empty seed makes a random one', async
 });
 
 test('a map\'s own seed fills in the brief', async ({page}) => {
-    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"seed":777, "tileGenerator":{"type":"proximity"}, "spawnGenerator":{"type":"proximity"}}'}));
+    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"seed":777, "tileGenerator":{"type":"proximity"}, "spawnGenerator":{"type":"proximity"}, "enemyAI":{"type":"squad"}}'}));
     await startGame(page);
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
@@ -149,30 +149,34 @@ test('Settings shows only the preferences, whatever the map', async ({page}) => 
     await expect(button(page, 'Reset to Defaults')).toHaveCount(0);
 });
 
-test('a map\'s rules and generator attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
+test('a map\'s rules and component attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
     const problems = await startGame(page);
     expect(await page.evaluate(() => {
         const rules = hc.settings.cleanRules({linkRange:99, movesPer:2.4, advance:'yes', fog:false, spawnEvery:2}, 'Map test'),
-            spawn = hc.SpawnGenerator.cleanAttrs('proximity', {spawnEvery:2.4, linkRange:2}, 'Map test spawn generator');
+            spawn = hc.SpawnGenerator.cleanAttrs('proximity', {spawnEvery:2.4, linkRange:2}, 'Map test spawn generator'),
+            ai = hc.EnemyAI.cleanAttrs('squad', {approach:0.26, beam:0, spawnEvery:2}, 'Map test enemy AI');
         hc.settings.applyRules(rules);
         const gen = hc.SpawnGenerator.make('proximity', hc.app.game, spawn),
-            out = [rules, spawn, hc.cfg.LINK.range, hc.cfg.RANK.movesPer, hc.cfg.COMBAT.advance, gen.attrs.spawnEvery, gen.attrs.initial];
+            squad = hc.EnemyAI.make('squad', hc.app.game, ai),
+            out = [rules, spawn, ai, hc.cfg.LINK.range, hc.cfg.RANK.movesPer, hc.cfg.COMBAT.advance, gen.attrs.spawnEvery, gen.attrs.initial, squad.attrs.approach, squad.attrs.expose];
         hc.settings.applyRules({});
         return [...out, hc.cfg.LINK.range];
-    })).toEqual([{linkRange:20, movesPer:2}, {spawnEvery:2}, 20, 2, true, 2, 3, 3]);
+    })).toEqual([{linkRange:20, movesPer:2}, {spawnEvery:2}, {approach:0.3, beam:1}, 20, 2, true, 2, 3, 0.3, 12, 3]);
     expect(problems.warnings.filter(w => /^Map test/.test(w)).map(w => w.split(' cannot')[0]).sort()).toEqual([
-        'Map test rules attr advance', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
+        'Map test enemy AI attr spawnEvery', 'Map test rules attr advance', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
     ]);
 });
 
-test('a map file without a known tile or spawn generator isn\'t loaded', async ({page}) => {
+test('a map file without a known tile generator, spawn generator or enemy AI isn\'t loaded', async ({page}) => {
     const problems = await startGame(page);
-    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"nowhere"}, "spawnGenerator":{"type":"proximity"}}'}));
-    await page.route('**/data/gamemap/open_ground.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"proximity"}}'}));
-    expect(await page.evaluate(() => Promise.all(['warrens', 'open_ground'].map(id => new Promise(done => hc.maps.loadMap(id, done)))))).toEqual([null, null]);
-    expect(problems.errors.filter(e => /^Bad map/.test(e))).toEqual([
-        'Bad map warrens Map warrens tile generator has an unknown type: nowhere',
-        'Bad map open_ground Map open_ground spawn generator is missing'
+    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"nowhere"}, "spawnGenerator":{"type":"proximity"}, "enemyAI":{"type":"squad"}}'}));
+    await page.route('**/data/gamemap/open_ground.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"proximity"}, "enemyAI":{"type":"squad"}}'}));
+    await page.route('**/data/gamemap/hedge_maze.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"proximity"}, "spawnGenerator":{"type":"proximity"}}'}));
+    expect(await page.evaluate(() => Promise.all(['warrens', 'open_ground', 'hedge_maze'].map(id => new Promise(done => hc.maps.loadMap(id, done)))))).toEqual([null, null, null]);
+    expect(problems.errors.filter(e => /^Bad map/.test(e)).sort()).toEqual([
+        'Bad map hedge_maze Map hedge_maze enemy AI is missing',
+        'Bad map open_ground Map open_ground spawn generator is missing',
+        'Bad map warrens Map warrens tile generator has an unknown type: nowhere'
     ]);
 });
 

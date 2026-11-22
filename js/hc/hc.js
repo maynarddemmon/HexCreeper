@@ -114,28 +114,14 @@
                 mode:'fixed' // how the player's pieces move at the start: fixed, free or follow (see Movement.js)
             },
             
-            // Enemy squad planning (see Game.planSquad).
-            AI:{
-                planRange:6,   // squads whose nearest piece is within this many steps plan their turn
-                beam:12,       // plans kept per search step
-                hit:10,        // value of each hit on a player piece
-                killPer:6,     // extra value per player piece destroyed (incl. pieces linked below it)
-                coreHit:15,    // extra value for hitting the player's core
-                coreKill:1000, // destroying the core
-                // expose (caution: penalty per piece, incl. pieces linked below, left next to a player
-                // piece) and patience (turns without a hit before a nearby squad stops caring about
-                // exposure) are the spawn generator's attrs aiExpose and aiPatience (see Generators.js).
-                poise:1,       // bonus for a piece ending exactly 2 steps away (can strike next turn, can't be hit)
-                approach:0.5,  // penalty per step of distance for pieces further away
-                jump:0.5,      // cost of a jump: the piece sits out next turn, which is worth a step of approach
-                jumpClose:1,   // pieces this close (steps) to a player piece don't jump when planning
-            },
+            // Enemy squad planning is the enemy AI's attrs (see SquadAI.js).
             
             // Rank: a player piece's rank = max(base, 1 + min of its two highest-ranked children)
             // (a missing child counts as 0, so a piece needs two children to rank up).
             RANK:{
                 base:1,         // rank of a piece without two children
                 hpPer:2,        // max HP = hpPer x the piece's own rank
+                enemyHpPer:1,   // an enemy's max HP = enemyHpPer x its rank
                 movesPer:1,     // pieces you may move per turn = movesPer x highest rank of any piece
                 placeBase:4,    // cost to place a piece = placeBase + 1 per placePerPieces of your pieces (rounded up)
                 placePerPieces:2,

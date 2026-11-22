@@ -5,11 +5,11 @@
         
         MAPS_DIR = DATA_BASE_DIR + 'gamemap/',
         
-        /*  A map file's "tileGenerator" or "spawnGenerator", {type, ...attrs}, made usable:
-            {type, attrs}, its attrs cleaned (see Generator.cleanAttrs). Base is
-            TileGenerator or SpawnGenerator. Throws if it isn't an object whose type is
-            registered with Base. */
-        generatorOf = (Base, config, where) => {
+        /*  A map file's "tileGenerator", "spawnGenerator" or "enemyAI", {type, ...attrs},
+            made usable: {type, attrs}, its attrs cleaned (see MapComponent.cleanAttrs).
+            Base is TileGenerator, SpawnGenerator or EnemyAI. Throws if it isn't an object
+            whose type is registered with Base. */
+        componentOf = (Base, config, where) => {
             if (!isObj(config)) throw new Error(where + ' is missing');
             if (!Base.has(config.type)) throw new Error(where + ' has an unknown type: ' + config.type);
             const {type, ...attrs} = config;
@@ -45,14 +45,16 @@
             tileGenerator: {type, ...attrs}: what makes its tiles: a type registered with
                 TileGenerator, and values for that type's attrs (see Generators.js);
             spawnGenerator: {type, ...attrs}: what makes its enemies, likewise;
+            enemyAI: {type, ...attrs}: what plays the enemies' turn, likewise (see
+                EnemyAI.js);
             goals and penalties, and optionally a seed.
         
         A map, once loaded, is its entry in init.json5 merged with its file:
             {id, name, number, description, seed, rules:{id:value}, tileGenerator:{type,
-            attrs}, spawnGenerator:{type, attrs}, objectives:[...]}
+            attrs}, spawnGenerator:{type, attrs}, enemyAI:{type, attrs}, objectives:[...]}
         where objectives are its goals and penalties (see goals.fromMap). Rules and attrs
         are only those the file gives, made usable (any that can't be are skipped with a
-        warning). A map whose goals or generators can't be used isn't loaded. */
+        warning). A map whose goals or components can't be used isn't loaded. */
     pkg.maps = {
         /*  Calls back with init.json5's contents, {defaultMap, maps:[...], materials,
             solids, holes, heals, harms, loots}, or null if it couldn't be loaded. It's loaded
@@ -101,8 +103,9 @@
                         gameMap = {
                             ...entry, ...data, id,
                             rules:pkg.settings.cleanRules(data.rules, where),
-                            tileGenerator:generatorOf(pkg.TileGenerator, data.tileGenerator, where + ' tile generator'),
-                            spawnGenerator:generatorOf(pkg.SpawnGenerator, data.spawnGenerator, where + ' spawn generator'),
+                            tileGenerator:componentOf(pkg.TileGenerator, data.tileGenerator, where + ' tile generator'),
+                            spawnGenerator:componentOf(pkg.SpawnGenerator, data.spawnGenerator, where + ' spawn generator'),
+                            enemyAI:componentOf(pkg.EnemyAI, data.enemyAI, where + ' enemy AI'),
                             objectives:pkg.goals.fromMap(data)
                         };
                         loaded.set(id, gameMap);

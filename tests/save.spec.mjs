@@ -25,7 +25,7 @@ const snapshot = page => page.evaluate(() => {
         turn:g.turn, score:g.score, scoreEarned:g.scoreEarned, over:g.over, quadRadius:hc.GRID.chunkRadius,
         pieces:[...g.pieces.values()].map(p => JSON.stringify(p)).sort(),
         tiles:[...g.tiles.values()].map(t => JSON.stringify(t)).sort(),
-        generators:[T.type, g.spawnGenerator.type],
+        components:[T.type, g.spawnGenerator.type, g.enemyAI.type, JSON.stringify(g.enemyAI.attrs)],
         terrainQuads:sorted(T.terrainQuads), tiledQuads:sorted(T.tiledQuads), visitedQuads:sorted(T.visitedQuads),
         seenCells:sorted(g.seenCells), borders:[...T.borders].map(String).sort(), corePath:g.corePath,
         coreAt:hc.app.game.pieceAt(g.getPlayerCore().x, g.getPlayerCore().y)?.id === g.playerCoreId,
@@ -47,7 +47,7 @@ test('saving with the header button, then reloading, carries on the same game', 
     // Taken after saving: what's in sight is only worked out as the board is drawn, so
     // before then the cells seen may not be up to date yet.
     const before = await snapshot(page);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hc.save')).version)).toBe(2);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hc.save')).version)).toBe(3);
 
     await page.reload();
     await waitForGame(page);
@@ -64,7 +64,7 @@ test('without a save, a reload starts a new game', async ({page}) => {
 
 test('a save that can\'t be used is cleared, with a message, then the maps are shown', async ({page}) => {
     await startGame(page);
-    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));});
+    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:3, format:'compact', data:{turn:'nope'}}));});
     await page.reload();
     await waitForGame(page);
     await expect(page.getByText('Save Could Not Be Loaded', {exact:true}).filter({visible:true})).toBeVisible();
@@ -78,7 +78,7 @@ test('after losing, a last save that can\'t be used shows the maps after the mes
     await startGame(page);
     await saveWithButton(page);
     await page.evaluate(() => {
-        localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));
+        localStorage.setItem('hc.save', JSON.stringify({version:3, format:'compact', data:{turn:'nope'}}));
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
         g.damage(g.getPlayerCore(), 99, e);
         hc.view.draw();
@@ -126,7 +126,7 @@ for (const format of ['compact', 'pretty']) {
         const file = await download,
             contents = await (await file.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString());
         expect(file.suggestedFilename()).toBe('hexcreeper-save.json');
-        expect(JSON.parse(contents)).toMatchObject({version:2, format});
+        expect(JSON.parse(contents)).toMatchObject({version:3, format});
         expect(contents.includes('\n')).toBe(format === 'pretty');
         
         await button(page, 'New game').click();
@@ -142,10 +142,10 @@ for (const format of ['compact', 'pretty']) {
 
 for (const [what, contents, msg] of [
     ['not JSON', 'not a save', 'That file is not a HexCreeper save file.'],
-    ['not a save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
-    ['without a format', JSON.stringify({version:2, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
-    ['in an unknown format', JSON.stringify({version:2, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
-    ['from before maps had generators', JSON.stringify({version:1, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (1).']
+    ['not a save', JSON.stringify({version:3, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
+    ['without a format', JSON.stringify({version:3, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
+    ['in an unknown format', JSON.stringify({version:3, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
+    ['from before maps had an enemy AI', JSON.stringify({version:2, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (2).']
 ]) {
     test(`importing a file that is ${what} changes nothing`, async ({page}) => {
         await startGame(page);

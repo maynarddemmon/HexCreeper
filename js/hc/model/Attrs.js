@@ -1,6 +1,6 @@
 /*  Declaring and checking attrs: named values with a type, a default and a range or set of
-    options. Preferences, map rules (Settings.js) and generators' attrs (Generators.js) are
-    declared with these. */
+    options. Preferences, map rules (Settings.js) and map components' attrs
+    (MapComponent.js) are declared with these. */
 (pkg => {
     'use strict';
     
@@ -8,7 +8,7 @@
         
         /*  A value the attr can hold, or undefined: booleans must be booleans, choices one of
             the options (any text, before the options are known), and numbers are rounded
-            and clamped. */
+            (to a whole number of steps) and clamped. */
         normalize = (def, value) => {
             let retval;
             if (def.type === 'boolean') {
@@ -17,15 +17,16 @@
                 const options = def.options();
                 if (typeof value === 'string' && (!options.length || options.some(o => o.value === value))) retval = value;
             } else {
-                const n = Math.round(Number(value));
+                const n = Math.round(Number(value) / def.step) / (1 / def.step);
                 if (Number.isFinite(n)) retval = Math.min(def.max, Math.max(def.min, n));
             }
             return retval;
         };
     
     pkg.attrs = {
-        /*  A whole number from min to max. */
-        num: (id, defaultValue, min, max) => ({id, type:'number', defaultValue, min, max}),
+        /*  A number from min to max, in steps of step (whole numbers by default; a step
+            below 1 should be 1/n, e.g. 0.1). */
+        num: (id, defaultValue, min, max, step=1) => ({id, type:'number', defaultValue, min, max, step}),
         
         /*  True or false. */
         bool: (id, defaultValue) => ({id, type:'boolean', defaultValue}),

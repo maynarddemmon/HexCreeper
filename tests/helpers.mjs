@@ -49,17 +49,18 @@ export const clearBoard = page => page.evaluate(() => {
     g.spawnGenerator.spawnWave = () => {};
 });
 
-/*  Gives the map being played these attrs for its tile and spawn generators ({tile, spawn}),
-    on top of its own, so a new game in it (or a reset) has them, and gives the game's
-    generators them now. */
-export const setGeneratorAttrs = (page, {tile = {}, spawn = {}}) => page.evaluate(([tile, spawn]) => {
+/*  Gives the map being played these attrs for its components ({tile, spawn, ai}: its tile
+    and spawn generators and its enemy AI), on top of its own, so a new game in it (or a
+    reset) has them, and gives the game's components them now. */
+export const setComponentAttrs = (page, {tile = {}, spawn = {}, ai = {}}) => page.evaluate(([tile, spawn, ai]) => {
     const g = hc.app.game,
-        m = g.gameMap ?? {},
-        add = (config, attrs) => ({type:config?.type ?? 'proximity', attrs:{...config?.attrs, ...attrs}});
-    g.gameMap = {...m, tileGenerator:add(m.tileGenerator, tile), spawnGenerator:add(m.spawnGenerator, spawn)};
+        m = g.gameMap ?? hc.Game.NO_MAP,
+        add = (config, attrs) => ({type:config.type, attrs:{...config.attrs, ...attrs}});
+    g.gameMap = {...m, tileGenerator:add(m.tileGenerator, tile), spawnGenerator:add(m.spawnGenerator, spawn), enemyAI:add(m.enemyAI, ai)};
     Object.assign(g.tileGenerator.attrs, tile);
     Object.assign(g.spawnGenerator.attrs, spawn);
-}, [tile, spawn]);
+    Object.assign(g.enemyAI.attrs, ai);
+}, [tile, spawn, ai]);
 
 /*  Puts a tile at (x, y), made as the game makes them (Game.makeTile), with props on top.
     A heal, harm or loot tile is already revealed, with its magnitude shown. Returns it. */

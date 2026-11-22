@@ -5,7 +5,7 @@
         
         isObj = pkg.isObj,
         
-        SAVE_FORMAT_VERSION = 2, // 2 (2026-11-22): maps with rules and generators; 1: before
+        SAVE_FORMAT_VERSION = 3, // 3 (2026-11-22): maps with an enemy AI; 2: with rules and generators; 1: before
         DEFAULT_STORAGE_KEY = 'hc.save',
         
         readStorage = key => {

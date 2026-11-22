@@ -10,6 +10,7 @@
 		"doorMax":1
 	},
 	"spawnGenerator":{"type":"proximity"},
+	"enemyAI":{"type":"squad"},
 	"goals":[
 		{
 			"name":"Explorer",

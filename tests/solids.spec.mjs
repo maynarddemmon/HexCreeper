@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, cellOnPage, setGeneratorAttrs} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, setComponentAttrs} from './helpers.mjs';
 
 /*  Materials and solid subtypes of the tests' own, in place of init.json5's, so editing
     the game's data doesn't break the tests. */
@@ -73,7 +73,7 @@ test('a material or subtype that isn\'t usable is left out', async ({page}) => {
 test('walls and clumps are made of the subtypes the tile generator\'s attrs choose, with their HP', async ({page}) => {
     await startGame(page);
     await useTestSolids(page);
-    await setGeneratorAttrs(page, {tile:{wallChance:100, wallHoleChance:0, solidMin:4, solidMax:4, holeMax:0, wallSolid:'iron_bars', clumpSolid:'fungus'}});
+    await setComponentAttrs(page, {tile:{wallChance:100, wallHoleChance:0, solidMin:4, solidMax:4, holeMax:0, wallSolid:'iron_bars', clumpSolid:'fungus'}});
     const kinds = await page.evaluate(() => {
         const g = hc.app.game;
         g.reset();

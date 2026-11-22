@@ -164,8 +164,8 @@
 	
 	// Every map, in the order the Maps dialog lists them, with what a list of maps
 	// needs. Each map's own file is data/gamemap/<id>.json5. A map with no "number" is
-	// listed without one. A map's file names its "tileGenerator" and "spawnGenerator",
-	// {"type":..., ...attrs}, and may give "rules", {id:value}: gameplay values in place of
+	// listed without one. A map's file names its "tileGenerator", "spawnGenerator" and
+	// "enemyAI", {"type":..., ...attrs}, and may give "rules", {id:value}: gameplay values in place of
 	// hc.cfg's (see js/hc/model/Maps.js), a "seed", so it's always laid out the same
 	// (otherwise the brief offers a random one), and "goals" and "penalties" (see
 	// docs/DESIGN.md, Maps).

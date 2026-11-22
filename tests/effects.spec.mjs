@@ -87,7 +87,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         hc.cfg.RANK.hpPer = 10;
-        g.spawnGenerator.attrs.enemyHpPer = 10;
+        hc.cfg.RANK.enemyHpPer = 10;
         g.score = 100;
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));

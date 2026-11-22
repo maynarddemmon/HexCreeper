@@ -166,7 +166,7 @@ test('a squad far off that can\'t get through keeping its shape squeezes through
             }
         }
         const fixed = g.legalMoves(root, 'fixed').filter(m => !m.attack).length;
-        g.marchSquad(root, g.distanceField(g.piecesOf('player')));
+        g.enemyAI.marchSquad(root, g.distanceField(g.piecesOf('player')));
         return [fixed, [root.x, root.y], [kid.x, kid.y]];
     });
     expect(r).toEqual([0, [19, 0], [20, 0]]); // the follower steps into the leader's place

@@ -1,6 +1,7 @@
 /*  The game state and rules: pieces and link trees, ranks, moves and attacks, tiles and
-    heals. Enemy turns are in EnemyAI.js and goals in Goals.js, modules it includes; the
-    map's tiles and enemies come from its generators (Generators.js). */
+    heals. Goals are in Goals.js, a module it includes; the map's tiles, enemies and enemy
+    turns come from its components (its generators, Generators.js, and its enemy AI,
+    EnemyAI.js). */
 (pkg => {
     'use strict';
     
@@ -16,17 +17,21 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.EnemyAI, pkg.Goals, pkg.EffectTiles],
+        include:[pkg.Movement, pkg.Goals, pkg.EffectTiles],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
-            // The tile and spawn generators a game is made with when it isn't in a map
-            // (one made in a test, say): "proximity", with every attr at its default.
-            NO_MAP_GENERATOR:{type:'proximity', attrs:{}}
+            // The components a game is made with when it isn't in a map (one made in a
+            // test, say), with every attr at its default.
+            NO_MAP:{
+                tileGenerator:{type:'proximity', attrs:{}},
+                spawnGenerator:{type:'proximity', attrs:{}},
+                enemyAI:{type:'squad', attrs:{}}
+            }
         },
         
         initialize: function() {
-            this.gameMap = null; // {id, name, attrs}: the map being played, set by the App
+            this.gameMap = null; // {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives}: the map being played, set by the App
             this.seed = null;  // the seed the map is made from, set before reset (or random)
             this.reset();
         },
@@ -50,10 +55,11 @@
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
-            // The map's tile and spawn generators (see Generators.js), with its attrs for them.
-            const {tileGenerator:tiles = pkg.Game.NO_MAP_GENERATOR, spawnGenerator:spawns = pkg.Game.NO_MAP_GENERATOR} = this.gameMap ?? {};
+            // The map's components (see MapComponent.js), with its attrs for them.
+            const {tileGenerator:tiles, spawnGenerator:spawns, enemyAI:ai} = this.gameMap ?? pkg.Game.NO_MAP;
             this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
             this.spawnGenerator = pkg.SpawnGenerator.make(spawns.type, this, spawns.attrs); // and its enemies
+            this.enemyAI = pkg.EnemyAI.make(ai.type, this, ai.attrs);                       // which it plays
             pkg.GRID = pkg.makeGrid(this.tileGenerator.chunkRadius()); // fixed for the whole game
             this.grid = pkg.GRID;
             this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
@@ -108,6 +114,7 @@
                 tiles:[...this.tiles.values()].map(t => ({...t})),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
                 spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
+                enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
                 seenCells:[...this.seenCells],
                 acted:[...this.acted],
                 fresh:[...this.fresh],
@@ -143,13 +150,17 @@
             } catch (err) {
                 throw new Error('Malformed goal: ' + err.message, {cause:err});
             }
-            // The generators, with what they keep (made before anything here changes).
-            let tileGenerator, spawnGenerator;
+            // The map's components, with what they keep (made before anything here changes).
+            let tileGenerator, spawnGenerator, enemyAI;
             try {
-                tileGenerator = pkg.TileGenerator.make(o.tileGenerator?.type, this, o.tileGenerator.attrs);
-                tileGenerator.importState(o.tileGenerator.state);
-                spawnGenerator = pkg.SpawnGenerator.make(o.spawnGenerator?.type, this, o.spawnGenerator.attrs);
-                spawnGenerator.importState(o.spawnGenerator.state);
+                const make = (Base, c) => {
+                    const component = Base.make(c?.type, this, c.attrs);
+                    component.importState(c.state);
+                    return component;
+                };
+                tileGenerator = make(pkg.TileGenerator, o.tileGenerator);
+                spawnGenerator = make(pkg.SpawnGenerator, o.spawnGenerator);
+                enemyAI = make(pkg.EnemyAI, o.enemyAI);
             } catch (err) {
                 throw new Error('Malformed game data: ' + err.message, {cause:err});
             }
@@ -184,6 +195,7 @@
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
+            this.enemyAI = enemyAI;
             this.seenCells = new Set(o.seenCells);
             this.acted = new Set(o.acted);
             this.fresh = new Set(o.fresh);
@@ -264,7 +276,7 @@
         
         addPiece: function(type, owner, x, y, parentId = null) {
             const s = PIECE_TYPES[type].stats[owner],
-                hp = (owner === 'player' ? RANK.hpPer : this.spawnGenerator.attrs.enemyHpPer) * RANK.base,
+                hp = (owner === 'player' ? RANK.hpPer : RANK.enemyHpPer) * RANK.base,
                 piece = {
                     id:this.nextId++, 
                     type, owner, x, y, parentId,
@@ -314,7 +326,7 @@
             for (const p of all) {
                 const r = rankOf(p),
                     player = p.owner === 'player',
-                    newMax = (player ? RANK.hpPer : this.spawnGenerator.attrs.enemyHpPer) * r;
+                    newMax = (player ? RANK.hpPer : RANK.enemyHpPer) * r;
                 if (newMax > p.maxHp && player && RANK.rankUpHeals) p.hp += newMax - p.maxHp;
                 p.rank = r; p.maxHp = newMax;
                 p.hp = Math.min(p.hp, p.maxHp);
@@ -761,6 +773,22 @@
             if (this.over) return;
             this.spawnGenerator.turnEnded();
             this.evaluateObjectives();
+        },
+        
+        // The enemies' turn, played by the enemy AI. Each squad's actions are animated one
+        // after another, squads at once (see actionStart): each squad is a track (the AI
+        // sets this.track), and each of its actions ends with endAction.
+        enemyPhase: function() {
+            const now = performance.now();
+            for (const [track, end] of this.trackEnds) {
+                if (end < now) this.trackEnds.delete(track);
+            }
+            try {
+                this.enemyAI.takeTurn();
+            } finally {
+                this.endAction();
+                this.track = null;
+            }
         },
         
         // How many turns it takes to reach a player piece from every cell within `radius`,

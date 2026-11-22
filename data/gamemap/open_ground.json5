@@ -9,6 +9,7 @@
 		"type":"proximity",
 		"spawnEvery":2
 	},
+	"enemyAI":{"type":"squad"},
 	"goals":[
 		{
 			"name":"Far Afield",

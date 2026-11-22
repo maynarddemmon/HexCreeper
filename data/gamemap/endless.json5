@@ -1,6 +1,7 @@
 {
 	// Plays as the game always has, with every value at its default (see hc.cfg and the
-	// generators' attrs).
+	// map components' attrs).
 	"tileGenerator":{"type":"proximity"},
-	"spawnGenerator":{"type":"proximity"}
+	"spawnGenerator":{"type":"proximity"},
+	"enemyAI":{"type":"squad"}
 }

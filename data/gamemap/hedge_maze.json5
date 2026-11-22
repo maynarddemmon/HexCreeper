@@ -17,6 +17,7 @@
 		"clumpSolid":"boulder"
 	},
 	"spawnGenerator":{"type":"proximity"},
+	"enemyAI":{"type":"squad"},
 	"goals":[
 		{
 			"name":"Explorer",
