@@ -70,8 +70,8 @@
         
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
-            // The map's values, as they were when the game was saved.
-            settings.applyMap(game.gameMap?.attrs);
+            // The map's rules, as they were when the game was saved.
+            settings.applyRules(game.gameMap?.rules);
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
@@ -574,11 +574,10 @@
             });
         },
         
-        /*  Loads a map and shows its brief, with the map's values in effect so its
-            settings can be set there. Start begins a new game in it with the seed shown;
-            Cancel puts the game's own map values back and the game carries on. If the
-            map can't be loaded, a dialog says so and the game carries on. callback, if
-            given, is called once it's done, whichever way. */
+        /*  Loads a map and shows its brief. Start puts its rules into effect and begins a
+            new game in it with the seed shown; Cancel leaves the game as it is. If the map
+            can't be loaded, a dialog says so and the game carries on. callback, if given,
+            is called once it's done, whichever way. */
         briefMap: (id, callback) => {
             maps.loadMap(id, gameMap => {
                 if (!gameMap) {
@@ -587,20 +586,19 @@
                     return;
                 }
                 openWhenClear(() => {
-                    const attrs = settings.applyMap(gameMap.attrs);
                     mapBrief ??= new pkg.MapBrief(appView);
                     mapBrief.show(gameMap, {
                         seed:Number.isInteger(gameMap.seed) ? gameMap.seed : pkg.randomSeed(),
                         underway:!game.over && game.turn > 1,
                         onStart: seed => {
-                            game.gameMap = {id, name:gameMap.name, attrs, objectives:gameMap.objectives};
+                            const {name, rules, tileGenerator, spawnGenerator, objectives} = gameMap;
+                            game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, objectives};
+                            settings.applyRules(rules);
                             game.seed = seed;
                             appView.newGame();
                             callback?.();
                         },
                         onCancel: () => {
-                            settings.applyMap(game.gameMap?.attrs);
-                            draw();
                             callback?.();
                         }
                     });

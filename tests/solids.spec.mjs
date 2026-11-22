@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button, cellOnPage} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, setGeneratorAttrs} from './helpers.mjs';
 
 /*  Materials and solid subtypes of the tests' own, in place of init.json5's, so editing
     the game's data doesn't break the tests. */
@@ -31,7 +31,7 @@ const putSolid = (page, x, y, subtype) => page.evaluate(([x, y, subtype]) => {
 test('materials and solid subtypes come from init.json5; a subtype\'s DR is its material\'s hardness', async ({page}) => {
     const problems = await startGame(page);
     const r = await page.evaluate(() => {
-        const list = hc.solids.list(), T = hc.cfg.TILES;
+        const list = hc.solids.list(), T = hc.app.game.tileGenerator.attrs;
         return {
             some:list.length > 0,
             made:list.every(s => s.material === hc.solids.getMaterial(s.composition) && s.dr === s.material.hardness && s.hp > 0),
@@ -70,17 +70,12 @@ test('a material or subtype that isn\'t usable is left out', async ({page}) => {
     expect(errors.errors.filter(e => /^Bad (material|solid)/.test(e)).length).toBe(6);
 });
 
-test('walls and clumps are made of the subtypes the settings choose, with their HP', async ({page}) => {
+test('walls and clumps are made of the subtypes the tile generator\'s attrs choose, with their HP', async ({page}) => {
     await startGame(page);
     await useTestSolids(page);
+    await setGeneratorAttrs(page, {tile:{wallChance:100, wallHoleChance:0, solidMin:4, solidMax:4, holeMax:0, wallSolid:'iron_bars', clumpSolid:'fungus'}});
     const kinds = await page.evaluate(() => {
-        const g = hc.app.game, T = hc.cfg.TILES;
-        T.wallChance = 100;
-        T.wallHoleChance = 0;
-        T.solidMin = T.solidMax = 4;
-        T.holeMax = 0;
-        T.wallSolid = 'iron_bars';
-        T.clumpSolid = 'fungus';
+        const g = hc.app.game;
         g.reset();
         const solids = [...g.tiles.values()].filter(t => t.kind === 'solid');
         return [...new Set(solids.map(t => t.subtype + ':' + t.hp))].sort();
@@ -164,14 +159,14 @@ test('pointing at a solid says what it is and how tough', async ({page}) => {
 });
 
 test('a map chooses what walls and clumps are made of, from the solid subtypes', async ({page}) => {
-    await startGame(page);
+    const problems = await startGame(page);
     await useTestSolids(page);
     expect(await page.evaluate(() => {
-        hc.settings.applyMap({wallSolid:'wooden_barricade', clumpSolid:'no_such_solid'});
-        const out = [hc.cfg.TILES.wallSolid, hc.cfg.TILES.clumpSolid];
-        hc.settings.applyMap({});
-        return [...out, hc.cfg.TILES.wallSolid];
-    })).toEqual(['wooden_barricade', 'boulder', 'stone_wall']);
+        const clean = hc.TileGenerator.cleanAttrs('proximity', {wallSolid:'wooden_barricade', clumpSolid:'no_such_solid'}, 'Test'),
+            gen = hc.TileGenerator.make('proximity', hc.app.game, clean);
+        return [clean, gen.attrs.wallSolid, gen.attrs.clumpSolid];
+    })).toEqual([{wallSolid:'wooden_barricade'}, 'wooden_barricade', 'boulder']);
+    expect(problems.warnings.some(w => /^Test attr clumpSolid cannot be no_such_solid/.test(w))).toBe(true);
 });
 
 test('a solid subtype with colours is drawn in them; one without, in the usual solid colours', async ({page}) => {

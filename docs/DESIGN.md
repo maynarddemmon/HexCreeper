@@ -1,6 +1,6 @@
 # HexCreeper — design notes
 
-Every rule in the game, its default numbers, and why it is the way it is. The numbers marked *(setting)* are defaults in `hc.cfg` that a map can set (its attrs; see Settings).
+Every rule in the game, its default numbers, and why it is the way it is. The numbers marked *(setting)* are defaults that a map can set: its rules, or its generators' attrs (see Settings).
 
 ## Core rules
 - World: a **hex grid**, effectively infinite (integer coordinates clamped to ±1,000,000). The core starts at (0,0), the centre of the first quadrant.
@@ -50,10 +50,11 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 - **Detach and attach** (X and L, 2026-11-20): a piece other than the core can be **detached** from its parent, however far apart they are, keeping what's linked below it; a piece with no parent (not the core) can be **attached** to any adjacent piece of yours, in the core's group or another detached one, but not one linked below it (no loops). Either is that piece's action for the turn and uses a move (`useMove`); ranks are recomputed. A detached group acts like any other: it moves and attacks, carrying what's below it, and isn't held by link range. Detached pieces still count for the swarm's rank (the highest rank of any piece), so detaching lowers the moves a turn only when it lowers some piece's rank, e.g. the parent's. Enemies can't detach or attach. Later piece types may not allow either.
 
 ## Map generators
-(2026-11-21, `model/Generators.js`.) A map's tiles come from its **tile generator** and its enemies from its **spawn generator**. The base classes `hc.TileGenerator` and `hc.SpawnGenerator` say what the game calls and when; a generator belongs to one game (`game.tileGenerator`, `game.spawnGenerator`), keeps whatever else it needs as its own, and is saved with the game as `{type, state}` (`exportState` / `importState`). Each kind registers with its base class (`TileGenerator.register(name, Type)`, a class method, as are `make(name, game)` and the `types` registry; the shared ones are on `hc.Generator`).
+(2026-11-21, `model/Generators.js`.) A map's tiles come from its **tile generator** and its enemies from its **spawn generator**. The base classes `hc.TileGenerator` and `hc.SpawnGenerator` say what the game calls and when; a generator belongs to one game (`game.tileGenerator`, `game.spawnGenerator`), keeps whatever else it needs as its own, and is saved with the game as `{type, attrs, state}` (`exportState` / `importState`). Each kind registers with its base class (`TileGenerator.register(name, Type)`, a class method, as are `has(name)`, `make(name, game, attrs)`, `cleanAttrs(name, attrs, where)` and the `types` registry; the shared ones are on `hc.Generator`).
+- **Attrs** (2026-11-22): a generator class declares the attrs it takes, with their defaults and ranges, in its `ATTRS` class attribute (with `model/Attrs.js`: `num`, `bool`, `choice`); a map gives values for them (see Maps), and a generator has all of them in `this.attrs`. The values are checked like the rules: numbers rounded and clamped, choices from their options, anything else skipped with a warning saying where.
 - **TileGenerator:** `chunkRadius()` (the grid's chunk radius for the map, fixed for the game), `start()` (a new game, the core in place), `piecesMoved()` (your pieces moved or one was placed; then the game reveals tiles).
-- **SpawnGenerator:** `start()` (a new game: the starting enemies), `turnEnded()` (each new turn: waves).
-- For now every map uses **"proximity"** for both: `ProximityTileGenerator` (the map made around your pieces as they go, by quadrant: see Quadrants and tiles; it keeps the quadrants made, borders and quadrants visited, which the `quadsVisited` goal value and the visited tint read) and `ProximitySpawnGenerator` (waves around your core: see Enemy pressure and Enemy pathing and spawning). They're today's generation and spawning code, moved out of Game unchanged. Still to come: maps choosing their generators and setting their attrs (most of today's settings).
+- **SpawnGenerator:** `start()` (a new game: the starting enemies), `turnEnded()` (each new turn: waves). Every spawn generator takes the enemy attrs (`aiExpose`, `aiPatience`, `enemyHpPer`, `maxSquad`), declared on the base class; Game and the squad planner read them from `game.spawnGenerator.attrs`. (They describe the enemies rather than where they come from, and may move to enemy subtypes one day.)
+- So far there's one of each, **"proximity"**: `ProximityTileGenerator` (the map made around your pieces as they go, by quadrant: see Quadrants and tiles; it keeps the quadrants made, borders and quadrants visited, which the `quadsVisited` goal value and the visited tint read) and `ProximitySpawnGenerator` (waves around your core: see Enemy pressure and Enemy pathing and spawning). Their attrs are below (Settings).
 
 ## Enemy pressure (tied to player rank)
 - **R = your highest piece rank.** The turn count doesn't drive difficulty (an optional clock ramp exists, off by default).
@@ -115,8 +116,13 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 ## Maps
 (Called levels until 2026-11-21. In code a single map is `gameMap`, not `map`, so it isn't mistaken for JavaScript's `Map` or `.map()`.)
 - `data/init.json5` lists every map, in order, with what a list of maps needs: `id`, `name`, an optional `number` and a `description`. Its `defaultMap` is played when there's no saved game. Each map's own file, `data/gamemap/<id>.json5`, is loaded only when it's played and holds what's needed to play it.
-- For now a map file has `attrs`, `{id:value}`: values in place of `hc.cfg`'s defaults (see Settings below). Anything a map doesn't set is at its default. The player never sees or changes them (2026-11-21; before, a map could mark one `pref` to show it in Settings, and changes were kept per map). A game remembers its map and its attrs, and saves them, so a saved game plays the same even if the map file changes.
-- **Endless Play** sets nothing, so it plays as the game always has; it has no goals and no end. Maps don't have to be played in order.
+- A map file (2026-11-22) has:
+  - `"tileGenerator":{"type":..., ...attrs}` and `"spawnGenerator":{"type":..., ...attrs}` (both required): the generators that make its tiles and its enemies (see Map generators), by the names they're registered under, and values for their attrs. A map naming a type that isn't registered, or without one of them, isn't loaded ("Bad map" in the console; the Maps dialog says it couldn't be loaded).
+  - `"rules":{id:value}` (optional): gameplay values in place of `hc.cfg`'s defaults (see Settings).
+  - `"goals"` and `"penalties"`, and a `"seed"` (all optional).
+  
+  Rules and attrs it doesn't give are at their defaults; ones that can't be used are skipped with a warning. The player never sees or changes them. A game remembers its map (its rules and generators, with the attrs the file gave) and saves it, so a saved game plays the same even if the map file changes; a saved game also keeps each generator's full attrs. (Before 2026-11-22 a map file had flat `attrs` for all of these; before 2026-11-21 a map could mark one `pref` to show it in Settings.)
+- **Endless Play** names "proximity" for both generators and sets nothing else, so it plays as the game always has; it has no goals and no end. Maps don't have to be played in order.
 - The **Maps** dialog (map button in the header) lists them all; pressing a map's name opens its brief. The info panel shows the map being played and its seed.
 - The **map brief** (`view/MapBrief.js`) comes before every new game: from Maps, New game, Play Again, and on opening HexCreeper with no save (help follows it on a first visit). It shows the map's description, its goals and penalties, and a **seed**, filled in with the map's `"seed"` if its file has one, else a random number under a million. A note warns when starting abandons a game under way. Start begins the game with that seed (empty or not a number: a random one); Cancel puts the game's own map values back and it carries on.
 - **Seeds** make map generation repeatable: terrain, border walls, tiles and the starting enemies come from `Game.rngFor(...parts)`, a mulberry32 generator seeded from a hash of the seed and the parts (e.g. `'terrain', quadrantKey`), so a quadrant comes out the same whatever order quadrants are made in. Waves, the AI and everything else during play still use `Math.random`. The seed is saved with the game. Not quite everything repeats: tiles skip cells pieces are standing on when the quadrant is made, and settings changed mid-game change what's made afterwards.
@@ -128,50 +134,62 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 - Still to come: more kinds of goals (e.g. places to reach shown on the board), end briefs, going on to the next map, and locking maps.
 
 ## Settings
-Two kinds of value stand in for `hc.cfg`'s (2026-11-21, `model/Settings.js`):
-- **Preferences** are the player's, for the whole app: shown in Settings (the gear in the header), saved in the browser (`hc.prefs`, `{id:value}`, only those changed from the default), never set by a map, and not in a map's brief. The one so far is **Animate pieces** (on; `ANIM.on`), under **Display**: off, nothing is animated and the enemies' turn shows at once.
-- **Map attrs** are everything else below: values a map sets in its file's `attrs` (numbers rounded and clamped to their range, choices from their options; anything else skipped with a warning), and otherwise at their defaults. They're never shown to the player: they're tuned in code, or by a map for some special effect of its own. (Until 2026-11-21 they were all settings the player could change, per map, where the map allowed.) Fog of war isn't one: see Fog of war.
+Values that stand in for defaults come in three kinds (`model/Settings.js`, `model/Generators.js`):
+- **Preferences** (2026-11-21) are the player's, for the whole app: shown in Settings (the gear in the header), saved in the browser (`hc.prefs`, `{id:value}`, only those changed from the default), never set by a map, and not in a map's brief. The one so far is **Animate pieces** (on; `ANIM.on`), under **Display**: off, nothing is animated and the enemies' turn shows at once.
+- **Map rules** (2026-11-22) are gameplay values in `hc.cfg` that a map's `rules` can set; anything it doesn't set is at its default.
+- **Generator attrs** (2026-11-22) tune a map's tile and spawn generators; their defaults are in each generator class (`ATTRS`), and a map's `tileGenerator` / `spawnGenerator` give values for them.
 
-The defaults are:
+Rules and attrs are never shown to the player: they're tuned in code, or by a map for some special effect of its own. Numbers are rounded and clamped to their range, choices must be one of their options, and anything else is skipped with a warning. (Until 2026-11-21 they were all settings the player could change, per map, where the map allowed.) Fog of war isn't one: see Fog of war.
 
-| Map attr | Default |
+**Map rules** (`hc.cfg`):
+
+| Rule | Default |
 |---|---|
-| Vision radius | 12 |
-| Spawn a wave every N turns | 3 |
-| Enemies per wave at rank 1 | 1 |
-| + enemies per wave per rank | 2 |
-| Largest squad = rank + | 1 |
-| +1 enemy/wave every N turns (0 = off) | 0 |
-| Enemies at start | 3 |
-| Spawn distance min / max | 6 / 9 |
-| Enemy caution (0 = reckless) | 12 |
-| Enemy patience (turns) | 2 |
-| Enemy HP per rank | 1 |
-| Max squad size | 8 |
-| Advance after a kill | on |
-| Link range | 3 |
-| Quadrant radius (new game) | 5 |
-| Heal tiles per quadrant | 1 |
-| Harm tiles per quadrant | 1 |
-| Chance a heal tile is loot instead | 10% |
-| Heal / harm / loot tiles are | Heal / Harm / Loot |
-| Chance a quadrant border is a wall | 50% |
-| Walls made of holes | 25% |
-| Door width | 1–2 |
-| Solid tiles per quadrant | 0–5 |
-| Hole tiles per quadrant | 0–3 |
-| Walls are made of | Stone wall (granite, DR 13, 30 HP) |
-| Solid clumps are made of | Boulder (basalt, DR 8, 12 HP) |
-| Base rank | 1 |
-| Max HP per rank | 2 |
-| Moves per turn per top rank | 1 |
-| Movement mode at the start of a game | Fixed |
-| Place cost, base | 4 |
-| Place cost: +1 per this many pieces | 2 |
-| Heal action cost per core rank | 5 |
-| Heal action HP per core rank | 1 |
-| Unused heal: score per unit | 1 |
-| Rank-up also adds HP | off |
+| `visionRadius` | 12 |
+| `advance` (after a kill) | on |
+| `linkRange` | 3 |
+| `moveMode` (at the start of a game) | fixed |
+| `rankBase` | 1 |
+| `hpPer` (max HP per rank) | 2 |
+| `movesPer` (moves per turn per top rank) | 1 |
+| `placeBase` (place cost, base) | 4 |
+| `placePerPieces` (place cost: +1 per this many pieces) | 2 |
+| `rankUpHeals` (rank-up also adds HP) | off |
+| `healCostPer` (Heal action cost per core rank) | 5 |
+| `healActPer` (Heal action HP per core rank) | 1 |
+| `healScore` (unused heal: score per point) | 1 |
+
+**Tile generator "proximity"** (`ProximityTileGenerator.ATTRS`):
+
+| Attr | Default |
+|---|---|
+| `quadRadius` | 5 |
+| `healPerQuad` / `harmPerQuad` | 1 / 1 |
+| `lootChance` (% of heal tiles that are loot instead) | 10 |
+| `healType` / `harmType` / `lootType` | heal / harm / loot |
+| `wallChance` (% of quadrant borders that are walls) | 50 |
+| `wallHoleChance` (% of walls made of holes) | 25 |
+| `doorMin` / `doorMax` (door width) | 1 / 2 |
+| `solidMin` / `solidMax` (solid tiles per quadrant) | 0 / 5 |
+| `holeMin` / `holeMax` (hole tiles per quadrant) | 0 / 3 |
+| `wallSolid` / `clumpSolid` | stone_wall (granite, DR 13, 30 HP) / boulder (basalt, DR 8, 12 HP) |
+| `wallHole` / `clumpHole` | chasm / pit |
+
+**Spawn generator "proximity"** (`ProximitySpawnGenerator.ATTRS`; the first four are every spawn generator's):
+
+| Attr | Default |
+|---|---|
+| `aiExpose` (enemy caution; 0 = reckless) | 12 |
+| `aiPatience` (turns) | 2 |
+| `enemyHpPer` (enemy HP per rank) | 1 |
+| `maxSquad` (largest squad) | 16 |
+| `spawnEvery` (a wave every N turns) | 3 |
+| `pBase` (enemies per wave at rank 1) | 1 |
+| `pPerRank` (+ enemies per wave per rank) | 2 |
+| `pSquadExtra` (largest squad = rank +) | 1 |
+| `pTime` (+1 enemy per wave every N turns; 0 = off) | 0 |
+| `initial` (enemies at start) | 3 |
+| `minDist` / `maxDist` (spawn distance) | 6 / 9 |
 
 ## UI
 - Pieces show their rank as a symbol inside the border (`drawRankSymbol` in `PieceTypes.js`): 1 nothing, 2 a vertical line, 3 a triangle (point up), 4 a cross, 5 a solid star, 6 an asterisk (3 lines), 7 a 7-point star, 8 four lines (the compass directions), and 9 and up a star with that many points. Lines run edge to edge. The info panel still gives the number. Player pieces are red-orange. Your core has a thick border and every other piece a thin one. The core is bigger by its border (`CORE_BORDER`), so inside the border it's the same size as other pieces. Selection, heal and link-target rings sit a fixed gap (`RING_GAP`) outside each piece's edge, and the core's HP bar sits lower to clear its ring. Enemies are indigo, with indigo link arrows within squads. HP bars show under pieces with more than 1 max HP. Occupied cells are tinted.
@@ -225,7 +243,8 @@ The defaults are:
 - `model/Expr.js`: `hc.expr.compile`, the expression language. `model/Goals.js`: `hc.goals` (`fromMap`, `compile`, `isGood`, the values and functions) and `hc.Goals`, a JS.Module included in Game: `getMapObjectives`, `evaluateObjectives` / `endGame`.
 - `model/EnemyAI.js`: `enemyPhase` → `planSquad` (beam search, near squads) / `marchSquad` (far squads), in `hc.EnemyAI`, a JS.Module included in Game. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera and its animated pans `panTo` / `stepPan`, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
-- `model/Settings.js`: `hc.settings`, the preferences (`get`, `set`, `getGroups`; saved in localStorage) and the map attrs (`applyMap`), each definition mapping to a value in `hc.cfg`.
-- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
+- `model/Settings.js`: `hc.settings`, the preferences (`get`, `set`, `getGroups`; saved in localStorage) and the map rules (`cleanRules`, `applyRules`), each definition mapping to a value in `hc.cfg`. `model/Attrs.js`: `hc.attrs`, declaring and checking attrs (`num`, `bool`, `choice`, `normalize`, `resolve`), used by both and by the generators.
+- `model/Maps.js`: `hc.maps` (`loadIndex`, `loadMap`), loading `init.json5` and map files, checking a map's rules and generators.
+- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` (version 2 since 2026-11-22, when maps got rules and generators; older saves are refused) is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
 - `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the preference rows from the definitions (`SettingsList`) and the dialog around them; `view/MapsDialog.js` and `view/MapBrief.js` list maps and brief one; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
 - UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

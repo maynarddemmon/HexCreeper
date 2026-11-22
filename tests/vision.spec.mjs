@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button} from './helpers.mjs';
+import {startGame, clearBoard} from './helpers.mjs';
 
 test.describe('fog of war', () => {
     test.beforeEach(async ({page}) => {
@@ -78,7 +78,7 @@ test('a map sets the vision radius; fog of war can be turned off in hc.cfg', asy
     await startGame(page);
     await clearBoard(page); // so no random solid tile blocks the cells checked below
     expect(await page.evaluate(() => {
-        hc.settings.applyMap({visionRadius:5});
+        hc.settings.applyRules({visionRadius:5});
         return hc.app.game.cellsInSight().has('5,0') && !hc.app.game.cellsInSight().has('6,0');
     })).toBe(true);
     expect(await page.evaluate(() => {

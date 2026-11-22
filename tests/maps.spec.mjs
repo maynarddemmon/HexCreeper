@@ -5,7 +5,10 @@ const mapsTitle = page => page.getByText('Maps', {exact:true}).filter({visible:t
 
 test('with no save, the default map from init.json5 is played', async ({page}) => {
     await startGame(page);
-    expect(await page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.gameMap.name, hc.app.game.gameMap.attrs])).toEqual(['endless', 'Endless Play', {}]);
+    expect(await page.evaluate(() => {
+        const {id, name, rules, tileGenerator, spawnGenerator} = hc.app.game.gameMap;
+        return [id, name, rules, tileGenerator, spawnGenerator, hc.app.game.tileGenerator.type];
+    })).toEqual(['endless', 'Endless Play', {}, {type:'proximity', attrs:{}}, {type:'proximity', attrs:{}}, 'proximity']);
 });
 
 test('the Maps dialog lists every map in init.json5 and marks the one being played', async ({page}) => {
@@ -29,7 +32,7 @@ test('playing a map starts a new game with its values in effect, and the save ke
     const seed = await page.evaluate(() => hc.app.game.seed);
     const inWarrens = () => page.evaluate(() => ({
         gameMap:hc.app.game.gameMap.id, turn:hc.app.game.turn, seed:hc.app.game.seed,
-        wallChance:hc.cfg.TILES.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.cfg.VISION.radius
+        wallChance:hc.app.game.tileGenerator.attrs.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.cfg.VISION.radius
     }));
     expect(await inWarrens()).toEqual({gameMap:'warrens', turn:1, seed, wallChance:90, quadRadius:4, vision:8});
     
@@ -62,7 +65,7 @@ test('the brief shows the map\'s description and a seed (no settings), and start
     await seedInput(page).fill('1234');
     await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
-    expect(await page.evaluate(() => [hc.app.game.seed, hc.cfg.SPAWN.every])).toEqual([1234, 2]);
+    expect(await page.evaluate(() => [hc.app.game.seed, hc.app.game.spawnGenerator.attrs.spawnEvery])).toEqual([1234, 2]);
     await expect(page.getByText('1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
 });
 
@@ -83,7 +86,7 @@ test('the same seed makes the same map; an empty seed makes a random one', async
 });
 
 test('a map\'s own seed fills in the brief', async ({page}) => {
-    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"seed":777, "attrs":{}}'}));
+    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"seed":777, "tileGenerator":{"type":"proximity"}, "spawnGenerator":{"type":"proximity"}}'}));
     await startGame(page);
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
@@ -93,13 +96,14 @@ test('a map\'s own seed fills in the brief', async ({page}) => {
 test('cancelling the brief keeps the game, and its map\'s values', async ({page}) => {
     await startGame(page);
     await page.evaluate(() => {hc.app.game.playerWait();});
-    const before = await page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.seed, hc.app.game.turn, hc.cfg.TILES.wallChance]);
+    const now = () => page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.seed, hc.app.game.turn, hc.app.game.tileGenerator.attrs.wallChance, hc.cfg.VISION.radius]),
+        before = await now();
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
     await expect(seedInput(page)).toBeVisible();
-    expect(await page.evaluate(() => hc.cfg.TILES.wallChance)).toBe(90); // the brief's map, while it's open
+    expect(await now()).toEqual(before); // nothing of the brief's map is in effect till it starts
     await button(page, '✗ Cancel').click();
-    expect(await page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.seed, hc.app.game.turn, hc.cfg.TILES.wallChance])).toEqual(before);
+    expect(await now()).toEqual(before);
 });
 
 test('switching maps mid-game warns in the brief; values the new map doesn\'t set go back', async ({page}) => {
@@ -115,7 +119,7 @@ test('switching maps mid-game warns in the brief; values the new map doesn\'t se
     await expect(page.getByText('Starting abandons the game in progress.')).toBeVisible();
     await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
-    expect(await page.evaluate(() => [hc.cfg.TILES.wallChance, hc.cfg.SPAWN.every, hc.cfg.VISION.radius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
+    expect(await page.evaluate(() => [hc.app.game.tileGenerator.attrs.wallChance, hc.app.game.spawnGenerator.attrs.spawnEvery, hc.cfg.VISION.radius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
 });
 
 test('a map file that can\'t be loaded says so and the game carries on', async ({page}) => {
@@ -145,11 +149,30 @@ test('Settings shows only the preferences, whatever the map', async ({page}) => 
     await expect(button(page, 'Reset to Defaults')).toHaveCount(0);
 });
 
-test('a map\'s attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
-    await startGame(page);
+test('a map\'s rules and generator attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
+    const problems = await startGame(page);
     expect(await page.evaluate(() => {
-        const clean = hc.settings.applyMap({linkRange:99, spawnEvery:2.4, advance:'yes', fog:false, nonsense:1});
-        return [clean, hc.cfg.LINK.range, hc.cfg.SPAWN.every, hc.cfg.COMBAT.advance, hc.cfg.TILES.wallChance];
-    })).toEqual([{linkRange:20, spawnEvery:2}, 20, 2, true, 50]);
+        const rules = hc.settings.cleanRules({linkRange:99, movesPer:2.4, advance:'yes', fog:false, spawnEvery:2}, 'Map test'),
+            spawn = hc.SpawnGenerator.cleanAttrs('proximity', {spawnEvery:2.4, linkRange:2}, 'Map test spawn generator');
+        hc.settings.applyRules(rules);
+        const gen = hc.SpawnGenerator.make('proximity', hc.app.game, spawn),
+            out = [rules, spawn, hc.cfg.LINK.range, hc.cfg.RANK.movesPer, hc.cfg.COMBAT.advance, gen.attrs.spawnEvery, gen.attrs.initial];
+        hc.settings.applyRules({});
+        return [...out, hc.cfg.LINK.range];
+    })).toEqual([{linkRange:20, movesPer:2}, {spawnEvery:2}, 20, 2, true, 2, 3, 3]);
+    expect(problems.warnings.filter(w => /^Map test/.test(w)).map(w => w.split(' cannot')[0]).sort()).toEqual([
+        'Map test rules attr advance', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
+    ]);
+});
+
+test('a map file without a known tile or spawn generator isn\'t loaded', async ({page}) => {
+    const problems = await startGame(page);
+    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"nowhere"}, "spawnGenerator":{"type":"proximity"}}'}));
+    await page.route('**/data/gamemap/open_ground.json5', route => route.fulfill({status:200, body:'{"tileGenerator":{"type":"proximity"}}'}));
+    expect(await page.evaluate(() => Promise.all(['warrens', 'open_ground'].map(id => new Promise(done => hc.maps.loadMap(id, done)))))).toEqual([null, null]);
+    expect(problems.errors.filter(e => /^Bad map/.test(e))).toEqual([
+        'Bad map warrens Map warrens tile generator has an unknown type: nowhere',
+        'Bad map open_ground Map open_ground spawn generator is missing'
+    ]);
 });
 

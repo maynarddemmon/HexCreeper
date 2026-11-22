@@ -1,14 +1,16 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, putTile} from './helpers.mjs';
+import {startGame, clearBoard, putTile, setGeneratorAttrs} from './helpers.mjs';
 
-// The tiles made when the game is restarted with these settings (and a fixed seed).
-const tilesWith = (page, settings) => page.evaluate(settings => {
-    const g = hc.app.game, T = hc.cfg.TILES;
-    Object.assign(T, {healPerQuad:3, harmPerQuad:2}, settings);
-    g.seed = 99;
-    g.reset();
-    return [...g.tiles.values()].filter(t => ['heal', 'harm', 'loot'].includes(t.kind)).map(t => ({...t}));
-}, settings);
+// The tiles made when the game is restarted with these tile generator attrs (and a fixed seed).
+const tilesWith = async (page, attrs) => {
+    await setGeneratorAttrs(page, {tile:{healPerQuad:3, harmPerQuad:2, ...attrs}});
+    return page.evaluate(() => {
+        const g = hc.app.game;
+        g.seed = 99;
+        g.reset();
+        return [...g.tiles.values()].filter(t => ['heal', 'harm', 'loot'].includes(t.kind)).map(t => ({...t}));
+    });
+};
 
 // Puts a loot tile you know of, holding value, at (x, y).
 const putLoot = (page, x, y, value) => putTile(page, x, y, 'loot', 'loot', {pool:value});
@@ -17,8 +19,8 @@ test('lootChance turns heal tiles into loot tiles of the lootType subtype, their
     await startGame(page);
     await page.evaluate(() => {
         hc.loots.define({test:{name:'Test loot', pool:{min:7, max:9}}});
-        hc.cfg.TILES.lootType = 'test';
     });
+    await setGeneratorAttrs(page, {tile:{lootType:'test'}});
     const none = await tilesWith(page, {lootChance:0}),
         all = await tilesWith(page, {lootChance:100});
     expect(none.some(t => t.kind === 'loot')).toBe(false);

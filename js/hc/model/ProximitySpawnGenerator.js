@@ -1,38 +1,67 @@
 /*  The "proximity" spawn generator: enemies arrive around your core. A game starts with
-    SPAWN.initial lone enemies, and every SPAWN.every turns a wave comes, sized by your
+    `initial` lone enemies, and every `spawnEvery` turns a wave comes, sized by your
     strongest piece's rank (and, optionally, the turn): squads shaped as binary trees, each
-    set down SPAWN.minDist to SPAWN.maxDist steps from your core, clear of your pieces. */
+    set down minDist to maxDist steps from your core, clear of your pieces (SPAWN.clearance).
+    
+    Enemy pressure follows the player's strength, not the clock. R = your highest piece
+    rank (the same number that sets your moves per turn):
+        enemies per wave = pBase + pPerRank x (R - 1)  [+ 1 per pTime turns, if set]
+        largest squad    = R + pSquadExtra (capped at maxSquad)
+    Losing rank lowers the pressure again. */
 (pkg => {
     'use strict';
     
     const {
-        cfg:{SPAWN, PRESSURE, ENEMY, RANK},
+        cfg:{SPAWN, RANK},
+        attrs:{num},
         hexDist
     } = pkg;
     
     pkg.ProximitySpawnGenerator = new JS.Class('ProximitySpawnGenerator', pkg.SpawnGenerator, {
+        // Class Methods and Attributes ////////////////////////////////////////
+        extend: {
+            ATTRS:[
+                ...pkg.SpawnGenerator.ATTRS,
+                num('spawnEvery', 3, 1, 50),  // a wave every this many turns
+                num('pBase', 1, 0, 50),       // enemies per wave at rank 1
+                num('pPerRank', 2, 0, 20),    // extra enemies per wave for each rank above 1
+                num('pSquadExtra', 1, 0, 10), // largest squad = rank + this
+                num('pTime', 0, 0, 500),      // optional slow clock ramp: +1 enemy per wave every this many turns (0: off)
+                num('initial', 3, 0, 50),     // enemies at the start
+                num('minDist', 6, 2, 40),     // the ring they spawn in: steps from your core
+                num('maxDist', 9, 2, 40)
+            ]
+        },
+        
+        // Life Cycle //////////////////////////////////////////////////////////
+        initialize: function(game, attrs) {
+            this.callSuper(game, attrs);
+            this.attrs.maxDist = Math.max(this.attrs.minDist, this.attrs.maxDist);
+        },
+        
         // Methods /////////////////////////////////////////////////////////////
         // The starting enemies come from the map's generator, so they're the same for a seed.
         start: function() {
             const rng = this.game.rngFor('enemies');
-            for (let i = 0; i < SPAWN.initial; i++) this.spawnEnemy(rng);
+            for (let i = 0; i < this.attrs.initial; i++) this.spawnEnemy(rng);
         },
         
         turnEnded: function() {
-            if (this.game.turn % SPAWN.every === 0) this.spawnWave();
+            if (this.game.turn % this.attrs.spawnEvery === 0) this.spawnWave();
         },
         
         // How many enemies a wave brings now.
         waveSize: function() {
             const game = this.game,
+                {pBase, pPerRank, pTime} = this.attrs,
                 R = Math.max(1, game.maxRank()),
-                clock = PRESSURE.timeEvery ? Math.floor(game.turn / PRESSURE.timeEvery) : 0;
-            return Math.max(0, PRESSURE.base + PRESSURE.perRank * (R - 1) + clock);
+                clock = pTime ? Math.floor(game.turn / pTime) : 0;
+            return Math.max(0, pBase + pPerRank * (R - 1) + clock);
         },
         // The largest squad a wave brings now.
         squadCap: function() {
             const R = Math.max(1, this.game.maxRank());
-            return Math.max(1, Math.min(ENEMY.maxSquad, R + PRESSURE.squadExtra));
+            return Math.max(1, Math.min(this.attrs.maxSquad, R + this.attrs.pSquadExtra));
         },
         
         // Split the wave's enemies into squads of (cap or cap-1) pieces.
@@ -76,12 +105,13 @@
             if (core) {
                 const players = game.piecesOf('player');
                 for (let tries = 0; tries < 60; tries++) {
-                    const d = SPAWN.minDist + Math.floor(rng() * (SPAWN.maxDist - SPAWN.minDist + 1)),
+                    const {minDist, maxDist} = this.attrs,
+                        d = minDist + Math.floor(rng() * (maxDist - minDist + 1)),
                         {x, y} = pkg.GRID.ring(core.x, core.y, d, rng);
                     if (!game.isOpen(x, y) || game.pieceAt(x, y) || game.isHarm(x, y)) continue;
                     if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                     const p = game.addPiece('core', 'enemy', x, y);
-                    p.hp = p.maxHp = ENEMY.hpPer * RANK.base;
+                    p.hp = p.maxHp = this.attrs.enemyHpPer * RANK.base;
                     game.fx(x, y, '', '--enemy', { spawn: true });
                     return p;
                 }

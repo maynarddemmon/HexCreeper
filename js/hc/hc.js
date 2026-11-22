@@ -108,14 +108,6 @@
             // Gameplay //
             WORLD_LIMIT:1000000,
             
-            // Quadrants: the world is divided into hexagonal quadrants of radius QUAD.radius.
-            // Whenever a player piece is in a quadrant, that quadrant and those around it, out to
-            // the vision radius (see ProximityTileGenerator.piecesMoved), get their tiles generated (once each,
-            // never cleaned up). Visited quadrants are tinted.
-            QUAD:{
-                radius:5 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)
-            },
-            
             // Links between pieces.
             LINK:{
                 range:3, // The maximum distance a linked piece can get from another one.
@@ -130,10 +122,11 @@
                 killPer:6,     // extra value per player piece destroyed (incl. pieces linked below it)
                 coreHit:15,    // extra value for hitting the player's core
                 coreKill:1000, // destroying the core
-                expose:12,     // caution: penalty per piece (incl. pieces linked below) left next to a player piece
+                // expose (caution: penalty per piece, incl. pieces linked below, left next to a player
+                // piece) and patience (turns without a hit before a nearby squad stops caring about
+                // exposure) are the spawn generator's attrs aiExpose and aiPatience (see Generators.js).
                 poise:1,       // bonus for a piece ending exactly 2 steps away (can strike next turn, can't be hit)
                 approach:0.5,  // penalty per step of distance for pieces further away
-                patience:2,    // turns without a hit before a nearby squad stops caring about exposure
                 jump:0.5,      // cost of a jump: the piece sits out next turn, which is worth a step of approach
                 jumpClose:1,   // pieces this close (steps) to a player piece don't jump when planning
             },
@@ -152,37 +145,9 @@
                 healPer:1,      // Heal action heals healPer x core rank
             },
             
-            // Enemy spawning
+            // Enemy spawning (the rest is the spawn generator's attrs; see Generators.js).
             SPAWN:{
-                initial:3,   // enemies at game start
-                minDist:6,   // spawn ring (Chebyshev distance from the player's core)
-                maxDist:9,
-                clearance:4, // never spawn closer than this to any player piece
-                every:3,     // spawn a wave every N turns
-            },
-            
-            // Heal, harm and loot tiles per quadrant, of the subtypes (data/init.json5) chosen
-            // here; see EffectTiles.js. Solid and hole tiles are there from the start and
-            // can never be entered; solid tiles block sight, holes don't.
-            TILES:{
-                healPerQuad:1,
-                harmPerQuad:1,
-                lootChance:10, // % chance a heal tile is a loot tile instead
-                healType:'heal',
-                harmType:'harm',
-                lootType:'loot',
-                wallChance:50, // % chance a border between quadrants is a wall
-                wallHoleChance:25, // % of walls made of holes rather than solid tiles
-                doorMin:1, // cells left open in the middle of a wall
-                doorMax:2,
-                solidMin:0, // solid tiles per quadrant, in one connected clump
-                solidMax:5,
-                holeMin:0, // hole tiles per quadrant, in one connected clump (may replace solid tiles)
-                holeMax:3,
-                wallSolid:'stone_wall', // the solid subtypes (data/init.json5) walls and clumps are made of
-                clumpSolid:'boulder',
-                wallHole:'chasm', // the hole subtypes (data/init.json5) walls and clumps are made of
-                clumpHole:'pit'
+                clearance:4 // never spawn closer than this to any player piece
             },
             
             // Fog of war: you see enemies only on cells in sight of one of your pieces: within
@@ -197,24 +162,6 @@
             // into the attacked direction if the whole group can legally do so (not onto harm).
             COMBAT:{
                 advance:true
-            },
-            
-            // Enemy squads: enemies are link trees too (same rank rules as the player).
-            ENEMY:{
-                hpPer:1,    // enemy max HP = hpPer x its rank
-                maxSquad:16, // hard cap on squad size
-            },
-            
-            // Enemy pressure follows the player's strength, not the clock. R = your
-            // highest piece rank (the same number that sets your moves per turn).
-            //   enemies per wave = base + perRank x (R - 1)  [+ 1 per timeEvery turns, if set]
-            //   largest squad    = R + squadExtra (capped at ENEMY.maxSquad)
-            // Losing rank lowers the pressure again.
-            PRESSURE:{
-                base:1,       // enemies per wave at rank 1
-                perRank:2,    // extra enemies per wave for each rank above 1
-                squadExtra:1, // largest squad = rank + squadExtra
-                timeEvery:0,  // optional slow clock ramp: +1 enemy per wave every N turns (0 = off)
             }
         },
         

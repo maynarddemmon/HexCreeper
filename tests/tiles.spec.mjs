@@ -1,14 +1,13 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, putTile} from './helpers.mjs';
+import {startGame, clearBoard, putTile, setGeneratorAttrs} from './helpers.mjs';
 
 test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
+    // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from
+    // the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
+    // neighbours. No loot, or some heal tiles are loot.
+    await setGeneratorAttrs(page, {tile:{quadRadius:3, lootChance:0}});
     const r = await page.evaluate(() => {
-        // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants
-        // from the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
-        // neighbours.
-        hc.cfg.QUAD.radius = 3;
-        hc.cfg.TILES.lootChance = 0; // or some heal tiles are loot
         hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
             inReach = tiles.every(t => {
@@ -16,7 +15,7 @@ test('solids and holes go out to the vision radius; heal and harm tiles only 1 q
                 return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
         return {terrainQuads:g.tileGenerator.terrainQuads.size, tiledQuads:g.tileGenerator.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
-            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === hc.cfg.TILES[t.kind + 'Type'])};
+            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === g.tileGenerator.attrs[t.kind + 'Type'])};
     });
     expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, subtypes:true});
 });
@@ -27,9 +26,9 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
         await startGame(page);
         const r = await page.evaluate(([kind, max, other]) => {
             const g = hc.app.game, G = hc.GRID, sizes = new Set();
-            hc.cfg.TILES[other + 'Max'] = 0;
+            hc.app.game.tileGenerator.attrs[other + 'Max'] = 0;
             let ok = true;
-            hc.cfg.TILES.wallChance = 0;
+            hc.app.game.tileGenerator.attrs.wallChance = 0;
             for (let i = 0; i < 40; i++) {
                 g.seed = i; // a different map each time
                 g.tiles.clear();
@@ -60,7 +59,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
 // clumps, no core), with every border a wall. A wall sits on the side of the quadrant whose
 // key comes first in the border's key. Helpers go on window.walls.
 const wallsOnly = page => page.evaluate(() => {
-    const g = hc.app.game, G = hc.GRID, T = hc.cfg.TILES,
+    const g = hc.app.game, G = hc.GRID, T = hc.app.game.tileGenerator.attrs,
         quads = [[0, 0], ...G.chunkNeighbours(0, 0)],
         touching = (side, other) => G.chunkCells(...side.split(',').map(Number))
             .filter(c => G.dirs.some(([dx, dy]) => G.chunkKey(c.x + dx, c.y + dy) === other));
@@ -111,7 +110,7 @@ test('the walls come out the same whatever order the quadrants are made in', asy
     const r = await page.evaluate(() => {
         const g = hc.app.game, {regenerate} = window.walls,
             tiles = () => JSON.stringify([...g.tiles.keys()].sort());
-        hc.cfg.TILES.doorMin = 0; // so the "never walled in" rule comes into it too
+        hc.app.game.tileGenerator.attrs.doorMin = 0; // so the "never walled in" rule comes into it too
         regenerate([0, 1, 2, 3, 4, 5, 6]);
         const forwards = tiles();
         regenerate([6, 5, 4, 3, 2, 1, 0]);
@@ -124,7 +123,7 @@ test('door widths come from the settings; walls with no door never close a quadr
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        const {regenerate, borders, solid} = window.walls, T = hc.cfg.TILES,
+        const {regenerate, borders, solid} = window.walls, T = hc.app.game.tileGenerator.attrs,
             openPerBorder = () => borders().map(({bk, inner}) => [bk, inner.filter(c => !solid(c)).length]);
         T.doorMin = T.doorMax = 3;
         regenerate();
@@ -144,7 +143,7 @@ test('a share of walls are holes', async ({page}) => {
     await wallsOnly(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game;
-        hc.cfg.TILES.wallHoleChance = 100;
+        hc.app.game.tileGenerator.attrs.wallHoleChance = 100;
         window.walls.regenerate();
         return [...new Set([...g.tiles.values()].map(t => t.kind))];
     });
@@ -155,7 +154,7 @@ test('no walls at a 0% chance', async ({page}) => {
     await startGame(page);
     await wallsOnly(page);
     const r = await page.evaluate(() => {
-        hc.cfg.TILES.wallChance = 0;
+        hc.app.game.tileGenerator.attrs.wallChance = 0;
         window.walls.regenerate();
         return hc.app.game.tiles.size;
     });
@@ -165,7 +164,7 @@ test('no walls at a 0% chance', async ({page}) => {
 test('holes are placed after solid tiles and may replace them', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, T = hc.cfg.TILES, free = hc.GRID.chunkCells(0, 0).length - 1; // less the core's
+        const g = hc.app.game, T = hc.app.game.tileGenerator.attrs, free = hc.GRID.chunkCells(0, 0).length - 1; // less the core's
         T.wallChance = 0;
         T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;

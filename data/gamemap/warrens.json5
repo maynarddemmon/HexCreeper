@@ -1,11 +1,15 @@
 {
-	"attrs":{
+	"rules":{
+		"visionRadius":8
+	},
+	"tileGenerator":{
+		"type":"proximity",
 		"quadRadius":4,
 		"wallChance":90,
 		"doorMin":1,
-		"doorMax":1,
-		"visionRadius":8
+		"doorMax":1
 	},
+	"spawnGenerator":{"type":"proximity"},
 	"goals":[
 		{
 			"name":"Explorer",

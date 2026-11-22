@@ -1,5 +1,5 @@
 /*  The "proximity" tile generator: the map is made around your pieces as they go. The world
-    is divided into quadrants (the grid's chunks, of radius QUAD.radius). When a piece of yours
+    is divided into quadrants (the grid's chunks, of radius quadRadius). When a piece of yours
     is in a quadrant, it's visited, and the quadrants around it get their tiles, once each:
     solid and hole tiles (border walls and clumps) out to where you could see, and heal,
     harm and loot tiles in it and its 6 neighbours. Everything comes from the game's seed
@@ -8,13 +8,45 @@
     'use strict';
     
     const {
-        cfg:{VISION, TILES},
+        cfg:{VISION},
+        attrs:{num, choice},
         TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT
-    } = pkg;
+    } = pkg,
+        
+        // A set of subtypes (solids, holes, heals...), as choices. They're known once
+        // init.json5 has loaded.
+        optionsOf = subtypes => () => subtypes.list().map(s => ({value:s.id, label:s.name}));
     
     const ProximityTileGenerator = pkg.ProximityTileGenerator = new JS.Class('ProximityTileGenerator', pkg.TileGenerator, {
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
+            ATTRS:[
+                num('quadRadius', 5, 1, 6),        // quadrants' radius; the start cell (0,0) is the centre of quadrant (0,0)
+                
+                // Heal, harm and loot tiles per quadrant, of these subtypes (data/init.json5;
+                // see EffectTiles.js).
+                num('healPerQuad', 1, 0, 20),
+                num('harmPerQuad', 1, 0, 40),
+                num('lootChance', 10, 0, 100),     // % chance a heal tile is a loot tile instead
+                choice('healType', 'heal', optionsOf(pkg.heals)),
+                choice('harmType', 'harm', optionsOf(pkg.harms)),
+                choice('lootType', 'loot', optionsOf(pkg.loots)),
+                
+                // Border walls, and the clumps of solid and hole tiles in each quadrant.
+                num('wallChance', 50, 0, 100),     // % chance a border between quadrants is a wall
+                num('wallHoleChance', 25, 0, 100), // % of walls made of holes rather than solid tiles
+                num('doorMin', 1, 0, 10),          // cells left open in the middle of a wall
+                num('doorMax', 2, 0, 10),
+                num('solidMin', 0, 0, 20),         // solid tiles per quadrant, in one connected clump
+                num('solidMax', 5, 0, 20),
+                num('holeMin', 0, 0, 20),          // hole tiles per quadrant, in one connected clump (may replace solid tiles)
+                num('holeMax', 3, 0, 20),
+                choice('wallSolid', 'stone_wall', optionsOf(pkg.solids)), // the solid and hole subtypes walls and clumps are made of
+                choice('clumpSolid', 'boulder', optionsOf(pkg.solids)),
+                choice('wallHole', 'chasm', optionsOf(pkg.holes)),
+                choice('clumpHole', 'pit', optionsOf(pkg.holes))
+            ],
+            
             // The quadrant [i, j] cell (x, y) is in.
             quadOf: (x, y) => pkg.GRID.chunkOf(x, y),
             
@@ -30,8 +62,14 @@
         },
         
         // Life Cycle //////////////////////////////////////////////////////////
-        initialize: function(game) {
-            this.callSuper(game);
+        initialize: function(game, attrs) {
+            this.callSuper(game, attrs);
+            // Keep the ranges the right way round.
+            const a = this.attrs;
+            a.doorMax = Math.max(a.doorMin, a.doorMax);
+            a.solidMax = Math.max(a.solidMin, a.solidMax);
+            a.holeMax = Math.max(a.holeMin, a.holeMax);
+            
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
             this.borders = new Map();        // border key (see ProximityTileGenerator.borderKey) -> its wall {door, hole, start}, or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal, harm and loot tiles have been placed
@@ -39,6 +77,8 @@
         },
         
         // Methods /////////////////////////////////////////////////////////////
+        chunkRadius: function() {return this.attrs.quadRadius;},
+        
         start: function() {this.piecesMoved();},
         
         exportState: function() {
@@ -75,7 +115,7 @@
         },
         
         // A quadrant's heal and harm tiles, once, on random free cells, of the subtypes in
-        // the settings (healType, harmType, lootType).
+        // its attrs (healType, harmType, lootType).
         generateTiles: function(qx, qy) {
             const game = this.game,
                 k = qx + ',' + qy;
@@ -89,18 +129,18 @@
                 lootRng = game.rngFor('loot', k),
                 rollRng = game.rngFor('rolls', k),
                 place = kind => {
-                    const loot = kind === TILE_TYPE_HEAL && lootRng() * 100 < TILES.lootChance,
+                    const loot = kind === TILE_TYPE_HEAL && lootRng() * 100 < this.attrs.lootChance,
                         made = loot ? TILE_TYPE_LOOT : kind;
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = game.key(x, y);
                         if (game.tiles.has(kk) || game.pieceAt(x, y)) continue;
-                        game.tiles.set(kk, game.makeTile(x, y, made, TILES[made + 'Type'], rollRng));
+                        game.tiles.set(kk, game.makeTile(x, y, made, this.attrs[made + 'Type'], rollRng));
                         return;
                     }
                 };
-            for (let i = 0; i < TILES.healPerQuad; i++) place(TILE_TYPE_HEAL);
-            for (let i = 0; i < TILES.harmPerQuad; i++) place(TILE_TYPE_HARM);
+            for (let i = 0; i < this.attrs.healPerQuad; i++) place(TILE_TYPE_HEAL);
+            for (let i = 0; i < this.attrs.harmPerQuad; i++) place(TILE_TYPE_HARM);
         },
         
         // A quadrant's solid and hole tiles, once: the walls on its side of its borders,
@@ -119,8 +159,8 @@
                 const bk = ProximityTileGenerator.borderKey(k, i + ',' + j), wall = this.borderWall(bk);
                 if (wall && bk.startsWith(k + '|')) this.placeWall(cells, i, j, wall);
             }
-            this.placeClump(cells, TILE_TYPE_SOLID, TILES.solidMin, TILES.solidMax, [], rng);
-            this.placeClump(cells, TILE_TYPE_HOLE, TILES.holeMin, TILES.holeMax, [TILE_TYPE_SOLID], rng);
+            this.placeClump(cells, TILE_TYPE_SOLID, this.attrs.solidMin, this.attrs.solidMax, [], rng);
+            this.placeClump(cells, TILE_TYPE_HOLE, this.attrs.holeMin, this.attrs.holeMax, [TILE_TYPE_SOLID], rng);
         },
         
         // A border as the seed makes it, on its own: a wall {door, hole, start} or null. The
@@ -128,10 +168,10 @@
         // (0 to 1) says where along the border the door goes.
         seededBorder: function(bk) {
             const rng = this.game.rngFor('border', bk);
-            if (rng() * 100 >= TILES.wallChance) return null;
+            if (rng() * 100 >= this.attrs.wallChance) return null;
             return {
-                door:TILES.doorMin + Math.floor(rng() * (TILES.doorMax - TILES.doorMin + 1)),
-                hole:rng() * 100 < TILES.wallHoleChance,
+                door:this.attrs.doorMin + Math.floor(rng() * (this.attrs.doorMax - this.attrs.doorMin + 1)),
+                hole:rng() * 100 < this.attrs.wallHoleChance,
                 start:rng()
             };
         },
@@ -180,7 +220,7 @@
                 kind = wall.hole ? TILE_TYPE_HOLE : TILE_TYPE_SOLID;
             for (const c of border) {
                 if (!door.has(c) && !game.tiles.has(game.key(c.x, c.y)) && !game.pieceAt(c.x, c.y)) {
-                    game.tiles.set(game.key(c.x, c.y), game.makeTile(c.x, c.y, kind, wall.hole ? TILES.wallHole : TILES.wallSolid));
+                    game.tiles.set(game.key(c.x, c.y), game.makeTile(c.x, c.y, kind, wall.hole ? this.attrs.wallHole : this.attrs.wallSolid));
                 }
             }
         },
@@ -201,7 +241,7 @@
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
                 const {x, y} = options[Math.floor(rng() * options.length)];
-                game.tiles.set(game.key(x, y), game.makeTile(x, y, kind, kind === TILE_TYPE_HOLE ? TILES.clumpHole : TILES.clumpSolid));
+                game.tiles.set(game.key(x, y), game.makeTile(x, y, kind, kind === TILE_TYPE_HOLE ? this.attrs.clumpHole : this.attrs.clumpSolid));
                 edge.delete(game.key(x, y));
                 for (const [dx, dy] of pkg.GRID.dirs) {
                     const nx = x + dx,

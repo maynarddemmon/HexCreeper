@@ -6,7 +6,7 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, VISION, LINK, COMBAT, ENEMY, RANK, ANIM
+            WORLD_LIMIT, VISION, LINK, COMBAT, RANK, ANIM
         },
         TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
         hexDist, PIECE_TYPES
@@ -20,7 +20,9 @@
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
-            GENERATOR:'proximity' // the tile and spawn generators every map is made with, for now
+            // The tile and spawn generators a game is made with when it isn't in a map
+            // (one made in a test, say): "proximity", with every attr at its default.
+            NO_MAP_GENERATOR:{type:'proximity', attrs:{}}
         },
         
         initialize: function() {
@@ -48,8 +50,10 @@
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
-            this.tileGenerator = pkg.TileGenerator.make(pkg.Game.GENERATOR, this);   // places the map's tiles
-            this.spawnGenerator = pkg.SpawnGenerator.make(pkg.Game.GENERATOR, this); // and its enemies
+            // The map's tile and spawn generators (see Generators.js), with its attrs for them.
+            const {tileGenerator:tiles = pkg.Game.NO_MAP_GENERATOR, spawnGenerator:spawns = pkg.Game.NO_MAP_GENERATOR} = this.gameMap ?? {};
+            this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
+            this.spawnGenerator = pkg.SpawnGenerator.make(spawns.type, this, spawns.attrs); // and its enemies
             pkg.GRID = pkg.makeGrid(this.tileGenerator.chunkRadius()); // fixed for the whole game
             this.grid = pkg.GRID;
             this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
@@ -102,8 +106,8 @@
                 quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
-                tileGenerator:{type:this.tileGenerator.type, state:this.tileGenerator.exportState()},
-                spawnGenerator:{type:this.spawnGenerator.type, state:this.spawnGenerator.exportState()},
+                tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
+                spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
                 seenCells:[...this.seenCells],
                 acted:[...this.acted],
                 fresh:[...this.fresh],
@@ -140,9 +144,9 @@
             // The generators, with what they keep (made before anything here changes).
             let tileGenerator, spawnGenerator;
             try {
-                tileGenerator = pkg.TileGenerator.make(o.tileGenerator?.type, this);
+                tileGenerator = pkg.TileGenerator.make(o.tileGenerator?.type, this, o.tileGenerator.attrs);
                 tileGenerator.importState(o.tileGenerator.state);
-                spawnGenerator = pkg.SpawnGenerator.make(o.spawnGenerator?.type, this);
+                spawnGenerator = pkg.SpawnGenerator.make(o.spawnGenerator?.type, this, o.spawnGenerator.attrs);
                 spawnGenerator.importState(o.spawnGenerator.state);
             } catch (err) {
                 throw new Error('Malformed game data: ' + err.message, {cause:err});
@@ -177,9 +181,7 @@
                 this.pieces.set(p.id, {...p});
                 this.board.set(this.key(p.x, p.y), p.id);
             }
-            // Heal, harm and loot tiles from saves made before they had subtypes are of
-            // the subtypes in the settings.
-            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), this.isEffectTile(t) && t.subtype === undefined ? this.upgradeEffectTile(t) : {...t}]));
+            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
             this.seenCells = new Set(o.seenCells);
@@ -265,7 +267,7 @@
         
         addPiece: function(type, owner, x, y, parentId = null) {
             const s = PIECE_TYPES[type].stats[owner],
-                hp = (owner === 'player' ? RANK.hpPer : ENEMY.hpPer) * RANK.base,
+                hp = (owner === 'player' ? RANK.hpPer : this.spawnGenerator.attrs.enemyHpPer) * RANK.base,
                 piece = {
                     id:this.nextId++, 
                     type, owner, x, y, parentId,
@@ -315,7 +317,7 @@
             for (const p of all) {
                 const r = rankOf(p),
                     player = p.owner === 'player',
-                    newMax = (player ? RANK.hpPer : ENEMY.hpPer) * r;
+                    newMax = (player ? RANK.hpPer : this.spawnGenerator.attrs.enemyHpPer) * r;
                 if (newMax > p.maxHp && player && RANK.rankUpHeals) p.hp += newMax - p.maxHp;
                 p.rank = r; p.maxHp = newMax;
                 p.hp = Math.min(p.hp, p.maxHp);
@@ -473,9 +475,6 @@
         },
         
         // ---- Tiles ----
-        // The tile and spawn generators the map is made with (see Generators.js). Maps
-        // don't choose yet: they're all "proximity".
-        
         // Your pieces have moved (or one was placed): the tiles they now need, and the
         // ones they now find.
         piecesMoved: function() {

@@ -57,7 +57,7 @@
                             // Patience: the longer a nearby squad goes without landing a hit, the
                             // less it cares about exposure, so it can't hang back forever.
                             const idle = root.idle || 0,
-                                caution = Math.max(0, 1 - idle / Math.max(1, AI.patience)),
+                                caution = Math.max(0, 1 - idle / Math.max(1, this.spawnGenerator.attrs.aiPatience)),
                                 hpBefore = this.piecesOf('player').reduce((a, q) => a + q.hp, 0),
                                 nBefore = this.piecesOf('player').length;
                             for (const a of this.planSquad(squad, budget, field, caution)) {
@@ -208,7 +208,7 @@
                         for (const [dx, dy] of pkg.GRID.dirs) if (livePlayerAt(st, x + dx, y + dy)) adj++;
                         if (adj) {
                             const pc = byId.get(id);
-                            v -= caution * AI.expose * sub(id).length * (pc.hp <= 1 ? 1 : 0.6);
+                            v -= caution * this.spawnGenerator.attrs.aiExpose * sub(id).length * (pc.hp <= 1 ? 1 : 0.6);
                         } else {
                             const d = fdist(x, y);
                             v += (d === 2 ? caution * AI.poise : 0) - AI.approach * Math.min(d, 30);

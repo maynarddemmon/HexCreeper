@@ -1,9 +1,20 @@
 (pkg => {
     'use strict';
     
-    const {cfg:{DATA_BASE_DIR}} = pkg,
+    const {cfg:{DATA_BASE_DIR}, isObj} = pkg,
         
         MAPS_DIR = DATA_BASE_DIR + 'gamemap/',
+        
+        /*  A map file's "tileGenerator" or "spawnGenerator", {type, ...attrs}, made usable:
+            {type, attrs}, its attrs cleaned (see Generator.cleanAttrs). Base is
+            TileGenerator or SpawnGenerator. Throws if it isn't an object whose type is
+            registered with Base. */
+        generatorOf = (Base, config, where) => {
+            if (!isObj(config)) throw new Error(where + ' is missing');
+            if (!Base.has(config.type)) throw new Error(where + ' has an unknown type: ' + config.type);
+            const {type, ...attrs} = config;
+            return {type, attrs:Base.cleanAttrs(type, attrs, where)};
+        },
         
         // Loads a JSON5 file. Calls back with the parsed data, or null if it couldn't be
         // loaded or parsed.
@@ -29,9 +40,19 @@
         game. Each map's own file, data/gamemap/<id>.json5, holds what's needed to play it,
         and is loaded only when it's played.
         
+        A map's file has (see docs/DESIGN.md, Maps):
+            rules: gameplay values in place of hc.cfg's, {id:value} (see Settings.js);
+            tileGenerator: {type, ...attrs}: what makes its tiles: a type registered with
+                TileGenerator, and values for that type's attrs (see Generators.js);
+            spawnGenerator: {type, ...attrs}: what makes its enemies, likewise;
+            goals and penalties, and optionally a seed.
+        
         A map, once loaded, is its entry in init.json5 merged with its file:
-            {id, name, number, description, attrs:{<setting id>:value, ...}, objectives:[...]}
-        where objectives are its goals and penalties (see goals.fromMap). */
+            {id, name, number, description, seed, rules:{id:value}, tileGenerator:{type,
+            attrs}, spawnGenerator:{type, attrs}, objectives:[...]}
+        where objectives are its goals and penalties (see goals.fromMap). Rules and attrs
+        are only those the file gives, made usable (any that can't be are skipped with a
+        warning). A map whose goals or generators can't be used isn't loaded. */
     pkg.maps = {
         /*  Calls back with init.json5's contents, {defaultMap, maps:[...], materials,
             solids, holes, heals, harms, loots}, or null if it couldn't be loaded. It's loaded
@@ -74,16 +95,20 @@
                         callback(null);
                         return;
                     }
-                    let objectives;
+                    const where = 'Map ' + id;
+                    let gameMap = null;
                     try {
-                        objectives = pkg.goals.fromMap(data);
+                        gameMap = {
+                            ...entry, ...data, id,
+                            rules:pkg.settings.cleanRules(data.rules, where),
+                            tileGenerator:generatorOf(pkg.TileGenerator, data.tileGenerator, where + ' tile generator'),
+                            spawnGenerator:generatorOf(pkg.SpawnGenerator, data.spawnGenerator, where + ' spawn generator'),
+                            objectives:pkg.goals.fromMap(data)
+                        };
+                        loaded.set(id, gameMap);
                     } catch (err) {
-                        console.error('Bad goals in map', id, err.message);
-                        callback(null);
-                        return;
+                        console.error('Bad map', id, err.message);
                     }
-                    const gameMap = {...entry, ...data, id, attrs:data.attrs ?? {}, objectives};
-                    loaded.set(id, gameMap);
                     callback(gameMap);
                 });
             });

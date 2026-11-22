@@ -5,7 +5,7 @@
         
         isObj = pkg.isObj,
         
-        SAVE_FORMAT_VERSION = 1,
+        SAVE_FORMAT_VERSION = 2, // 2 (2026-11-22): maps with rules and generators; 1: before
         DEFAULT_STORAGE_KEY = 'hc.save',
         
         readStorage = key => {

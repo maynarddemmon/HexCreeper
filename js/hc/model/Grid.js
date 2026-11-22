@@ -16,10 +16,6 @@
         INV_SQRT3 = 1 / SQRT3,
         PI_OVER_180 = PI / 180,
         
-        {
-            cfg:{QUAD}
-        } = pkg,
-        
         // Keys for the six directions: NW, NE, W, E, SW, SE
         KEY_DIRS = {
             q: [0, -1], e: [1, -1],
@@ -150,7 +146,7 @@
             };
         };
     
-    pkg.GRID = makeGrid(QUAD.radius); // replaced by Game.reset
+    pkg.GRID = makeGrid(1); // replaced by Game.reset, with the tile generator's chunk radius
     
     // Grid distance (steps between cells) and straight-line distance squared.
     pkg.hexDist = (a, b) => hexDist(a.x - b.x, a.y - b.y);

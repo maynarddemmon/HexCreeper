@@ -30,7 +30,7 @@ const step = (page, dx, dy, mode, who = 'core') => page.evaluate(([dx, dy, mode,
 
 const solid = (page, x, y) => page.evaluate(([x, y]) => {
     const g = hc.app.game;
-    g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.cfg.TILES.clumpSolid));
+    g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.app.game.tileGenerator.attrs.clumpSolid));
 }, [x, y]);
 
 test('fixed moves the whole subtree, so one blocked piece stops the move', async ({page}) => {
@@ -162,7 +162,7 @@ test('a squad far off that can\'t get through keeping its shape squeezes through
         for (const [dx, dy] of hc.GRID.dirs) {
             for (const p of [root, kid]) {
                 const x = p.x + dx, y = p.y + dy;
-                if (!g.pieceAt(x, y) && !(x === 19 && y === 0)) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.cfg.TILES.clumpSolid));
+                if (!g.pieceAt(x, y) && !(x === 19 && y === 0)) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.app.game.tileGenerator.attrs.clumpSolid));
             }
         }
         const fixed = g.legalMoves(root, 'fixed').filter(m => !m.attack).length;

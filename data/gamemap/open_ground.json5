@@ -1,8 +1,12 @@
 {
-	"attrs":{
+	"tileGenerator":{
+		"type":"proximity",
 		"wallChance":0,
 		"solidMax":1,
-		"holeMax":0,
+		"holeMax":0
+	},
+	"spawnGenerator":{
+		"type":"proximity",
 		"spawnEvery":2
 	},
 	"goals":[

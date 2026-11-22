@@ -87,7 +87,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         hc.cfg.RANK.hpPer = 10;
-        hc.cfg.ENEMY.hpPer = 10;
+        g.spawnGenerator.attrs.enemyHpPer = 10;
         g.score = 100;
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
@@ -206,18 +206,3 @@ test('a countdown runs from when the tile is revealed', async ({page}) => {
     }, at)).toEqual([[1, true], [2, false]]);
 });
 
-test('a save from before tiles had subtypes loads, its tiles of the settings\' subtypes', async ({page}) => {
-    const r = await page.evaluate(() => {
-        const g = hc.app.game, o = JSON.parse(JSON.stringify(g.exportToObj()));
-        o.tiles = [
-            {x:1, y:0, kind:'loot', timer:0, value:17},
-            {x:2, y:0, kind:'heal', timer:3},
-            {x:3, y:0, kind:'harm', timer:0},
-            {x:4, y:0, kind:'solid', timer:0, subtype:'boulder', hp:5}
-        ];
-        const copy = new hc.Game();
-        copy.importFromObj(o);
-        return [...copy.tiles.values()].map(t => [t.kind, t.subtype, t.kind === 'loot' ? t.pool : null, copy.isRevealed(t)]);
-    });
-    expect(r).toEqual([['loot', 'loot', 17, true], ['heal', 'heal', null, true], ['harm', 'harm', null, true], ['solid', 'boulder', null, true]]);
-});

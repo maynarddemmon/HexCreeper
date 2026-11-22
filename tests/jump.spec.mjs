@@ -20,7 +20,7 @@ test('a piece can jump to the twelve cells two away, over holes and pieces but n
         const g = hc.app.game,
             core = g.getPlayerCore(),
             cells = () => g.jumpTargets(core).map(c => c.x + ',' + c.y),
-            put = (x, y, kind) => g.tiles.set(g.key(x, y), g.makeTile(x, y, kind, kind === 'solid' ? hc.cfg.TILES.clumpSolid : hc.cfg.TILES.clumpHole)),
+            put = (x, y, kind) => g.tiles.set(g.key(x, y), g.makeTile(x, y, kind, kind === 'solid' ? hc.app.game.tileGenerator.attrs.clumpSolid : hc.app.game.tileGenerator.attrs.clumpHole)),
             out = {};
         hc.cfg.LINK.range = 3;
         out.all = cells().length;
@@ -129,7 +129,7 @@ test('enemies jump: a planned jump is carried out, and the piece sits out its ne
 // A line of holes across the board at y = -2, from x = -w to w.
 const holeLine = (page, w) => page.evaluate(w => {
     const g = hc.app.game;
-    for (let x = -w; x <= w; x++) g.tiles.set(g.key(x, -2), g.makeTile(x, -2, 'hole', hc.cfg.TILES.clumpHole));
+    for (let x = -w; x <= w; x++) g.tiles.set(g.key(x, -2), g.makeTile(x, -2, 'hole', hc.app.game.tileGenerator.attrs.clumpHole));
 }, w);
 
 test('an enemy near you, kept from you by a long line of holes, jumps it rather than going round', async ({page}) => {

@@ -141,16 +141,6 @@
             return {x, y, kind, subtype, pool:roll(type.pool), magnitude:roll(type.magnitude), uses:0, revealedAt:null, shown:false};
         },
         
-        /*  A tile from a save made before subtypes: of its kind's subtype in the settings,
-            shown, and a loot tile's value is its pool. */
-        upgradeEffectTile: function(t) {
-            const tile = this.makeEffectTile(t.x, t.y, t.kind, pkg.cfg.TILES[t.kind + 'Type'], this.rngFor('upgrade', this.key(t.x, t.y)));
-            if (Number.isInteger(t.value)) tile.pool = t.value;
-            tile.revealedAt = this.turn;
-            tile.shown = true;
-            return tile;
-        },
-        
         /*  Reveals the tiles your pieces now find (revealMode), and shows the magnitudes
             they now see (showMagnitude). After your pieces move. */
         revealTiles: function() {

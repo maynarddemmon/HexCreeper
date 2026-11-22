@@ -1,5 +1,9 @@
 {
-	"attrs":{
+	"rules":{
+		"visionRadius":8
+	},
+	"tileGenerator":{
+		"type":"proximity",
 		"quadRadius":2,
 		"wallChance":90,
 		"wallHoleChance":0,
@@ -10,9 +14,9 @@
 		"holeMin":0,
 		"holeMax":0,
 		"wallSolid":"hedge",
-		"clumpSolid":"boulder",
-		"visionRadius":8
+		"clumpSolid":"boulder"
 	},
+	"spawnGenerator":{"type":"proximity"},
 	"goals":[
 		{
 			"name":"Explorer",
