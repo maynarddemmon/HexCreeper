@@ -1,6 +1,8 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, waitForGame} from './helpers.mjs';
 
+const mapsTitle = page => page.getByText('Maps', {exact:true}).filter({visible:true});
+
 // Plays a few turns so there's something worth saving: placed pieces, moves, tiles seen.
 const playABit = page => page.evaluate(() => {
     const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
@@ -60,13 +62,31 @@ test('without a save, a reload starts a new game', async ({page}) => {
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
 });
 
-test('a save that can\'t be used is cleared, with a message, and a new game starts', async ({page}) => {
+test('a save that can\'t be used is cleared, with a message, then the maps are shown', async ({page}) => {
     await startGame(page);
-    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:2, data:{turn:'nope'}}));});
+    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));});
     await page.reload();
     await waitForGame(page);
     await expect(page.getByText('Save Could Not Be Loaded', {exact:true}).filter({visible:true})).toBeVisible();
     expect(await page.evaluate(() => [hc.app.game.turn, localStorage.getItem('hc.save')])).toEqual([1, null]);
+    await expect(mapsTitle(page)).toHaveCount(0);
+    await button(page, 'Acknowledge').click();
+    await expect(mapsTitle(page)).toBeVisible();
+});
+
+test('after losing, a last save that can\'t be used shows the maps after the message', async ({page}) => {
+    await startGame(page);
+    await saveWithButton(page);
+    await page.evaluate(() => {
+        localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));
+        const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
+        g.damage(g.getPlayerCore(), 99, e);
+        hc.view.draw();
+    });
+    await button(page, 'Load Last Save').click();
+    await expect(page.getByText('Save Could Not Be Loaded', {exact:true}).filter({visible:true})).toBeVisible();
+    await button(page, 'Acknowledge').click();
+    await expect(mapsTitle(page)).toBeVisible();
 });
 
 test('after losing, the last save can be loaded', async ({page}) => {
@@ -122,7 +142,8 @@ for (const format of ['compact', 'pretty']) {
 
 for (const [what, contents, msg] of [
     ['not JSON', 'not a save', 'That file is not a HexCreeper save file.'],
-    ['not a save', JSON.stringify({version:2, data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
+    ['not a save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
+    ['without a format', JSON.stringify({version:2, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
     ['in an unknown format', JSON.stringify({version:2, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
     ['from before maps had generators', JSON.stringify({version:1, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (1).']
 ]) {

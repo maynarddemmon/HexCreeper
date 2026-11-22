@@ -127,8 +127,10 @@
         importFromObj: function(o) {
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
-            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.quadRadius) ||
-                ![o.pieces, o.tiles, o.seenCells, o.acted, o.fresh, o.corePath ?? []].every(isArr) ||
+            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) || !isNum(o.quadRadius) ||
+                !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
+                !Number.isInteger(o.movesUsed) ||
+                ![o.pieces, o.tiles, o.seenCells, o.acted, o.fresh, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
@@ -156,17 +158,15 @@
             this.nextId = o.nextId;
             this.seed = Number.isInteger(o.seed) ? o.seed : null;
             this.score = o.score;
-            // Saves from before the total was kept only know what's left to spend.
-            this.scoreEarned = Number.isFinite(o.scoreEarned) ? o.scoreEarned : o.score;
+            this.scoreEarned = o.scoreEarned;
             this.over = !!o.over;
             this.outcome = this.over ? (o.outcome === 'won' ? 'won' : 'lost') : null;
             this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
-            // Saves from before these were kept start them at 0.
-            this.kills = isNum(o.kills) ? o.kills : 0;
-            this.piecesLost = isNum(o.piecesLost) ? o.piecesLost : 0;
-            this.piecesPlaced = isNum(o.piecesPlaced) ? o.piecesPlaced : 0;
-            this.lootOpened = isNum(o.lootOpened) ? o.lootOpened : 0;
-            this.lootTaken = isNum(o.lootTaken) ? o.lootTaken : 0;
+            this.kills = o.kills;
+            this.piecesLost = o.piecesLost;
+            this.piecesPlaced = o.piecesPlaced;
+            this.lootOpened = o.lootOpened;
+            this.lootTaken = o.lootTaken;
             this.objectives = objectives.map((obj, i) => {
                 const s = o.objectives?.[i];
                 return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
@@ -187,16 +187,13 @@
             this.seenCells = new Set(o.seenCells);
             this.acted = new Set(o.acted);
             this.fresh = new Set(o.fresh);
-            // Saves from before moves were counted apart from the pieces that moved.
-            this.movesUsed = Number.isInteger(o.movesUsed) ? o.movesUsed : this.acted.size;
+            this.movesUsed = o.movesUsed;
             this.recoverUsed = !!o.recoverUsed;
             this.quickenUsed = !!o.quickenUsed;
             this.moveMode = pkg.MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
-            // Saves from before the path was kept start it where the core is.
-            const core = this.getPlayerCore();
-            this.corePath = o.corePath?.map(c => [...c]) ?? (core ? [[core.x, core.y]] : []);
+            this.corePath = o.corePath.map(c => [...c]);
             this.gameMap = o.gameMap ?? null;
             this._sightKey = null;
         },

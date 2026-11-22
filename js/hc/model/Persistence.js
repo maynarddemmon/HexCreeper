@@ -38,8 +38,7 @@
         validateRecord = record => {
             if (!isObj(record)) return i18n('save-problem-not-save');
             if (record.version !== SAVE_FORMAT_VERSION) return i18n('save-problem-version', record.version);
-            // Saves from before the format was recorded have none.
-            if (record.format !== undefined && !Object.hasOwn(FORMATS, record.format)) return i18n('save-problem-format', record.format);
+            if (!Object.hasOwn(FORMATS, record.format)) return i18n('save-problem-format', record.format);
             if (!isObj(record.data)) return i18n('save-problem-no-data');
             return null;
         };

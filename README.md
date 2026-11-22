@@ -50,7 +50,7 @@ The tests start their own static server and load the real `index.html`, then dri
 - the rules behave as intended: ranks, moves per turn, link range, group attacks and combos, advancing after a kill, tiles and their countdowns, heal flow and the paid heal;
 - enemy waves follow your rank, squads path around harm, solid and hole tiles, strike and pull back, and don't wait forever;
 - fog of war: the vision radius, solid tiles blocking sight (and the edge rule), and seen tiles staying shown;
-- saving: a saved game comes back intact on reload, a bad save is cleared, and the last save can be loaded after losing;
+- saving: a saved game comes back intact on reload, a bad save is cleared and the maps are shown, and the last save can be loaded after losing;
 - the UI works: header buttons, help, click versus shift-click, keyboard moves and settings.
 
 `npm run setup-hooks` turns on a pre-commit hook that runs the linter and the startup tests. `npx playwright test --headed` shows the browser while they run, and `npx playwright test combat` runs a single file.

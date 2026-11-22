@@ -527,12 +527,14 @@
         },
         
         /*  Replaces this game with the saved one. If the save can't be used, it's cleared,
-            this game carries on, and a dialog says why. */
+            this game carries on, a dialog says why, and then the maps are shown to choose
+            one to play instead. */
         loadSave: () => {
             const problem = persistenceMgr.restore();
             if (problem) {
                 openAckMsgDialog(i18n('dlg-restore-failed-title'), i18n('dlg-restore-failed-msg', problem));
                 updateLastSaved();
+                openWhenClear(appView.openMaps);
                 return;
             }
             afterLoad();

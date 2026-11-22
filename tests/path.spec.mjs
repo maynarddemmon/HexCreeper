@@ -31,15 +31,3 @@ test('moving another piece leaves the golden path alone', async ({page}) => {
     });
     expect(r).toEqual([[0, 0]]);
 });
-
-test('a save without a golden path starts one where the core is', async ({page}) => {
-    const r = await page.evaluate(() => {
-        const g = hc.app.game, [a] = hc.GRID.dirs;
-        g.playerAct(g.getPlayerCore(), a[0], a[1]);
-        const data = g.exportToObj();
-        delete data.corePath;
-        g.importFromObj(data);
-        return {path:g.corePath, at:[g.getPlayerCore().x, g.getPlayerCore().y]};
-    });
-    expect(r.path).toEqual([r.at]);
-});
