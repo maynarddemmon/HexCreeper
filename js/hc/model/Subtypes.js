@@ -6,9 +6,20 @@
 (pkg => {
     'use strict';
     
-    const isText = v => v === undefined || typeof v === 'string';
+    const isText = v => v === undefined || typeof v === 'string',
+        isNum = v => Number.isFinite(v) && v >= 0;
     
     pkg.Subtypes = new JS.Class('Subtypes', {
+        // Class Methods and Attributes ////////////////////////////////////////
+        extend: {
+            /*  Helpers for parse functions: whether a value is a number that's not negative, a
+                whole one, optional text, or an optional percentage (missing, or 0 to 100). */
+            isText,
+            isNum,
+            isInt: v => Number.isInteger(v) && v >= 0,
+            isPercent: v => v === undefined || (isNum(v) && v <= 100)
+        },
+        
         /*  kind: what the subtypes are of, for error messages. parse(entry, id): the
             subtype's own properties, {...}, or null. */
         initialize: function(kind, parse) {
@@ -37,11 +48,4 @@
         /*  Every subtype, in the order init.json5 lists them. */
         list: function() {return [...this.byId.values()];}
     });
-    
-    /*  Helpers for parse functions: whether a value is a number that's not negative, a
-        whole one, optional text, or an optional percentage (missing, or 0 to 100). */
-    pkg.Subtypes.isNum = v => Number.isFinite(v) && v >= 0;
-    pkg.Subtypes.isInt = v => Number.isInteger(v) && v >= 0;
-    pkg.Subtypes.isText = isText;
-    pkg.Subtypes.isPercent = v => v === undefined || (pkg.Subtypes.isNum(v) && v <= 100);
 })(hc);

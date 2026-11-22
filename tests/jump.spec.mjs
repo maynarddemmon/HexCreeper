@@ -178,8 +178,8 @@ test('in open ground enemies walk rather than jump', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, out = [];
         // A lone enemy and a squad, near (planning) and far (marching).
-        const near = g.addPiece('core', 'enemy', 0, -5),
-            far = g.addPiece('core', 'enemy', 4, -12);
+        g.addPiece('core', 'enemy', 0, -5);
+        const far = g.addPiece('core', 'enemy', 4, -12);
         g.addPiece('core', 'enemy', 5, -12, far.id);
         g.recomputeRanks();
         for (let t = 0; t < 8; t++) {

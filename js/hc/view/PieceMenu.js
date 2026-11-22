@@ -3,10 +3,7 @@
     
     const M = myt,
         
-        {
-            Btn,
-            theme:{spacing, cornerRadius, colorMenu, colorTextMuted, fontSizeMedium}
-        } = pkg,
+        {spacing, fontSizeMedium} = pkg.theme,
         
         MENU_WIDTH = 120;
     
@@ -30,7 +27,7 @@
             
             self.getIDE().setAttribute('role', 'menu');
             self._buttons = items.map(item => {
-                const btn = new Btn(self, {width:MENU_WIDTH, text:item.label(), fontSize:fontSizeMedium}, [{
+                const btn = new pkg.Btn(self, {width:MENU_WIDTH, text:item.label(), fontSize:fontSizeMedium}, [{
                     doActivated: () => {
                         if (item.enabled()) {
                             onPick();

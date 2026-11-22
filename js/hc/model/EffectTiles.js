@@ -112,9 +112,9 @@
         // A tile of a subtype that isn't known: shown at once, 1 of whatever it does, then gone.
         FALLBACK = parseEffect({pool:1});
     
-    pkg.heals = new Subtypes('heal', parseEffect);
-    pkg.harms = new Subtypes('harm', parseEffect);
-    pkg.loots = new Subtypes('loot', parseEffect);
+    pkg.heals = new Subtypes(TILE_TYPE_HEAL, parseEffect);
+    pkg.harms = new Subtypes(TILE_TYPE_HARM, parseEffect);
+    pkg.loots = new Subtypes(TILE_TYPE_LOOT, parseEffect);
     
     // The subtypes of each kind of tile here.
     const TYPES = {[TILE_TYPE_HEAL]:pkg.heals, [TILE_TYPE_HARM]:pkg.harms, [TILE_TYPE_LOOT]:pkg.loots};
