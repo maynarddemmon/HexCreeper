@@ -193,7 +193,8 @@
             const kind = this.tiles.get(this.key(x, y))?.kind;
             return kind !== TILE_TYPE_SOLID && kind !== TILE_TYPE_HOLE;
         },
-        // Solid tiles block sight; holes don't.
+        // Solid tiles block movement (and jumps over them); how much they block sight is
+        // seeThrough's. Holes don't block sight.
         isSolid: function(x, y) { return this.tiles.get(this.key(x, y))?.kind === TILE_TYPE_SOLID; },
         
         // ---- Fog of war ----
@@ -223,16 +224,29 @@
             return this._sight;
         },
         
-        // Is the line from cell a to cell b clear? Solid cells block it, but a line along an
-        // edge is only blocked if the cells on both sides are solid. The end cells don't
-        // count, so solid cells themselves can be seen.
+        // Can a piece at cell a see cell b, within the vision radius? Solids along the line
+        // between them shorten the sight past them: what's left of it (the radius less the
+        // distance to the solid) is cut to the share the solid lets through (seeThrough).
+        // So an opaque solid blocks it; one 50% opaque halves what's left. Along an edge
+        // the clearer of the cells on either side counts. The end cells don't count, so
+        // solid cells themselves can be seen.
         canSee: function(a, b) {
             const left = pkg.GRID.line(a, b, 1),
-                right = pkg.GRID.line(a, b, -1);
-            for (let i = 1; i < left.length - 1; i++) {
-                if (this.isSolid(left[i].x, left[i].y) && this.isSolid(right[i].x, right[i].y)) return false;
+                right = pkg.GRID.line(a, b, -1),
+                dist = left.length - 1;
+            let range = VISION.radius;
+            for (let i = 1; i < dist && range >= dist; i++) {
+                const through = Math.max(this.seeThrough(left[i].x, left[i].y), this.seeThrough(right[i].x, right[i].y));
+                range = i + (range - i) * through;
             }
-            return true;
+            return range >= dist;
+        },
+        
+        // The share of sight that gets through (x, y): 1, or for a solid, 1 less its
+        // opacity (Solids.js); none for a solid of an unknown subtype.
+        seeThrough: function(x, y) {
+            const tile = this.tiles.get(this.key(x, y));
+            return tile?.kind === TILE_TYPE_SOLID ? 1 - (pkg.solids.get(tile.subtype)?.opacity ?? 100) / 100 : 1;
         },
         
         addPiece: function(type, owner, x, y, parentId = null) {

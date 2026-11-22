@@ -20,6 +20,38 @@
         // Where a heal tile's value goes, from its centre, in cells.
         HEAL_LABEL_OFFSET = [0.3, 0.32],
         
+        // A see-through solid's fill is drawn as see-through as it is, but at least this
+        // strong, so it still shows (its edges are drawn in full).
+        SOLID_MIN_FILL = 0.25,
+        
+        // A colour from data (any CSS colour, or a --variable), or the fallback --variable.
+        dataColor = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback),
+        
+        // How strongly a solid of the subtype is filled: by its opacity (Solids.js).
+        solidFillAlpha = solid => Math.max(SOLID_MIN_FILL, (solid?.opacity ?? 100) / 100),
+        
+        // Fills the see-through solids among tiles (each kind as one shape, so the fills
+        // don't darken where neighbours overlap). Opaque ones are filled with the rest of
+        // their tile (drawTile).
+        fillSeeThroughSolids = tiles => {
+            const byKind = new Map();
+            for (const t of tiles) {
+                if (t.kind === TILE_TYPE_SOLID && solidFillAlpha(pkg.solids.get(t.subtype)) < 1) {
+                    if (!byKind.has(t.subtype)) byKind.set(t.subtype, []);
+                    byKind.get(t.subtype).push(t);
+                }
+            }
+            for (const [subtype, kind] of byKind) {
+                const solid = pkg.solids.get(subtype);
+                ctx.beginPath();
+                for (const t of kind) addCellPath(t.x, t.y, -0.5);
+                ctx.globalAlpha = solidFillAlpha(solid);
+                ctx.fillStyle = dataColor(solid?.fillColor, '--solid');
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        },
+        
         // Whether (x, y) holds a tile of the same kind and subtype as t, if t is a solid or
         // a hole: tiles like that run together.
         sameTerrain = (t, x, y) => {
@@ -31,9 +63,9 @@
             if (t.kind === TILE_TYPE_SOLID) {
                 // In its subtype's colours, if it has them, filling the whole hex so solids of
                 // a kind run together: the outline is only on edges that don't meet a solid of
-                // the same subtype (sameTerrain).
+                // the same subtype (sameTerrain). A see-through one is already filled
+                // (fillSeeThroughSolids).
                 const solid = pkg.solids.get(t.subtype),
-                    color = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback),
                     [cx, cy] = cellCenter(t.x, t.y),
                     inset = 1,
                     pts = pkg.GRID.corners(t.x, t.y).map(([wx, wy]) => {
@@ -43,10 +75,12 @@
                     });
                 // Half a pixel bigger, so neighbouring fills overlap rather than leave a faint
                 // antialiased seam between them.
-                ctx.beginPath();
-                addCellPath(t.x, t.y, -0.5);
-                ctx.fillStyle = color(solid?.fillColor, '--solid');
-                ctx.fill();
+                if (solidFillAlpha(solid) >= 1) {
+                    ctx.beginPath();
+                    addCellPath(t.x, t.y, -0.5);
+                    ctx.fillStyle = dataColor(solid?.fillColor, '--solid');
+                    ctx.fill();
+                }
                 // Where an edge's neighbour isn't drawn, the corner is an outside corner of
                 // the joined shape, and this hex's line and the next hex's stop short of each
                 // other (each is inset into its own hex): run the line on past the corner, by
@@ -67,7 +101,7 @@
                         ctx.lineTo(bx + ux * post, by + uy * post);
                     }
                 });
-                ctx.strokeStyle = color(solid?.borderColor, '--solid-edge');
+                ctx.strokeStyle = dataColor(solid?.borderColor, '--solid-edge');
                 ctx.lineWidth = lineWidth;
                 ctx.lineCap = 'round';
                 ctx.stroke();
@@ -373,9 +407,9 @@
         fillCells(known.filter(c => game.visitedQuads.has(chunkKey(c.x, c.y))), '--visited');
         
         // Heal, harm, solid and hole tiles
-        for (const t of game.tiles.values()) {
-            if (inView(t.x, t.y) && isKnown(t.x, t.y)) drawTile(t, now);
-        }
+        const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
+        fillSeeThroughSolids(tilesShown);
+        for (const t of tilesShown) drawTile(t, now);
         
         // Tint occupied cells
         for (const p of game.pieces.values()) {

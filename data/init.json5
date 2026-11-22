@@ -3,7 +3,9 @@
 	"defaultLevel":"endless",
 	
 	// Materials solids are made of. hardness is the damage reduction (DR) of a solid made of
-	// it: an attack does the attacker's rank less the DR. density isn't used yet.
+	// it: an attack does the attacker's rank less the DR. density isn't used yet. opacity
+	// (0-100, default 100) is how much it blocks sight: 100 blocks it, 0 not at all, and in
+	// between, sight past it is shortened (see docs/DESIGN.md, Fog of war).
 	"materials":{
 		// Organic
 		"flesh":    {"name":"flesh",     "hardness":0, "density":0.95, "description":""},
@@ -37,12 +39,24 @@
 		"granite":   {"name":"granite",    "hardness":13, "density":10, "description":""},
 		"marble":    {"name":"marble",     "hardness":8,  "density":10, "description":""},
 		"basalt":    {"name":"basalt",     "hardness":8,  "density":10, "description":""},
-		"serpentine":{"name":"serpentine", "hardness":7,  "density":10, "description":""}
+		"serpentine":{"name":"serpentine", "hardness":7,  "density":10, "description":""},
+		
+		// See-through
+		"glass":  {"name":"glass",   "hardness":3, "density":2.5,  "opacity":10, "description":""},
+		"ice":    {"name":"ice",     "hardness":2, "density":0.92, "opacity":50, "description":""},
+		"crystal":{"name":"crystal", "hardness":9, "density":2.65, "opacity":15, "description":""},
+		"plastic":{"name":"plastic", "hardness":3, "density":1.2,  "opacity":30, "description":""},
+		
+		// Fibre
+		"rope":{"name":"rope", "hardness":1, "density":0.9, "description":""}
 	},
 	
 	// Kinds of solid tile: what each is made of ("composition", a material above) and its
 	// hit points, and optionally the colours it's drawn in ("fillColor" and "borderColor":
 	// any CSS colour, or a --variable from index.html); without them it's the usual grey.
+	// "coverage" (0-100, default 100) is how much of the cell the material fills, e.g. bars
+	// or a net: its opacity is its material's times its coverage. A solid that can be seen
+	// through is drawn see-through too.
 	// Settings (and so levels) choose which kinds walls and clumps are made of.
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
@@ -53,7 +67,13 @@
 		"wall_of_iron":    {"name":"Wall of iron",     "composition":"iron",      "hp":15, "fillColor":"#5c6168", "borderColor":"#7c838c"},
 		"wall_of fungus":  {"name":"Wall of fungus",   "composition":"fungus",    "hp":3,  "fillColor":"#6e5c7e", "borderColor":"#8a76a0"},
 		"wall_of_flesh":   {"name":"Wall of flesh",    "composition":"flesh",     "hp":6,  "fillColor":"#9c5058", "borderColor":"#b6666f"},
-		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447"}
+		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447"},
+		"glass_wall":      {"name":"Glass wall",       "composition":"glass",     "hp":4,  "fillColor":"#9cc8d8", "borderColor":"#c4e4ee"},
+		"ice_wall":        {"name":"Ice wall",         "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"},
+		"crystal_wall":    {"name":"Crystal wall",     "composition":"crystal",   "hp":20, "fillColor":"#c8b8e8", "borderColor":"#e0d4f6"},
+		"plastic_wall":    {"name":"Plastic wall",     "composition":"plastic",   "hp":6,  "fillColor":"#d8d0b0", "borderColor":"#ece6cc"},
+		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
+		"net":             {"name":"Net",              "composition":"rope",      "hp":3,  "coverage":30, "fillColor":"#8a7a5a", "borderColor":"#a8966e"}
 	},
 	
 	// Kinds of hole tile: a name, a description and optionally the colour it's filled with

@@ -86,6 +86,7 @@ myt.I18N.setDictionary({
 "status-jump":"Jump: click a highlighted cell to jump the selected piece to. Esc cancels.",
 "status-attach":"Attach: click a ringed piece to link the selected piece to. Esc cancels.",
 "status-solid":"$0 ($1) · HP $2/$3 · DR $4",
+"status-opacity":" · $0% opaque",
 "status-hole":"$0 · $1",
 
 // Dialogs

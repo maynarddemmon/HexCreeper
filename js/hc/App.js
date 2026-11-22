@@ -327,6 +327,7 @@
                         if (known) {
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
+                                if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));
                             } else if (hole) {
                                 status = hole.description ? i18n('status-hole', hole.name, hole.description) : hole.name;
                             }

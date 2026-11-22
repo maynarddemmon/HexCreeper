@@ -201,3 +201,92 @@ test('a solid subtype with colours is drawn in them; one without, in the usual s
     expect(g).toBeGreaterThan(r);
     expect(Math.abs(plain[1] - plain[0])).toBeLessThan(8);
 });
+
+/*  See-through materials and solids of the tests' own: glass (10% opaque), ice (50%), and
+    iron (opaque) as a wall and as bars (20% coverage). */
+const useSeeThroughSolids = page => page.evaluate(() => {
+    hc.solids.define({
+        granite:{name:'granite', hardness:13},
+        glass:{name:'glass', hardness:3, opacity:10},
+        ice:{name:'ice', hardness:2, opacity:50},
+        iron:{name:'iron', hardness:17}
+    }, {
+        stone_wall:{name:'Stone wall', composition:'granite', hp:30},
+        glass_wall:{name:'Glass wall', composition:'glass', hp:4},
+        ice_wall:{name:'Ice wall', composition:'ice', hp:6},
+        iron_bars:{name:'Iron bars', composition:'iron', hp:10, coverage:20}
+    });
+});
+
+test('a material has an opacity (default 100) and a solid a coverage (default 100); the solid\'s opacity is the two multiplied', async ({page}) => {
+    const problems = await startGame(page);
+    // The game's own see-through solids load.
+    expect(await page.evaluate(() => ['glass_wall', 'ice_wall', 'iron_bars', 'net'].map(id => hc.solids.get(id)?.opacity))).toEqual([10, 50, 20, 30]);
+    await useSeeThroughSolids(page);
+    const r = await page.evaluate(() => {
+        const out = ['stone_wall', 'glass_wall', 'ice_wall', 'iron_bars'].map(id => [hc.solids.get(id).coverage, hc.solids.get(id).opacity]);
+        hc.solids.define({a:{name:'a', hardness:1, opacity:150}, b:{name:'b', hardness:1}}, {c:{name:'c', composition:'b', hp:1, coverage:-5}});
+        out.push([hc.solids.getMaterial('a') ?? null, hc.solids.get('c') ?? null]);
+        return out;
+    });
+    expect(r).toEqual([[100, 100], [100, 10], [100, 50], [20, 20], [null, null]]);
+    expect(problems.errors.filter(e => /^Bad (material|solid)/.test(e))).toEqual(['Bad material a', 'Bad solid c']);
+});
+
+test('sight past a see-through solid is what\'s left of it, cut to the share the solid lets through', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await useSeeThroughSolids(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = {x:0, y:0},
+            put = (x, y, s) => g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', s)),
+            // How far straight up the core sees.
+            reach = () => {
+                let d = 0;
+                while (d < 12 && g.canSee(core, {x:0, y:-(d + 1)})) d++;
+                return d;
+            },
+            out = {};
+        hc.cfg.VISION.radius = 12;
+        out.clear = reach();
+        put(0, -2, 'stone_wall');
+        out.opaque = reach();          // the wall itself, no further
+        put(0, -2, 'iron_bars');
+        out.bars = reach();            // 2 + 10 x 0.8 = 10
+        put(0, -2, 'ice_wall');
+        out.ice = reach();             // 2 + 10 x 0.5 = 7
+        put(0, -4, 'ice_wall');
+        out.twoIce = reach();          // 4 + (7 - 4) x 0.5 = 5.5
+        g.tiles.clear();
+        put(0, -6, 'glass_wall');
+        out.glass = reach();           // 6 + 6 x 0.9 = 11.4
+        return out;
+    });
+    expect(r).toEqual({clear:12, opaque:2, bars:10, ice:7, twoIce:5, glass:11});
+});
+
+test('along an edge, the clearer of the two solids beside the line counts', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await useSeeThroughSolids(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = {x:0, y:0},
+            put = (x, y, s) => g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', s)),
+            // The line from the core to (k, -2k) runs along the edge between (0, -1) and (1, -1) first.
+            reach = () => {
+                let k = 0;
+                while (k < 6 && g.canSee(core, {x:k + 1, y:-2 * (k + 1)})) k++;
+                return k;
+            },
+            out = {};
+        hc.cfg.VISION.radius = 12;
+        put(0, -1, 'stone_wall');
+        out.oneSide = reach();         // the other side is clear
+        put(1, -1, 'stone_wall');
+        out.bothSides = reach();
+        put(1, -1, 'ice_wall');
+        out.iceBeside = reach();       // 1 + 11 x 0.5 = 6.5: (3, -6) is 6 away
+        return out;
+    });
+    expect(r).toEqual({oneSide:6, bothSides:0, iceBeside:3});
+});
