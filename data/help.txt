@@ -24,9 +24,8 @@ Moving onto an enemy attacks it. When a group moves, every piece in it that woul
 Enemies arrive in waves of linked squads, and waves grow with your rank. A squad acts as often as its rank and plans its turn: it will carry a piece into reach, strike, and pull back out of reach. Kill a squad's leader to destroy the whole squad.
 
 <span style="font-size:16px;">TILES</span>
-- A green heart heals the piece that steps on it; spare healing flows along links (up first, then down), and any left over becomes score. Its value, shown on the tile, is higher near unexplored quadrants.
-- Gold coins are loot: step on one (or place a piece on it) to take its score, shown on the tile.
-- A red blood drop deals damage to the first piece that moves onto it, then it's gone. Enemies walk around them.
+- A green heart heals, a red blood drop does damage, and a gold coin is loot: score. They act when one of your pieces moves onto them (or is placed on one), and the number in the corner, if it shows, is what each gives. Spare healing flows along links (up first, then down), and any left over becomes score. Enemies walk around harm.
+- There are kinds of each: point at one to see what it is. Some only show when you're close, or when you step on them; some affect every piece around them (pointing at one outlines where); some last only a few turns once found (the turns left show top right), and some hold more than one go (what's left shows bottom left).
 - The trail of gold dots is the path your core has taken; it's darker where you've gone that way more than once.
 - Grey hexes are solid: nothing can move onto them or see past them. Point at one to see what it's made of. A piece whose rank is more than a solid's DR can attack it, doing its rank less the DR in damage, and break through.
 - Black hexes are holes: nothing can move onto them, but you can see across them.

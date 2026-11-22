@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard} from './helpers.mjs';
+import {startGame, clearBoard, putTile} from './helpers.mjs';
 
 // The tiles made when the game is restarted with these settings (and a fixed seed).
 const tilesWith = (page, settings) => page.evaluate(settings => {
@@ -10,28 +10,29 @@ const tilesWith = (page, settings) => page.evaluate(settings => {
     return [...g.tiles.values()].filter(t => ['heal', 'harm', 'loot'].includes(t.kind)).map(t => ({...t}));
 }, settings);
 
-// Puts an active loot tile worth value at (x, y).
-const putLoot = (page, x, y, value) => page.evaluate(([x, y, value]) => {
-    const g = hc.app.game;
-    g.tiles.set(g.key(x, y), {x, y, kind:'loot', timer:0, value});
-}, [x, y, value]);
+// Puts a loot tile you know of, holding value, at (x, y).
+const putLoot = (page, x, y, value) => putTile(page, x, y, 'loot', 'loot', {pool:value});
 
-test('lootChance turns heal tiles into loot tiles, active at once, worth lootMin to lootMax', async ({page}) => {
+test('lootChance turns heal tiles into loot tiles of the lootType subtype, their pools rolled from the seed', async ({page}) => {
     await startGame(page);
+    await page.evaluate(() => {
+        hc.loots.define({test:{name:'Test loot', pool:{min:7, max:9}}});
+        hc.cfg.TILES.lootType = 'test';
+    });
     const none = await tilesWith(page, {lootChance:0}),
-        all = await tilesWith(page, {lootChance:100, lootMin:7, lootMax:9});
+        all = await tilesWith(page, {lootChance:100});
     expect(none.some(t => t.kind === 'loot')).toBe(false);
     expect(all.some(t => t.kind === 'heal')).toBe(false);
     const loot = all.filter(t => t.kind === 'loot');
     expect(loot.length).toBe(none.filter(t => t.kind === 'heal').length);
-    expect(loot.every(t => t.timer === 0 && t.value >= 7 && t.value <= 9)).toBe(true);
-    expect(new Set(loot.map(t => t.value)).size).toBeGreaterThan(1);
+    expect(loot.every(t => t.subtype === 'test' && t.pool >= 7 && t.pool <= 9)).toBe(true);
+    expect(new Set(loot.map(t => t.pool)).size).toBeGreaterThan(1);
     // Loot doesn't move the other tiles: the same cells, heal or loot, and the same harm tiles.
     const cells = list => list.map(t => t.x + ',' + t.y + (t.kind === 'harm' ? 'h' : '')).sort();
     expect(cells(all)).toEqual(cells(none));
     
-    const some = await tilesWith(page, {lootChance:50, lootMin:7, lootMax:9}),
-        again = await tilesWith(page, {lootChance:50, lootMin:7, lootMax:9});
+    const some = await tilesWith(page, {lootChance:50}),
+        again = await tilesWith(page, {lootChance:50});
     expect(again).toEqual(some); // from the seed
 });
 
@@ -74,16 +75,17 @@ test('enemies leave loot where it is', async ({page}) => {
     expect(r).toEqual([6, 'loot', true]);
 });
 
-test('loot tiles are saved with their value', async ({page}) => {
+test('loot tiles are saved as they are', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await putLoot(page, 2, 0, 17);
+    const tile = await putLoot(page, 2, 0, 17);
     const kept = await page.evaluate(() => {
         const copy = new hc.Game();
         copy.importFromObj(JSON.parse(JSON.stringify(hc.app.game.exportToObj())));
         return copy.tiles.get('2,0');
     });
-    expect(kept).toEqual({x:2, y:0, kind:'loot', timer:0, value:17});
+    expect(kept).toEqual(tile);
+    expect(kept.pool).toBe(17);
 });
 
 test('opening loot tiles counts toward goals, and the count is saved', async ({page}) => {
@@ -101,7 +103,7 @@ test('opening loot tiles counts toward goals, and the count is saved', async ({p
         g.playerAct(core, 2, 0);
         const copy = new hc.Game();
         copy.importFromObj(JSON.parse(JSON.stringify(g.exportToObj())));
-        return [after1, [g.lootOpened, g.objectives[0].progress, g.outcome], copy.lootOpened];
+        return [after1, [g.lootOpened, g.objectives[0].progress, g.outcome], copy.lootOpened, [g.lootTaken, copy.lootTaken]];
     });
-    expect(r).toEqual([[1, '1/2', null], [2, '2/2', 'won'], 2]);
+    expect(r).toEqual([[1, '1/2', null], [2, '2/2', 'won'], 2, [10, 10]]);
 });

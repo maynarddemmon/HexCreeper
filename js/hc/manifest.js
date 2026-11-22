@@ -24,12 +24,14 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.makeGrid','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'Expr.js').provides('hc.expr').requires('hc');
     file(MODEL_ROOT + 'Goals.js').provides('hc.goals','hc.Goals').requires('hc.makeGrid','hc.expr');
-    file(MODEL_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc');
-    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids');
-    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.MOVE_MODES');
+    file(MODEL_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
+    file(MODEL_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc.Subtypes');
+    file(MODEL_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
+    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids','hc.EffectTiles');
+    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.EffectTiles','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
-    file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5','hc.goals','hc.solids');
+    file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles');
     
     // View //
     file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.settings');

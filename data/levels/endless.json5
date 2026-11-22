@@ -33,8 +33,9 @@
 		"healPerQuad":   {"pref":true},
 		"harmPerQuad":   {"pref":true},
 		"lootChance":    {"pref":true},
-		"lootMin":       {"pref":true},
-		"lootMax":       {"pref":true},
+		"healType":      {"pref":true},
+		"harmType":      {"pref":true},
+		"lootType":      {"pref":true},
 		"wallChance":    {"pref":true},
 		"wallHoleChance":{"pref":true},
 		"doorMin":       {"pref":true},
@@ -47,14 +48,9 @@
 		"clumpSolid":    {"pref":true},
 		"wallHole":      {"pref":true},
 		"clumpHole":     {"pref":true},
-		"timerMin":      {"pref":true},
-		"timerMax":      {"pref":true},
-		"harmDamage":    {"pref":true},
 		
 		"healCostPer":   {"pref":true},
 		"healActPer":    {"pref":true},
-		"healAmount":    {"pref":true},
-		"healPer":       {"pref":true},
 		"healScore":     {"pref":true}
 	}
 }

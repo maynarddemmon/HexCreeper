@@ -34,8 +34,9 @@
         where objectives are its goals and penalties (see goals.fromLevel). */
     pkg.levels = {
         /*  Calls back with init.json5's contents, {defaultLevel, levels:[...], materials,
-            solids, holes}, or null if it couldn't be loaded. It's loaded once, and its
-            materials and solid subtypes go to pkg.solids, and its hole subtypes to pkg.holes. */
+            solids, holes, heals, harms, loots}, or null if it couldn't be loaded. It's loaded
+            once, and its materials and solid subtypes go to pkg.solids, and its hole, heal,
+            harm and loot subtypes to pkg.holes, pkg.heals, pkg.harms and pkg.loots. */
         loadIndex: callback => {
             if (index) {
                 callback(index);
@@ -45,6 +46,9 @@
                         index = data;
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
+                        pkg.heals.define(data.heals);
+                        pkg.harms.define(data.harms);
+                        pkg.loots.define(data.loots);
                     }
                     callback(index);
                 });

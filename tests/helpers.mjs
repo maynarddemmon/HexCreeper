@@ -49,6 +49,17 @@ export const clearBoard = page => page.evaluate(() => {
     g.spawnWave = () => {};
 });
 
+/*  Puts a tile at (x, y), made as the game makes them (Game.makeTile), with props on top.
+    A heal, harm or loot tile is already revealed, with its magnitude shown. Returns it. */
+export const putTile = (page, x, y, kind, subtype, props = {}) => page.evaluate(([x, y, kind, subtype, props]) => {
+    const g = hc.app.game,
+        t = g.makeTile(x, y, kind, subtype);
+    if (g.isEffectTile(t)) Object.assign(t, {revealedAt:g.turn, shown:true});
+    Object.assign(t, props);
+    g.tiles.set(g.key(x, y), t);
+    return t;
+}, [x, y, kind, subtype, props]);
+
 /*  Where a cell's centre is on the page, for clicking it. */
 export const cellOnPage = (page, x, y) => page.evaluate(([x, y]) => {
     const r = hc.view.canvas.getBoundingClientRect(),

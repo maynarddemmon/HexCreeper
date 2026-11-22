@@ -37,7 +37,7 @@ for (const kind of ['harm', 'solid', 'hole']) {
     test(`enemies path around a wall of ${kind} tiles`, async ({page}) => {
         const r = await page.evaluate(kind => {
             const g = hc.app.game;
-            for (let x = -4; x <= 4; x++) g.tiles.set(g.key(x, -2), {x, y:-2, kind, timer:0});
+            for (let x = -4; x <= 4; x++) g.tiles.set(g.key(x, -2), {...g.makeTile(x, -2, kind), revealedAt:g.turn});
             const e = g.addPiece('core', 'enemy', 1, -6);
             let stepped = false, hit = false;
             for (let i = 0; i < 20 && !hit; i++) {

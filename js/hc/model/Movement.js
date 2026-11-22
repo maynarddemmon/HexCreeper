@@ -9,7 +9,7 @@
       relative to the piece it's linked to on the way back to the lead; a piece that
       can't get there takes the free cell (within a step of where it is, or where it is)
       nearest that place, keeping its link close to its old length. Followers keep off
-      harm tiles, armed or not, as if they were walls (the lead may step on one). So a
+      harm tiles you know of as if they were walls (the lead may step on one). So a
       swarm flows after its leader around obstacles, its links stretching and shrinking.
     
     In every mode a link may not end out of range unless it got shorter. Attacks: in fixed,
@@ -41,7 +41,7 @@
                 open(x, y) -> whether a piece could stand there (terrain only)
                 passable(x, y) -> optional: whether the piece itself may try to go there
                     (it may still be blocked); open, if not given
-                harm(x, y) -> optional: whether there's a harm tile there (armed or not),
+                harm(x, y) -> optional: whether there's a harm tile there you know of,
                     which followers treat as a wall
                 target(id, x, y) -> what the piece would hit by moving there, or null
             Returns null if it can't be done, {attack:true, hits} for an attack, or
@@ -336,7 +336,7 @@
             return done;
         },
         
-        /*  A view of the board as it is, for resolveStep. With avoidHarm, active harm
+        /*  A view of the board as it is, for resolveStep. With avoidHarm, harm
             tiles count as closed. */
         boardView: function(avoidHarm = false) {
             const kids = new Map();
@@ -355,7 +355,7 @@
                 parentOf: id => this.parent(this.pieces.get(id))?.id ?? null,
                 occupant: (x, y) => this.board.get(this.key(x, y)),
                 open: (x, y) => this.isOpen(x, y) && !(avoidHarm && this.isHarm(x, y)),
-                harm: (x, y) => this.tiles.get(this.key(x, y))?.kind === pkg.TILE_TYPE_HARM,
+                harm: (x, y) => this.isHarm(x, y),
                 target: (id, x, y) => {
                     const g = this.pieces.get(id),
                         t = this.pieceAt(x, y),

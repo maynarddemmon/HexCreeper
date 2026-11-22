@@ -6,7 +6,7 @@
     const V = pkg.view,
         {
             ctx, game, cam, css, worldToScreen, screenToWorld, cellCenter, 
-            inView, addCellPath, strokeCell, strokeRegion, sameCell, draw, fillCell
+            inView, addCellPath, strokeRegion, sameCell, draw, fillCell
         } = V,
         
         {
@@ -17,8 +17,9 @@
         
         FX_MS = 650,
         
-        // Where a heal tile's value goes, from its centre, in cells.
-        HEAL_LABEL_OFFSET = [0.3, 0.32],
+        // Where a heal, harm or loot tile's magnitude goes, from its centre, in cells (and
+        // its other numbers, mirrored; see drawTileLabels).
+        TILE_LABEL_OFFSET = [0.3, 0.32],
         
         // A see-through solid's fill is drawn as see-through as it is, but at least this
         // strong, so it still shows (its edges are drawn in full).
@@ -59,7 +60,7 @@
             return !!n && n.kind === t.kind && n.subtype === t.subtype;
         },
         
-        drawTile = (t, now) => {
+        drawTile = t => {
             if (t.kind === TILE_TYPE_SOLID) {
                 // In its subtype's colours, if it has them, filling the whole hex so solids of
                 // a kind run together: the outline is only on edges that don't meet a solid of
@@ -166,83 +167,74 @@
                 return;
             }
             
-            if (t.kind === TILE_TYPE_LOOT) {
-                // Gold, with a coin, and its score in the corner.
+            // Heal, harm and loot tiles show once revealed (EffectTiles.js).
+            if (game.isRevealed(t)) {
                 const s = cam.size,
                     [cx, cy] = cellCenter(t.x, t.y),
-                    r = s * 0.17;
-                ctx.beginPath(); addCellPath(t.x, t.y, 1);
-                ctx.fillStyle = css('--loot-bg'); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.fillStyle = css('--loot'); ctx.fill();
-                ctx.lineWidth = Math.max(1, s * 0.035);
-                ctx.strokeStyle = css('--loot-ink');
-                ctx.beginPath(); ctx.arc(cx, cy, r * 0.68, 0, Math.PI * 2); ctx.stroke();
-                if (s >= 22) {
-                    const [lx, ly] = HEAL_LABEL_OFFSET;
-                    ctx.fillStyle = css('--loot');
-                    ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
-                    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-                    ctx.fillText(String(t.value), cx + s * lx, cy + s * ly);
+                    loot = t.kind === TILE_TYPE_LOOT,
+                    heal = t.kind === TILE_TYPE_HEAL,
+                    ink = css(loot ? '--loot' : heal ? '--heal' : '--harm');
+                ctx.beginPath();
+                addCellPath(t.x, t.y, 1);
+                ctx.fillStyle = css(loot ? '--loot-bg' : heal ? '--heal-bg' : '--harm-bg');
+                ctx.fill();
+                ctx.fillStyle = ink;
+                if (loot) {
+                    // A gold coin.
+                    const r = s * 0.17;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.lineWidth = Math.max(1, s * 0.035);
+                    ctx.strokeStyle = css('--loot-ink');
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r * 0.68, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (heal) {
+                    // A heart: two lobes meeting at a point below.
+                    const w = s * 0.22 * 1.05;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy + w * 0.95);
+                    ctx.bezierCurveTo(cx - w * 1.45, cy + w * 0.1, cx - w * 0.95, cy - w * 1.1, cx, cy - w * 0.35);
+                    ctx.bezierCurveTo(cx + w * 0.95, cy - w * 1.1, cx + w * 1.45, cy + w * 0.1, cx, cy + w * 0.95);
+                    ctx.fill();
+                } else {
+                    // Harm: a drop of blood, pointed at the top and round below.
+                    const arm = s * 0.22,
+                        r = arm * 0.68,
+                        by = cy + arm * 0.3,
+                        tip = cy - arm * 1.1;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, tip);
+                    ctx.bezierCurveTo(cx + r * 0.3, by - r * 1.5, cx + r, by - r * 0.85, cx + r, by);
+                    ctx.arc(cx, by, r, 0, Math.PI);
+                    ctx.bezierCurveTo(cx - r, by - r * 0.85, cx - r * 0.3, by - r * 1.5, cx, tip);
+                    ctx.fill();
                 }
-                return;
+                if (s >= 22) drawTileLabels(t, cx, cy, s, ink);
             }
-            
-            const s = cam.size,
-                [cx, cy] = cellCenter(t.x, t.y),
-                heal = t.kind === TILE_TYPE_HEAL,
-                ink = css(heal ? '--heal' : '--harm'), bg = css(heal ? '--heal-bg' : '--harm-bg');
-            if (t.timer > 0) {
-                // Pending: faint dashed outline and the countdown
-                ctx.globalAlpha = 0.55;
-                strokeCell(t.x, t.y, ink, 1.2, 3.5, [3, 3]);
-                if (s >= 16) {
-                    ctx.fillStyle = ink;
-                    ctx.font = `600 ${Math.round(s * 0.3)}px ui-sans-serif, system-ui, sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(String(t.timer), cx, cy + 1);
-                }
-                ctx.globalAlpha = 1;
-                return;
-            }
-            
-            // Active: pop briefly when it arms
-            const armFx = game.effects.find(f => f.arm && f.x === t.x && f.y === t.y);
-            let k = 1;
-            if (armFx) {
-                const a = Math.min(1, Math.max(0, (now - armFx.t0) / 300));
-                k = 0.4 + 0.6 * a;
-            }
-            ctx.beginPath(); addCellPath(t.x, t.y, 1);
-            ctx.fillStyle = bg; ctx.fill();
+        },
+        
+        /*  A heal, harm or loot tile's numbers, in its corners: its magnitude bottom right
+            (once shown; all that's left, for a magnitude of the whole pool), what's left in
+            it bottom left (with showPool; ∞ for an infinite pool) and, for a countdown, the
+            turns left top right. */
+        drawTileLabels = (t, cx, cy, s, ink) => {
+            const [lx, ly] = TILE_LABEL_OFFSET,
+                type = game.tileType(t),
+                turnsLeft = game.turnsLeft(t),
+                label = (text, x, y, align, baseline, size) => {
+                    ctx.font = `700 ${Math.round(s * size)}px ui-sans-serif, system-ui, sans-serif`;
+                    ctx.textAlign = align;
+                    ctx.textBaseline = baseline;
+                    ctx.fillText(text, x, y);
+                };
             ctx.fillStyle = ink;
-            const arm = s * 0.22 * k;
-            if (heal) {
-                // A heart: two lobes meeting at a point below.
-                const w = arm * 1.05;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy + w * 0.95);
-                ctx.bezierCurveTo(cx - w * 1.45, cy + w * 0.1, cx - w * 0.95, cy - w * 1.1, cx, cy - w * 0.35);
-                ctx.bezierCurveTo(cx + w * 0.95, cy - w * 1.1, cx + w * 1.45, cy + w * 0.1, cx, cy + w * 0.95);
-                ctx.fill();
-                if (s >= 22) { // current value in the corner
-                    const [lx, ly] = HEAL_LABEL_OFFSET;
-                    ctx.font = `700 ${Math.round(s * 0.22)}px ui-sans-serif, system-ui, sans-serif`;
-                    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-                    ctx.fillText(String(game.healValue(t.x, t.y)), cx + s * lx, cy + s * ly);
-                }
-            } else {
-                // Harm: a drop of blood, pointed at the top and round below.
-                const r = arm * 0.68,
-                    by = cy + arm * 0.3,
-                    tip = cy - arm * 1.1;
-                ctx.beginPath();
-                ctx.moveTo(cx, tip);
-                ctx.bezierCurveTo(cx + r * 0.3, by - r * 1.5, cx + r, by - r * 0.85, cx + r, by);
-                ctx.arc(cx, by, r, 0, Math.PI);
-                ctx.bezierCurveTo(cx - r, by - r * 0.85, cx - r * 0.3, by - r * 1.5, cx, tip);
-                ctx.fill();
-            }
+            if (t.shown) label(String(t.magnitude ?? t.pool), cx + s * lx, cy + s * ly, 'right', 'bottom', 0.22);
+            ctx.globalAlpha = 0.75;
+            if (type.showPool) label(t.pool == null ? '∞' : String(t.pool), cx - s * lx, cy + s * ly, 'left', 'bottom', 0.18);
+            if (turnsLeft != null) label(String(turnsLeft), cx + s * lx, cy - s * ly, 'right', 'top', 0.18);
+            ctx.globalAlpha = 1;
         },
         
         // Half the width of a link at the end where `chain` pieces hang below it: wider the
@@ -409,7 +401,13 @@
         // Heal, harm, solid and hole tiles
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
         fillSeeThroughSolids(tilesShown);
-        for (const t of tilesShown) drawTile(t, now);
+        for (const t of tilesShown) drawTile(t);
+        
+        // The area of the heal, harm or loot tile under the pointer, if it reaches past it.
+        const hoverTile = V.hover && game.tileAt(V.hover.x, V.hover.y);
+        if (hoverTile && game.isEffectTile(hoverTile) && game.tileType(hoverTile).area.radius > 0) {
+            strokeRegion(hoverTile, game.tileType(hoverTile).area.radius, '--' + hoverTile.kind);
+        }
         
         // Tint occupied cells
         for (const p of game.pieces.values()) {

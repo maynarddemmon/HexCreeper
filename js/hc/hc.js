@@ -161,15 +161,16 @@
                 every:3,     // spawn a wave every N turns
             },
             
-            // Heal and harm tiles appear with a countdown (turns) and become active when it
-            // reaches 0. Solid and hole tiles are there from the start and can never be
-            // entered; solid tiles block sight, holes don't.
+            // Heal, harm and loot tiles per quadrant, of the subtypes (data/init.json5) chosen
+            // here; see EffectTiles.js. Solid and hole tiles are there from the start and
+            // can never be entered; solid tiles block sight, holes don't.
             TILES:{
                 healPerQuad:1,
                 harmPerQuad:1,
                 lootChance:10, // % chance a heal tile is a loot tile instead
-                lootMin:10, // score for taking a loot tile, rolled when it's made
-                lootMax:30,
+                healType:'heal',
+                harmType:'harm',
+                lootType:'loot',
                 wallChance:50, // % chance a border between quadrants is a wall
                 wallHoleChance:25, // % of walls made of holes rather than solid tiles
                 doorMin:1, // cells left open in the middle of a wall
@@ -181,17 +182,7 @@
                 wallSolid:'stone_wall', // the solid subtypes (data/init.json5) walls and clumps are made of
                 clumpSolid:'boulder',
                 wallHole:'chasm', // the hole subtypes (data/init.json5) walls and clumps are made of
-                clumpHole:'pit',
-                timerMin:2,
-                timerMax:8,
-                harmDamage:1, // damage to any piece that moves onto an active harm tile
-            },
-            
-            // Heal tile value = floor(unvisited neighbouring quadrants / per) + base,
-            // i.e. 8 -> 5, 6-7 -> 4, 4-5 -> 3, 2-3 -> 2, 0-1 -> 1 with the defaults.
-            HEAL:{
-                amount:1, // amount: base value;
-                per:2     // per: unvisited quadrants per +1
+                clumpHole:'pit'
             },
             
             // Fog of war: you see enemies only on cells in sight of one of your pieces: within

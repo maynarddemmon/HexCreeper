@@ -5,7 +5,7 @@
         
         {
             isObj,
-            cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK, ANIM}
+            cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, RANK, ANIM}
         } = pkg,
         
         STORAGE_KEY = 'hc.settings',
@@ -43,11 +43,11 @@
         // and Reset to Defaults leaves it alone.
         pref = def => ({...def, app:true}),
         
-        // The solid subtypes, as choices. They're known once init.json5 has loaded.
-        solidOptions = () => pkg.solids.list().map(s => ({value:s.id, label:s.name})),
-        
-        // The hole subtypes, as choices, likewise.
-        holeOptions = () => pkg.holes.list().map(h => ({value:h.id, label:h.name})),
+        // A set of subtypes (solids, holes, heals...), as choices. They're known once
+        // init.json5 has loaded.
+        optionsOf = subtypes => () => subtypes.list().map(s => ({value:s.id, label:s.name})),
+        solidOptions = optionsOf(pkg.solids),
+        holeOptions = optionsOf(pkg.holes),
         
         /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
             setting here is enough to make it appear there (in a level that shows it). */
@@ -85,8 +85,9 @@
         num('healPerQuad', GROUP_TILES, TILES,    'healPerQuad', 0, 20),
         num('harmPerQuad', GROUP_TILES, TILES,    'harmPerQuad', 0, 40),
         num('lootChance',  GROUP_TILES, TILES,    'lootChance', 0, 100),
-        num('lootMin',     GROUP_TILES, TILES,    'lootMin', 0, 1000),
-        num('lootMax',     GROUP_TILES, TILES,    'lootMax', 0, 1000),
+        choice('healType', GROUP_TILES, TILES,    'healType', optionsOf(pkg.heals)),
+        choice('harmType', GROUP_TILES, TILES,    'harmType', optionsOf(pkg.harms)),
+        choice('lootType', GROUP_TILES, TILES,    'lootType', optionsOf(pkg.loots)),
         num('wallChance',  GROUP_TILES, TILES,    'wallChance', 0, 100),
         num('wallHoleChance', GROUP_TILES, TILES, 'wallHoleChance', 0, 100),
         num('doorMin',     GROUP_TILES, TILES,    'doorMin', 0, 10),
@@ -99,14 +100,9 @@
         choice('clumpSolid', GROUP_TILES, TILES,  'clumpSolid', solidOptions),
         choice('wallHole', GROUP_TILES, TILES,    'wallHole', holeOptions),
         choice('clumpHole', GROUP_TILES, TILES,   'clumpHole', holeOptions),
-        num('timerMin',    GROUP_TILES, TILES,    'timerMin', 0, 50),
-        num('timerMax',    GROUP_TILES, TILES,    'timerMax', 0, 50),
-        num('harmDamage',  GROUP_TILES, TILES,    'harmDamage', 0, 10),
         
         num('healCostPer', GROUP_HEALS, RANK,     'healCostPer', 0, 100),
         num('healActPer',  GROUP_HEALS, RANK,     'healPer', 1, 20),
-        num('healAmount',  GROUP_HEALS, HEAL,     'amount', 0, 20),
-        num('healPer',     GROUP_HEALS, HEAL,     'per', 1, 8),
         num('healScore',   GROUP_HEALS, RANK,     'healScorePer', 0, 20)],
         
         GROUPS = [GROUP_DISPLAY, GROUP_VISION, GROUP_WAVES, GROUP_ENEMIES, GROUP_SWARM, GROUP_TILES, GROUP_HEALS].map(id => ({
@@ -133,7 +129,6 @@
             def.obj[def.prop] = value;
             // Keep the ranges the right way round.
             if (SPAWN.maxDist < SPAWN.minDist) SPAWN.maxDist = SPAWN.minDist;
-            if (TILES.timerMax < TILES.timerMin) TILES.timerMax = TILES.timerMin;
             if (TILES.solidMax < TILES.solidMin) TILES.solidMax = TILES.solidMin;
             if (TILES.holeMax < TILES.holeMin) TILES.holeMax = TILES.holeMin;
             if (TILES.doorMax < TILES.doorMin) TILES.doorMax = TILES.doorMin;

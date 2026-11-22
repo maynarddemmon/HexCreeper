@@ -239,7 +239,7 @@
                             },
                             open: (x, y) => this.isOpen(x, y) && !this.isHarm(x, y),
                             passable: (x, y) => this.isOpen(x, y),
-                            harm: (x, y) => this.tiles.get(this.key(x, y))?.kind === pkg.TILE_TYPE_HARM,
+                            harm: (x, y) => this.isHarm(x, y),
                             target: (id, x, y) => livePlayerAt(st, x, y)
                         };
                     for (const id of ids) {

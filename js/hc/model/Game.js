@@ -6,7 +6,7 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK, ANIM
+            WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, RANK, ANIM
         },
         TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
         hexDist, PIECE_TYPES
@@ -16,7 +16,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.EnemyAI, pkg.Goals],
+        include:[pkg.Movement, pkg.EnemyAI, pkg.Goals, pkg.EffectTiles],
         
         initialize: function() {
             this.level = null; // {id, name, attrs}: the level being played, set by the App
@@ -38,13 +38,14 @@
             this.kills = 0;                  // enemy pieces destroyed
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
-            this.lootOpened = 0;             // loot tiles taken
+            this.lootOpened = 0;             // loot tiles emptied
+            this.lootTaken = 0;              // score taken from loot tiles
             this.objectives = this.getLevelObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the level's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
-            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", timer}
+            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
             this.terrainQuads = new Set();   // quadrants whose solid and hole tiles have been placed
             this.borders = new Map();        // border key (see borderKey) -> its wall {door, hole, start}, or null: no wall
             this.tiledQuads = new Set();     // quadrants whose heal and harm tiles have been placed
@@ -93,6 +94,7 @@
                 piecesLost:this.piecesLost,
                 piecesPlaced:this.piecesPlaced,
                 lootOpened:this.lootOpened,
+                lootTaken:this.lootTaken,
                 objectives:this.objectives.map(s => ({...s})),
                 quadRadius:this.grid.chunkRadius,
                 pieces:[...this.pieces.values()].map(p => ({...p})),
@@ -123,7 +125,7 @@
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.quadRadius) ||
                 ![o.pieces, o.tiles, o.terrainQuads, o.borders ?? [], o.tiledQuads, o.visitedQuads, o.seenCells, o.acted, o.fresh, o.corePath ?? []].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
-                !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && isNum(t.timer) && typeof t.kind === 'string')
+                !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
             const objectives = o.level?.objectives ?? [];
             try {
@@ -149,6 +151,7 @@
             this.piecesLost = isNum(o.piecesLost) ? o.piecesLost : 0;
             this.piecesPlaced = isNum(o.piecesPlaced) ? o.piecesPlaced : 0;
             this.lootOpened = isNum(o.lootOpened) ? o.lootOpened : 0;
+            this.lootTaken = isNum(o.lootTaken) ? o.lootTaken : 0;
             this.objectives = objectives.map((obj, i) => {
                 const s = o.objectives?.[i];
                 return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
@@ -163,7 +166,9 @@
                 this.pieces.set(p.id, {...p});
                 this.board.set(this.key(p.x, p.y), p.id);
             }
-            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
+            // Heal, harm and loot tiles from saves made before they had subtypes are of
+            // the subtypes in the settings.
+            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), this.isEffectTile(t) && t.subtype === undefined ? this.upgradeEffectTile(t) : {...t}]));
             this.terrainQuads = new Set(o.terrainQuads);
             this.borders = new Map(o.borders ?? []);
             this.tiledQuads = new Set(o.tiledQuads);
@@ -400,33 +405,6 @@
             return !!r && !r.attack;
         },
         
-        // Apply tiles under pieces that just moved. Harm first, then heals. Eating n
-        // heal tiles in one move makes each worth n x HEAL.amount (n^2 in total).
-        landOnTiles: function(pieces) {
-            for (const g of pieces) {
-                if (this.pieces.has(g.id) && this.isHarm(g.x, g.y)) this.springHarm(g);
-            }
-            const eaters = pieces.filter(g => this.pieces.has(g.id) && this.tileAt(g.x, g.y, TILE_TYPE_HEAL)),
-                n = eaters.length;
-            for (const g of eaters) this.consumeHeal(g, g.x, g.y, n);
-            if (n > 1) this.fx(eaters[0].x, eaters[0].y, `${n}× heal combo!`, '--heal', {delay:260});
-            for (const g of pieces) {
-                if (this.pieces.has(g.id)) this.takeLoot(g);
-            }
-        },
-        
-        // A player piece on a loot tile takes it: its score is earned and it's gone.
-        // Enemies leave loot where it is.
-        takeLoot: function(piece) {
-            const t = piece.owner === 'player' ? this.tileAt(piece.x, piece.y, TILE_TYPE_LOOT) : null;
-            if (t) {
-                this.tiles.delete(this.key(t.x, t.y));
-                this.lootOpened++;
-                this.earn(t.value);
-                this.fx(t.x, t.y, `+${t.value}`, '--loot', {});
-            }
-        },
-        
         // Damage a piece; returns the list of pieces destroyed (empty if it survived).
         // Destroying a piece also destroys everything linked below it.
         damage: function(target, dmg, attacker) {
@@ -503,31 +481,30 @@
                 for (const q of pkg.GRID.disk(qx, qy, reach)) this.generateTerrain(q.x, q.y);
                 for (const q of pkg.GRID.disk(qx, qy, 1)) this.generateTiles(q.x, q.y);
             }
+            this.revealTiles();
         },
         
-        // A quadrant's heal and harm tiles, once, on random free cells. They start with a
-        // countdown.
+        // A quadrant's heal and harm tiles, once, on random free cells, of the subtypes in
+        // the settings (healType, harmType, lootType).
         generateTiles: function(qx, qy) {
             const k = qx + ',' + qy;
             if (this.tiledQuads.has(k)) return;
             this.tiledQuads.add(k);
-            // A loot tile replaces a heal tile at lootChance. It's active at once, and its
-            // score is rolled now. (Loot has its own generator, so the rest of the
-            // quadrant's tiles come out as they would without it.)
+            // A loot tile replaces a heal tile at lootChance. (Loot and the tiles' pools and
+            // magnitudes have their own generators, so the cells come out as they would
+            // without them.)
             const cells = pkg.GRID.chunkCells(qx, qy),
                 rng = this.rngFor('tiles', k),
                 lootRng = this.rngFor('loot', k),
-                lootLo = Math.min(TILES.lootMin, TILES.lootMax),
-                lootHi = Math.max(TILES.lootMin, TILES.lootMax),
+                rollRng = this.rngFor('rolls', k),
                 place = kind => {
                     const loot = kind === TILE_TYPE_HEAL && lootRng() * 100 < TILES.lootChance,
-                        value = lootLo + Math.floor(lootRng() * (lootHi - lootLo + 1));
+                        made = loot ? TILE_TYPE_LOOT : kind;
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = this.key(x, y);
                         if (this.tiles.has(kk) || this.pieceAt(x, y)) continue;
-                        const timer = TILES.timerMin + Math.floor(rng() * (TILES.timerMax - TILES.timerMin + 1));
-                        this.tiles.set(kk, loot ? {x, y, kind:TILE_TYPE_LOOT, timer:0, value} : { x, y, kind, timer });
+                        this.tiles.set(kk, this.makeTile(x, y, made, TILES[made + 'Type'], rollRng));
                         return;
                     }
                 };
@@ -632,15 +609,15 @@
         // first on a random free cell, each next one on a free cell touching the clump. A
         // cell is free if no piece is on it and it has no tile, or a tile of a kind in
         // `replaces`. rng picks the cells.
-        /*  A terrain tile, there from the start. A solid or hole is of the given subtype
-            (see Solids.js), and a solid has its hit points. */
-        makeTile: function(x, y, kind, subtype) {
-            const tile = {x, y, kind, timer:0};
+        /*  A tile of the given kind and subtype: a solid (see Solids.js) with its hit
+            points, a hole, or a heal, harm or loot tile, its pool and magnitude rolled by rng
+            (see EffectTiles.js). */
+        makeTile: function(x, y, kind, subtype, rng = Math.random) {
+            let tile = {x, y, kind, subtype};
             if (kind === TILE_TYPE_SOLID) {
-                tile.subtype = subtype;
                 tile.hp = pkg.solids.get(subtype)?.hp ?? 1;
-            } else if (kind === TILE_TYPE_HOLE) {
-                tile.subtype = subtype;
+            } else if (this.isEffectTile(tile)) {
+                tile = this.makeEffectTile(x, y, kind, subtype, rng);
             }
             return tile;
         },
@@ -667,47 +644,15 @@
             }
         },
         
-        // Active tile at (x, y), optionally of a given kind.
+        // The tile at (x, y) you know of (see isRevealed), optionally of a given kind.
         tileAt: function(x, y, kind) {
             const t = this.tiles.get(this.key(x, y));
-            return t && t.timer <= 0 && (!kind || t.kind === kind) ? t : null;
+            return t && this.isRevealed(t) && (!kind || t.kind === kind) ? t : null;
         },
+        // A harm tile you know of. (Harm tiles only hurt what you set them off on, so the
+        // enemies, who keep off them, needn't know of hidden ones.)
         isHarm: function(x, y) {
             return !!this.tileAt(x, y, TILE_TYPE_HARM);
-        },
-        
-        // A harm tile damages the piece on it once, then is gone.
-        springHarm: function(piece) {
-            this.tiles.delete(this.key(piece.x, piece.y));
-            this.fx(piece.x, piece.y, '', '--harm', {vanish: true});
-            this.damage(piece, TILES.harmDamage, null);
-        },
-        
-        // Count tiles down. A tile that activates under a piece takes effect at once:
-        // a heal tile is eaten by a player piece standing on it; a harm tile damages
-        // whatever piece is standing on it (and is gone).
-        tickTiles: function() {
-            const armed = [];
-            for (const t of this.tiles.values()) {
-                if (t.timer > 0) {
-                    t.timer--;
-                    if (t.timer === 0) {
-                        armed.push(t);
-                        this.fx(t.x, t.y, '', t.kind === TILE_TYPE_HEAL ? '--heal' : '--harm', {arm: true});
-                    }
-                }
-            }
-            for (const t of armed) {
-                if (this.over) return;
-                const p = this.pieceAt(t.x, t.y);
-                if (p) {
-                    if (t.kind === TILE_TYPE_HARM) {
-                        this.springHarm(p);
-                    } else if (p.owner === 'player') {
-                        this.consumeHeal(p, t.x, t.y, 1);
-                    }
-                }
-            }
         },
         
         // ---- Placing linked pieces ----
@@ -768,40 +713,18 @@
             this.recomputeRanks();
             p.hp = p.maxHp;
             this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
-            if (this.tileAt(x, y, TILE_TYPE_HEAL)) this.consumeHeal(p, x, y, 1);
-            this.takeLoot(p);
+            this.landOnTiles([p]);
             this.updateQuadrants();
             this.afterPlayerAction();
             return true;
         },
         
         // ---- Heal flow ----
-        // A heal tile gives healValue() heal units (x combo). They heal the piece that ate it
-        // first; any surplus flows along links: up to the nearest damaged ancestor,
-        // or down toward the most damaged child. Units alternate up / down, starting
-        // up (so with two spare units one goes up and one goes down). Units that find
-        // nobody to heal become score: RANK.healScorePer each.
-        // Unvisited quadrants among those around the tile's quadrant (6).
-        unvisitedAround: function(x, y) {
-            const [qx, qy] = this.quadOf(x, y);
-            let n = 0;
-            for (const [nx, ny] of pkg.GRID.chunkNeighbours(qx, qy)) {
-                if (!this.visitedQuads.has(nx + ',' + ny)) n++;
-            }
-            return n;
-        },
-        healValue: function(x, y) {
-            return Math.floor(this.unvisitedAround(x, y) / Math.max(1, HEAL.per)) + HEAL.amount;
-        },
-        
-        consumeHeal: function(piece, x, y, mult = 1) {
-            const units = this.healValue(x, y) * mult;
-            this.tiles.delete(this.key(x, y));
-            this.applyHeal(piece, units, true, x, y);
-        },
-        
-        // Heal `units` starting at `piece`, flowing along links. Leftover becomes
-        // score only if leftoverToScore.
+        // Heal units (from a heal tile, or the Heal action) heal the piece first; any
+        // surplus flows along links: up to the nearest damaged ancestor, or down toward the
+        // most damaged child. Units alternate up / down, starting up (so with two spare
+        // units one goes up and one goes down). Units that find nobody to heal become
+        // score, RANK.healScorePer each, if leftoverToScore.
         applyHeal: function(piece, units, leftoverToScore, x = piece.x, y = piece.y) {
             const self = Math.min(units, piece.maxHp - piece.hp);
             if (self > 0) {

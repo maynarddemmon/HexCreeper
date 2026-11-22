@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard} from './helpers.mjs';
+import {startGame, clearBoard, putTile} from './helpers.mjs';
 
 test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
     await startGame(page);
@@ -16,9 +16,9 @@ test('solids and holes go out to the vision radius; heal and harm tiles only 1 q
                 return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
         return {terrainQuads:g.terrainQuads.size, tiledQuads:g.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
-            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, timers:tiles.every(t => t.timer >= 2 && t.timer <= 8)};
+            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === hc.cfg.TILES[t.kind + 'Type'])};
     });
-    expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, timers:true});
+    expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, subtypes:true});
 });
 
 // Each kind is checked with the other turned off, since holes may replace solid tiles.
@@ -39,7 +39,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
                 const clump = [...g.tiles.values()].filter(t => t.kind === kind),
                     keys = new Set(clump.map(t => g.key(t.x, t.y)));
                 sizes.add(clump.length);
-                if (clump.length > max || g.tiles.size !== clump.length || clump.some(t => t.timer !== 0 || G.chunkOf(t.x, t.y).join() !== '0,0')) ok = false;
+                if (clump.length > max || g.tiles.size !== clump.length || clump.some(t => G.chunkOf(t.x, t.y).join() !== '0,0')) ok = false;
                 // Connected: everything is reachable from the first one.
                 const seen = new Set(), todo = clump.slice(0, 1);
                 for (const t of todo) {
@@ -186,9 +186,10 @@ test.describe('rules', () => {
     });
     
     test('a harm tile hurts whoever moves onto it, then is gone', async ({page}) => {
+        const d = await page.evaluate(() => hc.GRID.dirs[0]);
+        await putTile(page, d[0], d[1], 'harm', 'harm');
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[0];
-            g.tiles.set(g.key(d[0], d[1]), {x:d[0], y:d[1], kind:'harm', timer:0});
             const hp = c.hp;
             g.playerAct(c, d[0], d[1]);
             return {lost:hp - c.hp, gone:!g.tiles.has(g.key(d[0], d[1]))};
@@ -218,33 +219,11 @@ test.describe('rules', () => {
         expect(r).toEqual({move:false, place:false, groupMove:false, coreStayed:true});
     });
     
-    test('countdown tiles are inert until they arm, then act on a piece standing there', async ({page}) => {
-        const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore();
-            g.tiles.set(g.key(0, 0), {x:0, y:0, kind:'harm', timer:2});
-            const inert = !g.isHarm(0, 0);
-            g.playerWait(); const after1 = c.hp;
-            g.playerWait(); const after2 = c.hp;
-            return {inert, after1, after2, gone:!g.tiles.has(g.key(0, 0))};
-        });
-        expect(r).toEqual({inert:true, after1:2, after2:1, gone:true});
-    });
-    
-    test('heal value drops as nearby quadrants are visited', async ({page}) => {
-        const r = await page.evaluate(() => {
-            const g = hc.app.game;
-            const v0 = g.healValue(0, 0);
-            for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.visitedQuads.add(i + ',' + j);
-            return {v0, v1:g.healValue(0, 0)};
-        });
-        expect(r.v0).toBe(4); // 6 unvisited neighbours: floor(6/2) + 1
-        expect(r.v1).toBe(1);
-    });
-    
     test('harm tiles stay once every neighbouring quadrant is visited', async ({page}) => {
+        const d = await page.evaluate(() => hc.GRID.dirs[0]);
+        await putTile(page, d[0], d[1], 'harm', 'harm');
         const r = await page.evaluate(() => {
             const g = hc.app.game, d = hc.GRID.dirs[0];
-            g.tiles.set(g.key(d[0], d[1]), {x:d[0], y:d[1], kind:'harm', timer:0});
             for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.visitedQuads.add(i + ',' + j);
             g.updateQuadrants();
             return g.isHarm(d[0], d[1]);
@@ -275,20 +254,19 @@ test.describe('rules', () => {
         expect(r).toEqual({oneUp:true, upAndDown:true, leftover:3});
     });
     
-    test('eating n heal tiles in one move makes each worth n times', async ({page}) => {
+    test('eating two heal tiles in one move: each gives its own, with no combo', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
             const a = g.pieceAt(D[0][0], D[0][1]), m = D[2];
-            for (const p of [c, a]) g.tiles.set(g.key(p.x + m[0], p.y + m[1]), {x:p.x + m[0], y:p.y + m[1], kind:'heal', timer:0});
-            for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.visitedQuads.add(i + ',' + j);   // value 1 each
+            for (const p of [c, a]) g.tiles.set(g.key(p.x + m[0], p.y + m[1]), {...g.makeTile(p.x + m[0], p.y + m[1], 'heal', 'heal'), pool:1, revealedAt:0});
             const s0 = g.score;
             g.playerAct(c, c.x + m[0], c.y + m[1]);
-            return g.score - s0;   // both at full HP: 2 tiles x 2 = 4 score
+            return g.score - s0;   // both at full HP: 1 score each
         });
-        expect(r).toBe(4);
+        expect(r).toBe(2);
     });
     
     test('the paid heal costs 5 x core rank, heals core rank, and wastes leftovers', async ({page}) => {

@@ -85,6 +85,81 @@
 		"sinkhole":{"name":"Sinkhole", "description":"The ground has fallen away here.",        "fillColor":"#1a140e"}
 	},
 	
+	// Kinds of heal, harm and loot tile. Each has a name, a description, and how it works
+	// (see js/hc/model/EffectTiles.js for the details):
+	//   revealMode: when it shows: "instant" (default: once its cell is in sight),
+	//     "hidden" (once a piece of yours enters it) or {"proximity":n} (once a piece of
+	//     yours is within n cells).
+	//   pool: what it holds (HP, damage or score): n, {"min":n, "max":n} (rolled when it's
+	//     made) or "infinite".
+	//   magnitude: what it gives each piece it affects, each time: n, {"min","max"} or
+	//     "pool" (default: all that's left).
+	//   showMagnitude: when its magnitude shows, as revealMode ("hidden": once used).
+	//   showPool: whether what's left in it shows (default false).
+	//   area: who it affects when a piece of yours enters it: a radius (default 0: just
+	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
+	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
+	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
+	// Settings (and so levels) choose which kinds a quadrant's tiles are.
+	"heals":{
+		"heal": {
+			"name":"Heal",
+			"description":"Heals the piece that takes it; what it doesn't need flows along its links.",
+			"pool":{"min":1, "max":4}
+		},
+		"spring":{
+			"name":"Healing spring", 
+			"description":"Heals 1 each time, for as long as it lasts.", 
+			"pool":"infinite", 
+			"magnitude":1, 
+			"duration":{"countdown":10}
+		},
+		"salve": {
+			"name":"Salve",
+			"description":"Heals every piece of yours next to it.",
+			"pool":6,
+			"magnitude":2,
+			"area":1,
+			"showPool":true
+		}
+	},
+	"harms":{
+		"harm":{
+			"name":"Harm",
+			"description":"Hurts whatever piece of yours steps on it.",
+			"pool":1
+		},
+		"trap":{
+			"name":"Hidden trap",
+			"description":"You only find it by stepping on it.",
+			"revealMode":"hidden",
+			"pool":2
+		},
+		"mine":{
+			"name":"Mine",
+			"description":"Blasts every piece around it, less further out.",
+			"revealMode":{"proximity":2},
+			"pool":"infinite",
+			"magnitude":2,
+			"area":{"radius":1, "shape":"fade"},
+			"duration":"once"
+		}
+	},
+	"loots":{
+		"loot":{
+			"name":"Loot",
+			"description":"Score for the taking.",
+			"pool":{"min":10, "max":30}
+		},
+		"cache":{
+			"name":"Cache",
+			"description":"Buried: you have to be close to find it, and closer to tell what's in it.",
+			"revealMode":{"proximity":2},
+			"pool":{"min":30, "max":60},
+			"showMagnitude":{"proximity":1}
+		}
+	},
+	
 	// Every level, in the order the Levels dialog lists them, with what a list of levels
 	// needs. Each level's own file is data/levels/<id>.json5. A level with no "number" is
 	// listed without one. A level's file may give a "seed", so its map is always the same;

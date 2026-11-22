@@ -319,17 +319,18 @@
                     } else if (V.jumpMode) {
                         status = i18n('status-jump');
                     } else if (V.hover) {
-                        // A solid under the pointer: what it is and how tough. A hole: what it is.
-                        const tile = game.tiles.get(game.key(V.hover.x, V.hover.y)),
+                        // A solid under the pointer: what it is and how tough. A hole, or a heal,
+                        // harm or loot tile you know of: what it is.
+                        const tile = game.tileAt(V.hover.x, V.hover.y),
                             solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
-                            hole = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : null,
+                            other = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : game.isEffectTile(tile) ? game.tileType(tile) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
                         if (known) {
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
                                 if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));
-                            } else if (hole) {
-                                status = hole.description ? i18n('status-hole', hole.name, hole.description) : hole.name;
+                            } else if (other) {
+                                status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
                             }
                         }
                     }

@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button} from './helpers.mjs';
+import {startGame, clearBoard, button, putTile} from './helpers.mjs';
 
 /*  The core at (0, 0), a at (1, 0) linked to it, and b at (2, 0) linked to a, on an empty
     board, in a new turn. Puts their ids on window.ids. */
@@ -63,16 +63,14 @@ test('in follow a piece leads and its parent, grandparent and their other branch
     expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[0, 0], a:[2, -1], b:[3, -1]});
 });
 
-test('in follow, followers treat harm tiles (armed or not) as walls; the lead may step on one', async ({page}) => {
+test('in follow, followers treat harm tiles you know of as walls; the lead may step on one', async ({page}) => {
     await setUp(page);
-    const harm = (x, y, timer) => page.evaluate(([x, y, timer]) => {
-        hc.app.game.tiles.set(x + ',' + y, {x, y, kind:'harm', timer});
-    }, [x, y, timer]);
-    await harm(2, -1, 0);                 // where a would go
-    await harm(3, -1, 2);                 // where b would go: not armed yet
+    const harm = (x, y) => putTile(page, x, y, 'harm', 'harm');
+    await harm(2, -1);                    // where a would go
+    await harm(3, -1);                    // where b would go
     expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
     expect(await step(page, 1, -1, 'fixed')).toEqual({core:[1, -1], a:[2, -1], b:[3, -1]}); // fixed walks onto them
-    await harm(1, -1, 0);
+    await harm(1, -1);
     expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]}); // the lead may
 });
 
