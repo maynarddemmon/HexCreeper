@@ -94,7 +94,7 @@ test('free moves only the piece, dragging along any that would be out of range',
     await setUp(page);
     expect(await step(page, 1, -1, 'free')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
     expect(await step(page, 1, 0, 'free')).toBe(null);      // a is in the way, and isn't dragged
-    await page.evaluate(() => {hc.cfg.LINK.range = 1;});
+    await page.evaluate(() => {hc.app.game.rules.linkRange = 1;});
     expect(await step(page, -1, 0, 'free')).toEqual({core:[-1, 0], a:[0, 0], b:[1, 0]}); // both dragged
     expect(await step(page, 1, -1, 'free')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]}); // a still in range
     expect(await step(page, 0, -1, 'free')).toEqual({core:[0, -1], a:[1, -1], b:[2, -1]}); // a, then b, dragged
@@ -146,7 +146,7 @@ test('your moves use the chosen mode; M (or the button) cycles it, and it\'s sav
 test('a game starts in the moveMode setting\'s mode', async ({page}) => {
     await setUp(page);
     expect(await page.evaluate(() => {
-        hc.cfg.LINK.mode = 'free';
+        hc.app.game.gameMap = {...hc.app.game.gameMap, rules:{moveMode:'free'}};
         hc.app.game.reset();
         return hc.app.game.moveMode;
     })).toBe('free');

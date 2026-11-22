@@ -1,14 +1,14 @@
-/*  Preferences and map rules: the two kinds of value that can stand in for hc.cfg's.
+/*  Preferences and map rules.
     
     Preferences are the player's, for the whole app (so far only whether pieces' moves are
-    animated). They're shown in Settings and saved in the browser (hc.prefs, {id:value},
-    only those changed from the default).
+    animated), and stand in for hc.cfg's values. They're shown in Settings and saved in
+    the browser (hc.prefs, {id:value}, only those changed from the default).
     
-    Map rules are gameplay values a map sets in place of hc.cfg's defaults: its file's
-    "rules", {id:value}. They're never shown to the player, and anything a map doesn't set
-    is at its default. (They're tuned in code, or by a map for some special effect of its
-    own.) What a map's tiles and enemies are like is up to its generators' attrs instead
-    (see Generators.js). */
+    Map rules are gameplay values, with their defaults here (RULES), that a map can set:
+    its file's "rules", {id:value}. A game has all of them, its map's over the defaults, in
+    game.rules. They're never shown to the player. (They're tuned in code, or by a map for
+    some special effect of its own.) What a map's tiles and enemies are like is up to its
+    components' attrs instead (see MapComponent.js). */
 (pkg => {
     'use strict';
     
@@ -17,7 +17,7 @@
         {
             isObj,
             attrs:{num, bool, choice, normalize, resolve},
-            cfg:{VISION, LINK, COMBAT, RANK, ANIM}
+            cfg:{ANIM}
         } = pkg,
         
         PREFS_KEY = 'hc.prefs',
@@ -40,22 +40,24 @@
             id, label:i18n('settings-group-' + id), definitions:PREFERENCES.filter(def => def.group === id)
         })),
         
-        /*  Every map rule. */
+        /*  Every map rule, with its default. A piece's rank = max(rankBase, 1 + the lower
+            of its two highest-ranked children's) (a missing child counts as 0, so a piece
+            needs two children to rank up). */
         RULES = [
-            onto(VISION, 'radius',       num,    'visionRadius', 1, 30),   // how far your pieces see
-            onto(COMBAT, 'advance',      bool,   'advance'),               // advance after a kill
-            onto(LINK,   'range',        num,    'linkRange', 1, 20),
-            onto(LINK,   'mode',         choice, 'moveMode', () => pkg.MOVE_MODES.map(m => ({value:m, label:m}))), // at the start of a game
-            onto(RANK,   'base',         num,    'rankBase', 1, 10),
-            onto(RANK,   'hpPer',        num,    'hpPer', 1, 20),          // max HP per rank
-            onto(RANK,   'enemyHpPer',   num,    'enemyHpPer', 1, 20),     // enemy max HP per rank
-            onto(RANK,   'movesPer',     num,    'movesPer', 1, 10),       // moves per turn per top rank
-            onto(RANK,   'placeBase',    num,    'placeBase', 0, 100),     // place cost, base
-            onto(RANK,   'placePerPieces', num,  'placePerPieces', 1, 100), // place cost: +1 per this many pieces
-            onto(RANK,   'rankUpHeals',  bool,   'rankUpHeals'),           // ranking up adds HP too
-            onto(RANK,   'healCostPer',  num,    'healCostPer', 0, 100),   // Heal action cost per core rank
-            onto(RANK,   'healPer',      num,    'healActPer', 1, 20),     // Heal action HP per core rank
-            onto(RANK,   'healScorePer', num,    'healScore', 0, 20)       // unused heal: score per point
+            num('visionRadius', 12, 1, 30),   // how far your pieces see (see hc.cfg.VISION)
+            bool('advance', true),            // after a kill, the attacker (with its group) steps into the attacked cell if the whole group can (not onto harm)
+            num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
+            choice('moveMode', 'fixed', () => pkg.MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed, free or follow (see Movement.js)
+            num('rankBase', 1, 1, 10),        // the rank of a piece without two children
+            num('hpPer', 2, 1, 20),           // max HP = this x the piece's own rank
+            num('enemyHpPer', 1, 1, 20),      // an enemy's max HP = this x its rank
+            num('movesPer', 1, 1, 10),        // pieces you may move per turn = this x the highest rank of any piece
+            num('placeBase', 4, 0, 100),      // the cost to place a piece = this + 1 per placePerPieces of your pieces (rounded up)
+            num('placePerPieces', 2, 1, 100),
+            bool('rankUpHeals', false),       // when max HP rises with rank, HP rises too (otherwise the new HP must be healed)
+            num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's rank
+            num('healActPer', 1, 1, 20),      // and heals this x your core's rank
+            num('healScore', 1, 0, 20)        // each unused heal point becomes this much score
         ],
         
         PREFERENCES_BY_ID = new Map(PREFERENCES.map(def => [def.id, def])),
@@ -91,8 +93,7 @@
             }
         };
     
-    // The preferences in effect from the start; the rules are at their defaults until a map
-    // is applied.
+    // The preferences in effect from the start.
     for (const def of PREFERENCES) def.obj[def.prop] = prefs[def.id] ?? def.defaultValue;
     
     pkg.settings = {
@@ -130,10 +131,8 @@
             used skipped with a warning saying where (e.g. "Map warrens"). */
         cleanRules: (rules, where) => resolve(RULES, rules, where + ' rules', true),
         
-        /*  Puts a map's rules (cleaned) into effect, in place of any earlier map's: every
-            rule it doesn't set goes back to its default. */
-        applyRules: rules => {
-            for (const def of RULES) def.obj[def.prop] = rules?.[def.id] ?? def.defaultValue;
-        }
+        /*  Every rule, {id:value}: those given, made usable as cleanRules does, and the
+            rest at their defaults. */
+        resolveRules: (rules, where) => resolve(RULES, rules, where + ' rules')
     };
 })(hc);

@@ -86,8 +86,8 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     // The core at (0, 0), a at (2, 0) linked to it, and an enemy at (1, 1): the tile goes at (1, 0).
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        hc.cfg.RANK.hpPer = 10;
-        hc.cfg.RANK.enemyHpPer = 10;
+        hc.app.game.rules.hpPer = 10;
+        hc.app.game.rules.enemyHpPer = 10;
         g.score = 100;
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
@@ -133,7 +133,7 @@ test('reveal: instant once in sight, hidden only once entered, proximity within 
     });
     await page.evaluate(() => {
         hc.cfg.VISION.fog = true;
-        hc.cfg.VISION.radius = 6;
+        hc.app.game.rules.visionRadius = 6;
     });
     await putHidden(page, 0, -3, 'heal', 'instant');   // in sight
     await putHidden(page, 0, -9, 'heal', 'instant');   // out of sight

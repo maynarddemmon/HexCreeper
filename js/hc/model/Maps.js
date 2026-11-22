@@ -41,7 +41,7 @@
         and is loaded only when it's played.
         
         A map's file has (see docs/DESIGN.md, Maps):
-            rules: gameplay values in place of hc.cfg's, {id:value} (see Settings.js);
+            rules: gameplay values in place of their defaults, {id:value} (see Settings.js);
             tileGenerator: {type, ...attrs}: what makes its tiles: a type registered with
                 TileGenerator, and values for that type's attrs (see Generators.js);
             spawnGenerator: {type, ...attrs}: what makes its enemies, likewise;

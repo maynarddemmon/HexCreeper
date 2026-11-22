@@ -7,7 +7,7 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, VISION, LINK, COMBAT, RANK, ANIM
+            WORLD_LIMIT, VISION, ANIM
         },
         TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
         hexDist, PIECE_TYPES
@@ -55,6 +55,7 @@
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
+            this.rules = pkg.settings.resolveRules(this.gameMap?.rules, 'Game'); // the map's rules, the rest at their defaults (see Settings.js)
             // The map's components (see MapComponent.js), with its attrs for them.
             const {tileGenerator:tiles, spawnGenerator:spawns, enemyAI:ai} = this.gameMap ?? pkg.Game.NO_MAP;
             this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
@@ -69,7 +70,7 @@
             this.movesUsed = 0;              // moves made this turn (counts toward the move limit)
             this.recoverUsed = false;        // whether Recover has been used this turn (once a turn)
             this.quickenUsed = false;        // whether Quicken has been used this turn (once a turn: a move more)
-            this.moveMode = pkg.MOVE_MODES.includes(LINK.mode) ? LINK.mode : 'fixed'; // how the player's pieces move (see Movement.js)
+            this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
@@ -125,6 +126,7 @@
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
+                rules:{...this.rules},
                 gameMap:this.gameMap
             };
         },
@@ -136,12 +138,13 @@
                 isArr = Array.isArray;
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) || !isNum(o.quadRadius) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
-                !Number.isInteger(o.movesUsed) ||
+                !Number.isInteger(o.movesUsed) || !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.acted, o.fresh, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
-            const objectives = o.gameMap?.objectives ?? [];
+            const rules = pkg.settings.resolveRules(o.rules, 'Saved game'),
+                objectives = o.gameMap?.objectives ?? [];
             try {
                 for (const obj of objectives) {
                     pkg.goals.compile(obj.expression);
@@ -206,6 +209,7 @@
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             this.corePath = o.corePath.map(c => [...c]);
+            this.rules = rules;
             this.gameMap = o.gameMap ?? null;
             this._sightKey = null;
         },
@@ -233,11 +237,11 @@
             if (!VISION.fog) return null;
             if (this.over) return this.seenCells;
             const players = this.piecesOf('player'),
-                sightKey = [VISION.radius, this.tiles.size, ...players.map(p => this.key(p.x, p.y))].join(';');
+                sightKey = [this.rules.visionRadius, this.tiles.size, ...players.map(p => this.key(p.x, p.y))].join(';');
             if (sightKey !== this._sightKey) {
                 const sight = new Set();
                 for (const p of players) {
-                    for (const c of pkg.GRID.disk(p.x, p.y, VISION.radius)) {
+                    for (const c of pkg.GRID.disk(p.x, p.y, this.rules.visionRadius)) {
                         const k = this.key(c.x, c.y);
                         if (!sight.has(k) && this.canSee(p, c)) sight.add(k);
                     }
@@ -259,7 +263,7 @@
             const left = pkg.GRID.line(a, b, 1),
                 right = pkg.GRID.line(a, b, -1),
                 dist = left.length - 1;
-            let range = VISION.radius;
+            let range = this.rules.visionRadius;
             for (let i = 1; i < dist && range >= dist; i++) {
                 const through = Math.max(this.seeThrough(left[i].x, left[i].y), this.seeThrough(right[i].x, right[i].y));
                 range = i + (range - i) * through;
@@ -276,12 +280,12 @@
         
         addPiece: function(type, owner, x, y, parentId = null) {
             const s = PIECE_TYPES[type].stats[owner],
-                hp = (owner === 'player' ? RANK.hpPer : RANK.enemyHpPer) * RANK.base,
+                hp = (owner === 'player' ? this.rules.hpPer : this.rules.enemyHpPer) * this.rules.rankBase,
                 piece = {
                     id:this.nextId++, 
                     type, owner, x, y, parentId,
                     hp, maxHp: hp, 
-                    rank:RANK.base, 
+                    rank:this.rules.rankBase, 
                     scoreValue:s.scoreValue,
                     score:0
                 };
@@ -310,7 +314,7 @@
         
         // ---- Rank ----
         // rank = max(base, 1 + min(two highest child ranks)), missing children count as 0.
-        // Max HP follows rank; HP is clamped down, and only raised if RANK.rankUpHeals.
+        // Max HP follows rank; HP is clamped down, and only raised with the rankUpHeals rule.
         recomputeRanks: function() {
             const all = [...this.pieces.values()],
                 kids = new Map(all.map(p => [p.id, []]));
@@ -319,15 +323,15 @@
                 rankOf = p => {
                     if (memo.has(p.id)) return memo.get(p.id);
                     const rs = kids.get(p.id).map(rankOf).sort((a, b) => b - a);
-                    const r = Math.max(RANK.base, 1 + Math.min(rs[0] || 0, rs[1] || 0));
+                    const r = Math.max(this.rules.rankBase, 1 + Math.min(rs[0] || 0, rs[1] || 0));
                     memo.set(p.id, r);
                     return r;
                 };
             for (const p of all) {
                 const r = rankOf(p),
                     player = p.owner === 'player',
-                    newMax = (player ? RANK.hpPer : RANK.enemyHpPer) * r;
-                if (newMax > p.maxHp && player && RANK.rankUpHeals) p.hp += newMax - p.maxHp;
+                    newMax = (player ? this.rules.hpPer : this.rules.enemyHpPer) * r;
+                if (newMax > p.maxHp && player && this.rules.rankUpHeals) p.hp += newMax - p.maxHp;
                 p.rank = r; p.maxHp = newMax;
                 p.hp = Math.min(p.hp, p.maxHp);
             }
@@ -338,10 +342,10 @@
             return c ? c.rank : 0;
         },
         maxRank: function() {return Math.max(0, ...this.piecesOf('player').map(p => p.rank)); },
-        moveLimit: function() {return RANK.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
+        moveLimit: function() {return this.rules.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
         // Placing costs more the more pieces you have (the core and detached ones too), but
         // not with rank, so detaching to keep ranks down doesn't make pieces cheaper.
-        placeCost: function() {return RANK.placeBase + Math.ceil(this.piecesOf('player').length / Math.max(1, RANK.placePerPieces));},
+        placeCost: function() {return this.rules.placeBase + Math.ceil(this.piecesOf('player').length / Math.max(1, this.rules.placePerPieces));},
         
         // Can this player piece still move this turn?
         canMove: function(p) {
@@ -408,7 +412,7 @@
                     this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
                 }
                 // Advance into the space cleared, if a piece was destroyed or a solid broken.
-                if ((kills || broken) && piece.owner === 'player' && COMBAT.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
+                if ((kills || broken) && piece.owner === 'player' && this.rules.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
                     this.moveGroup(piece, m.dx, m.dy, mode);
                 }
             } else {
@@ -525,8 +529,8 @@
         canAffordPlace: function() { return this.score >= this.placeCost(); },
         
         // ---- Heal action ----
-        healCost: function() {return RANK.healCostPer * this.coreRank();},
-        healAmount: function() {return RANK.healPer * this.coreRank();},
+        healCost: function() {return this.rules.healCostPer * this.coreRank();},
+        healAmount: function() {return this.rules.healActPer * this.coreRank();},
         anyDamaged: function() {return this.piecesOf('player').some(p => p.hp < p.maxHp);},
         canAffordHeal: function() {return this.score >= this.healCost();},
         
@@ -584,7 +588,7 @@
         // surplus flows along links: up to the nearest damaged ancestor, or down toward the
         // most damaged child. Units alternate up / down, starting up (so with two spare
         // units one goes up and one goes down). Units that find nobody to heal become
-        // score, RANK.healScorePer each, if leftoverToScore.
+        // score, the healScore rule's worth each, if leftoverToScore.
         applyHeal: function(piece, units, leftoverToScore, x = piece.x, y = piece.y) {
             const self = Math.min(units, piece.maxHp - piece.hp);
             if (self > 0) {
@@ -601,7 +605,7 @@
                 this.fx(t.x, t.y, '+1 HP', '--heal', { delay: 160 });
             }
             if (units > 0 && leftoverToScore) {
-                const gain = units * RANK.healScorePer;
+                const gain = units * this.rules.healScore;
                 piece.score += gain; this.earn(gain);
                 this.fx(x, y, `+${gain} score`, '--gain', { delay: 60 });
             }

@@ -39,9 +39,9 @@ test('no swap that would leave a link out of range, with a piece not next to it,
     await setUp(page);
     const r = await page.evaluate(`(() => {
         const g = hc.app.game, out = [];
-        hc.cfg.LINK.range = 1;
+        hc.app.game.rules.linkRange = 1;
         out.push(g.swapTargets(${P('core')}).some(t => t.id === window.ids.a)); // a and core: b would be 2 from a
-        hc.cfg.LINK.range = 3;
+        hc.app.game.rules.linkRange = 3;
         out.push(g.swapTargets(${P('b')}).length);                           // only a is next to b
         g.addPiece('core', 'enemy', 2, -1);
         out.push(g.swapTargets(${P('b')}).some(t => t.owner === 'enemy'));

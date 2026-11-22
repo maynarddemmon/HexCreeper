@@ -9,7 +9,6 @@
     'use strict';
     
     const {
-        cfg:{RANK},
         attrs:{num},
         hexDist, euclid2, PIECE_TYPES
     } = pkg,
@@ -54,7 +53,7 @@
                         this.game.endAction();
                         this.game.track = root.id;
                         const squad = this.game.group(root);
-                        const budget = RANK.movesPer * Math.max(...squad.map(g => g.rank));
+                        const budget = this.game.rules.movesPer * Math.max(...squad.map(g => g.rank));
                         if (front(squad) <= this.attrs.planRange) {
                             // Patience: the longer a nearby squad goes without landing a hit, the
                             // less it cares about exposure, so it can't hang back forever.

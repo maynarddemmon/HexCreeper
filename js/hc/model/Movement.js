@@ -48,7 +48,7 @@
             {attack:false, moves:[[id, x, y], ...]} for the pieces that move and where. */
         resolveStep: function(view, id, dx, dy, mode) {
             const {posOf, kidsOf, parentOf, open, target} = view,
-                range = pkg.cfg.LINK.range,
+                range = this.rules.linkRange,
                 [px, py] = posOf(id);
             
             // The pieces that may move: the piece and what's below it, or in follow, its
@@ -106,7 +106,7 @@
             piece that moves can't land. @private */
         _shift: function(view, subtree, dest, mode) {
             const {posOf, kidsOf, occupant, open} = view,
-                range = pkg.cfg.LINK.range,
+                range = this.rules.linkRange,
                 moving = new Set(mode === 'free' ? [subtree[0]] : subtree);
             if (mode === 'free') {
                 for (const gid of subtree) {
@@ -201,7 +201,7 @@
             linked to them stays where it is. */
         swapOk: function(view, a, b) {
             const {posOf, kidsOf, parentOf} = view,
-                range = pkg.cfg.LINK.range,
+                range = this.rules.linkRange,
                 pa = posOf(a), pb = posOf(b),
                 after = id => id === a ? pb : id === b ? pa : posOf(id);
             if (dist(pa, pb) !== 1) return false;
@@ -268,7 +268,7 @@
             open ground a jump is no quicker and leaves the piece sitting out a turn. */
         jumpCells: function(view, id, overGaps = false) {
             const {posOf, kidsOf, parentOf, occupant, open} = view,
-                range = pkg.cfg.LINK.range,
+                range = this.rules.linkRange,
                 [px, py] = posOf(id),
                 par = parentOf(id),
                 linked = [...kidsOf(id), ...(par != null ? [par] : [])].map(posOf),

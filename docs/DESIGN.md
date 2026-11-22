@@ -120,7 +120,7 @@ The "squad" enemy AI (`model/SquadAI.js`); its numbers are its attrs (see Settin
 - `data/init.json5` lists every map, in order, with what a list of maps needs: `id`, `name`, an optional `number` and a `description`. Its `defaultMap` is played when there's no saved game. Each map's own file, `data/gamemap/<id>.json5`, is loaded only when it's played and holds what's needed to play it.
 - A map file (2026-11-22) has:
   - `"tileGenerator":{"type":..., ...attrs}`, `"spawnGenerator":{"type":..., ...attrs}` and `"enemyAI":{"type":..., ...attrs}` (all required): the components that make its tiles and its enemies and play the enemies' turn (see Map components), by the names they're registered under, and values for their attrs. A map naming a type that isn't registered, or without one of them, isn't loaded ("Bad map" in the console; the Maps dialog says it couldn't be loaded).
-  - `"rules":{id:value}` (optional): gameplay values in place of `hc.cfg`'s defaults (see Settings).
+  - `"rules":{id:value}` (optional): gameplay values in place of their defaults (see Settings).
   - `"goals"` and `"penalties"`, and a `"seed"` (all optional).
   
   Rules and attrs it doesn't give are at their defaults; ones that can't be used are skipped with a warning. The player never sees or changes them. A game remembers its map (its rules and components, with the attrs the file gave) and saves it, so a saved game plays the same even if the map file changes; a saved game also keeps each component's full attrs. (Before 2026-11-22 a map file had flat `attrs` for all of these; before 2026-11-21 a map could mark one `pref` to show it in Settings.)
@@ -138,12 +138,12 @@ The "squad" enemy AI (`model/SquadAI.js`); its numbers are its attrs (see Settin
 ## Settings
 Values that stand in for defaults come in three kinds (`model/Settings.js`, `model/MapComponent.js`):
 - **Preferences** (2026-11-21) are the player's, for the whole app: shown in Settings (the gear in the header), saved in the browser (`hc.prefs`, `{id:value}`, only those changed from the default), never set by a map, and not in a map's brief. The one so far is **Animate pieces** (on; `ANIM.on`), under **Display**: off, nothing is animated and the enemies' turn shows at once.
-- **Map rules** (2026-11-22) are gameplay values in `hc.cfg` that a map's `rules` can set; anything it doesn't set is at its default.
+- **Map rules** (2026-11-22) are gameplay values that a map's `rules` can set; anything it doesn't set is at its default. Their defaults are in `RULES` (`model/Settings.js`), not `hc.cfg`. A game has all of them in `game.rules` (`{id:value}`, made when it starts, from its map's rules over the defaults), reads them only from there, and saves them (since 2026-11-22; until then they were written into `hc.cfg` while a map was played).
 - **Component attrs** (2026-11-22) tune a map's tile and spawn generators and its enemy AI; their defaults are in each component class (`ATTRS`), and a map's `tileGenerator` / `spawnGenerator` / `enemyAI` give values for them.
 
 Rules and attrs are never shown to the player: they're tuned in code, or by a map for some special effect of its own. Numbers are rounded and clamped to their range, choices must be one of their options, and anything else is skipped with a warning. (Until 2026-11-21 they were all settings the player could change, per map, where the map allowed.) Fog of war isn't one: see Fog of war.
 
-**Map rules** (`hc.cfg`):
+**Map rules** (`RULES`, read from `game.rules`):
 
 | Rule | Default |
 |---|---|
@@ -248,7 +248,7 @@ Rules and attrs are never shown to the player: they're tuned in code, or by a ma
 - An isometric view (2026-11-20): rows squashed to 60%, the floor a unit thick, solids as raised hex prisms, holes as pits, pieces as upright tokens drawn back to front, clicks on tokens picking their cell. A prototype worked and showed promise, but would need a fair amount of work to feel good to play (readability of distances, solids hiding what's behind them, tuning), so it's set aside.
 
 ## Implementation
-- `js/hc/hc.js`: the `hc` namespace and tunables (`SPAWN`, `PRESSURE`, `ENEMY`, `AI`, `QUAD`, `TILES`, `HEAL`, `RANK`, `LINK`, `COMBAT`, `OWNERS`, `PIECE_R`), plus small utilities.
+- `js/hc/hc.js`: the `hc` namespace and `hc.cfg`: layout and drawing (`PIECE_R`, `OWNERS`...), animation (`ANIM`), and the few gameplay values that aren't rules or attrs (`WORLD_LIMIT`, `SPAWN.clearance`, `VISION.fog`), plus small utilities.
 - `model/Grid.js`: `makeGrid(k)` returns the `hc.GRID` object for quadrants of radius k: `dirs`, `dist`, `center`, `cellAtWorld`, `corners`, `edges`, `chunkOf` / `chunkKey` / `chunkNeighbours` / `chunkCells`, `ring`, `visibleCells`, `keyDirs`. Also `hexDist()` (= `GRID.dist`) and `euclid2()`. `Game.reset` sets `hc.GRID` from `QUAD.radius`.
 - `model/PieceTypes.js`: per-owner `stats`, `steps(piece)` and `draw()`.
 - `model/Game.js`: `hc.Game`, a JS.Class (the getters are methods: `getPlayerCore`, `getSelected`); state and rules: `legalMoves`, `act` (combo scoring, advance), `canStep`, `damage`, `moveGroup` → `landOnTiles`, `rngFor`, `piecesMoved` (→ the tile generator, then `revealTiles`), `makeTile`, `distanceField`, `recomputeRanks`, `maxRank` / `moveLimit` / `placeCost`, `healCost` / `healAmount` / `playerHeal` → `applyHeal`.
@@ -259,8 +259,8 @@ Rules and attrs are never shown to the player: they're tuned in code, or by a ma
 - `model/MapComponent.js`: `hc.MapComponent`, the base of a map's components (registry, `make`, `cleanAttrs`, `ATTRS`, `this.attrs`). `model/Generators.js`: `hc.TileGenerator`, `hc.SpawnGenerator`. `model/EnemyAI.js`: `hc.EnemyAI`.
 - `model/SquadAI.js`: `hc.SquadAI`, the "squad" enemy AI: `takeTurn` → `planSquad` (beam search, near squads) / `marchSquad` (far squads). Game's `enemyPhase` calls `takeTurn`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera and its animated pans `panTo` / `stepPan`, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
-- `model/Settings.js`: `hc.settings`, the preferences (`get`, `set`, `getGroups`; saved in localStorage) and the map rules (`cleanRules`, `applyRules`), each definition mapping to a value in `hc.cfg`. `model/Attrs.js`: `hc.attrs`, declaring and checking attrs (`num`, `bool`, `choice`, `normalize`, `resolve`), used by both and by the generators.
+- `model/Settings.js`: `hc.settings`, the preferences (`get`, `set`, `getGroups`; saved in localStorage) and the map rules (`RULES`; `cleanRules` for a map's, `resolveRules` for all of them, as `Game.reset` and `importFromObj` make `game.rules`). A preference's definition maps to a value in `hc.cfg`. `model/Attrs.js`: `hc.attrs`, declaring and checking attrs (`num`, `bool`, `choice`, `normalize`, `resolve`), used by both and by the generators.
 - `model/Maps.js`: `hc.maps` (`loadIndex`, `loadMap`), loading `init.json5` and map files, checking a map's rules and components.
-- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` (version 3 since 2026-11-22, when maps got an enemy AI; version 2 had rules and generators; older saves are refused) is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
+- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` (version 4 since 2026-11-22, when the game's rules were saved with it; versions 2 and 3 had maps' rules, generators and enemy AI; older saves are refused) is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
 - `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the preference rows from the definitions (`SettingsList`) and the dialog around them; `view/MapsDialog.js` and `view/MapBrief.js` list maps and brief one; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
 - UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

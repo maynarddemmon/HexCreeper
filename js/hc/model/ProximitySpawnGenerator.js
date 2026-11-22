@@ -12,7 +12,7 @@
     'use strict';
     
     const {
-        cfg:{SPAWN, RANK},
+        cfg:{SPAWN},
         attrs:{num},
         hexDist
     } = pkg;
@@ -111,7 +111,7 @@
                     if (!game.isOpen(x, y) || game.pieceAt(x, y) || game.isHarm(x, y)) continue;
                     if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                     const p = game.addPiece('core', 'enemy', x, y);
-                    p.hp = p.maxHp = RANK.enemyHpPer * RANK.base;
+                    p.hp = p.maxHp = this.game.rules.enemyHpPer * this.game.rules.rankBase;
                     game.fx(x, y, '', '--enemy', { spawn: true });
                     return p;
                 }

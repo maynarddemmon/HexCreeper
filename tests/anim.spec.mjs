@@ -115,10 +115,7 @@ test('Animate pieces is a preference: in Settings, kept for the whole app, not s
     expect(await page.evaluate(() => [hc.cfg.ANIM.on, JSON.parse(localStorage.getItem('hc.prefs'))])).toEqual([false, {animate:false}]);
     await page.keyboard.press('Escape');
     // A map can't change it, and it carries over to other maps.
-    expect(await page.evaluate(() => {
-        hc.settings.applyRules(hc.settings.cleanRules({animate:true}, 'Map test'));
-        return [hc.cfg.ANIM.on, hc.settings.get('animate')];
-    })).toEqual([false, false]);
+    expect(await page.evaluate(() => [hc.settings.cleanRules({animate:true}, 'Map test'), hc.cfg.ANIM.on, hc.settings.get('animate')])).toEqual([{}, false, false]);
     await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();

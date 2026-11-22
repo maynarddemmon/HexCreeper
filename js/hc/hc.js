@@ -108,28 +108,9 @@
             // Gameplay //
             WORLD_LIMIT:1000000,
             
-            // Links between pieces.
-            LINK:{
-                range:3, // The maximum distance a linked piece can get from another one.
-                mode:'fixed' // how the player's pieces move at the start: fixed, free or follow (see Movement.js)
-            },
-            
-            // Enemy squad planning is the enemy AI's attrs (see SquadAI.js).
-            
-            // Rank: a player piece's rank = max(base, 1 + min of its two highest-ranked children)
-            // (a missing child counts as 0, so a piece needs two children to rank up).
-            RANK:{
-                base:1,         // rank of a piece without two children
-                hpPer:2,        // max HP = hpPer x the piece's own rank
-                enemyHpPer:1,   // an enemy's max HP = enemyHpPer x its rank
-                movesPer:1,     // pieces you may move per turn = movesPer x highest rank of any piece
-                placeBase:4,    // cost to place a piece = placeBase + 1 per placePerPieces of your pieces (rounded up)
-                placePerPieces:2,
-                healScorePer:1, // each unused heal unit becomes this much score
-                rankUpHeals:false, // true: when max HP rises with rank, HP rises too; false: the new HP must be healed
-                healCostPer:5,  // Heal action cost = healCostPer x core rank
-                healPer:1,      // Heal action heals healPer x core rank
-            },
+            // The gameplay values a map can set, its rules, have their defaults in
+            // Settings.js (RULES), and the map components' tuning is in their attrs (see
+            // MapComponent.js).
             
             // Enemy spawning (the rest is the spawn generator's attrs; see Generators.js).
             SPAWN:{
@@ -137,17 +118,10 @@
             },
             
             // Fog of war: you see enemies only on cells in sight of one of your pieces: within
-            // radius steps, with the line between the two cell centres not blocked by solid
-            // tiles. Tiles stay shown once seen.
+            // the visionRadius rule's steps, with the line between the two cell centres not
+            // blocked by solid tiles. Tiles stay shown once seen.
             VISION:{
-                fog:true,
-                radius:12
-            },
-            
-            // After a player attack that kills, the attacking piece (with its group) steps
-            // into the attacked direction if the whole group can legally do so (not onto harm).
-            COMBAT:{
-                advance:true
+                fog:true
             }
         },
         

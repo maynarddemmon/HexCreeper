@@ -10,7 +10,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK, ANIM},
+            cfg:{PIECE_R, CORE_BORDER, OWNERS, ANIM},
             TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
             PIECE_TYPES
         } = pkg,
@@ -433,7 +433,7 @@
         } else if (sel) {
             // Link-range box around the selected piece's parent
             const par = game.parent(sel);
-            if (par) strokeRegion(par, LINK.range, '--range');
+            if (par) strokeRegion(par, game.rules.linkRange, '--range');
             const group = game.group(sel);
             selGroupIds = new Set(group.map(g => g.id));
             for (const g of group) if (g !== sel) fillCell(g.x, g.y, '--sel-tint');

@@ -8,7 +8,6 @@
     'use strict';
     
     const {
-        cfg:{VISION},
         attrs:{num, choice},
         TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT
     } = pkg,
@@ -105,7 +104,7 @@
         // of war is on, so turning it off and on doesn't change the world. Heal, harm and
         // loot tiles are placed only 1 quadrant out.
         piecesMoved: function() {
-            const reach = Math.max(1, Math.ceil(VISION.radius / (3 * pkg.GRID.chunkRadius + 2)));
+            const reach = Math.max(1, Math.ceil(this.game.rules.visionRadius / (3 * pkg.GRID.chunkRadius + 2)));
             for (const p of this.game.piecesOf('player')) {
                 const [qx, qy] = ProximityTileGenerator.quadOf(p.x, p.y);
                 this.visitedQuads.add(qx + ',' + qy);

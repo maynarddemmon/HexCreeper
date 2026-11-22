@@ -240,7 +240,7 @@ test('sight past a see-through solid is what\'s left of it, cut to the share the
                 return d;
             },
             out = {};
-        hc.cfg.VISION.radius = 12;
+        hc.app.game.rules.visionRadius = 12;
         out.clear = reach();
         put(0, -2, 'stone_wall');
         out.opaque = reach();          // the wall itself, no further
@@ -272,7 +272,7 @@ test('along an edge, the clearer of the two solids beside the line counts', asyn
                 return k;
             },
             out = {};
-        hc.cfg.VISION.radius = 12;
+        hc.app.game.rules.visionRadius = 12;
         put(0, -1, 'stone_wall');
         out.oneSide = reach();         // the other side is clear
         put(1, -1, 'stone_wall');

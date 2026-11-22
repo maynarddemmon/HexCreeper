@@ -22,7 +22,7 @@ test('a piece can jump to the twelve cells two away, over holes and pieces but n
             cells = () => g.jumpTargets(core).map(c => c.x + ',' + c.y),
             put = (x, y, kind) => g.tiles.set(g.key(x, y), g.makeTile(x, y, kind, kind === 'solid' ? hc.app.game.tileGenerator.attrs.clumpSolid : hc.app.game.tileGenerator.attrs.clumpHole)),
             out = {};
-        hc.cfg.LINK.range = 3;
+        hc.app.game.rules.linkRange = 3;
         out.all = cells().length;
         // Over a piece of yours (a, at (1, 0)) and an enemy, and over a hole.
         g.addPiece('core', 'enemy', -1, 0);
@@ -49,9 +49,9 @@ test('a jump that would leave a link out of range is not allowed', async ({page}
     const r = await page.evaluate(() => {
         const g = hc.app.game, a = g.pieces.get(window.ids.a),
             cells = () => g.jumpTargets(a).map(c => c.x + ',' + c.y);
-        hc.cfg.LINK.range = 2;
+        hc.app.game.rules.linkRange = 2;
         const out = [cells().includes('3,0'), cells().includes('2,-2'), cells().includes('-1,0')];
-        hc.cfg.LINK.range = 3;
+        hc.app.game.rules.linkRange = 3;
         return out;
     });
     // (3, 0) is 3 from the core; (2, -2) and (-1, 0) are within 2.

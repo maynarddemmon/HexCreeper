@@ -32,7 +32,7 @@ test('playing a map starts a new game with its values in effect, and the save ke
     const seed = await page.evaluate(() => hc.app.game.seed);
     const inWarrens = () => page.evaluate(() => ({
         gameMap:hc.app.game.gameMap.id, turn:hc.app.game.turn, seed:hc.app.game.seed,
-        wallChance:hc.app.game.tileGenerator.attrs.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.cfg.VISION.radius
+        wallChance:hc.app.game.tileGenerator.attrs.wallChance, quadRadius:hc.GRID.chunkRadius, vision:hc.app.game.rules.visionRadius
     }));
     expect(await inWarrens()).toEqual({gameMap:'warrens', turn:1, seed, wallChance:90, quadRadius:4, vision:8});
     
@@ -96,7 +96,7 @@ test('a map\'s own seed fills in the brief', async ({page}) => {
 test('cancelling the brief keeps the game, and its map\'s values', async ({page}) => {
     await startGame(page);
     await page.evaluate(() => {hc.app.game.playerWait();});
-    const now = () => page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.seed, hc.app.game.turn, hc.app.game.tileGenerator.attrs.wallChance, hc.cfg.VISION.radius]),
+    const now = () => page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.seed, hc.app.game.turn, hc.app.game.tileGenerator.attrs.wallChance, hc.app.game.rules.visionRadius]),
         before = await now();
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
@@ -119,7 +119,7 @@ test('switching maps mid-game warns in the brief; values the new map doesn\'t se
     await expect(page.getByText('Starting abandons the game in progress.')).toBeVisible();
     await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
-    expect(await page.evaluate(() => [hc.app.game.tileGenerator.attrs.wallChance, hc.app.game.spawnGenerator.attrs.spawnEvery, hc.cfg.VISION.radius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
+    expect(await page.evaluate(() => [hc.app.game.tileGenerator.attrs.wallChance, hc.app.game.spawnGenerator.attrs.spawnEvery, hc.app.game.rules.visionRadius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
 });
 
 test('a map file that can\'t be loaded says so and the game carries on', async ({page}) => {
@@ -155,13 +155,11 @@ test('a map\'s rules and component attrs are rounded and clamped, those it can\'
         const rules = hc.settings.cleanRules({linkRange:99, movesPer:2.4, advance:'yes', fog:false, spawnEvery:2}, 'Map test'),
             spawn = hc.SpawnGenerator.cleanAttrs('proximity', {spawnEvery:2.4, linkRange:2}, 'Map test spawn generator'),
             ai = hc.EnemyAI.cleanAttrs('squad', {approach:0.26, beam:0, spawnEvery:2}, 'Map test enemy AI');
-        hc.settings.applyRules(rules);
-        const gen = hc.SpawnGenerator.make('proximity', hc.app.game, spawn),
-            squad = hc.EnemyAI.make('squad', hc.app.game, ai),
-            out = [rules, spawn, ai, hc.cfg.LINK.range, hc.cfg.RANK.movesPer, hc.cfg.COMBAT.advance, gen.attrs.spawnEvery, gen.attrs.initial, squad.attrs.approach, squad.attrs.expose];
-        hc.settings.applyRules({});
-        return [...out, hc.cfg.LINK.range];
-    })).toEqual([{linkRange:20, movesPer:2}, {spawnEvery:2}, {approach:0.3, beam:1}, 20, 2, true, 2, 3, 0.3, 12, 3]);
+        const all = hc.settings.resolveRules(rules, 'Map test'),
+            gen = hc.SpawnGenerator.make('proximity', hc.app.game, spawn),
+            squad = hc.EnemyAI.make('squad', hc.app.game, ai);
+        return [rules, spawn, ai, all.linkRange, all.movesPer, all.advance, gen.attrs.spawnEvery, gen.attrs.initial, squad.attrs.approach, squad.attrs.expose];
+    })).toEqual([{linkRange:20, movesPer:2}, {spawnEvery:2}, {approach:0.3, beam:1}, 20, 2, true, 2, 3, 0.3, 12]);
     expect(problems.warnings.filter(w => /^Map test/.test(w)).map(w => w.split(' cannot')[0]).sort()).toEqual([
         'Map test enemy AI attr spawnEvery', 'Map test rules attr advance', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
     ]);

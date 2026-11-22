@@ -29,7 +29,7 @@
         
         {
             view:V,
-            Btn, IconBtn, WideView, Spacer, LabeledValue, maps, settings,
+            Btn, IconBtn, WideView, Spacer, LabeledValue, maps,
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
@@ -70,8 +70,6 @@
         
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
-            // The map's rules, as they were when the game was saved.
-            settings.applyRules(game.gameMap?.rules);
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
@@ -576,8 +574,8 @@
             });
         },
         
-        /*  Loads a map and shows its brief. Start puts its rules into effect and begins a
-            new game in it with the seed shown; Cancel leaves the game as it is. If the map
+        /*  Loads a map and shows its brief. Start begins a new game in it (with its rules
+            and components) with the seed shown; Cancel leaves the game as it is. If the map
             can't be loaded, a dialog says so and the game carries on. callback, if given,
             is called once it's done, whichever way. */
         briefMap: (id, callback) => {
@@ -595,7 +593,6 @@
                         onStart: seed => {
                             const {name, rules, tileGenerator, spawnGenerator, enemyAI, objectives} = gameMap;
                             game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives};
-                            settings.applyRules(rules);
                             game.seed = seed;
                             appView.newGame();
                             callback?.();

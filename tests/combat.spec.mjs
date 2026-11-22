@@ -24,7 +24,7 @@ test('a group attack hits with every member in line; n kills score n squared', a
     const r = await page.evaluate(fwd => {
         const g = hc.app.game, c = g.getPlayerCore();
         for (const p of g.piecesOf('player')) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]);
-        hc.cfg.COMBAT.advance = false;
+        hc.app.game.rules.advance = false;
         const s0 = g.score, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
         g.playerAct(c, m.x, m.y);
         return {hits:m.hits.length, gained:g.score - s0, left:g.piecesOf('enemy').length, moved:c.x !== 0 || c.y !== 0};
@@ -35,7 +35,7 @@ test('a group attack hits with every member in line; n kills score n squared', a
 test('killing a squad leader destroys the squad and every piece counts toward the combo', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs, d = D[0];
-        hc.cfg.COMBAT.advance = false;
+        hc.app.game.rules.advance = false;
         const lead = g.addPiece('core', 'enemy', d[0], d[1]);
         const far = D.map(([dx, dy]) => ({x:lead.x + dx, y:lead.y + dy})).filter(q => hc.hexDist(q, c) > 1 && !g.pieceAt(q.x, q.y));
         g.addPiece('core', 'enemy', far[0].x, far[0].y, lead.id);
@@ -52,7 +52,7 @@ test('killing a squad leader destroys the squad and every piece counts toward th
 test('after a kill the attacker advances, unless that would land on harm', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[1];
-        hc.cfg.COMBAT.advance = true;
+        hc.app.game.rules.advance = true;
         g.addPiece('core', 'enemy', d[0], d[1]);
         g.playerAct(c, d[0], d[1]);
         const advanced = c.x === d[0] && c.y === d[1];
@@ -70,7 +70,7 @@ test('after a kill the attacker advances, unless that would land on harm', async
 test('with advance off, the attacker stays put', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), d = hc.GRID.dirs[1];
-        hc.cfg.COMBAT.advance = false;
+        hc.app.game.rules.advance = false;
         g.addPiece('core', 'enemy', d[0], d[1]);
         g.playerAct(c, d[0], d[1]);
         return [c.x, c.y];
@@ -101,7 +101,7 @@ test('a linked piece must stay within link range of its parent', async ({page}) 
             if (!g.playerAct(a, a.x + d[0], a.y + d[1])) break;
             steps++;
         }
-        return {dist:hc.hexDist(a, c), steps, range:hc.cfg.LINK.range};
+        return {dist:hc.hexDist(a, c), steps, range:hc.app.game.rules.linkRange};
     });
     // It starts 1 step away, so it can take (range - 1) steps outward and no more.
     expect(r).toEqual({dist:r.range, steps:r.range - 1, range:3});

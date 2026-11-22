@@ -33,7 +33,7 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'ProximitySpawnGenerator.js').provides('hc.ProximitySpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist');
     file(MODEL_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.MapComponent');
     file(MODEL_ROOT + 'SquadAI.js').provides('hc.SquadAI').requires('hc.EnemyAI','hc.makeGrid','hc.PIECE_TYPES');
-    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.Goals','hc.solids','hc.EffectTiles','hc.ProximityTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
+    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.Goals','hc.solids','hc.EffectTiles','hc.settings','hc.ProximityTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.attrs','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
