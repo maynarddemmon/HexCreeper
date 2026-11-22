@@ -1,0 +1,37 @@
+{
+	"tileGenerator":{
+		"type":"caverns",
+		
+		"cavernSizeMin":20,
+		"cavernSizeMax":400,
+		"tunnelWidthMin":1,
+		"tunnelWidthMax":3,
+		"tangle":100,
+		"loops":40,
+		"junctionChance":100,
+		
+		"cavernDeadEndSchema":"random",
+		"cavernDeadEndFactor":66,
+		"tunnelDeadEndSchema":"random",
+		"tunnelDeadEndFactor":66,
+		"tunnelLassoChance":50,
+		"cavernLoopChance":50,
+		"cavernJoinChance":75,
+		
+		"stalagmiteFrequency":50,
+		"stalactiteFrequency":50,
+		"holeFrequency":25,
+		
+		"healFrequency":2,
+		"harmFrequency":8,
+		"lootFrequency":1,
+		
+		"holeTable":{"chasm":1},
+		
+		"rockSolid":"ice_wall",
+		"stalagmiteSolid":"icicle",
+		"stalactiteSolid":"icicle"
+	},
+	"spawnGenerator":{"type":"proximity", "initial":0, "pBase":0, "pPerRank":0},
+	"enemyAI":{"type":"squad"}
+}

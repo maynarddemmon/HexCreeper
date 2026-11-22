@@ -55,6 +55,95 @@ test('the start is open, and its cavern has tunnels to the neighbouring caverns 
     expect(r).toEqual({start:'open', children:true, reached:true, rock:true});
 });
 
+// From the start, walking over every made cell without a solid or hole tile: whether the
+// centre of every site within r of the start's on the lattice can be reached.
+const reachesSites = r => {
+    const g = hc.app.game, T = g.tileGenerator,
+        seen = new Set(['0,0']), todo = [[0, 0]];
+    for (const [x, y] of todo) {
+        for (const [dx, dy] of hc.hex.dirs) {
+            const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
+            if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || g.isEffectTile(t))) {
+                seen.add(k);
+                todo.push([x + dx, y + dy]);
+            }
+        }
+    }
+    return hc.hex.disk(0, 0, r).every(({x, y}) => {
+        const s = T.site(x, y), c = hc.hex.cellAtWorld(s.wx, s.wy);
+        return seen.has(c.x + ',' + c.y);
+    });
+};
+
+for (const schema of ['random', 'adaptive']) {
+    test(`with most sites wanting to be dead ends (${schema}), there are dead ends but none cuts anything off`, async ({page}) => {
+        await startGame(page);
+        for (const [seed, factor] of [[3, 60], [4, 90]]) {
+            await inCaverns(page, {
+                junctionChance:50, cavernDeadEndSchema:schema, tunnelDeadEndSchema:schema, cavernDeadEndFactor:factor, tunnelDeadEndFactor:factor,
+                stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0
+            }, seed);
+            expect(await page.evaluate(reachesSites => {
+                const T = hc.app.game.tileGenerator, sites = hc.hex.disk(0, 0, 3);
+                window.caves.make(9);
+                const deadEnds = sites.filter(s => T.isDeadEnd(s.x, s.y)),
+                    // A dead end's only tunnel is to its parent.
+                    tunnels = deadEnds.map(s => hc.hex.dirs.filter(([di, dj]) => T.hasTunnel([s.x, s.y], [s.x + di, s.y + dj])).length);
+                return [deadEnds.length > 3, tunnels.every(n => n === 1), new Function('return ' + reachesSites)()(1)];
+            }, reachesSites.toString())).toEqual([true, true, true]);
+        }
+    });
+}
+
+test('with a dead end factor of 0 there are no dead ends', async ({page}) => {
+    await startGame(page);
+    for (const schema of ['random', 'adaptive']) {
+        await inCaverns(page, {junctionChance:50, cavernDeadEndSchema:schema, tunnelDeadEndSchema:schema, cavernDeadEndFactor:0, tunnelDeadEndFactor:0});
+        expect(await page.evaluate(() => hc.hex.disk(0, 0, 4).some(s => hc.app.game.tileGenerator.isDeadEnd(s.x, s.y)))).toBe(false);
+    }
+});
+
+test('junctions have no cavern; a dead-end tunnel can curl into a ring', async ({page}) => {
+    await startGame(page);
+    await inCaverns(page, {junctionChance:100, tunnelDeadEndFactor:60, tunnelLassoChance:100});
+    const r = await page.evaluate(() => {
+        const T = hc.app.game.tileGenerator, sites = hc.hex.disk(0, 0, 3),
+            lassos = sites.map(s => T.lasso(s.x, s.y)).filter(Boolean),
+            // A lasso's cells go all the way round its centre, and not over it.
+            ring = l => [0, 1, 2, 3, 4, 5, 6, 7].every(n => {
+                const c = hc.hex.cellAtWorld(l.center[0] + l.radius * Math.cos(n * Math.PI / 4), l.center[1] + l.radius * Math.sin(n * Math.PI / 4));
+                return l.cells.has(c.x + ',' + c.y);
+            }) && !l.cells.has(Object.values(hc.hex.cellAtWorld(...l.center)).join());
+        return {
+            start:T.cavern(0, 0).size > 0,
+            others:sites.filter(s => s.x || s.y).every(s => T.cavern(s.x, s.y).size === 0),
+            lassos:lassos.length > 0 && lassos.every(ring)
+        };
+    });
+    expect(r).toEqual({start:true, others:true, lassos:true});
+});
+
+test('a cavern loop leaves its cavern and comes back; joined caverns open straight into each other', async ({page}) => {
+    await startGame(page);
+    await inCaverns(page, {junctionChance:0, cavernLoopChance:100, cavernJoinChance:100, stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0});
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, T = g.tileGenerator, start = T.cavern(0, 0),
+            loop = [...T.cavernLoop(0, 0).cells],
+            [i, j] = hc.hex.dirs.find(([i, j]) => T.isJoined([0, 0], [i, j])),
+            a = T.site(0, 0), b = T.site(i, j);
+        window.caves.make(6);
+        // The straight line between the joined caverns' centres.
+        const line = [];
+        for (let n = 0; n <= 100; n++) line.push(hc.hex.cellAtWorld(a.wx + (b.wx - a.wx) * n / 100, a.wy + (b.wy - a.wy) * n / 100));
+        return {
+            loopOut:loop.some(k => !start.has(k)),
+            loopBack:loop.filter(k => start.has(k)).length > 1,
+            joined:line.every(c => window.caves.cell(c.x, c.y) !== 'rock')
+        };
+    });
+    expect(r).toEqual({loopOut:true, loopBack:true, joined:true});
+});
+
 test('a cell comes out the same whatever order the blocks are made in', async ({page}) => {
     await startGame(page);
     const made = async order => {
