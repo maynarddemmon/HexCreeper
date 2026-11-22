@@ -1,0 +1,31 @@
+{
+	"tileGenerator":{
+		"type":"caverns",
+		
+		"cavernSizeMin":20,
+		"cavernSizeMax":300,
+		"tunnelWidthMin":2,
+		"tunnelWidthMax":4,
+		"tangle":100,
+		"loops":50,
+		
+		"stalagmiteFrequency":50,
+		"stalactiteFrequency":50,
+		"holeFrequency":25,
+		
+		"healFrequency":2,
+		"harmFrequency":8,
+		"lootFrequency":1,
+		
+		"holeTable":{"pit":6, "chasm":3, "sinkhole":1},
+		"healTable":{"heal":2, "spring":1},
+		"harmTable":{"harm":1},
+		"lootTable":{"loot":4, "cache":1},
+		
+		"rockSolid":"cave_rock",
+		"stalagmiteSolid":"stalagmite",
+		"stalactiteSolid":"stalactite"
+	},
+	"spawnGenerator":{"type":"proximity", "initial":0, "pBase":0, "pPerRank":0},
+	"enemyAI":{"type":"squad"}
+}

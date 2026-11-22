@@ -6,16 +6,26 @@
     
     const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
+        // Whether value is one of a choice or table attr's options (anything, before the
+        // options are known).
+        isOption = (def, value) => {
+            const options = def.options();
+            return !options.length || options.some(o => o.value === value);
+        },
+        
         /*  A value the attr can hold, or undefined: booleans must be booleans, choices one of
-            the options (any text, before the options are known), and numbers are rounded
-            (to a whole number of steps) and clamped. */
+            the options, tables {option:weight} with whole-number weights from 0 to 1000,
+            and numbers are rounded (to a whole number of steps) and clamped. */
         normalize = (def, value) => {
             let retval;
             if (def.type === 'boolean') {
                 if (typeof value === 'boolean') retval = value;
             } else if (def.type === 'choice') {
-                const options = def.options();
-                if (typeof value === 'string' && (!options.length || options.some(o => o.value === value))) retval = value;
+                if (typeof value === 'string' && isOption(def, value)) retval = value;
+            } else if (def.type === 'table') {
+                if (isObj(value) && Object.entries(value).every(([k, w]) => isOption(def, k) && Number.isInteger(w) && w >= 0 && w <= 1000)) {
+                    retval = {...value};
+                }
             } else {
                 const n = Math.round(Number(value) / def.step) / (1 / def.step);
                 if (Number.isFinite(n)) retval = Math.min(def.max, Math.max(def.min, n));
@@ -33,6 +43,29 @@
         
         /*  One of the values options() gives: [{value, label}]. */
         choice: (id, defaultValue, options) => ({id, type:'choice', defaultValue, options}),
+        
+        /*  Weights for some of the values options() gives, {value:weight}, to pick one of
+            them at random (see pick). */
+        table: (id, defaultValue, options) => ({id, type:'table', defaultValue, options}),
+        
+        /*  A value from a table attr's value ({value:weight}), picked at random by rng in
+            proportion to the weights, or undefined if they're all 0 (or there are none). */
+        pick: (table, rng) => {
+            const entries = Object.entries(table).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+                total = entries.reduce((sum, [, w]) => sum + w, 0);
+            let retval,
+                n = rng() * total;
+            for (const [value, w] of entries) {
+                if (retval === undefined && w > 0) {
+                    if (n < w) {
+                        retval = value;
+                    } else {
+                        n -= w;
+                    }
+                }
+            }
+            return retval;
+        },
         
         normalize,
         

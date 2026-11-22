@@ -40,6 +40,7 @@
 		"marble":    {"name":"marble",     "hardness":8,  "density":10, "description":""},
 		"basalt":    {"name":"basalt",     "hardness":8,  "density":10, "description":""},
 		"serpentine":{"name":"serpentine", "hardness":7,  "density":10, "description":""},
+		"calcite":   {"name":"calcite",    "hardness":3,  "density":2.7, "description":"Calcite is the mineral stalagmites and stalactites are made of"},
 		
 		// See-through
 		"glass":  {"name":"glass",   "hardness":3, "density":2.5,  "opacity":10, "description":""},
@@ -57,8 +58,9 @@
 	// "coverage" (0-100, default 100) is how much of the cell the material fills, e.g. bars
 	// or a net: its opacity is its material's times its coverage. A solid that can be seen
 	// through is drawn see-through too.
-	// Maps choose which kinds walls and clumps are made of (their tile generator's attrs;
-	// see js/hc/model/ProximityTileGenerator.js).
+	// Maps choose which kinds walls, clumps and cave rock are made of (their tile
+	// generator's attrs; see js/hc/model/ProximityTileGenerator.js and
+	// CavernsTileGenerator.js).
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
 		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12},
@@ -74,7 +76,12 @@
 		"crystal_wall":    {"name":"Crystal wall",     "composition":"crystal",   "hp":20, "fillColor":"#c8b8e8", "borderColor":"#e0d4f6"},
 		"plastic_wall":    {"name":"Plastic wall",     "composition":"plastic",   "hp":6,  "fillColor":"#d8d0b0", "borderColor":"#ece6cc"},
 		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
-		"net":             {"name":"Net",              "composition":"rope",      "hp":3,  "coverage":30, "fillColor":"#8a7a5a", "borderColor":"#a8966e"}
+		"net":             {"name":"Net",              "composition":"rope",      "hp":3,  "coverage":30, "fillColor":"#8a7a5a", "borderColor":"#a8966e"},
+		// Caverns (see js/hc/model/CavernsTileGenerator.js). A stalactite hangs from the
+		// ceiling, so you can see past it more than a stalagmite.
+		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c"},
+		"stalagmite":      {"name":"Stalagmite",       "composition":"calcite",   "hp":8,  "fillColor":"#9a8f7e", "borderColor":"#b3a894"},
+		"stalactite":      {"name":"Stalactite",       "composition":"calcite",   "hp":6,  "coverage":40, "fillColor":"#a89c88", "borderColor":"#c0b49e"}
 	},
 	
 	// Kinds of hole tile: a name, a description and optionally the colour it's filled with
@@ -101,8 +108,8 @@
 	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
-	// Maps choose which kinds a quadrant's tiles are (their tile generator's attrs; see
-	// js/hc/model/ProximityTileGenerator.js).
+	// Maps choose which kinds their tiles are (their tile generator's attrs; see
+	// js/hc/model/ProximityTileGenerator.js and CavernsTileGenerator.js).
 	"heals":{
 		"heal": {
 			"name":"Heal",
@@ -189,6 +196,16 @@
 			"number":3,
 			"name":"Hedge Maze",
 			"description":"A maze of hedges."
+		},{
+			"id":"caverns",
+			"number":4,
+			"name":"Caverns",
+			"description":"Caverns deep in the rock, joined by winding tunnels."
+		},{
+			"id":"empty_caverns",
+			"number":5,
+			"name":"Empty Caverns",
+			"description":"Empty Caverns deep in the rock, joined by twisty tunnels."
 		}
 	]
 }

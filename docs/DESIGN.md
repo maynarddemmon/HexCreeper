@@ -55,7 +55,8 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 - **TileGenerator:** `start()` (a new game, the core in place), `piecesMoved()` (your pieces moved or one was placed; then the game reveals tiles).
 - **SpawnGenerator:** `start()` (a new game: the starting enemies), `turnEnded()` (each new turn: waves).
 - **EnemyAI:** `takeTurn()` (the enemies' turn). Game's `enemyPhase` calls it and animates what it does: the AI sets `game.track` to the squad acting and calls `game.endAction()` after each action.
-- So far there's one of each. The generators are **"proximity"**: `ProximityTileGenerator` (the map made around your pieces as they go, by quadrant: see Quadrants and tiles; it keeps the quadrants made, borders and quadrants visited, which the `quadsVisited` goal value and the visited tint read) and `ProximitySpawnGenerator` (waves around your core: see Enemy pressure and Enemy pathing and spawning). The enemy AI is **"squad"**: `SquadAI` (see Enemy AI). Their attrs are below (Settings).
+- The tile generators are **"proximity"**: `ProximityTileGenerator` (the map made around your pieces as they go, by quadrant: see Quadrants and tiles; it keeps the quadrants made, borders and quadrants visited, which the `quadsVisited` goal value and the visited tint read), and **"caverns"** (2026-11-22): `CavernsTileGenerator` (caverns joined by tunnels in solid rock: see Caverns). There's one spawn generator, **"proximity"**: `ProximitySpawnGenerator` (waves around your core: see Enemy pressure and Enemy pathing and spawning). The enemy AI is **"squad"**: `SquadAI` (see Enemy AI). Their attrs are below (Settings).
+- An attr can be a **table** (2026-11-22): weights for some of a set of subtypes, `{subtype:weight}` (whole numbers, 0 to 1000), from which one is picked at random in proportion (`attrs.pick`; all 0 picks none). A table with an unknown subtype or a bad weight is skipped with a warning, like any attr.
 
 ## Enemy pressure (tied to player rank)
 - **R = your highest piece rank.** The turn count doesn't drive difficulty (an optional clock ramp exists, off by default).
@@ -101,6 +102,15 @@ The "squad" enemy AI (`model/SquadAI.js`); its numbers are its attrs (see Settin
 - **Hole subtypes** (2026-11-21, `model/Solids.js`, `hc.holes`): `data/init.json5` lists `"holes"`, each with a `name`, a `description` (no material) and optionally a `fillColor` (any CSS colour or a `--variable`, in place of the usual near-black). Hole walls are made of the `wallHole` subtype and clumps of `clumpHole` *(settings)*; each hole tile keeps its `subtype` (saved). Hovering a known hole shows its name and description.
 - **Breaking solids:** your pieces (not enemies) can attack a solid like an enemy, by moving into it, but only if their rank is more than its DR. A hit does the attacker's rank less the DR; at 0 HP the solid is gone, leaving open floor, and the attacker advances into it (with `advance` on). In a group move, each piece that would land on a breakable solid hits it. A solid that's too hard just blocks, as before. A damaged solid shows a bar of its HP left, and pointing at a solid says what it is, its material, HP and DR. Solids from saves made before this have no subtype and can't be broken.
 - **Hole tile** (near-black hex with lines fading in from its corners): blocks movement, placing and spawning exactly like a solid tile, but **doesn't block sight**.
+
+## Caverns
+(2026-11-22, `model/CavernsTileGenerator.js`, the "caverns" tile generator; the **Caverns** map uses it, with "proximity" spawning for now.) A network of caverns joined by tunnels, in solid rock. There are no quadrants: the visited tint doesn't show, and the `quadsVisited` goal value stays 0.
+- **Caverns** sit at sites on a hidden lattice (axial, spaced so no two caverns touch: from `cavernSizeMax`), each moved up to 12% of the spacing at random. A cavern is `cavernSizeMin` to `cavernSizeMax` cells (60 / 200), irregular: its radius wobbles with the angle (three random harmonics). Site (0, 0)'s cavern isn't moved, so you start in its centre.
+- **Tunnels** run from cavern centre to cavern centre. Every cavern has one to a neighbouring cavern nearer the start (picked by the seed), so they're all joined; any two neighbours get another at `loops`% (30). A tunnel swings to the side as it goes, by up to `tangle`% (40) of 30% of its length, in waves that get tighter with tangle; with tangle 0 it's straight. Its width drifts between `tunnelWidthMin` and `tunnelWidthMax` (2 / 3).
+- **Rock** (`rockSolid`: cave rock, limestone, DR 8, 40 HP) fills every other cell, so digging is possible but only for rank 9 and up.
+- On **cavern floor**, off the tunnels' paths through the caverns and the cells around the start (so nothing cuts a cavern off): **stalagmites** (`stalagmiteSolid`; calcite, DR 3, 8 HP), **stalactites** (`stalactiteSolid`; calcite, 6 HP, 40% coverage: they hang from the ceiling, so you can partly see past them) and clumps of 1 to 3 **holes** (`holeTable`: pit 6, chasm 3, sinkhole 1). On any open cell but the start: **heal, harm and loot** tiles (`healTable`, `harmTable`, `lootTable`). The `*Frequency` attrs are tiles (for holes, clumps) per 1000 cells: stalagmites 30, stalactites 20, holes 15, heal 4, harm 4, loot 2.
+- Cells are made as your pieces go, out to where they could see, a block (radius 4) at a time; each cell comes from the seed alone, so it's the same whatever order it's made in. The generator keeps only which blocks it has made.
+- Rock fills every cell made, so a long game holds many solid tiles (about 10k after a lot of exploring, ~0.5 MB saved). If that's too much, only the rock next to open space could be made, and more when one is broken.
 
 ## Fog of war
 - *(On; `VISION.fog` in `hc.cfg` turns it off, for testing. It's not a setting: it's a core feature.)* A cell is **in sight** if it's within the **vision radius** (12 steps, *setting*) of one of your pieces and the straight line between the two cell centres isn't blocked by a solid tile. The two end cells don't count, so you see the solid tiles that block you. A line running exactly along the edge between two cells is blocked only if both are solid.
@@ -177,6 +187,19 @@ Rules and attrs are never shown to the player: they're tuned in code, or by a ma
 | `holeMin` / `holeMax` (hole tiles per quadrant) | 0 / 3 |
 | `wallSolid` / `clumpSolid` | stone_wall (granite, DR 13, 30 HP) / boulder (basalt, DR 8, 12 HP) |
 | `wallHole` / `clumpHole` | chasm / pit |
+
+**Tile generator "caverns"** (`CavernsTileGenerator.ATTRS`; see Caverns):
+
+| Attr | Default |
+|---|---|
+| `cavernSizeMin` / `cavernSizeMax` (cells) | 60 / 200 |
+| `tunnelWidthMin` / `tunnelWidthMax` (cells) | 2 / 3 |
+| `tangle` (how much tunnels wind) | 40 |
+| `loops` (% chance of a tunnel between neighbours, on top of the ones joining them all) | 30 |
+| `stalagmiteFrequency` / `stalactiteFrequency` / `holeFrequency` (per 1000 cavern cells) | 30 / 20 / 15 |
+| `healFrequency` / `harmFrequency` / `lootFrequency` (per 1000 open cells) | 4 / 4 / 2 |
+| `holeTable` / `healTable` / `harmTable` / `lootTable` | pit 6, chasm 3, sinkhole 1 / heal / harm / loot |
+| `rockSolid` / `stalagmiteSolid` / `stalactiteSolid` | cave_rock / stalagmite / stalactite |
 
 **Spawn generator "proximity"** (`ProximitySpawnGenerator.ATTRS`):
 
@@ -256,11 +279,12 @@ Rules and attrs are never shown to the player: they're tuned in code, or by a ma
 - `model/Subtypes.js`: `hc.Subtypes`, the base class for every set of subtypes from init.json5 (`define`, `get`, `list`; every entry has a name and description, and a parse function gives the rest). Materials, solids, holes, heals, harms and loots are all one.
 - `model/Solids.js`: `hc.solids` (`define(materials, solids)`, `get`, `list`, `getMaterial`) and `hc.holes`, Subtypes for the materials, solids and holes from init.json5.
 - `model/Expr.js`: `hc.expr.compile`, the expression language. `model/Goals.js`: `hc.goals` (`fromMap`, `compile`, `isGood`, the values and functions) and `hc.Goals`, a JS.Module included in Game: `getMapObjectives`, `evaluateObjectives` / `endGame`.
+- `model/CavernsTileGenerator.js`: `hc.CavernsTileGenerator`, the "caverns" tile generator.
 - `model/MapComponent.js`: `hc.MapComponent`, the base of a map's components (registry, `make`, `cleanAttrs`, `ATTRS`, `this.attrs`). `model/Generators.js`: `hc.TileGenerator`, `hc.SpawnGenerator`. `model/EnemyAI.js`: `hc.EnemyAI`.
 - `model/SquadAI.js`: `hc.SquadAI`, the "squad" enemy AI: `takeTurn` → `planSquad` (beam search, near squads) / `marchSquad` (far squads). Game's `enemyPhase` calls `takeTurn`. Squad state: `root.idle`.
 - `view/View.js`: `hc.view`, the shared view state (canvas, camera and its animated pans `panTo` / `stepPan`, hover, input mode) and cell-drawing helpers (`cellCenter`, `inView`, `addCellPath`, `fillCell`, `strokeCell`, `strokeRegion`).
 - `model/Settings.js`: `hc.settings`, the preferences (`get`, `set`, `getGroups`; saved in localStorage) and the map rules (`RULES`; `cleanRules` for a map's, `resolveRules` for all of them, as `Game.reset` and `importFromObj` make `game.rules`). A preference's definition maps to a value in `hc.cfg`. `model/Attrs.js`: `hc.attrs`, declaring and checking attrs (`num`, `bool`, `choice`, `normalize`, `resolve`), used by both and by the generators.
 - `model/Maps.js`: `hc.maps` (`loadIndex`, `loadMap`), loading `init.json5` and map files, checking a map's rules and components.
-- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` (version 4 since 2026-11-22, when the game's rules were saved with it; versions 2 and 3 had maps' rules, generators and enemy AI; older saves are refused) is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
+- `model/Persistence.js`: `hc.PersistenceManager`, the save game (from TimeCorps). The record `{version, format, savedAt, data}` (version 1; a save of any other version is refused) is stored in localStorage (`hc.save`); `data` is `Game.exportToObj()`, the whole game, and `Game.importFromObj()` restores it. `export` / `importRecord` write and read the same record as a file.
 - `view/Render.js` draws the board; `view/GameView.js` is the myt view around the canvas (info panel, status line, mouse input); `view/SettingsDialog.js` builds the preference rows from the definitions (`SettingsList`) and the dialog around them; `view/MapsDialog.js` and `view/MapBrief.js` list maps and brief one; `App.js` is the myt root view (header, keyboard, new games, help; `hc.app.game` exposes the game for tests).
 - UI framework: [myt](https://github.com/maynarddemmon/myt), with components, dialogs, i18n and help loading taken from TimeCorps.

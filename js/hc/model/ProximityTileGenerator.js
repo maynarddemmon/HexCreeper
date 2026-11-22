@@ -9,12 +9,9 @@
     
     const {
         attrs:{num, choice},
+        TileGenerator:{optionsOf},
         TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT
-    } = pkg,
-        
-        // A set of subtypes (solids, holes, heals...), as choices. They're known once
-        // init.json5 has loaded.
-        optionsOf = subtypes => () => subtypes.list().map(s => ({value:s.id, label:s.name}));
+    } = pkg;
     
     const ProximityTileGenerator = pkg.ProximityTileGenerator = new JS.Class('ProximityTileGenerator', pkg.TileGenerator, {
         // Class Methods and Attributes ////////////////////////////////////////

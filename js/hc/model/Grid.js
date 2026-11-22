@@ -143,6 +143,10 @@
             radius:k,
             of, // the chunk [i, j] cell (q, r) is in
             key: (q, r) => of(q, r).join(','), // and as an "i,j" key
+            center: (i, j) => {
+                const [x, y] = center(i, j);
+                return {x, y};
+            }, // the cell in the middle of chunk (i, j)
             neighbours: (i, j) => [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1], [i + 1, j - 1], [i - 1, j + 1]],
             cells: (i, j) => {
                 const [cq, cr] = center(i, j);

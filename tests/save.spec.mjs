@@ -158,7 +158,7 @@ for (const [what, contents, msg] of [
     ['not a save', JSON.stringify({version:1, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
     ['without a format', JSON.stringify({version:1, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
     ['in an unknown format', JSON.stringify({version:1, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
-    ['from before the rules were saved', JSON.stringify({version:0.5, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (0.5).']
+    ['from an unsupported version', JSON.stringify({version:0.5, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (0.5).']
 ]) {
     test(`importing a file that is ${what} changes nothing`, async ({page}) => {
         await startGame(page);
