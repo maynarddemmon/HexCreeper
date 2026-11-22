@@ -1098,10 +1098,11 @@
         },
         
         // When what's being done now shows: now, or for a squad, when its action starts.
+        // With animation off, everything shows at once.
         actionStart: function() {
             const now = performance.now();
             let t = now;
-            if (this.track != null) {
+            if (this.track != null && ANIM.on) {
                 this.openAction ??= {t0:Math.max(now, this.trackEnds.get(this.track) ?? 0), dur:0};
                 t = this.openAction.t0;
             }
@@ -1119,14 +1120,16 @@
             this.openAction = null;
         },
         
-        // Piece p moved from one cell to another (by a jump, or a step).
+        // Piece p moved from one cell to another (by a jump, or a step). Nothing to animate
+        // with animation off.
         motionFx: function(p, from, to, jump = false) {
             const now = performance.now(),
-                dur = jump ? ANIM.JUMP_MS : ANIM.MOVE_MS,
-                t0 = this.actionStart();
+                dur = jump ? ANIM.JUMP_MS : ANIM.MOVE_MS;
             this.motions = this.motions.filter(m => now < m.t0 + m.dur && !(this.track == null && m.id === p.id));
-            this.motions.push({id:p.id, from, to, jump, t0, dur});
-            this.actionTakes(dur);
+            if (ANIM.on) {
+                this.motions.push({id:p.id, from, to, jump, t0:this.actionStart(), dur});
+                this.actionTakes(dur);
+            }
         },
         
         // When everything animating will have finished.

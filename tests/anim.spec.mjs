@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard} from './helpers.mjs';
+import {startGame, clearBoard, button} from './helpers.mjs';
 
 test.beforeEach(async ({page}) => {
     await startGame(page);
@@ -14,7 +14,8 @@ test('moves are recorded to animate: a group step together, a jump as a jump', a
         g.playerWait();
         g.motions = [];
         g.playerAct(c, 0, 1);
-        const step = g.motions.map(m => [m.from, m.to, m.jump, m.t0 === g.motions[0].t0]);
+        // Together: within a few ms (each reads the clock).
+        const step = g.motions.map(m => [m.from, m.to, m.jump, Math.abs(m.t0 - g.motions[0].t0) < 5]);
         g.playerWait();
         g.motions = [];
         g.playerJump(c, -2, 1);
@@ -81,4 +82,47 @@ test('a piece destroyed in a squad\'s later action stays drawn until then', asyn
         return {gone:!g.pieces.has(kid.id), later:burst.t0 - now >= hc.cfg.ANIM.MOVE_MS - 1};
     });
     expect(r).toEqual({gone:true, later:true});
+});
+
+test('with Animate pieces off, nothing is animated, and the enemies\' turn shows at once', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        hc.settings.set('animate', false);
+        g.motions = [];
+        g.playerAct(c, 1, 0);
+        const moved = g.motions.length;
+        g.score = 100;
+        g.playerPlace(1, -1, c);
+        const kid = g.pieceAt(1, -1);
+        kid.hp = 1;
+        const e = g.addPiece('core', 'enemy', 3, -3), e2 = g.addPiece('core', 'enemy', 2, -2, e.id);
+        g.recomputeRanks();
+        g.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
+        hc.cfg.AI.planRange = 100;
+        g.effects = [];
+        const now = performance.now();
+        g.enemyPhase();
+        return {moved, enemyMoves:g.motions.length, killed:!g.pieces.has(kid.id), atOnce:g.effects.every(f => f.t0 - (f.delay || 0) - now < 50)};
+    });
+    expect(r).toEqual({moved:0, enemyMoves:0, killed:true, atOnce:true});
+});
+
+test('Animate pieces is a preference: in Settings in every level, kept for the whole app, left alone by Reset to Defaults, not in a brief', async ({page}) => {
+    await button(page, 'Settings').click();
+    await expect(page.getByText('Display', {exact:true}).filter({visible:true})).toBeVisible();
+    await page.getByText('Animate pieces', {exact:true}).filter({visible:true}).click();
+    expect(await page.evaluate(() => [hc.cfg.ANIM.on, JSON.parse(localStorage.getItem('hc.prefs')), localStorage.getItem('hc.settings')])).toEqual([false, {animate:false}, null]);
+    await button(page, 'Reset to Defaults').click();
+    expect(await page.evaluate(() => hc.cfg.ANIM.on)).toBe(false);
+    await page.keyboard.press('Escape');
+    // A level can't change it, and it carries over to other levels.
+    expect(await page.evaluate(() => {
+        hc.settings.applyLevel('warrens', {animate:{value:true, pref:true}});
+        return [hc.cfg.ANIM.on, hc.settings.get('animate')];
+    })).toEqual([false, false]);
+    await page.evaluate(() => hc.settings.applyLevel('endless', hc.app.game.level?.attrs));
+    await button(page, 'Levels').click();
+    await button(page, 'Play Open Ground').click();
+    await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();
+    await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toHaveCount(0);
 });

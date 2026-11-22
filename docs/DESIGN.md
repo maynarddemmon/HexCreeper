@@ -114,7 +114,11 @@ Every rule in the game, its default numbers, and why it is the way it is. All th
 - Still to come: more kinds of goals (e.g. places to reach shown on the board), end briefs, going on to the next level, and locking levels.
 
 ## Settings
-Every setting belongs to the level being played (see Levels): Settings shows only those the level marks `pref`. A change applies immediately (those marked "new game" from the next game) and is saved in the browser per level (`hc.settings`, `{levelId:{settingId:value}}`). "Reset to Defaults" goes back to the level's values. The defaults are:
+Every setting belongs to the level being played (see Levels): Settings shows only those the level marks `pref`. A change applies immediately (those marked "new game" from the next game) and is saved in the browser per level (`hc.settings`, `{levelId:{settingId:value}}`). "Reset to Defaults" goes back to the level's values.
+
+**Preferences** (2026-11-21) are settings for the whole app rather than a level (`app:true` in their definition): they're always in Settings, in a **Display** section at the top, but not in a level's brief; a level's `attrs` can't change them; they're saved once for every level (`hc.prefs`, `{settingId:value}`); and Reset to Defaults leaves them alone. The one so far is **Animate pieces** (on; `ANIM.on`): off, nothing is animated and the enemies' turn shows at once.
+
+The defaults are:
 
 | Setting | Default |
 |---|---|

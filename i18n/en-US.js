@@ -133,6 +133,7 @@ myt.I18N.setDictionary({
 // Settings
 "settings-none":"This level has no settings you can change.",
 "settings-note":"Changes apply at once. Those marked ✱ apply from the next new game.",
+"settings-group-display":"Display",
 "settings-group-vision":"Vision",
 "settings-group-waves":"Enemy Waves",
 "settings-group-enemies":"Enemies",
@@ -174,6 +175,7 @@ myt.I18N.setDictionary({
 "setting-doorMax":"Door width (max)",
 "setting-solidMin":"Solid tiles per quadrant (min)",
 "setting-solidMax":"Solid tiles per quadrant (max)",
+"setting-animate":"Animate pieces",
 "setting-holeMin":"Hole tiles per quadrant (min)",
 "setting-holeMax":"Hole tiles per quadrant (max)",
 "setting-wallSolid":"Walls are made of",

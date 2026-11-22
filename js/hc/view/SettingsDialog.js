@@ -135,13 +135,16 @@
         });
     
     /*  Every setting, by group, built from the setting definitions; refresh shows only those
-        the level shows. Changes apply as soon as they're made. Used by the SettingsDialog and
-        the LevelBrief. */
+        the level shows, and with prefs, the preferences (always). Changes apply as soon as
+        they're made. Used by the SettingsDialog (with prefs) and the LevelBrief. */
     pkg.SettingsList = new JSClass('SettingsList', WideView, {
         initNode: function(parent, attrs) {
             const self = this,
                 rows = self._rows = [],
                 headers = self._headers = [];
+            
+            self.prefs = !!attrs.prefs;
+            delete attrs.prefs;
             
             self.callSuper(parent, attrs);
             
@@ -155,15 +158,15 @@
             new SpacedLayout(self, {axis:'y', spacing, collapseParent:true});
         },
         
-        /*  Shows the settings the level being played shows, with their values. Returns
-            whether there are any. */
+        /*  Shows the settings the level being played shows (and the preferences, with
+            prefs), with their values. Returns whether the level shows any. */
         refresh: function() {
             for (const row of this._rows) {
-                row.setVisible(settings.isShown(row.def.id));
+                row.setVisible(row.def.app ? this.prefs : settings.isShown(row.def.id));
                 row.refresh();
             }
             for (const header of this._headers) header.setVisible(header.rows.some(row => row.visible));
-            return this._rows.some(row => row.visible);
+            return this._rows.some(row => row.visible && !row.def.app);
         }
     });
     
@@ -193,7 +196,7 @@
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
-            self._list = new pkg.SettingsList(container);
+            self._list = new pkg.SettingsList(container, {prefs:true});
             
             new SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});
         },

@@ -5,11 +5,13 @@
         
         {
             isObj,
-            cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK}
+            cfg:{AI, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK, ANIM}
         } = pkg,
         
         STORAGE_KEY = 'hc.settings',
+        PREFS_KEY = 'hc.prefs',
         
+        GROUP_DISPLAY = 'display',
         GROUP_VISION = 'vision',
         GROUP_WAVES = 'waves',
         GROUP_ENEMIES = 'enemies',
@@ -36,6 +38,11 @@
             defaultValue:obj[prop], label:i18n('setting-' + id)
         }),
         
+        // A preference: a setting for the whole app, not a level. It's always in Settings
+        // (not in a level's brief), levels can't change it, it's kept once for every level,
+        // and Reset to Defaults leaves it alone.
+        pref = def => ({...def, app:true}),
+        
         // The solid subtypes, as choices. They're known once init.json5 has loaded.
         solidOptions = () => pkg.solids.list().map(s => ({value:s.id, label:s.name})),
         
@@ -45,6 +52,8 @@
         /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
             setting here is enough to make it appear there (in a level that shows it). */
         DEFINITIONS = [
+        pref(bool('animate', GROUP_DISPLAY, ANIM, 'on')),
+        
         bool('fog',        GROUP_VISION, VISION,  'fog'),
         num('visionRadius', GROUP_VISION, VISION, 'radius', 1, 30),
         
@@ -100,7 +109,7 @@
         num('healPer',     GROUP_HEALS, HEAL,     'per', 1, 8),
         num('healScore',   GROUP_HEALS, RANK,     'healScorePer', 0, 20)],
         
-        GROUPS = [GROUP_VISION, GROUP_WAVES, GROUP_ENEMIES, GROUP_SWARM, GROUP_TILES, GROUP_HEALS].map(id => ({
+        GROUPS = [GROUP_DISPLAY, GROUP_VISION, GROUP_WAVES, GROUP_ENEMIES, GROUP_SWARM, GROUP_TILES, GROUP_HEALS].map(id => ({
             id, label:i18n('settings-group-' + id), definitions:DEFINITIONS.filter(def => def.group === id)
         })),
         
@@ -153,6 +162,36 @@
             return retval;
         })(),
         
+        /*  The preferences the player has changed: {settingId:value}, for every level. */
+        prefs = (() => {
+            const retval = {};
+            try {
+                const stored = JSON.parse(localStorage.getItem(PREFS_KEY));
+                if (isObj(stored)) {
+                    for (const id in stored) {
+                        const def = DEFINITIONS_BY_ID.get(id),
+                            value = def?.app ? normalize(def, stored[id]) : undefined;
+                        if (value !== undefined) retval[id] = value;
+                    }
+                }
+            } catch (err) {
+                console.warn('Unable to read preferences', err);
+            }
+            return retval;
+        })(),
+        
+        writePrefs = () => {
+            try {
+                if (Object.keys(prefs).length) {
+                    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+                } else {
+                    localStorage.removeItem(PREFS_KEY);
+                }
+            } catch (err) {
+                console.warn('Unable to store preferences', err);
+            }
+        },
+        
         writeOverrides = () => {
             try {
                 for (const levelId in overrides) if (!Object.keys(overrides[levelId]).length) delete overrides[levelId];
@@ -179,7 +218,7 @@
         isShown = id => entries[id]?.pref === true,
         
         /*  The value in effect: the player's, if the level shows the setting and they've
-            changed it, otherwise the level's. */
+            changed it, otherwise the level's. A preference's is the player's, or its default. */
         get = id => {
             const def = DEFINITIONS_BY_ID.get(id);
             if (!def) {
@@ -187,7 +226,7 @@
                 return;
             }
             const mine = overrides[levelId];
-            return isShown(id) && mine && id in mine ? mine[id] : levelValue(def);
+            return def.app ? prefs[id] ?? def.defaultValue : isShown(id) && mine && id in mine ? mine[id] : levelValue(def);
         },
         
         applyAll = () => {
@@ -211,16 +250,25 @@
         isShown,
         
         /*  Returns the value set, after rounding and clamping, or undefined if it was refused,
-            including when the level doesn't show the setting. */
+            including when the level doesn't show the setting. A preference can always be set. */
         set: (id, value) => {
             const def = DEFINITIONS_BY_ID.get(id);
-            if (!def || !isShown(id)) {
+            if (!def || !(def.app || isShown(id))) {
                 console.warn('Setting', id, 'cannot be changed in this level');
                 return;
             }
             const normalized = normalize(def, value);
             if (normalized === undefined) {
                 console.warn('Setting', id, 'cannot be', value);
+            } else if (def.app) {
+                if (normalized === def.defaultValue) {
+                    delete prefs[id];
+                } else {
+                    prefs[id] = normalized;
+                }
+                writePrefs();
+                applyValue(def, normalized);
+                pkg.app?.notifySettingChanged(id, normalized);
             } else {
                 const mine = overrides[levelId] ??= {};
                 if (normalized === levelValue(def)) {
@@ -245,7 +293,7 @@
             for (const settingId in attrs ?? {}) {
                 const def = DEFINITIONS_BY_ID.get(settingId),
                     entry = attrs[settingId];
-                if (!def || !isObj(entry)) {
+                if (!def || def.app || !isObj(entry)) {
                     console.warn('Level attr', settingId, 'cannot be', entry);
                     continue;
                 }
