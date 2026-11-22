@@ -27,7 +27,10 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
     file(MODEL_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc.Subtypes');
     file(MODEL_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
-    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids','hc.EffectTiles');
+    file(MODEL_ROOT + 'Generators.js').provides('hc.TileGenerator','hc.SpawnGenerator').requires('hc.cfg');
+    file(MODEL_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeGrid');
+    file(MODEL_ROOT + 'ProximitySpawnGenerator.js').provides('hc.ProximitySpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist');
+    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.makeGrid','hc.PIECE_TYPES','hc.Movement','hc.EnemyAI','hc.Goals','hc.solids','hc.EffectTiles','hc.ProximityTileGenerator','hc.ProximitySpawnGenerator');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.EffectTiles','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');

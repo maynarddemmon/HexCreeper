@@ -110,7 +110,7 @@
             
             // Quadrants: the world is divided into hexagonal quadrants of radius QUAD.radius.
             // Whenever a player piece is in a quadrant, that quadrant and those around it, out to
-            // the vision radius (see Game.updateQuadrants), get their tiles generated (once each,
+            // the vision radius (see ProximityTileGenerator.piecesMoved), get their tiles generated (once each,
             // never cleaned up). Visited quadrants are tinted.
             QUAD:{
                 radius:5 // applies to new games; the start cell (0,0) is the centre of quadrant (0,0)

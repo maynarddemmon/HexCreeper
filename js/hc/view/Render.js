@@ -396,7 +396,8 @@
         }
         
         // Visited quadrants
-        fillCells(known.filter(c => game.visitedQuads.has(chunkKey(c.x, c.y))), '--visited');
+        const visited = game.tileGenerator.visitedQuads; // with a generator that has quadrants
+        if (visited) fillCells(known.filter(c => visited.has(chunkKey(c.x, c.y))), '--visited');
         
         // Heal, harm, solid and hole tiles
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));

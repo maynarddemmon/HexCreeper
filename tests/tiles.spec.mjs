@@ -15,7 +15,7 @@ test('solids and holes go out to the vision radius; heal and harm tiles only 1 q
                 const [i, j] = hc.GRID.chunkOf(t.x, t.y);
                 return hc.GRID.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
-        return {terrainQuads:g.terrainQuads.size, tiledQuads:g.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
+        return {terrainQuads:g.tileGenerator.terrainQuads.size, tiledQuads:g.tileGenerator.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
             harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === hc.cfg.TILES[t.kind + 'Type'])};
     });
     expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, subtypes:true});
@@ -33,9 +33,9 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
             for (let i = 0; i < 40; i++) {
                 g.seed = i; // a different map each time
                 g.tiles.clear();
-                g.borders.clear();
-                g.terrainQuads.delete('0,0');
-                g.generateTerrain(0, 0);
+                g.tileGenerator.borders.clear();
+                g.tileGenerator.terrainQuads.delete('0,0');
+                g.tileGenerator.generateTerrain(0, 0);
                 const clump = [...g.tiles.values()].filter(t => t.kind === kind),
                     keys = new Set(clump.map(t => g.key(t.x, t.y)));
                 sizes.add(clump.length);
@@ -72,14 +72,14 @@ const wallsOnly = page => page.evaluate(() => {
         // Makes the seven quadrants again, in the given order of quadrant indexes.
         regenerate: (order = [0, 1, 2, 3, 4, 5, 6]) => {
             g.tiles.clear();
-            g.terrainQuads.clear();
-            g.borders.clear();
-            for (const n of order) g.generateTerrain(...quads[n]);
+            g.tileGenerator.terrainQuads.clear();
+            g.tileGenerator.borders.clear();
+            for (const n of order) g.tileGenerator.generateTerrain(...quads[n]);
         },
         // (0,0)'s borders, each with the cells of its wall less the two corners, which
         // other walls share.
         borders: () => G.chunkNeighbours(0, 0).map(([i, j]) => {
-            const bk = g.borderKey('0,0', i + ',' + j), [side, other] = bk.split('|');
+            const bk = hc.ProximityTileGenerator.borderKey('0,0', i + ',' + j), [side, other] = bk.split('|');
             return {bk, inner:touching(side, other).filter(c => G.dirs.every(([dx, dy]) => {
                 const k = G.chunkKey(c.x + dx, c.y + dy);
                 return k === side || k === other;
@@ -170,9 +170,9 @@ test('holes are placed after solid tiles and may replace them', async ({page}) =
         T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;
         g.tiles.clear();
-        g.borders.clear();
-        g.terrainQuads.delete('0,0');
-        g.generateTerrain(0, 0);
+        g.tileGenerator.borders.clear();
+        g.tileGenerator.terrainQuads.delete('0,0');
+        g.tileGenerator.generateTerrain(0, 0);
         const kinds = [...g.tiles.values()].map(t => t.kind);
         return {holes:kinds.filter(k => k === 'hole').length, solids:kinds.filter(k => k === 'solid').length === free - 3};
     });
@@ -224,8 +224,8 @@ test.describe('rules', () => {
         await putTile(page, d[0], d[1], 'harm', 'harm');
         const r = await page.evaluate(() => {
             const g = hc.app.game, d = hc.GRID.dirs[0];
-            for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.visitedQuads.add(i + ',' + j);
-            g.updateQuadrants();
+            for (const [i, j] of hc.GRID.chunkNeighbours(0, 0)) g.tileGenerator.visitedQuads.add(i + ',' + j);
+            g.piecesMoved();
             return g.isHarm(d[0], d[1]);
         });
         expect(r).toBe(true);

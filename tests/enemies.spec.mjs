@@ -12,12 +12,12 @@ test.describe('waves', () => {
     test('wave size and squad size follow the highest player rank, not the turn', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.GRID.dirs, out = [];
-            out.push([g.waveSize(), g.squadCap()]);
+            out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             g.turn = 300;
-            out.push([g.waveSize(), g.squadCap()]);
+            out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             g.score = 1000;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
-            out.push([g.waveSize(), g.squadCap()]);
+            out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             return out;
         });
         expect(r).toEqual([[1, 2], [1, 2], [3, 3]]);
@@ -26,7 +26,7 @@ test.describe('waves', () => {
     test('squads spawn as binary link trees with ranks', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game;
-            const sizes = [3, 7].map(n => { const root = g.spawnSquad(n); return [g.group(root).length, root.rank, root.hp]; });
+            const sizes = [3, 7].map(n => { const root = g.spawnGenerator.spawnSquad(n); return [g.group(root).length, root.rank, root.hp]; });
             return sizes;
         });
         expect(r).toEqual([[3, 2, 2], [7, 3, 3]]);

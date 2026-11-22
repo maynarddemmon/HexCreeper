@@ -229,7 +229,7 @@
             const core = [a, b].find(p => p.id === this.playerCoreId);
             if (core) this.corePath.push([core.x, core.y]);
             this.landOnTiles([a, b]);
-            if (a.owner === 'player') this.updateQuadrants();
+            if (a.owner === 'player') this.piecesMoved();
         },
         
         // ---- Swap ----
@@ -392,7 +392,7 @@
             }
             if (piece.owner === 'player') {
                 this.landOnTiles(moved);
-                this.updateQuadrants();
+                this.piecesMoved();
             }
             return moved;
         }

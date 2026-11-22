@@ -88,8 +88,8 @@ test('every value an expression can use is a number, at the start of a game', as
     expect((await state(page)).objectives.every(s => s.value)).toBe(true);
     expect(await page.evaluate(() => {
         const g = hc.app.game;
-        return [hc.goals.compile('turn + coreHp + coreDist + quadsVisited')({value:n => ({turn:g.turn, coreHp:g.getPlayerCore().hp, coreDist:0, quadsVisited:g.visitedQuads.size})[n]})];
-    })).toEqual([await page.evaluate(() => 1 + hc.app.game.getPlayerCore().hp + hc.app.game.visitedQuads.size)]);
+        return [hc.goals.compile('turn + coreHp + coreDist + quadsVisited')({value:n => ({turn:g.turn, coreHp:g.getPlayerCore().hp, coreDist:0, quadsVisited:g.tileGenerator.visitedQuads.size})[n]})];
+    })).toEqual([await page.evaluate(() => 1 + hc.app.game.getPlayerCore().hp + hc.app.game.tileGenerator.visitedQuads.size)]);
 });
 
 test('kills, pieces lost and placed, and the core\'s distance are counted', async ({page}) => {

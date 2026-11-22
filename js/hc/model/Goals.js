@@ -25,7 +25,7 @@
             lootTaken:g => g.lootTaken,
             enemies:g => g.piecesOf('enemy').length,
             kills:g => g.kills,
-            quadsVisited:g => g.visitedQuads.size
+            quadsVisited:g => g.tileGenerator.visitedQuads?.size ?? 0 // with a generator that has quadrants
         },
         FUNCTIONS = {
             dist:(g, x, y) => hexDist(corePos(g), {x, y}),

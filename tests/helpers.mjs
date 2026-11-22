@@ -46,7 +46,7 @@ export const clearBoard = page => page.evaluate(() => {
     const g = hc.app.game;
     for (const e of g.piecesOf('enemy')) g.removePiece(e);
     g.tiles.clear();
-    g.spawnWave = () => {};
+    g.spawnGenerator.spawnWave = () => {};
 });
 
 /*  Puts a tile at (x, y), made as the game makes them (Game.makeTile), with props on top.

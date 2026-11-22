@@ -17,12 +17,15 @@ const playABit = page => page.evaluate(() => {
 const snapshot = page => page.evaluate(() => {
     hc.app.game.cellsInSight();
     const g = hc.app.game,
+        T = g.tileGenerator,
         sorted = a => [...a].sort();
     return {
         turn:g.turn, score:g.score, scoreEarned:g.scoreEarned, over:g.over, quadRadius:hc.GRID.chunkRadius,
         pieces:[...g.pieces.values()].map(p => JSON.stringify(p)).sort(),
         tiles:[...g.tiles.values()].map(t => JSON.stringify(t)).sort(),
-        visitedQuads:sorted(g.visitedQuads), seenCells:sorted(g.seenCells), borders:[...g.borders].map(String).sort(), corePath:g.corePath,
+        generators:[T.type, g.spawnGenerator.type],
+        terrainQuads:sorted(T.terrainQuads), tiledQuads:sorted(T.tiledQuads), visitedQuads:sorted(T.visitedQuads),
+        seenCells:sorted(g.seenCells), borders:[...T.borders].map(String).sort(), corePath:g.corePath,
         coreAt:hc.app.game.pieceAt(g.getPlayerCore().x, g.getPlayerCore().y)?.id === g.playerCoreId,
         selectedId:g.selectedId
     };
