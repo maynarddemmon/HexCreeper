@@ -84,6 +84,16 @@
             EDGE_MARGIN:100,
             PAN_MS:250,
             
+            // Animation: a piece's step takes MOVE_MS and a jump JUMP_MS, during which it grows
+            // by up to JUMP_GROW (as if rising towards you) and back. An attack's bump takes
+            // BUMP_MS.
+            ANIM:{
+                MOVE_MS:160,
+                JUMP_MS:320,
+                JUMP_GROW:0.35,
+                BUMP_MS:180
+            },
+            
             // Look //
             PIECE_R:0.25, // piece radius as a fraction of a cell
             CORE_BORDER:0.08, // your core's thick border; the core is bigger by this much

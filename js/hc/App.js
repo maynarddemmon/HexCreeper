@@ -485,7 +485,8 @@
             if (game.over && !gameOverShown) {
                 gameOverShown = true;
                 // Use a timeout to give any animations or other gameplay effects a chance to
-                // finish. It's a more appealing UX this way.
+                // finish (the enemies' moves may still be playing). It's a more appealing UX
+                // this way.
                 setTimeout(() => {
                     if (game.outcome === 'won') {
                         openConfirmMsgDialog(
@@ -508,7 +509,7 @@
                             i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN
                         );
                     }
-                }, 500);
+                }, 500 + Math.max(0, game.animationEnd() - performance.now()));
             }
         },
         

@@ -10,7 +10,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK},
+            cfg:{PIECE_R, CORE_BORDER, OWNERS, LINK, ANIM},
             TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
             PIECE_TYPES
         } = pkg,
@@ -322,6 +322,44 @@
             isKnown = (x, y) => !sight || game.seenCells.has(game.key(x, y)),
             known = sight ? visible.filter(c => isKnown(c.x, c.y)) : visible;
         
+        // Each piece's moves still to play (Game.motionFx), in order.
+        game.motions = game.motions.filter(m => now < m.t0 + m.dur);
+        const motionsOf = new Map(),
+            places = new Map(),
+            
+            // Where a piece is drawn, {x, y, scale, seen}: along the first of its moves still
+            // to play that's in sight at either end, eased, growing and shrinking for a jump,
+            // or before that move starts, where it starts; with none, where it is (so a move
+            // entirely out of sight isn't animated). seen: whether to draw it (an enemy
+            // shows only in sight, or on its way into or out of it).
+            placeOf = p => {
+                let place = places.get(p.id);
+                if (!place) {
+                    const seenAt = (x, y) => p.owner === 'player' || game.over || inSight(x, y),
+                        m = (motionsOf.get(p.id) ?? []).find(m => inSight(...m.from) || inSight(...m.to));
+                    if (!m) {
+                        place = {x:p.x, y:p.y, scale:1, seen:seenAt(p.x, p.y)};
+                    } else if (now < m.t0) {
+                        place = {x:m.from[0], y:m.from[1], scale:1, seen:seenAt(...m.from)};
+                    } else {
+                        const t = Math.min(1, (now - m.t0) / m.dur),
+                            e = t * t * (3 - 2 * t);
+                        place = {
+                            x:m.from[0] + (m.to[0] - m.from[0]) * e,
+                            y:m.from[1] + (m.to[1] - m.from[1]) * e,
+                            scale:m.jump ? 1 + ANIM.JUMP_GROW * Math.sin(Math.PI * t) : 1,
+                            seen:true
+                        };
+                    }
+                    places.set(p.id, place);
+                }
+                return place;
+            };
+        for (const m of game.motions) {
+            if (!motionsOf.has(m.id)) motionsOf.set(m.id, []);
+            motionsOf.get(m.id).push(m);
+        }
+        
         // Background: fog everywhere, then plain floor on known cells.
         ctx.fillStyle = css('--bg');
         ctx.fillRect(0, 0, W, H);
@@ -462,14 +500,19 @@
             }
         }
         const chain = p => chains.get(p.id) ?? 1;
-        // An enemy's link to a piece out of sight shows as a stub fading into the fog.
+        // Between where the pieces are drawn (placeOf). An enemy's link to a piece out of
+        // sight shows as a stub fading into the fog.
         for (const p of game.piecesOf('enemy')) {
             const par = game.parent(p);
-            if (par && (shown(p) || shown(par))) drawLink(p, par, '--enemy-link', chain(p), shown(p) ? (shown(par) ? null : 'to') : 'from');
+            if (par) {
+                const a = placeOf(p),
+                    b = placeOf(par);
+                if (a.seen || b.seen) drawLink(a, b, '--enemy-link', chain(p), a.seen ? (b.seen ? null : 'to') : 'from');
+            }
         }
         for (const p of game.piecesOf('player')) {
-            const par = game.parent(p); if (!par) continue;
-            drawLink(p, par, selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p));
+            const par = game.parent(p);
+            if (par) drawLink(placeOf(p), placeOf(par), selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p));
         }
         // The link a piece placed on the hovered cell would have
         if (V.placeMode && sel && V.hover && game.placeCells(sel).some(q => sameCell(q, V.hover))) {
@@ -493,16 +536,26 @@
             }
         }
         
-        // Pieces
+        // Pieces destroyed in an action that hasn't played yet (Game.damage), until it does.
+        for (const f of game.effects) {
+            const p = f.piece;
+            if (p && now < f.t0 && !game.pieces.has(p.id) && inView(p.x, p.y) && (p.owner === 'player' || inSight(p.x, p.y))) {
+                const [sx, sy] = cellCenter(p.x, p.y);
+                PIECE_TYPES[p.type].draw(ctx, sx, sy, s, p, {root:p.id === game.playerCoreId});
+            }
+        }
+        
+        // Pieces, where placeOf says.
         for (const p of game.pieces.values()) {
-            if (!inView(p.x, p.y) || !shown(p)) continue;
-            let [sx, sy] = cellCenter(p.x, p.y);
+            const place = placeOf(p);
+            if (!inView(place.x, place.y) || !place.seen) continue;
+            let [sx, sy] = cellCenter(place.x, place.y);
             const sp = game.effects.find(f => f.spawn && f.x === p.x && f.y === p.y);
-            let scale = 1;
-            if (sp) { const a = Math.min(1, Math.max(0, (now - sp.t0) / 250)); scale = 0.3 + 0.7 * a; }
+            let scale = place.scale;
+            if (sp) { const a = Math.min(1, Math.max(0, (now - sp.t0) / 250)); scale *= 0.3 + 0.7 * a; }
             for (const f of game.effects) {
                 if (!f.bump || f.bump.from !== p) continue;
-                const age = (now - f.t0) / 180;
+                const age = (now - f.t0) / ANIM.BUMP_MS;
                 if (age >= 0 && age < 1) {
                     const k = Math.sin(age * Math.PI) * 0.28 * s;
                     const [tx, ty] = cellCenter(f.x, f.y), dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1;
@@ -576,7 +629,7 @@
         }
         
         game.effects = game.effects.filter(f => now - f.t0 < FX_MS);
-        if (game.effects.length || panning) draw();
+        if (game.effects.length || game.motions.length || panning) draw();
         
         // Update HUD
         pkg.app?.update();

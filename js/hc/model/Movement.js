@@ -218,6 +218,8 @@
         /*  Swaps two pieces' cells (each lands on the other's tiles). */
         swapPieces: function(a, b) {
             const [ax, ay, bx, by] = [a.x, a.y, b.x, b.y];
+            this.motionFx(a, [ax, ay], [bx, by]);
+            this.motionFx(b, [bx, by], [ax, ay]);
             a.x = bx;
             a.y = by;
             b.x = ax;
@@ -305,7 +307,7 @@
         jumpPiece: function(p, x, y) {
             let done = false;
             if (this.jumpCells(this.boardView(p.owner !== 'player'), p.id).some(c => c.x === x && c.y === y)) {
-                this.applyMoves(p, [[p.id, x, y]]);
+                this.applyMoves(p, [[p.id, x, y]], true);
                 p.tiredUntil = this.turn + 1;
                 this.fx(x, y, 'jump', '--place-ink', {});
                 done = true;
@@ -372,12 +374,14 @@
         // The mode a piece moves in by default: the player's chosen mode, or fixed.
         modeFor: function(piece) {return piece?.owner === 'player' ? this.moveMode : 'fixed';},
         
-        /*  Puts the pieces that move where resolveStep says. Returns the pieces moved. */
-        applyMoves: function(piece, moves) {
+        /*  Puts the pieces that move where resolveStep says (or where piece jumps to, with
+            jump), to be animated. Returns the pieces moved. */
+        applyMoves: function(piece, moves, jump = false) {
             const moved = moves.map(([gid]) => this.pieces.get(gid));
             for (const g of moved) this.board.delete(this.key(g.x, g.y));
             moves.forEach(([, x, y], i) => {
                 const g = moved[i];
+                this.motionFx(g, [g.x, g.y], [x, y], jump);
                 g.x = x;
                 g.y = y;
                 this.board.set(this.key(x, y), g.id);

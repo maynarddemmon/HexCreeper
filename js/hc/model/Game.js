@@ -6,7 +6,7 @@
     
     const {
         cfg:{
-            WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK
+            WORLD_LIMIT, QUAD, VISION, LINK, COMBAT, ENEMY, PRESSURE, SPAWN, TILES, HEAL, RANK, ANIM
         },
         TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
         hexDist, PIECE_TYPES
@@ -41,6 +41,7 @@
             this.lootOpened = 0;             // loot tiles taken
             this.objectives = this.getLevelObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the level's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
+            this.clearAnimation();
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
             this.grid = pkg.GRID;
             this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", timer}
@@ -153,6 +154,7 @@
                 return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
             });
             this.effects = [];
+            this.clearAnimation();
             pkg.GRID = pkg.makeGrid(o.quadRadius);
             this.grid = pkg.GRID;
             this.pieces = new Map();
@@ -427,8 +429,10 @@
                     this.kills++;
                 }
             }
-            for (const g of lost.slice(1)) this.fx(g.x, g.y, '', col, {burst:true, delay:80});
-            this.fx(target.x, target.y, '', col, { burst: true });
+            // A burst where each was. `piece` keeps it drawn until then, since in the enemies'
+            // turn that can be after it's gone (see actionStart).
+            for (const g of lost.slice(1)) this.fx(g.x, g.y, '', col, {burst:true, delay:80, piece:{...g}});
+            this.fx(target.x, target.y, '', col, {burst:true, piece:{...target}});
             if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
             return lost;
@@ -1075,7 +1079,59 @@
         },
         
         fx: function(x, y, text, color, opts = {}) {
-            this.effects.push({x, y, text, color, t0:performance.now() + (opts.delay || 0), ...opts});
+            this.effects.push({x, y, text, color, t0:this.actionStart() + (opts.delay || 0), ...opts});
+            if (opts.bump) this.actionTakes(ANIM.BUMP_MS);
+        },
+        
+        // ---- Animation ----
+        // The view animates pieces' moves (motions: {id, from:[x, y], to:[x, y], jump, t0,
+        // dur}) and effects. In the enemies' turn each squad is a track: its actions play
+        // one after another, so you can follow them, and all squads play at once. A move or
+        // effect made during an action starts when the action does. Your actions play at
+        // once (no track), and a piece you move drops any move of its still playing. None
+        // of this is saved.
+        clearAnimation: function() {
+            this.motions = [];
+            this.track = null;            // the squad (its leader's id) acting, or null for you
+            this.trackEnds = new Map();   // track -> when its next action may start
+            this.openAction = null;       // the track's action being made: {t0, dur}
+        },
+        
+        // When what's being done now shows: now, or for a squad, when its action starts.
+        actionStart: function() {
+            const now = performance.now();
+            let t = now;
+            if (this.track != null) {
+                this.openAction ??= {t0:Math.max(now, this.trackEnds.get(this.track) ?? 0), dur:0};
+                t = this.openAction.t0;
+            }
+            return t;
+        },
+        
+        // The action being made takes at least ms.
+        actionTakes: function(ms) {
+            if (this.openAction) this.openAction.dur = Math.max(this.openAction.dur, ms);
+        },
+        
+        // The squad's action is done: its next starts when this one has played.
+        endAction: function() {
+            if (this.track != null && this.openAction) this.trackEnds.set(this.track, this.openAction.t0 + this.openAction.dur);
+            this.openAction = null;
+        },
+        
+        // Piece p moved from one cell to another (by a jump, or a step).
+        motionFx: function(p, from, to, jump = false) {
+            const now = performance.now(),
+                dur = jump ? ANIM.JUMP_MS : ANIM.MOVE_MS,
+                t0 = this.actionStart();
+            this.motions = this.motions.filter(m => now < m.t0 + m.dur && !(this.track == null && m.id === p.id));
+            this.motions.push({id:p.id, from, to, jump, t0, dur});
+            this.actionTakes(dur);
+        },
+        
+        // When everything animating will have finished.
+        animationEnd: function() {
+            return Math.max(performance.now(), ...this.motions.map(m => m.t0 + m.dur), ...this.trackEnds.values());
         }
     });
 })(hc);

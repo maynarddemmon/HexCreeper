@@ -36,10 +36,6 @@
                             onPick();
                             item.run();
                         }
-                    },
-                    setWidth: function(v) {
-                        console.log(v);
-                        this.callSuper(v);
                     }
                 }]);
                 btn.getIDE().setAttribute('role', 'menuitem');

@@ -20,7 +20,23 @@
         // scored by damage dealt and how exposed the squad is when the turn ends.
         // That lets them carry a piece into reach, strike with it, then pull it back
         // out of reach by moving an ancestor. Far-away squads just march as a block.
+        // Each squad's actions are animated one after another, squads at once (see
+        // actionStart): each squad is a track, and each of its actions ends with endAction.
         enemyPhase: function() {
+            const now = performance.now();
+            for (const [track, end] of this.trackEnds) {
+                if (end < now) this.trackEnds.delete(track);
+            }
+            try {
+                this.enemyActions();
+            } finally {
+                this.endAction();
+                this.track = null;
+            }
+        },
+        
+        // The enemies' turn itself: each squad, nearest the player first.
+        enemyActions: function() {
             let players = this.piecesOf('player');
             if (players.length) {
                 const field = this.distanceField(players),
@@ -33,6 +49,8 @@
                     if (this.pieces.has(root.id)) {
                         players = this.piecesOf('player');
                         if (!players.length) return;
+                        this.endAction();
+                        this.track = root.id;
                         const squad = this.group(root);
                         const budget = RANK.movesPer * Math.max(...squad.map(g => g.rank));
                         if (front(squad) <= AI.planRange) {
@@ -54,6 +72,7 @@
                                 } else if (!pc || !this.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) {
                                     break;
                                 }
+                                this.endAction();
                             }
                             const hit = this.piecesOf('player').length < nBefore || this.piecesOf('player').reduce((a, q) => a + q.hp, 0) < hpBefore;
                             if (this.pieces.has(root.id)) root.idle = hit ? 0 : idle + 1;
