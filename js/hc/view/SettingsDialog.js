@@ -135,8 +135,8 @@
         });
     
     /*  Every setting, by group, built from the setting definitions; refresh shows only those
-        the level shows, and with prefs, the preferences (always). Changes apply as soon as
-        they're made. Used by the SettingsDialog (with prefs) and the LevelBrief. */
+        the map shows, and with prefs, the preferences (always). Changes apply as soon as
+        they're made. Used by the SettingsDialog (with prefs) and the MapBrief. */
     pkg.SettingsList = new JSClass('SettingsList', WideView, {
         initNode: function(parent, attrs) {
             const self = this,
@@ -158,8 +158,8 @@
             new SpacedLayout(self, {axis:'y', spacing, collapseParent:true});
         },
         
-        /*  Shows the settings the level being played shows (and the preferences, with
-            prefs), with their values. Returns whether the level shows any. */
+        /*  Shows the settings the map being played shows (and the preferences, with
+            prefs), with their values. Returns whether the map shows any. */
         refresh: function() {
             for (const row of this._rows) {
                 row.setVisible(row.def.app ? this.prefs : settings.isShown(row.def.id));
@@ -170,7 +170,7 @@
         }
     });
     
-    /*  Edits hc.settings: a note, then the SettingsList. The footer puts the level's values
+    /*  Edits hc.settings: a note, then the SettingsList. The footer puts the map's values
         back. */
     pkg.SettingsDialog = new JSClass('SettingsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
@@ -212,7 +212,7 @@
             self.setContentHeightToFit(self._container.height);
         },
         
-        /*  Shows the settings the level being played shows, with their values. */
+        /*  Shows the settings the map being played shows, with their values. */
         refresh: function() {
             const any = this._list.refresh();
             this._note.setText(i18n(any ? 'settings-note' : 'settings-none'));

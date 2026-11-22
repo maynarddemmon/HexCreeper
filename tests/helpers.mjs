@@ -30,7 +30,7 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
 };
 
 /*  Waits until the App exists and its game has started. Without a save, the game starts
-    from the level brief, so its Start button is clicked when it shows. */
+    from the map brief, so its Start button is clicked when it shows. */
 export const waitForGame = async page => {
     const isReady = () => window.hc?.app?.ready && window.hc.app.game.getPlayerCore() != null,
         start = button(page, '✓ Start');

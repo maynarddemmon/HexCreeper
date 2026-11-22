@@ -95,7 +95,7 @@ test('opening loot tiles counts toward goals, and the count is saved', async ({p
     await putLoot(page, 2, 0, 5);
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.level = {...g.level, objectives:hc.goals.fromLevel({goals:[{name:'Looter', expression:'lootOpened >= 2', progress:'{lootOpened}/2'}]})};
+        g.gameMap = {...g.gameMap, objectives:hc.goals.fromMap({goals:[{name:'Looter', expression:'lootOpened >= 2', progress:'{lootOpened}/2'}]})};
         g.objectives = [{value:false, locked:false, progress:''}];
         g.playerAct(core, 1, 0);
         const after1 = [g.lootOpened, g.objectives[0].progress, g.outcome];

@@ -17,14 +17,14 @@
         
         PANEL_WIDTH = 480,
         
-        /*  One level: its number and name, as a button that plays it, and its description
+        /*  One map: its number and name, as a button that plays it, and its description
             below. */
-        LevelRow = new JSClass('LevelRow', WideView, {
+        MapRow = new JSClass('MapRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    level = self.level = attrs.level,
+                    gameMap = self.gameMap = attrs.gameMap,
                     onPlay = attrs.onPlay;
-                delete attrs.level;
+                delete attrs.gameMap;
                 delete attrs.onPlay;
                 
                 self.callSuper(parent, attrs);
@@ -32,33 +32,33 @@
                 const top = new WideView(self, {height:rowHeight});
                 self._name = new UnderlineBtn(top, {
                     x:padding, valign:'middle', fontSize:fontSizeLarge, fontWeight:'bold',
-                    tooltip:i18n('tip-play-level', level.name)
-                }, [{doActivated: () => {onPlay(level.id);}}]);
-                self._name.getIDE().setAttribute('aria-label', i18n('btn-play') + ' ' + level.name);
+                    tooltip:i18n('tip-play-map', gameMap.name)
+                }, [{doActivated: () => {onPlay(gameMap.id);}}]);
+                self._name.getIDE().setAttribute('aria-label', i18n('btn-play') + ' ' + gameMap.name);
                 self.setPlaying(false);
-                if (level.description) {
+                if (gameMap.description) {
                     new Text(self, {
-                        x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal', text:level.description,
+                        x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal', text:gameMap.description,
                         fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
                     });
                 }
                 new M.SpacedLayout(self, {axis:'y', spacing:spacing, collapseParent:true});
             },
             
-            /*  Marks the level being played. */
+            /*  Marks the map being played. */
             setPlaying: function(playing) {
-                const level = this.level;
+                const gameMap = this.gameMap;
                 this._name.setText(
-                    (level.number == null ? level.name : i18n('level-numbered', level.number, level.name)) +
-                    (playing ? ' ' + i18n('level-playing') : '')
+                    (gameMap.number == null ? gameMap.name : i18n('map-numbered', gameMap.number, gameMap.name)) +
+                    (playing ? ' ' + i18n('map-playing') : '')
                 );
             }
         });
     
-    /*  Lists every level in data/init.json5; pressing a level's name plays it. The list is
-        built the first time it's shown, once init.json5 has loaded. onPlay(levelId) is
-        called when a level's name is pressed, after the dialog closes. */
-    pkg.LevelsDialog = new JSClass('LevelsDialog', pkg.AckDialog, {
+    /*  Lists every map in data/init.json5; pressing a map's name plays it. The list is
+        built the first time it's shown, once init.json5 has loaded. onPlay(mapId) is
+        called when a map's name is pressed, after the dialog closes. */
+    pkg.MapsDialog = new JSClass('MapsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
             const self = this;
@@ -70,7 +70,7 @@
             
             self.callSuper(parent, attrs);
             
-            self.setTitle(i18n('dlg-levels-title'));
+            self.setTitle(i18n('dlg-maps-title'));
             self.getFooterView().ackBtn.setText(pkg.ICON_CANCEL + ' ' + i18n('btn-close'));
             
             self._container = new WideView(self.getContentView());
@@ -79,13 +79,13 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  Shows the levels, with the one being played (if any) marked. */
+        /*  Shows the maps, with the one being played (if any) marked. */
         show: function(playingId) {
             const self = this;
             self.callSuper();
-            pkg.levels.loadIndex(index => {
+            pkg.maps.loadIndex(index => {
                 if (!self._rows.length) self._build(index);
-                for (const row of self._rows) row.setPlaying(row.level.id === playingId);
+                for (const row of self._rows) row.setPlaying(row.gameMap.id === playingId);
                 self.setContentHeightToFit(self._container.height);
             });
         },
@@ -94,10 +94,10 @@
             const self = this,
                 container = self._container;
             if (!index) {
-                new Text(container, {x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal', text:i18n('levels-load-failed'), textColor:colorTextMuted});
+                new Text(container, {x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal', text:i18n('maps-load-failed'), textColor:colorTextMuted});
             } else {
-                for (const level of index.levels) {
-                    self._rows.push(new LevelRow(container, {level, onPlay: id => {
+                for (const gameMap of index.maps) {
+                    self._rows.push(new MapRow(container, {gameMap, onPlay: id => {
                         self.hide();
                         self.onPlay?.(id);
                     }}));

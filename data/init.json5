@@ -1,6 +1,6 @@
 {
-	// The level played when there's no saved game.
-	"defaultLevel":"endless",
+	// The map played when there's no saved game.
+	"defaultMap":"endless",
 	
 	// Materials solids are made of. hardness is the damage reduction (DR) of a solid made of
 	// it: an attack does the attacker's rank less the DR. density isn't used yet. opacity
@@ -57,7 +57,7 @@
 	// "coverage" (0-100, default 100) is how much of the cell the material fills, e.g. bars
 	// or a net: its opacity is its material's times its coverage. A solid that can be seen
 	// through is drawn see-through too.
-	// Settings (and so levels) choose which kinds walls and clumps are made of.
+	// Settings (and so maps) choose which kinds walls and clumps are made of.
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
 		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12},
@@ -100,7 +100,7 @@
 	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
-	// Settings (and so levels) choose which kinds a quadrant's tiles are.
+	// Settings (and so maps) choose which kinds a quadrant's tiles are.
 	"heals":{
 		"heal": {
 			"name":"Heal",
@@ -160,12 +160,12 @@
 		}
 	},
 	
-	// Every level, in the order the Levels dialog lists them, with what a list of levels
-	// needs. Each level's own file is data/levels/<id>.json5. A level with no "number" is
-	// listed without one. A level's file may give a "seed", so its map is always the same;
+	// Every map, in the order the Maps dialog lists them, with what a list of maps
+	// needs. Each map's own file is data/gamemap/<id>.json5. A map with no "number" is
+	// listed without one. A map's file may give a "seed", so it's always laid out the same;
 	// otherwise the brief offers a random one. It may also list "goals" and "penalties"
-	// (see docs/DESIGN.md, Levels).
-	"levels":[
+	// (see docs/DESIGN.md, Maps).
+	"maps":[
 		{
 			"id":"endless",
 			"name":"Endless Play",

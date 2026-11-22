@@ -62,13 +62,13 @@ The tests start their own static server and load the real `index.html`, then dri
 | `index.html` | Entry point: colours (light and dark), button styles, locale detection and script loading |
 | `js/hc/hc.js` | The `hc` namespace, the tunable numbers, the UI theme and config, and small utilities |
 | `js/hc/component/` | Reusable [myt](https://github.com/maynarddemmon/myt) views, taken from TimeCorps: `Misc.js` (layout views, `Panel`, `LabeledValue`), `Btn.js` (`Btn`, `UnderlineBtn`, `SquareBtn`, `ToggleBtn`), `Dialogs.js` (modal, confirm and acknowledge dialogs, and `hc.dialogUtil`) |
-| `js/hc/model/` | `Grid.js` (hex geometry), `PieceTypes.js`, `Game.js` (state and rules), `EnemyAI.js` (squad planning), `Settings.js` (every setting, saved to localStorage), `Persistence.js` (the save game, in localStorage), `Levels.js` (loads `data/init.json5` and level files) |
-| `js/hc/view/` | `View.js` (canvas, camera, shared view state), `Render.js` (draws the board), `GameView.js` (the myt view holding the canvas, the info panel and mouse input), `SettingsDialog.js`, `LevelsDialog.js` |
+| `js/hc/model/` | `Grid.js` (hex geometry), `PieceTypes.js`, `Game.js` (state and rules), `EnemyAI.js` (squad planning), `Settings.js` (every setting, saved to localStorage), `Persistence.js` (the save game, in localStorage), `Maps.js` (loads `data/init.json5` and map files) |
+| `js/hc/view/` | `View.js` (canvas, camera, shared view state), `Render.js` (draws the board), `GameView.js` (the myt view holding the canvas, the info panel and mouse input), `SettingsDialog.js`, `MapsDialog.js` |
 | `js/hc/App.js` | The root view: the header bar and its buttons, keyboard input, new games and the help dialog |
 | `js/hc/manifest.js` | Which file provides and requires what, for the loader |
 | `i18n/` | UI text (`en-US.js`) and myt's own resources |
 | `data/help.txt` | The How to Play text, loaded when help opens |
-| `data/init.json5`, `data/levels/` | The list of levels, and one JSON5 file per level |
+| `data/init.json5`, `data/gamemap/` | The list of maps, and one JSON5 file per map |
 | `lib/` | The script loader, myt and JSON5 |
 | `fonts/`, `img/` | Space Mono (OFL), the GitHub mark, and in `img/icons/` the [Lucide](https://lucide.dev) icons the UI uses (ISC; only the ones used are copied in, from the `lucide-static` package) |
 | `docs/DESIGN.md` | The design notes: every rule, its numbers and the reasoning behind them |

@@ -1,7 +1,7 @@
 (pkg => {
     'use strict';
     
-    /*  A small expression language for level goals: a subset of JS expressions that can only
+    /*  A small expression language for map goals: a subset of JS expressions that can only
         reach the names it's given, so an expression from a file (or an imported save) can't
         run code.
         

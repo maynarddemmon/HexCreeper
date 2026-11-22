@@ -1,4 +1,4 @@
-/*  Level goals and penalties. A goal is something to achieve and a penalty something to
+/*  Map goals and penalties. A goal is something to achieve and a penalty something to
     avoid; each has an expression (see Expr.js) over the values below. pkg.Goals, the
     module included in Game, evaluates them: evaluateObjectives. */
 (pkg => {
@@ -91,13 +91,13 @@
         compile,
         compileTemplate,
         
-        /*  A level's goals and penalties, from its file's "goals" and "penalties", as one
+        /*  A map's goals and penalties, from its file's "goals" and "penalties", as one
             list of objectives: {kind:'goal' | 'penalty', name, description, expression,
             progress, lockOnSuccess, lockOnFailure, required}, with the defaults filled in.
             progress is text with expressions in braces, e.g. "{kills}/40 destroyed"; it's
             shown as play goes on (see evaluateObjectives). Throws an Error saying what's
             wrong with the first bad one. */
-        fromLevel: data => {
+        fromMap: data => {
             const objectives = [];
             for (const kind of ['goal', 'penalty']) {
                 const list = data?.[kind === 'goal' ? 'goals' : 'penalties'] ?? [];
@@ -139,17 +139,17 @@
     };
     
     pkg.Goals = new JS.Module('Goals', {
-        // The level's objectives (see goals.fromLevel).
-        getLevelObjectives: function() { return this.level?.objectives ?? []; },
+        // The map's objectives (see goals.fromMap).
+        getMapObjectives: function() { return this.gameMap?.objectives ?? []; },
         
         /*  Evaluates the objectives that aren't locked, and their progress text (so a locked
             one's stays as it was when it locked), locking any that lock, then ends the
-            game if the level is won (every required goal true and penalty false) or can't
-            be won any more (a required one locked the wrong way). A level with nothing
+            game if the map is won (every required goal true and penalty false) or can't
+            be won any more (a required one locked the wrong way). A map with nothing
             required can't be won. */
         evaluateObjectives: function() {
             if (this.over) return;
-            const list = this.getLevelObjectives(),
+            const list = this.getMapObjectives(),
                 scope = {
                     value:name => VALUES[name](this),
                     call:(name, args) => FUNCTIONS[name](this, ...args)

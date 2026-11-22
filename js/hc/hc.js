@@ -259,14 +259,14 @@
             };
         },
         
-        /*  A 32-bit hash of a string (FNV-1a), e.g. to make a seed for one part of a level. */
+        /*  A 32-bit hash of a string (FNV-1a), e.g. to make a seed for one part of a map. */
         hashString: str => {
             let h = 0x811C9DC5;
             for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
             return h >>> 0;
         },
         
-        /*  A new seed for a level: a random whole number below a million, easy to note down. */
+        /*  A new seed for a map: a random whole number below a million, easy to note down. */
         randomSeed: () => Math.floor(Math.random() * 1000000),
         
         isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v)

@@ -3,7 +3,7 @@
     
     const {cfg:{DATA_BASE_DIR}} = pkg,
         
-        LEVELS_DIR = DATA_BASE_DIR + 'levels/',
+        MAPS_DIR = DATA_BASE_DIR + 'gamemap/',
         
         // Loads a JSON5 file. Calls back with the parsed data, or null if it couldn't be
         // loaded or parsed.
@@ -22,18 +22,18 @@
         };
     
     let index = null; // init.json5, once loaded
-    const loaded = new Map(); // level id -> level, once loaded
+    const loaded = new Map(); // map id -> map, once loaded
     
-    /*  The levels. data/init.json5 lists every level with what a list of levels needs (its
-        id, name, number and description), and names the level played when there's no saved
-        game. Each level's own file, data/levels/<id>.json5, holds what's needed to play it,
+    /*  The maps. data/init.json5 lists every map with what a list of maps needs (its
+        id, name, number and description), and names the map played when there's no saved
+        game. Each map's own file, data/gamemap/<id>.json5, holds what's needed to play it,
         and is loaded only when it's played.
         
-        A level, once loaded, is its entry in init.json5 merged with its file:
+        A map, once loaded, is its entry in init.json5 merged with its file:
             {id, name, number, description, attrs:{<setting id>:value, ...}, objectives:[...]}
-        where objectives are its goals and penalties (see goals.fromLevel). */
-    pkg.levels = {
-        /*  Calls back with init.json5's contents, {defaultLevel, levels:[...], materials,
+        where objectives are its goals and penalties (see goals.fromMap). */
+    pkg.maps = {
+        /*  Calls back with init.json5's contents, {defaultMap, maps:[...], materials,
             solids, holes, heals, harms, loots}, or null if it couldn't be loaded. It's loaded
             once, and its materials and solid subtypes go to pkg.solids, and its hole, heal,
             harm and loot subtypes to pkg.holes, pkg.heals, pkg.harms and pkg.loots. */
@@ -42,7 +42,7 @@
                 callback(index);
             } else {
                 loadJSON5(DATA_BASE_DIR + 'init.json5', data => {
-                    if (data && Array.isArray(data.levels)) {
+                    if (data && Array.isArray(data.maps)) {
                         index = data;
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
@@ -55,36 +55,36 @@
             }
         },
         
-        /*  Calls back with the level, or null if it isn't in init.json5 or its file couldn't
-            be loaded. Each level is loaded once. */
-        loadLevel: (id, callback) => {
+        /*  Calls back with the map, or null if it isn't in init.json5 or its file couldn't
+            be loaded. Each map is loaded once. */
+        loadMap: (id, callback) => {
             if (loaded.has(id)) {
                 callback(loaded.get(id));
                 return;
             }
-            pkg.levels.loadIndex(idx => {
-                const entry = idx?.levels.find(level => level.id === id);
+            pkg.maps.loadIndex(idx => {
+                const entry = idx?.maps.find(m => m.id === id);
                 if (!entry) {
-                    console.error('Unknown level', id);
+                    console.error('Unknown map', id);
                     callback(null);
                     return;
                 }
-                loadJSON5(LEVELS_DIR + id + '.json5', data => {
+                loadJSON5(MAPS_DIR + id + '.json5', data => {
                     if (!data) {
                         callback(null);
                         return;
                     }
                     let objectives;
                     try {
-                        objectives = pkg.goals.fromLevel(data);
+                        objectives = pkg.goals.fromMap(data);
                     } catch (err) {
-                        console.error('Bad goals in level', id, err.message);
+                        console.error('Bad goals in map', id, err.message);
                         callback(null);
                         return;
                     }
-                    const level = {...entry, ...data, id, attrs:data.attrs ?? {}, objectives};
-                    loaded.set(id, level);
-                    callback(level);
+                    const gameMap = {...entry, ...data, id, attrs:data.attrs ?? {}, objectives};
+                    loaded.set(id, gameMap);
+                    callback(gameMap);
                 });
             });
         }

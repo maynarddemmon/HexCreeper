@@ -19,8 +19,8 @@
         include:[pkg.Movement, pkg.EnemyAI, pkg.Goals, pkg.EffectTiles],
         
         initialize: function() {
-            this.level = null; // {id, name, attrs}: the level being played, set by the App
-            this.seed = null;  // the seed the level is made from, set before reset (or random)
+            this.gameMap = null; // {id, name, attrs}: the map being played, set by the App
+            this.seed = null;  // the seed the map is made from, set before reset (or random)
             this.reset();
         },
         
@@ -40,7 +40,7 @@
             this.piecesPlaced = 0;
             this.lootOpened = 0;             // loot tiles emptied
             this.lootTaken = 0;              // score taken from loot tiles
-            this.objectives = this.getLevelObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the level's goals and penalties
+            this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
             pkg.GRID = pkg.makeGrid(QUAD.radius); // fixed for the whole game
@@ -69,9 +69,9 @@
             this.evaluateObjectives();
         },
         
-        /*  A generator for one part of the level, seeded from the game's seed and that part's
+        /*  A generator for one part of the map, seeded from the game's seed and that part's
             name, so each part comes out the same for a seed whatever order the parts are
-            made in (e.g. which way the player explores). Only the level is made this way:
+            made in (e.g. which way the player explores). Only the map is made this way:
             enemy waves, the AI and everything else during play use Math.random. */
         rngFor: function(...parts) {
             return pkg.makeRng(pkg.hashString(this.seed + '|' + parts.join('|')));
@@ -113,7 +113,7 @@
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
-                level:this.level
+                gameMap:this.gameMap
             };
         },
         
@@ -127,7 +127,7 @@
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
-            const objectives = o.level?.objectives ?? [];
+            const objectives = o.gameMap?.objectives ?? [];
             try {
                 for (const obj of objectives) {
                     pkg.goals.compile(obj.expression);
@@ -186,7 +186,7 @@
             // Saves from before the path was kept start it where the core is.
             const core = this.getPlayerCore();
             this.corePath = o.corePath?.map(c => [...c]) ?? (core ? [[core.x, core.y]] : []);
-            this.level = o.level ?? null;
+            this.gameMap = o.gameMap ?? null;
             this._sightKey = null;
         },
         
@@ -997,7 +997,7 @@
             return root;
         },
         
-        // rng picks where: Math.random for waves, the level's generator at the start.
+        // rng picks where: Math.random for waves, the map's generator at the start.
         spawnEnemy: function(rng = Math.random) {
             const core = this.getPlayerCore();
             if (core) {

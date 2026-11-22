@@ -22,11 +22,11 @@
             return /^\d{1,9}$/.test(s) ? Number(s) : null;
         };
     
-    /*  Shown before a level starts: its description, its goals and penalties, the settings
-        it shows (so they can be set first) and the seed its map is made from, filled in with the level's seed or a
+    /*  Shown before a map starts: its description, its goals and penalties, the settings
+        it shows (so they can be set first) and the seed its map is made from, filled in with the map's seed or a
         random one. Start calls onStart(seed). Cancel (or closing it) calls onCancel. When
         a game is under way, a note says starting will end it. */
-    pkg.LevelBrief = new JS.Class('LevelBrief', pkg.ConfirmDialog, {
+    pkg.MapBrief = new JS.Class('MapBrief', pkg.ConfirmDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
             const self = this;
@@ -73,21 +73,21 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  level is a loaded level. The level's settings must already be in effect, so the
+        /*  map is a loaded map. The map's settings must already be in effect, so the
             list shows its settings. */
-        show: function(level, {seed, underway, onStart, onCancel}) {
+        show: function(gameMap, {seed, underway, onStart, onCancel}) {
             const self = this;
             self.callSuper();
             
             self._onStart = onStart;
             self._onCancel = onCancel;
             
-            self.setTitle(level.number == null ? level.name : i18n('level-numbered', level.number, level.name));
-            self._description.setText(level.description ?? '');
-            self._description.setVisible(!!level.description);
+            self.setTitle(gameMap.number == null ? gameMap.name : i18n('map-numbered', gameMap.number, gameMap.name));
+            self._description.setText(gameMap.description ?? '');
+            self._description.setVisible(!!gameMap.description);
             self._warning.setVisible(!!underway);
             
-            const objectives = level.objectives ?? [],
+            const objectives = gameMap.objectives ?? [],
                 textAttrs = {x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal'};
             self._goalsHeader.setText(i18n(objectives.length ? 'brief-goals' : 'brief-no-goals'));
             for (const view of [...self._goals.getSubviews()]) view.destroy();

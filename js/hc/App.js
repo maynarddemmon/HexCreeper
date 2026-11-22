@@ -19,8 +19,8 @@
         persistenceMgr, // The PersistenceManager.
         gameOverShown = false,
         settingsDialog,
-        levelsDialog,
-        levelBrief;
+        mapsDialog,
+        mapBrief;
     
     const JSClass = JS.Class,
         
@@ -29,7 +29,7 @@
         
         {
             view:V,
-            Btn, IconBtn, WideView, Spacer, LabeledValue, levels, settings,
+            Btn, IconBtn, WideView, Spacer, LabeledValue, maps, settings,
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
@@ -70,8 +70,8 @@
         
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
-            // The level's values, as they were when the game was saved.
-            settings.applyLevel(game.level?.id, game.level?.attrs);
+            // The map's values, as they were when the game was saved.
+            settings.applyMap(game.gameMap?.id, game.gameMap?.attrs);
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
@@ -194,8 +194,8 @@
             ];
         },
         
-        /*  The stats that don't fit in the header: the level and seed, core HP, the selected
-            piece, and the level's goals and penalties with how each stands. */
+        /*  The stats that don't fit in the header: the map and seed, core HP, the selected
+            piece, and the map's goals and penalties with how each stands. */
         InfoPanel = new JSClass('InfoPanel', View, {
             initNode: function(parent, attrs) {
                 const self = this;
@@ -208,7 +208,7 @@
                     label:i18n(key), fontSize:fontSizeMedium, valueTextColor:valueColor,
                     width:INFO_WIDTH, whiteSpace:'nowrap'
                 });
-                self.level = row('info-level');
+                self.mapInfo = row('info-map');
                 self.seed = row('info-seed');
                 self.hp = row('info-core-hp', colorAccent);
                 const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
@@ -226,7 +226,7 @@
                     hp = Math.max(0, core ? core.hp : 0),
                     max = core ? core.maxHp : 1,
                     sel = game.getSelected();
-                self.level.update(game.level?.name ?? i18n('info-none'));
+                self.mapInfo.update(game.gameMap?.name ?? i18n('info-none'));
                 self.seed.update(game.seed ?? i18n('info-none'));
                 self.hp.update(hp + '/' + max);
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
@@ -238,9 +238,9 @@
                     self.selected.update(i18n('info-none'));
                 }
                 
-                // For each of the level's objectives, its name and state, then in small text
-                // its description and progress. Made again when the level changes.
-                const list = game.getLevelObjectives();
+                // For each of the map's objectives, its name and state, then in small text
+                // its description and progress. Made again when the map changes.
+                const list = game.getMapObjectives();
                 if (self._rowsFor !== list) {
                     self._rowsFor = list;
                     for (const r of self.goalRows) {
@@ -349,7 +349,7 @@
             game.reset(); // With the stored settings, now they're in effect.
             
             // Once init.json5 has loaded (it has the materials and solids a game needs), carry on 
-            // with the saved game, if there is one, or else show the default level's brief. ready 
+            // with the saved game, if there is one, or else show the default map's brief. ready 
             // is true once either is done. Help follows on a first visit.
             const whenReady = () => {
                 appView.ready = true;
@@ -357,12 +357,12 @@
             };
             appView.ready = false;
             persistenceMgr = new pkg.PersistenceManager(game);
-            levels.loadIndex(index => {
+            maps.loadIndex(index => {
                 if (persistenceMgr.hasSave()) {
                     appView.loadSave();
                     whenReady();
                 } else if (index) {
-                    appView.briefLevel(index.defaultLevel, whenReady);
+                    appView.briefMap(index.defaultMap, whenReady);
                 } else {
                     whenReady();
                 }
@@ -399,8 +399,8 @@
             new IconBtn(hdrView, {icon:'upload', label:i18n('lbl-import'), tooltip:i18n('tip-import')}, [{
                 doActivated:appView.confirmImport
             }]);
-            new IconBtn(hdrView, {icon:'map', label:i18n('lbl-levels'), tooltip:i18n('tip-levels')}, [{
-                doActivated:appView.openLevels
+            new IconBtn(hdrView, {icon:'map', label:i18n('lbl-maps'), tooltip:i18n('tip-maps')}, [{
+                doActivated:appView.openMaps
             }]);
             new IconBtn(hdrView, {icon:'rotate-ccw', label:i18n('lbl-new-game'), tooltip:i18n('tip-new-game')}, [{
                 doActivated:appView.briefNewGame
@@ -493,16 +493,16 @@
                     if (game.outcome === 'won') {
                         openConfirmMsgDialog(
                             i18n('dlg-won-title'),
-                            i18n('dlg-won-msg', game.level.name, game.turn, game.scoreEarned),
+                            i18n('dlg-won-msg', game.gameMap.name, game.turn, game.scoreEarned),
                             () => {appView.briefNewGame();},
-                            () => {appView.openLevels();},
-                            i18n('btn-play-again'), i18n('btn-levels')
+                            () => {appView.openMaps();},
+                            i18n('btn-play-again'), i18n('btn-maps')
                         );
                     } else {
                         // Lost, to the core being destroyed or to a goal or penalty. With a
                         // save, closing loads it instead.
                         const hasSave = persistenceMgr.hasSave(),
-                            by = game.getLevelObjectives()[game.lostBy];
+                            by = game.getMapObjectives()[game.lostBy];
                         openConfirmMsgDialog(
                             i18n(by ? 'dlg-lost-title' : 'dlg-game-over-title'),
                             by ? i18n('dlg-lost-' + by.kind + '-msg', by.name, game.scoreEarned, game.turn) : i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
@@ -574,32 +574,32 @@
             });
         },
         
-        /*  Loads a level and shows its brief, with the level's values in effect so its
+        /*  Loads a map and shows its brief, with the map's values in effect so its
             settings can be set there. Start begins a new game in it with the seed shown;
-            Cancel puts the game's own level values back and the game carries on. If the
-            level can't be loaded, a dialog says so and the game carries on. callback, if
+            Cancel puts the game's own map values back and the game carries on. If the
+            map can't be loaded, a dialog says so and the game carries on. callback, if
             given, is called once it's done, whichever way. */
-        briefLevel: (id, callback) => {
-            levels.loadLevel(id, level => {
-                if (!level) {
-                    openAckMsgDialog(i18n('dlg-level-failed-title'), i18n('dlg-level-failed-msg', id));
+        briefMap: (id, callback) => {
+            maps.loadMap(id, gameMap => {
+                if (!gameMap) {
+                    openAckMsgDialog(i18n('dlg-map-failed-title'), i18n('dlg-map-failed-msg', id));
                     callback?.();
                     return;
                 }
                 openWhenClear(() => {
-                    const attrs = settings.applyLevel(id, level.attrs);
-                    levelBrief ??= new pkg.LevelBrief(appView);
-                    levelBrief.show(level, {
-                        seed:Number.isInteger(level.seed) ? level.seed : pkg.randomSeed(),
+                    const attrs = settings.applyMap(id, gameMap.attrs);
+                    mapBrief ??= new pkg.MapBrief(appView);
+                    mapBrief.show(gameMap, {
+                        seed:Number.isInteger(gameMap.seed) ? gameMap.seed : pkg.randomSeed(),
                         underway:!game.over && game.turn > 1,
                         onStart: seed => {
-                            game.level = {id, name:level.name, attrs, objectives:level.objectives};
+                            game.gameMap = {id, name:gameMap.name, attrs, objectives:gameMap.objectives};
                             game.seed = seed;
                             appView.newGame();
                             callback?.();
                         },
                         onCancel: () => {
-                            settings.applyLevel(game.level?.id, game.level?.attrs);
+                            settings.applyMap(game.gameMap?.id, game.gameMap?.attrs);
                             draw();
                             callback?.();
                         }
@@ -608,11 +608,11 @@
             });
         },
         
-        /*  The brief for the level being played, or a new game straight away when there are
-            no levels. */
+        /*  The brief for the map being played, or a new game straight away when there are
+            no maps. */
         briefNewGame: () => {
-            if (game.level) {
-                appView.briefLevel(game.level.id);
+            if (game.gameMap) {
+                appView.briefMap(game.gameMap.id);
             } else {
                 appView.newGame();
             }
@@ -627,10 +627,10 @@
         
         
         // Opening Dialogs /////////////////////////////////////////////////////
-        openLevels: () => {
-            levelsDialog ??= new pkg.LevelsDialog(appView, {onPlay:id => {appView.briefLevel(id);}});
-            levelsDialog.show(game.level?.id);
-            return levelsDialog;
+        openMaps: () => {
+            mapsDialog ??= new pkg.MapsDialog(appView, {onPlay:id => {appView.briefMap(id);}});
+            mapsDialog.show(game.gameMap?.id);
+            return mapsDialog;
         },
         
         openSettings: () => {

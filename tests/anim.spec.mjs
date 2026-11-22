@@ -100,14 +100,15 @@ test('with Animate pieces off, nothing is animated, and the enemies\' turn shows
         g.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
         hc.cfg.AI.planRange = 100;
         g.effects = [];
-        const now = performance.now();
         g.enemyPhase();
-        return {moved, enemyMoves:g.motions.length, killed:!g.pieces.has(kid.id), atOnce:g.effects.every(f => f.t0 - (f.delay || 0) - now < 50)};
+        // At once: nothing is put off till after the enemies' turn is over.
+        const end = performance.now();
+        return {moved, enemyMoves:g.motions.length, killed:!g.pieces.has(kid.id), atOnce:g.effects.every(f => f.t0 - (f.delay || 0) <= end)};
     });
     expect(r).toEqual({moved:0, enemyMoves:0, killed:true, atOnce:true});
 });
 
-test('Animate pieces is a preference: in Settings in every level, kept for the whole app, left alone by Reset to Defaults, not in a brief', async ({page}) => {
+test('Animate pieces is a preference: in Settings in every map, kept for the whole app, left alone by Reset to Defaults, not in a brief', async ({page}) => {
     await button(page, 'Settings').click();
     await expect(page.getByText('Display', {exact:true}).filter({visible:true})).toBeVisible();
     await page.getByText('Animate pieces', {exact:true}).filter({visible:true}).click();
@@ -115,13 +116,13 @@ test('Animate pieces is a preference: in Settings in every level, kept for the w
     await button(page, 'Reset to Defaults').click();
     expect(await page.evaluate(() => hc.cfg.ANIM.on)).toBe(false);
     await page.keyboard.press('Escape');
-    // A level can't change it, and it carries over to other levels.
+    // A map can't change it, and it carries over to other maps.
     expect(await page.evaluate(() => {
-        hc.settings.applyLevel('warrens', {animate:{value:true, pref:true}});
+        hc.settings.applyMap('warrens', {animate:{value:true, pref:true}});
         return [hc.cfg.ANIM.on, hc.settings.get('animate')];
     })).toEqual([false, false]);
-    await page.evaluate(() => hc.settings.applyLevel('endless', hc.app.game.level?.attrs));
-    await button(page, 'Levels').click();
+    await page.evaluate(() => hc.settings.applyMap('endless', hc.app.game.gameMap?.attrs));
+    await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();
     await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toHaveCount(0);

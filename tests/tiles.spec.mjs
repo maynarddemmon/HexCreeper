@@ -31,7 +31,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
             let ok = true;
             hc.cfg.TILES.wallChance = 0;
             for (let i = 0; i < 40; i++) {
-                g.seed = i; // a different level each time
+                g.seed = i; // a different map each time
                 g.tiles.clear();
                 g.borders.clear();
                 g.terrainQuads.delete('0,0');

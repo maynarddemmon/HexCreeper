@@ -38,8 +38,8 @@
             defaultValue:obj[prop], label:i18n('setting-' + id)
         }),
         
-        // A preference: a setting for the whole app, not a level. It's always in Settings
-        // (not in a level's brief), levels can't change it, it's kept once for every level,
+        // A preference: a setting for the whole app, not a map. It's always in Settings
+        // (not in a map's brief), maps can't change it, it's kept once for every map,
         // and Reset to Defaults leaves it alone.
         pref = def => ({...def, app:true}),
         
@@ -50,7 +50,7 @@
         holeOptions = optionsOf(pkg.holes),
         
         /*  Every setting. The SettingsDialog builds its UI from this list, so adding a
-            setting here is enough to make it appear there (in a level that shows it). */
+            setting here is enough to make it appear there (in a map that shows it). */
         DEFINITIONS = [
         pref(bool('animate', GROUP_DISPLAY, ANIM, 'on')),
         
@@ -134,20 +134,20 @@
             if (TILES.doorMax < TILES.doorMin) TILES.doorMax = TILES.doorMin;
         },
         
-        /*  What the player has changed, per level: {levelId:{settingId:value}}. Only values
-            that differ from the level's are kept. Unknown or invalid entries are dropped when
+        /*  What the player has changed, per map: {mapId:{settingId:value}}. Only values
+            that differ from the map's are kept. Unknown or invalid entries are dropped when
             read. */
         overrides = (() => {
             const retval = {};
             try {
                 const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
                 if (isObj(stored)) {
-                    for (const levelId in stored) {
-                        if (!isObj(stored[levelId])) continue;
-                        for (const id in stored[levelId]) {
+                    for (const mapId in stored) {
+                        if (!isObj(stored[mapId])) continue;
+                        for (const id in stored[mapId]) {
                             const def = DEFINITIONS_BY_ID.get(id),
-                                value = def ? normalize(def, stored[levelId][id]) : undefined;
-                            if (value !== undefined) (retval[levelId] ??= {})[id] = value;
+                                value = def ? normalize(def, stored[mapId][id]) : undefined;
+                            if (value !== undefined) (retval[mapId] ??= {})[id] = value;
                         }
                     }
                 }
@@ -157,7 +157,7 @@
             return retval;
         })(),
         
-        /*  The preferences the player has changed: {settingId:value}, for every level. */
+        /*  The preferences the player has changed: {settingId:value}, for every map. */
         prefs = (() => {
             const retval = {};
             try {
@@ -189,7 +189,7 @@
         
         writeOverrides = () => {
             try {
-                for (const levelId in overrides) if (!Object.keys(overrides[levelId]).length) delete overrides[levelId];
+                for (const mapId in overrides) if (!Object.keys(overrides[mapId]).length) delete overrides[mapId];
                 if (Object.keys(overrides).length) {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
                 } else {
@@ -200,41 +200,41 @@
             }
         };
     
-    /*  The level being played, and its setting entries by setting id: {value, pref}. A
-        level only lists the settings it changes or shows. */
-    let levelId = null,
+    /*  The map being played, and its setting entries by setting id: {value, pref}. A
+        map only lists the settings it changes or shows. */
+    let mapId = null,
         entries = {};
     
     const
-        /*  The level's value for a setting: its entry's value, or the default. */
-        levelValue = def => entries[def.id]?.value ?? def.defaultValue,
+        /*  The map's value for a setting: its entry's value, or the default. */
+        mapValue = def => entries[def.id]?.value ?? def.defaultValue,
         
-        /*  Is the setting shown in Settings, for the player to change, in this level? */
+        /*  Is the setting shown in Settings, for the player to change, in this map? */
         isShown = id => entries[id]?.pref === true,
         
-        /*  The value in effect: the player's, if the level shows the setting and they've
-            changed it, otherwise the level's. A preference's is the player's, or its default. */
+        /*  The value in effect: the player's, if the map shows the setting and they've
+            changed it, otherwise the map's. A preference's is the player's, or its default. */
         get = id => {
             const def = DEFINITIONS_BY_ID.get(id);
             if (!def) {
                 console.warn('Unknown setting', id);
                 return;
             }
-            const mine = overrides[levelId];
-            return def.app ? prefs[id] ?? def.defaultValue : isShown(id) && mine && id in mine ? mine[id] : levelValue(def);
+            const mine = overrides[mapId];
+            return def.app ? prefs[id] ?? def.defaultValue : isShown(id) && mine && id in mine ? mine[id] : mapValue(def);
         },
         
         applyAll = () => {
             for (const def of DEFINITIONS) applyValue(def, get(def.id));
         };
     
-    // Start with every default in effect, until a level is applied.
+    // Start with every default in effect, until a map is applied.
     applyAll();
     
-    /*  The settings. Every one belongs to the level being played: a level file's "attrs"
-        gives, per setting id, {value, pref}. value (optional) is the level's value, in
+    /*  The settings. Every one belongs to the map being played: a map file's "attrs"
+        gives, per setting id, {value, pref}. value (optional) is the map's value, in
         place of the default. pref (default false) shows the setting in Settings, so the
-        player can change it; their changes are remembered per level. A setting a level
+        player can change it; their changes are remembered per map. A setting a map
         doesn't list is at its default and isn't shown. */
     pkg.settings = {
         getDefinitions: () => DEFINITIONS,
@@ -245,11 +245,11 @@
         isShown,
         
         /*  Returns the value set, after rounding and clamping, or undefined if it was refused,
-            including when the level doesn't show the setting. A preference can always be set. */
+            including when the map doesn't show the setting. A preference can always be set. */
         set: (id, value) => {
             const def = DEFINITIONS_BY_ID.get(id);
             if (!def || !(def.app || isShown(id))) {
-                console.warn('Setting', id, 'cannot be changed in this level');
+                console.warn('Setting', id, 'cannot be changed in this map');
                 return;
             }
             const normalized = normalize(def, value);
@@ -265,8 +265,8 @@
                 applyValue(def, normalized);
                 pkg.app?.notifySettingChanged(id, normalized);
             } else {
-                const mine = overrides[levelId] ??= {};
-                if (normalized === levelValue(def)) {
+                const mine = overrides[mapId] ??= {};
+                if (normalized === mapValue(def)) {
                     delete mine[id];
                 } else {
                     mine[id] = normalized;
@@ -278,25 +278,25 @@
             return normalized;
         },
         
-        /*  Puts a level's settings into effect, with the player's changes for that level, in
-            place of any earlier level's. attrs is the level file's "attrs". Unknown ids, and
+        /*  Puts a map's settings into effect, with the player's changes for that map, in
+            place of any earlier map's. attrs is the map file's "attrs". Unknown ids, and
             entries or values that can't be used, are skipped with a warning. Returns the
             entries put into effect, cleaned up, e.g. for saving with a game. */
-        applyLevel: (id, attrs) => {
-            levelId = id ?? null;
+        applyMap: (id, attrs) => {
+            mapId = id ?? null;
             entries = {};
             for (const settingId in attrs ?? {}) {
                 const def = DEFINITIONS_BY_ID.get(settingId),
                     entry = attrs[settingId];
                 if (!def || def.app || !isObj(entry)) {
-                    console.warn('Level attr', settingId, 'cannot be', entry);
+                    console.warn('Map attr', settingId, 'cannot be', entry);
                     continue;
                 }
                 const clean = {pref:entry.pref === true};
                 if ('value' in entry) {
                     const value = normalize(def, entry.value);
                     if (value === undefined) {
-                        console.warn('Level attr', settingId, 'cannot have the value', entry.value);
+                        console.warn('Map attr', settingId, 'cannot have the value', entry.value);
                     } else {
                         clean.value = value;
                     }
@@ -307,9 +307,9 @@
             return structuredClone(entries);
         },
         
-        /*  Puts every setting the level shows back to the level's value. */
+        /*  Puts every setting the map shows back to the map's value. */
         resetToDefaults: () => {
-            delete overrides[levelId];
+            delete overrides[mapId];
             writeOverrides();
             applyAll();
             pkg.app?.notifySettingChanged(null);

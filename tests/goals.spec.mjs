@@ -12,11 +12,11 @@ const evaluate = (page, src, values = {}) => page.evaluate(([src, values]) => {
     }
 }, [src, values]);
 
-/*  Plays the current level again with these goals and penalties in place of its own, on
+/*  Plays the current map again with these goals and penalties in place of its own, on
     an empty board so nothing gets in the way. */
 const playWith = (page, goals, penalties = []) => page.evaluate(([goals, penalties]) => {
     const g = hc.app.game;
-    g.level = {...g.level, objectives:hc.goals.fromLevel({goals, penalties})};
+    g.gameMap = {...g.gameMap, objectives:hc.goals.fromMap({goals, penalties})};
     hc.app.newGame();
     for (const p of g.piecesOf('enemy')) g.removePiece(p);
 }, [goals, penalties]);
@@ -55,11 +55,11 @@ test('expressions refuse bad syntax and any name or function they aren\'t given'
     }
 });
 
-test('a level\'s goals and penalties get their defaults, and a bad one is refused', async ({page}) => {
+test('a map\'s goals and penalties get their defaults, and a bad one is refused', async ({page}) => {
     await startGame(page);
     const read = data => page.evaluate(data => {
         try {
-            return hc.goals.fromLevel(data);
+            return hc.goals.fromMap(data);
         } catch (err) {
             return 'error: ' + err.message;
         }
@@ -131,7 +131,7 @@ test('progress text fills in its expressions as play goes on, and stops once loc
     expect(kept).toEqual(['Turn 3 of 3 (100%)', '7 0', 'no braces']);
 });
 
-test('a level is won once every required goal is met and no required penalty is', async ({page}) => {
+test('a map is won once every required goal is met and no required penalty is', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await playWith(page, [goal('turn >= 3'), goal('kills > 100', {required:false})], [goal('turn == 3')]);
@@ -141,9 +141,9 @@ test('a level is won once every required goal is met and no required penalty is'
     expect((await state(page)).over).toBe(false);
     await wait(page);
     expect(await state(page)).toMatchObject({over:true, outcome:'won', lostBy:null});
-    await expect(page.getByText('Level Complete')).toBeVisible();
+    await expect(page.getByText('Map Complete')).toBeVisible();
     await expect(page.getByText('You completed Endless Play on turn 4.', {exact:false})).toBeVisible();
-    await button(page, 'Levels').filter({hasText:'Levels'}).click(); // the dialog's, not the header's
+    await button(page, 'Maps').filter({hasText:'Maps'}).click(); // the dialog's, not the header's
     await expect(button(page, 'Play Open Ground')).toBeVisible();
 });
 
@@ -161,12 +161,12 @@ test('lockOnSuccess keeps a goal met once it has been', async ({page}) => {
     expect(await state(page)).toMatchObject({over:false, objectives:[{value:false, locked:false}, {value:true, locked:false}]});
 });
 
-test('a required goal locked unmet, or penalty locked incurred, loses the level', async ({page}) => {
+test('a required goal locked unmet, or penalty locked incurred, loses the map', async ({page}) => {
     await startGame(page);
     await playWith(page, [goal('turn < 2', {lockOnFailure:true}), goal('turn > 50')]);
     await wait(page);
     expect(await state(page)).toMatchObject({over:true, outcome:'lost', lostBy:0, objectives:[{value:false, locked:true}, {value:false, locked:false}]});
-    await expect(page.getByText('Level Failed')).toBeVisible();
+    await expect(page.getByText('Map Failed')).toBeVisible();
     await expect(page.getByText('"turn < 2" can no longer be achieved.', {exact:false})).toBeVisible();
     await button(page, 'Close').click();
     
@@ -184,7 +184,7 @@ test('optional goals and penalties neither win nor lose; with nothing required, 
     expect(await state(page)).toMatchObject({over:false, outcome:null});
 });
 
-test('losing the core loses the level', async ({page}) => {
+test('losing the core loses the map', async ({page}) => {
     await startGame(page);
     await playWith(page, [goal('turn > 50')]);
     await page.evaluate(() => {hc.app.game.damage(hc.app.game.getPlayerCore(), 999, null);});
@@ -199,13 +199,13 @@ test('goals, their state and the outcome are saved with the game', async ({page}
     const kept = await page.evaluate(() => {
         const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj())), copy = new hc.Game();
         copy.importFromObj(data);
-        return [copy.getLevelObjectives().map(o => o.expression), copy.objectives, copy.outcome];
+        return [copy.getMapObjectives().map(o => o.expression), copy.objectives, copy.outcome];
     });
     expect(kept).toEqual([['turn == 2', 'turn > 50'], [{value:true, locked:true, progress:''}, {value:false, locked:false, progress:''}], null]);
     
     const refused = await page.evaluate(() => {
         const data = hc.app.game.exportToObj();
-        data.level = {...data.level, objectives:[{kind:'goal', name:'x', expression:'alert(1)'}]};
+        data.gameMap = {...data.gameMap, objectives:[{kind:'goal', name:'x', expression:'alert(1)'}]};
         try {
             new hc.Game().importFromObj(data);
             return null;
@@ -216,12 +216,12 @@ test('goals, their state and the outcome are saved with the game', async ({page}
     expect(refused).toBe('Malformed goal: Unknown function "alert" at 0');
 });
 
-test('the brief and the info panel show the level\'s goals and penalties', async ({page}) => {
+test('the brief and the info panel show the map\'s goals and penalties', async ({page}) => {
     await startGame(page);
-    await expect(page.getByText('This level has no goals; play as long as you like.').filter({visible:true})).toHaveCount(0); // the brief is closed
+    await expect(page.getByText('This map has no goals; play as long as you like.').filter({visible:true})).toHaveCount(0); // the brief is closed
     await expect(page.getByText('Goals', {exact:true}).filter({visible:true})).toHaveCount(0);   // no goals in Endless
     
-    await button(page, 'Levels').click();
+    await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     const visible = text => page.getByText(text, {exact:true}).filter({visible:true});
     await expect(visible('Far Afield')).toBeVisible();
@@ -246,10 +246,10 @@ test('the brief and the info panel show the level\'s goals and penalties', async
     await expect(visible('40/40 destroyed')).toBeVisible();
 });
 
-test('a level whose goals are bad isn\'t loaded', async ({page}) => {
-    await page.route('**/data/levels/warrens.json5', route => route.fulfill({status:200, body:'{"goals":[{"name":"G", "expression":"turn >"}]}'}));
+test('a map whose goals are bad isn\'t loaded', async ({page}) => {
+    await page.route('**/data/gamemap/warrens.json5', route => route.fulfill({status:200, body:'{"goals":[{"name":"G", "expression":"turn >"}]}'}));
     await startGame(page);
-    await button(page, 'Levels').click();
+    await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
-    await expect(page.getByText('Level Not Loaded')).toBeVisible();
+    await expect(page.getByText('Map Not Loaded')).toBeVisible();
 });

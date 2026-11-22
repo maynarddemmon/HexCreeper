@@ -31,7 +31,7 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.solids','hc.EffectTiles','hc.MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
-    file(MODEL_ROOT + 'Levels.js').provides('hc.levels').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles');
+    file(MODEL_ROOT + 'Maps.js').provides('hc.maps').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles');
     
     // View //
     file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.settings');
@@ -40,16 +40,16 @@ JS.Packages(file => {
     file(VIEW_ROOT + 'SettingsDialog.js').provides('hc.SettingsDialog','hc.SettingsList').requires(
         'hc.AckDialog','hc.settings','hc.ToggleBtn','hc.UnderlineBtn','hc.WideView'
     );
-    file(VIEW_ROOT + 'LevelsDialog.js').provides('hc.LevelsDialog').requires(
-        'hc.AckDialog','hc.levels','hc.UnderlineBtn','hc.WideView'
+    file(VIEW_ROOT + 'MapsDialog.js').provides('hc.MapsDialog').requires(
+        'hc.AckDialog','hc.maps','hc.UnderlineBtn','hc.WideView'
     );
     file(VIEW_ROOT + 'PieceMenu.js').provides('hc.PieceMenu').requires('hc.Btn','hc.theme');
-    file(VIEW_ROOT + 'LevelBrief.js').provides('hc.LevelBrief').requires(
+    file(VIEW_ROOT + 'MapBrief.js').provides('hc.MapBrief').requires(
         'hc.ConfirmDialog','hc.SettingsList','hc.WideView'
     );
     
     // Include Everything
     file(HC_ROOT + 'App.js').provides('hc.App').requires(
-        'hc.GameView','hc.SettingsDialog','hc.LevelsDialog','hc.LevelBrief','hc.PieceMenu','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
+        'hc.GameView','hc.SettingsDialog','hc.MapsDialog','hc.MapBrief','hc.PieceMenu','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'
     );
 });
