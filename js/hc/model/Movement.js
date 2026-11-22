@@ -260,32 +260,45 @@
             straight over one cell or between two. It may jump over holes and pieces, but not
             over a solid: the cell it passes over, or one of the two, mustn't be solid. It
             must be able to stand where it lands (open, with no piece there), and since
-            nothing linked to it moves, each of its links must end in range. */
-        jumpCells: function(view, id) {
+            nothing linked to it moves, each of its links must end in range. With
+            overGaps, only jumps over cells it couldn't stand on (not open: holes, say),
+            where walking would take the long way round: enemies jump only those, since in
+            open ground a jump is no quicker and leaves the piece sitting out a turn. */
+        jumpCells: function(view, id, overGaps = false) {
             const {posOf, kidsOf, parentOf, occupant, open} = view,
                 range = pkg.cfg.LINK.range,
                 [px, py] = posOf(id),
-                dirs = pkg.GRID.dirs,
                 par = parentOf(id),
                 linked = [...kidsOf(id), ...(par != null ? [par] : [])].map(posOf),
                 out = [];
-            dirs.forEach(([ax, ay], i) => {
-                const [bx, by] = dirs[(i + 1) % 6],
-                    jumps = [
-                        {dx:2 * ax, dy:2 * ay, over:[[ax, ay]]},
-                        {dx:ax + bx, dy:ay + by, over:[[ax, ay], [bx, by]]}
-                    ];
-                for (const {dx, dy, over} of jumps) {
-                    const x = px + dx,
-                        y = py + dy;
-                    if (over.some(([ox, oy]) => !this.isSolid(px + ox, py + oy)) && open(x, y) && occupant(x, y) === undefined &&
-                        linked.every(q => dist([x, y], q) <= range)) {
-                        out.push({x, y});
-                    }
+            for (const {dx, dy, over} of this.jumpOffsets()) {
+                const x = px + dx,
+                    y = py + dy;
+                if (this.canJumpOver(px, py, over) && !(overGaps && over.some(([ox, oy]) => open(px + ox, py + oy))) &&
+                    open(x, y) && occupant(x, y) === undefined &&
+                    linked.every(q => dist([x, y], q) <= range)) {
+                    out.push({x, y});
                 }
-            });
+            }
             return out;
         },
+        
+        /*  The twelve jumps from a cell, [{dx, dy, over}]: two steps away, straight over one
+            cell or between two, with the offsets of the cells passed over. */
+        jumpOffsets: function() {
+            const dirs = pkg.GRID.dirs;
+            return dirs.flatMap(([ax, ay], i) => {
+                const [bx, by] = dirs[(i + 1) % 6];
+                return [
+                    {dx:2 * ax, dy:2 * ay, over:[[ax, ay]]},
+                    {dx:ax + bx, dy:ay + by, over:[[ax, ay], [bx, by]]}
+                ];
+            });
+        },
+        
+        /*  Whether a jump from (x, y) can pass over the cells at the offsets `over`: not
+            over a solid, so one of them mustn't be solid. */
+        canJumpOver: function(x, y, over) {return over.some(([ox, oy]) => !this.isSolid(x + ox, y + oy));},
         
         /*  Jumps piece p to (x, y), if it can (jumpCells; an enemy won't land on harm). It
             lands on the tiles there, and is tired: it can't act this turn or the next. */

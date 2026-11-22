@@ -123,7 +123,8 @@
                 poise:1,       // bonus for a piece ending exactly 2 steps away (can strike next turn, can't be hit)
                 approach:0.5,  // penalty per step of distance for pieces further away
                 patience:2,    // turns without a hit before a nearby squad stops caring about exposure
-                jump:2,        // cost of a jump (the piece sits out next turn)
+                jump:0.5,      // cost of a jump: the piece sits out next turn, which is worth a step of approach
+                jumpClose:1,   // pieces this close (steps) to a player piece don't jump when planning
             },
             
             // Rank: a player piece's rank = max(base, 1 + min of its two highest-ranked children)

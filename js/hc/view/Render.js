@@ -215,19 +215,50 @@
         // longer the chain, up to a limit.
         linkHalfWidth = chain => cam.size * Math.min(0.03 * chain, 0.27),
         
+        // How much of a link to a piece out of sight is drawn, from the end in sight.
+        LINK_STUB = 0.5,
+        
+        // A colour as written in index.html (#rgb, #rgba, #rrggbb or #rrggbbaa), made fully
+        // transparent, for fading to: fading to plain "transparent" would go through black.
+        clearOf = c => {
+            const hex = c.trim().replace('#', ''),
+                full = hex.length <= 4 ? [...hex].map(h => h + h).join('') : hex,
+                [r, g, b] = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16));
+            return `rgba(${r}, ${g}, ${b}, 0)`;
+        },
+        
         // Draws a translucent link from `from` to `to` (child -> parent) as a trapezoid between
         // the two cell centres, behind the pieces. `chain` is the longest chain of pieces from
         // `from` down, counting `from`: the link widens from that chain's width at `from` (a
         // point for a lone piece) to one more at `to`, so widths match where links meet.
-        drawLink = (from, to, color, chain) => {
-            const [ax, ay] = cellCenter(from.x, from.y),
-                [bx, by] = cellCenter(to.x, to.y),
-                len = Math.hypot(bx - ax, by - ay);
+        // `hidden` ('from' or 'to') says an end is out of sight: then only the part nearest
+        // the other end is drawn (LINK_STUB), fading out, so you can tell a piece is linked to
+        // something you can't see, but not quite where.
+        drawLink = (from, to, color, chain, hidden = null) => {
+            let [ax, ay] = cellCenter(from.x, from.y),
+                [bx, by] = cellCenter(to.x, to.y);
+            const len = Math.hypot(bx - ax, by - ay);
             if (!len) return;
-            const px = (ay - by) / len, py = (bx - ax) / len,
-                w0 = linkHalfWidth(chain - 1),
-                w1 = linkHalfWidth(chain);
-            ctx.fillStyle = css(color);
+            const px = (ay - by) / len, py = (bx - ax) / len;
+            let w0 = linkHalfWidth(chain - 1),
+                w1 = linkHalfWidth(chain),
+                fill = css(color);
+            if (hidden === 'to') {
+                bx = ax + (bx - ax) * LINK_STUB;
+                by = ay + (by - ay) * LINK_STUB;
+                w1 = w0 + (w1 - w0) * LINK_STUB;
+                fill = ctx.createLinearGradient(ax, ay, bx, by);
+            } else if (hidden === 'from') {
+                ax = bx + (ax - bx) * LINK_STUB;
+                ay = by + (ay - by) * LINK_STUB;
+                w0 = w1 + (w0 - w1) * LINK_STUB;
+                fill = ctx.createLinearGradient(bx, by, ax, ay);
+            }
+            if (hidden) {
+                fill.addColorStop(0, css(color));
+                fill.addColorStop(1, clearOf(css(color)));
+            }
+            ctx.fillStyle = fill;
             ctx.beginPath();
             ctx.moveTo(ax + px * w0, ay + py * w0);
             ctx.lineTo(bx + px * w1, by + py * w1);
@@ -431,8 +462,10 @@
             }
         }
         const chain = p => chains.get(p.id) ?? 1;
+        // An enemy's link to a piece out of sight shows as a stub fading into the fog.
         for (const p of game.piecesOf('enemy')) {
-            const par = game.parent(p); if (par && shown(p) && shown(par)) drawLink(p, par, '--enemy-link', chain(p));
+            const par = game.parent(p);
+            if (par && (shown(p) || shown(par))) drawLink(p, par, '--enemy-link', chain(p), shown(p) ? (shown(par) ? null : 'to') : 'from');
         }
         for (const p of game.piecesOf('player')) {
             const par = game.parent(p); if (!par) continue;

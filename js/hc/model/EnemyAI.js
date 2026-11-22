@@ -65,12 +65,13 @@
             }
         },
         
-        // Far from the player: step the squad one cell along the shortest harm-free path,
-        // keeping its shape (fixed) if that gets it closer, or else letting it give (follow,
-        // then free) to get through tight places. A squad whose leader is tired from a jump
-        // stays put.
+        // Far from the player: step the squad one cell along the shortest path (see
+        // distanceField), keeping its shape (fixed) if that gets it closer, or else letting
+        // it give (follow, then free) to get through tight places. If no step gets it closer
+        // (a line of holes in the way, say), one of its pieces jumps instead, if that gets
+        // the squad's nearest piece closer, or else its pieces closer in all: so the rest
+        // can follow the first over. A tired leader doesn't step, but the others may jump.
         marchSquad: function(root, field) {
-            if (this.isTired(root)) return;
             const players = this.piecesOf('player'),
                 fd = p => field.get(this.key(p.x, p.y)) ?? Infinity,
                 members = this.group(root),
@@ -78,7 +79,7 @@
                 t = players.reduce((b, q) => hexDist(root, q) < hexDist(root, b) ? q : b);
             let best = null,
                 bestKey = [cur, hexDist(root, t) * 1000 + euclid2(root, t)];
-            for (const mode of ['fixed', 'follow', 'free']) {
+            for (const mode of this.isTired(root) ? [] : ['fixed', 'follow', 'free']) {
                 for (const m of this.legalMoves(root, mode)) {
                     if (!m.attack && this.canStep(root, m.dx, m.dy, true, mode)) {
                         const moved = new Map(m.moves.map(([id, x, y]) => [id, [x, y]])),
@@ -97,6 +98,32 @@
                             bestKey = k;
                         }
                     }
+                }
+            }
+            if (!(best && bestKey[0] < cur) && cur !== Infinity) {
+                // [nearest, total] after a jump of piece g to (x, y)
+                const sumOf = vals => vals.reduce((a, v) => a + v, 0),
+                    after = (g, x, y) => {
+                        const vals = members.map(m => m === g ? field.get(this.key(x, y)) ?? Infinity : fd(m));
+                        return [Math.min(...vals), sumOf(vals)];
+                    },
+                    view = this.boardView(true);
+                let jump = null,
+                    jumpKey = [cur, sumOf(members.map(fd))];
+                for (const g of members) {
+                    if (!this.isTired(g)) {
+                        for (const c of this.jumpCells(view, g.id, true)) {
+                            const k = after(g, c.x, c.y);
+                            if (k[0] < jumpKey[0] || (k[0] === jumpKey[0] && k[1] < jumpKey[1])) {
+                                jump = [g, c];
+                                jumpKey = k;
+                            }
+                        }
+                    }
+                }
+                if (jump) {
+                    best = null;
+                    this.jumpPiece(jump[0], jump[1].x, jump[1].y);
                 }
             }
             if (best) this.act(root, best.x, best.y, best.mode);
@@ -264,7 +291,14 @@
                         }
                         // Jumping: only it moves, two cells, and it's then done, and tired next
                         // turn, which costs AI.jump. After the steps, so a step wins a tie.
-                        for (const {x, y} of this.jumpCells(view, id)) {
+                        // Only over gaps (holes, harm): in open ground a jump gets it no
+                        // nearer than walking, and leaves it unable to strike next turn.
+                        // Not within AI.jumpClose of a player piece, where sitting out the
+                        // next turn would spoil striking and pulling back: it's for getting
+                        // to the player, over holes, say.
+                        const [x0, y0] = st.pos.get(id),
+                            near = players.some(p => !st.dead.has(p.id) && hexDist(p, {x:x0, y:y0}) <= AI.jumpClose);
+                        for (const {x, y} of near ? [] : this.jumpCells(view, id, true)) {
                             const pos = new Map(st.pos);
                             pos.set(id, [x, y]);
                             out.push({

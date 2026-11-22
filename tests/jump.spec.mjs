@@ -126,17 +126,68 @@ test('enemies jump: a planned jump is carried out, and the piece sits out its ne
     expect(r).toEqual({at:[0, -6], tired:true, planned:0, marched:false, later:false});
 });
 
-test('an enemy that plans its turn, kept from you by a line of holes, jumps it', async ({page}) => {
+// A line of holes across the board at y = -2, from x = -w to w.
+const holeLine = (page, w) => page.evaluate(w => {
+    const g = hc.app.game;
+    for (let x = -w; x <= w; x++) g.tiles.set(g.key(x, -2), g.makeTile(x, -2, 'hole', hc.cfg.TILES.clumpHole));
+}, w);
+
+test('an enemy near you, kept from you by a long line of holes, jumps it rather than going round', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await holeLine(page, 8);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, e = g.addPiece('core', 'enemy', 0, -4);
+        g.recomputeRanks();
+        let turns = 0;
+        while (e.y < -2 && turns < 4) {
+            g.enemyPhase();
+            g.turn++;
+            turns++;
+        }
+        return {over:e.y > -2, turns};
+    });
+    expect(r.over).toBe(true);
+    expect(r.turns).toBeLessThanOrEqual(3);
+});
+
+test('a far squad marches over a long line of holes, one piece after another', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await holeLine(page, 12);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game,
+            lead = g.addPiece('core', 'enemy', 0, -12),
+            kid = g.addPiece('core', 'enemy', 1, -12, lead.id);
+        g.recomputeRanks();
+        let turns = 0, jumped = false;
+        while ((lead.y < -2 || kid.y < -2) && turns < 30) {
+            g.enemyPhase();
+            jumped ||= g.isTired(lead) || g.isTired(kid);
+            g.turn++;
+            turns++;
+        }
+        return {over:lead.y > -2 && kid.y > -2, jumped, linked:kid.parentId === lead.id};
+    });
+    expect(r).toEqual({over:true, jumped:true, linked:true});
+});
+
+test('in open ground enemies walk rather than jump', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, core = g.getPlayerCore();
-        hc.cfg.AI.planRange = 12; // the way round is long, so it would otherwise march
-        for (let x = -3; x <= 3; x++) g.tiles.set(g.key(x, -2), g.makeTile(x, -2, 'hole', hc.cfg.TILES.clumpHole));
-        const e = g.addPiece('core', 'enemy', core.x, core.y - 3);
+        const g = hc.app.game, out = [];
+        // A lone enemy and a squad, near (planning) and far (marching).
+        const near = g.addPiece('core', 'enemy', 0, -5),
+            far = g.addPiece('core', 'enemy', 4, -12);
+        g.addPiece('core', 'enemy', 5, -12, far.id);
         g.recomputeRanks();
-        g.enemyPhase();
-        return [e.y > core.y - 2, g.isTired(e)];
+        for (let t = 0; t < 8; t++) {
+            g.enemyPhase();
+            out.push(g.piecesOf('enemy').some(e => g.isTired(e)));
+            g.turn++;
+        }
+        return out.some(Boolean);
     });
-    expect(r).toEqual([true, true]);
+    expect(r).toBe(false);
 });

@@ -974,25 +974,39 @@
             this.evaluateObjectives();
         },
         
-        // Steps-to-reach-a-player-piece for every cell within `radius`, walking
-        // around active harm tiles (other pieces are ignored since they move).
+        // How many turns it takes to reach a player piece from every cell within `radius`,
+        // keeping off active harm tiles (other pieces are ignored since they move). A step
+        // takes a turn, and so does a jump (see jumpOffsets) but the piece then sits out the
+        // next: it counts 2, so it's no quicker than walking, but it can cross holes.
         distanceField: function(sources, radius = 30) {
-            const dist = new Map(), q = [];
+            const dist = new Map(),
+                buckets = [], // the cells reached, by distance: [x, y, x, y, ...]
+                jumps = this.jumpOffsets(),
+                reach = (x, y, d) => {
+                    const k = this.key(x, y);
+                    if (d <= radius && !(dist.get(k) <= d) && this.isOpen(x, y) && !this.isHarm(x, y)) {
+                        dist.set(k, d);
+                        (buckets[d] ??= []).push(x, y);
+                    }
+                };
             for (const p of sources) {
                 dist.set(this.key(p.x, p.y), 0);
-                q.push(p.x, p.y);
+                (buckets[0] ??= []).push(p.x, p.y);
             }
-            for (let i = 0; i < q.length; i += 2) {
-                const x = q[i], y = q[i + 1],
-                    d = dist.get(this.key(x, y));
-                if (d < radius) {
-                    for (const [dx, dy] of pkg.GRID.dirs) {
-                        const nx = x + dx,
-                            ny = y + dy,
-                            k = this.key(nx, ny);
-                        if (dist.has(k) || !this.isOpen(nx, ny) || this.isHarm(nx, ny)) continue;
-                        dist.set(k, d + 1);
-                        q.push(nx, ny);
+            for (let d = 0; d < buckets.length; d++) {
+                const cells = buckets[d] ?? [];
+                for (let i = 0; i < cells.length; i += 2) {
+                    const x = cells[i],
+                        y = cells[i + 1];
+                    // Reached more cheaply since it was put here: skip it.
+                    if (dist.get(this.key(x, y)) === d && d < radius) {
+                        for (const [dx, dy] of pkg.GRID.dirs) reach(x + dx, y + dy, d + 1);
+                        // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is as quick.
+                        for (const {dx, dy, over} of jumps) {
+                            if (this.canJumpOver(x, y, over) && !over.some(([ox, oy]) => this.isOpen(x + ox, y + oy) && !this.isHarm(x + ox, y + oy))) {
+                                reach(x + dx, y + dy, d + 2);
+                            }
+                        }
                     }
                 }
             }
