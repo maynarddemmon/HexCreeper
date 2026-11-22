@@ -1,18 +1,17 @@
 {
 	"attrs":{
-		"quadRadius":{"value":2},
-		"wallChance":{"value":90},
-		"wallHoleChance":{"value":0},
-		"doorMin":{"value":1},
-		"doorMax":{"value":1},
-		"solidMin":{"value":0},
-		"solidMax":{"value":3},
-		"holeMin":{"value":0},
-		"holeMax":{"value":0},
-		"wallSolid":{"value":"hedge"},
-		"clumpSolid":{"value":"boulder"},
-		"visionRadius":{"value":8},
-		"fog":{"value":true}
+		"quadRadius":2,
+		"wallChance":90,
+		"wallHoleChance":0,
+		"doorMin":1,
+		"doorMax":1,
+		"solidMin":0,
+		"solidMax":3,
+		"holeMin":0,
+		"holeMax":0,
+		"wallSolid":"hedge",
+		"clumpSolid":"boulder",
+		"visionRadius":8
 	},
 	"goals":[
 		{

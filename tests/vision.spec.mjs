@@ -74,18 +74,15 @@ test('once the game is over, every cell seen is in sight, and every enemy shows'
     })).toEqual([true, false]);
 });
 
-test('fog of war can be turned off and its radius changed in Settings', async ({page}) => {
+test('a map sets the vision radius; fog of war can be turned off in hc.cfg', async ({page}) => {
     await startGame(page);
     await clearBoard(page); // so no random solid tile blocks the cells checked below
-    await button(page, 'Settings').click();
-    const radius = page.locator('input[data-setting="visionRadius"]').filter({visible:true});
-    await radius.fill('5');
-    await radius.press('Enter');
-    expect(await page.evaluate(() => hc.app.game.cellsInSight().has('5,0') && !hc.app.game.cellsInSight().has('6,0'))).toBe(true);
-    
-    await page.getByText('Fog of war', {exact:true}).filter({visible:true}).click();
-    expect(await page.evaluate(() => [hc.app.game.cellsInSight(), JSON.parse(localStorage.getItem('hc.settings')).endless.fog])).toEqual([null, false]);
-    
-    await button(page, 'Reset to Defaults').click();
-    expect(await page.evaluate(() => [hc.cfg.VISION.fog, hc.cfg.VISION.radius])).toEqual([true, 12]);
+    expect(await page.evaluate(() => {
+        hc.settings.applyMap({visionRadius:5});
+        return hc.app.game.cellsInSight().has('5,0') && !hc.app.game.cellsInSight().has('6,0');
+    })).toBe(true);
+    expect(await page.evaluate(() => {
+        hc.cfg.VISION.fog = false;
+        return hc.app.game.cellsInSight();
+    })).toBe(null);
 });

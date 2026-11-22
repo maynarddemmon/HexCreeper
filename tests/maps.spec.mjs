@@ -5,7 +5,7 @@ const mapsTitle = page => page.getByText('Maps', {exact:true}).filter({visible:t
 
 test('with no save, the default map from init.json5 is played', async ({page}) => {
     await startGame(page);
-    expect(await page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.gameMap.name, hc.app.game.gameMap.attrs.fog])).toEqual(['endless', 'Endless Play', {pref:true}]);
+    expect(await page.evaluate(() => [hc.app.game.gameMap.id, hc.app.game.gameMap.name, hc.app.game.gameMap.attrs])).toEqual(['endless', 'Endless Play', {}]);
 });
 
 test('the Maps dialog lists every map in init.json5 and marks the one being played', async ({page}) => {
@@ -50,23 +50,19 @@ const seedInput = page => page.getByRole('textbox', {name:'Seed', exact:true}).f
         return {tiles:[...g.tiles].sort(), enemies:g.piecesOf('enemy').map(e => e.x + ',' + e.y).sort()};
     });
 
-test('the brief shows the map\'s description, its settings and a seed, and starts with them', async ({page}) => {
+test('the brief shows the map\'s description and a seed (no settings), and starts with them', async ({page}) => {
     await startGame(page);
     await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();
     await expect(page.getByText('Wide open country with nowhere to hide, and the enemy comes often.').filter({visible:true})).toBeVisible();
-    const shown = await page.locator('input[data-setting]').filter({visible:true}).evaluateAll(inputs => inputs.map(i => i.dataset.setting));
-    expect(shown.sort()).toEqual(['solidMax', 'spawnEvery', 'visionRadius']);
+    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(0);
     await expect(seedInput(page)).toHaveValue(/^\d+$/);
     
-    const spawn = page.locator('input[data-setting="spawnEvery"]').filter({visible:true});
-    await spawn.fill('3');
-    await spawn.press('Enter');
     await seedInput(page).fill('1234');
     await button(page, '✓ Start').click();
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
-    expect(await page.evaluate(() => [hc.app.game.seed, hc.cfg.SPAWN.every])).toEqual([1234, 3]);
+    expect(await page.evaluate(() => [hc.app.game.seed, hc.cfg.SPAWN.every])).toEqual([1234, 2]);
     await expect(page.getByText('1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
 });
 
@@ -139,38 +135,21 @@ const playMap = async (page, name, id) => {
     await page.waitForFunction(id => hc.app.game.gameMap?.id === id, id);
 };
 
-test('Settings shows only what the map shows; the map\'s values are used, and are what Reset goes back to', async ({page}) => {
+test('Settings shows only the preferences, whatever the map', async ({page}) => {
     await startGame(page);
     await playMap(page, 'Open Ground', 'open_ground');
     await button(page, 'Settings').click();
-    const shown = await page.locator('input[data-setting]').filter({visible:true}).evaluateAll(inputs => inputs.map(i => i.dataset.setting));
-    expect(shown.sort()).toEqual(['solidMax', 'spawnEvery', 'visionRadius']);
+    await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toBeVisible();
+    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(0); // no number or choice rows
     await expect(page.getByText('Fog of war', {exact:true}).filter({visible:true})).toHaveCount(0);
-    
-    const spawn = page.locator('input[data-setting="spawnEvery"]').filter({visible:true});
-    await expect(spawn).toHaveValue('2'); // the map's value
-    await spawn.fill('4');
-    await spawn.press('Enter');
-    expect(await page.evaluate(() => [hc.cfg.SPAWN.every, hc.settings.set('wallChance', 50), hc.cfg.TILES.wallChance])).toEqual([4, undefined, 0]); // not shown: can't be set
-    await button(page, 'Reset to Defaults').click();
-    await expect(spawn).toHaveValue('2');
-});
-
-test('a map that shows nothing says so', async ({page}) => {
-    await startGame(page);
-    await playMap(page, 'The Warrens', 'warrens');
-    await button(page, 'Settings').click();
-    await expect(page.getByText('This map has no settings you can change.')).toBeVisible();
     await expect(button(page, 'Reset to Defaults')).toHaveCount(0);
 });
 
-test('changes to settings are kept per map', async ({page}) => {
+test('a map\'s attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
     await startGame(page);
-    await page.evaluate(() => {hc.settings.set('spawnEvery', 7);});
-    await playMap(page, 'Open Ground', 'open_ground');
-    expect(await page.evaluate(() => hc.cfg.SPAWN.every)).toBe(2);
-    await page.evaluate(() => {hc.settings.set('spawnEvery', 5);});
-    await playMap(page, 'Endless Play', 'endless');
-    expect(await page.evaluate(() => [hc.cfg.SPAWN.every, JSON.parse(localStorage.getItem('hc.settings'))])).toEqual([7, {endless:{spawnEvery:7}, open_ground:{spawnEvery:5}}]);
+    expect(await page.evaluate(() => {
+        const clean = hc.settings.applyMap({linkRange:99, spawnEvery:2.4, advance:'yes', fog:false, nonsense:1});
+        return [clean, hc.cfg.LINK.range, hc.cfg.SPAWN.every, hc.cfg.COMBAT.advance, hc.cfg.TILES.wallChance];
+    })).toEqual([{linkRange:20, spawnEvery:2}, 20, 2, true, 50]);
 });
 

@@ -1,10 +1,9 @@
 {
 	"attrs":{
-		"wallChance":{"value":0},
-		"solidMax":{"value":1, "pref":true},
-		"holeMax":{"value":0},
-		"spawnEvery":{"value":2, "pref":true},
-		"visionRadius":{"pref":true}
+		"wallChance":0,
+		"solidMax":1,
+		"holeMax":0,
+		"spawnEvery":2
 	},
 	"goals":[
 		{

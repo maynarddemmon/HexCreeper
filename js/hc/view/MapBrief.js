@@ -49,9 +49,6 @@
             self._goals = new WideView(container);
             new M.SpacedLayout(self._goals, {axis:'y', spacing:padding/2, collapseParent:true});
             
-            self._settingsHeader = new Text(container, {...textAttrs, text:i18n('brief-settings'), fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono});
-            self._list = new pkg.SettingsList(container);
-            
             // The seed //
             const seedRow = new WideView(container, {height:rowHeight + padding});
             new Text(seedRow, {x:padding, y:padding + 5, text:i18n('brief-seed'), fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
@@ -73,8 +70,7 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  map is a loaded map. The map's settings must already be in effect, so the
-            list shows its settings. */
+        /*  gameMap is a loaded map. */
         show: function(gameMap, {seed, underway, onStart, onCancel}) {
             const self = this;
             self.callSuper();
@@ -99,8 +95,6 @@
             }
             self._goals.setVisible(objectives.length > 0);
             
-            const any = self._list.refresh();
-            self._settingsHeader.setVisible(any);
             self._seedInput.setValue(String(seed));
             
             self.setContentHeightToFit(self._container.height);

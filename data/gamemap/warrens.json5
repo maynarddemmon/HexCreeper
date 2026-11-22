@@ -1,11 +1,10 @@
 {
 	"attrs":{
-		"quadRadius":{"value":4},
-		"wallChance":{"value":90},
-		"doorMin":{"value":1},
-		"doorMax":{"value":1},
-		"visionRadius":{"value":8},
-		"fog":{"value":true}
+		"quadRadius":4,
+		"wallChance":90,
+		"doorMin":1,
+		"doorMax":1,
+		"visionRadius":8
 	},
 	"goals":[
 		{

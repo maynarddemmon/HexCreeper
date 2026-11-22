@@ -38,38 +38,6 @@ test('keys are ignored while a dialog is open', async ({page}) => {
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
 });
 
-test('a setting marked ✱ applies from the next new game', async ({page}) => {
-    await startGame(page);
-    await button(page, 'Settings').click();
-    const input = page.locator('input[data-setting="quadRadius"]').filter({visible:true});
-    await input.fill('2');
-    await input.press('Enter');
-    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(5);
-    await button(page, 'X Close').click();
-    await button(page, 'New game').click();
-    await button(page, '✓ Start').click();
-    expect(await page.evaluate(() => hc.GRID.chunkRadius)).toBe(2);
-});
-
-test('a setting applies at once, is saved (per map) only while not the map\'s value, and resets', async ({page}) => {
-    await startGame(page);
-    await button(page, 'Settings').click();
-    const input = page.locator('input[data-setting="linkRange"]').filter({visible:true});
-    await expect(input).toHaveValue('3');
-    await input.fill('5');
-    await input.press('Enter');
-    expect(await page.evaluate(() => [hc.cfg.LINK.range, JSON.parse(localStorage.getItem('hc.settings')).endless.linkRange])).toEqual([5, 5]); // per map
-
-    // Out of range values are clamped.
-    await input.fill('99');
-    await input.press('Enter');
-    await expect(input).toHaveValue('20');
-
-    await button(page, 'Reset to Defaults').click();
-    await expect(input).toHaveValue('3');
-    expect(await page.evaluate(() => [hc.cfg.LINK.range, localStorage.getItem('hc.settings')])).toEqual([3, null]);
-});
-
 test('New Game shows the map\'s brief, which warns once the game has started', async ({page}) => {
     await startGame(page);
     const warning = page.getByText('Starting abandons the game in progress.').filter({visible:true});

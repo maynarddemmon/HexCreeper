@@ -108,20 +108,18 @@ test('with Animate pieces off, nothing is animated, and the enemies\' turn shows
     expect(r).toEqual({moved:0, enemyMoves:0, killed:true, atOnce:true});
 });
 
-test('Animate pieces is a preference: in Settings in every map, kept for the whole app, left alone by Reset to Defaults, not in a brief', async ({page}) => {
+test('Animate pieces is a preference: in Settings, kept for the whole app, not something a map sets, not in a brief', async ({page}) => {
     await button(page, 'Settings').click();
     await expect(page.getByText('Display', {exact:true}).filter({visible:true})).toBeVisible();
     await page.getByText('Animate pieces', {exact:true}).filter({visible:true}).click();
-    expect(await page.evaluate(() => [hc.cfg.ANIM.on, JSON.parse(localStorage.getItem('hc.prefs')), localStorage.getItem('hc.settings')])).toEqual([false, {animate:false}, null]);
-    await button(page, 'Reset to Defaults').click();
-    expect(await page.evaluate(() => hc.cfg.ANIM.on)).toBe(false);
+    expect(await page.evaluate(() => [hc.cfg.ANIM.on, JSON.parse(localStorage.getItem('hc.prefs'))])).toEqual([false, {animate:false}]);
     await page.keyboard.press('Escape');
     // A map can't change it, and it carries over to other maps.
     expect(await page.evaluate(() => {
-        hc.settings.applyMap('warrens', {animate:{value:true, pref:true}});
+        hc.settings.applyMap({animate:true});
         return [hc.cfg.ANIM.on, hc.settings.get('animate')];
     })).toEqual([false, false]);
-    await page.evaluate(() => hc.settings.applyMap('endless', hc.app.game.gameMap?.attrs));
+    await page.evaluate(() => hc.settings.applyMap(hc.app.game.gameMap?.attrs));
     await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();

@@ -71,7 +71,7 @@
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
             // The map's values, as they were when the game was saved.
-            settings.applyMap(game.gameMap?.id, game.gameMap?.attrs);
+            settings.applyMap(game.gameMap?.attrs);
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
@@ -587,7 +587,7 @@
                     return;
                 }
                 openWhenClear(() => {
-                    const attrs = settings.applyMap(id, gameMap.attrs);
+                    const attrs = settings.applyMap(gameMap.attrs);
                     mapBrief ??= new pkg.MapBrief(appView);
                     mapBrief.show(gameMap, {
                         seed:Number.isInteger(gameMap.seed) ? gameMap.seed : pkg.randomSeed(),
@@ -599,7 +599,7 @@
                             callback?.();
                         },
                         onCancel: () => {
-                            settings.applyMap(game.gameMap?.id, game.gameMap?.attrs);
+                            settings.applyMap(game.gameMap?.attrs);
                             draw();
                             callback?.();
                         }
@@ -618,10 +618,8 @@
             }
         },
         
-        /*  Called when a setting changes (id is null when they're all reset), so the game
-            reflects it at once. */
+        /*  Called when a preference changes, so the game reflects it at once. */
         notifySettingChanged: (_id, _value) => {
-            game.recomputeRanks();
             draw();
         },
         

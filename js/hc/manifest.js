@@ -41,14 +41,14 @@ JS.Packages(file => {
     file(VIEW_ROOT + 'Render.js').provides('hc.view.render').requires('hc.view');
     file(VIEW_ROOT + 'GameView.js').provides('hc.GameView').requires('hc.view.render','hc.LabeledValue');
     file(VIEW_ROOT + 'SettingsDialog.js').provides('hc.SettingsDialog','hc.SettingsList').requires(
-        'hc.AckDialog','hc.settings','hc.ToggleBtn','hc.UnderlineBtn','hc.WideView'
+        'hc.AckDialog','hc.settings','hc.ToggleBtn','hc.WideView'
     );
     file(VIEW_ROOT + 'MapsDialog.js').provides('hc.MapsDialog').requires(
         'hc.AckDialog','hc.maps','hc.UnderlineBtn','hc.WideView'
     );
     file(VIEW_ROOT + 'PieceMenu.js').provides('hc.PieceMenu').requires('hc.Btn','hc.theme');
     file(VIEW_ROOT + 'MapBrief.js').provides('hc.MapBrief').requires(
-        'hc.ConfirmDialog','hc.SettingsList','hc.WideView'
+        'hc.ConfirmDialog','hc.WideView'
     );
     
     // Include Everything

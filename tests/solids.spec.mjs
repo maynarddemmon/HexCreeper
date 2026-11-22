@@ -163,17 +163,15 @@ test('pointing at a solid says what it is and how tough', async ({page}) => {
     await expect(page.getByText('Stone wall (granite) · HP 30/30 · DR 13', {exact:true})).toBeVisible();
 });
 
-test('Settings chooses what walls and clumps are made of', async ({page}) => {
+test('a map chooses what walls and clumps are made of, from the solid subtypes', async ({page}) => {
     await startGame(page);
     await useTestSolids(page);
-    await button(page, 'Settings').click();
-    const select = page.locator('select[data-setting="wallSolid"]').filter({visible:true});
-    await expect(select).toHaveValue('stone_wall');
-    await select.selectOption('wooden_barricade');
-    expect(await page.evaluate(() => [hc.cfg.TILES.wallSolid, JSON.parse(localStorage.getItem('hc.settings')).endless.wallSolid])).toEqual(['wooden_barricade', 'wooden_barricade']);
-    expect(await page.locator('select[data-setting="clumpSolid"]').filter({visible:true}).locator('option').allTextContents()).toEqual(
-        ['Stone wall', 'Boulder', 'Wooden barricade', 'Iron bars', 'Fungus', 'Wall of flesh', 'Painted wall']
-    );
+    expect(await page.evaluate(() => {
+        hc.settings.applyMap({wallSolid:'wooden_barricade', clumpSolid:'no_such_solid'});
+        const out = [hc.cfg.TILES.wallSolid, hc.cfg.TILES.clumpSolid];
+        hc.settings.applyMap({});
+        return [...out, hc.cfg.TILES.wallSolid];
+    })).toEqual(['wooden_barricade', 'boulder', 'stone_wall']);
 });
 
 test('a solid subtype with colours is drawn in them; one without, in the usual solid colours', async ({page}) => {

@@ -57,7 +57,7 @@
 	// "coverage" (0-100, default 100) is how much of the cell the material fills, e.g. bars
 	// or a net: its opacity is its material's times its coverage. A solid that can be seen
 	// through is drawn see-through too.
-	// Settings (and so maps) choose which kinds walls and clumps are made of.
+	// Maps choose which kinds walls and clumps are made of (their attrs; see hc.cfg.TILES).
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
 		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12},
@@ -100,7 +100,7 @@
 	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
-	// Settings (and so maps) choose which kinds a quadrant's tiles are.
+	// Maps choose which kinds a quadrant's tiles are (their attrs; see hc.cfg.TILES).
 	"heals":{
 		"heal": {
 			"name":"Heal",
@@ -163,7 +163,8 @@
 	// Every map, in the order the Maps dialog lists them, with what a list of maps
 	// needs. Each map's own file is data/gamemap/<id>.json5. A map with no "number" is
 	// listed without one. A map's file may give a "seed", so it's always laid out the same;
-	// otherwise the brief offers a random one. It may also list "goals" and "penalties"
+	// otherwise the brief offers a random one. It may also give "attrs", {id:value}, values
+	// in place of hc.cfg's (see js/hc/model/Settings.js), and list "goals" and "penalties"
 	// (see docs/DESIGN.md, Maps).
 	"maps":[
 		{

@@ -6,7 +6,7 @@
         {I18N:{get:i18n}, PlainText, SpacedLayout, global:{keys:globalKeys}} = M,
         
         {
-            WideView, UnderlineBtn, settings,
+            WideView, settings,
             theme:{
                 spacing, padding, cornerRadius, rowHeight,
                 colorText, colorTextMuted, colorPanel,
@@ -134,44 +134,30 @@
             }
         });
     
-    /*  Every setting, by group, built from the setting definitions; refresh shows only those
-        the map shows, and with prefs, the preferences (always). Changes apply as soon as
-        they're made. Used by the SettingsDialog (with prefs) and the MapBrief. */
+    /*  Every preference, by group, built from their definitions (hc.settings). Changes
+        apply as soon as they're made. */
     pkg.SettingsList = new JSClass('SettingsList', WideView, {
         initNode: function(parent, attrs) {
             const self = this,
-                rows = self._rows = [],
-                headers = self._headers = [];
-            
-            self.prefs = !!attrs.prefs;
-            delete attrs.prefs;
+                rows = self._rows = [];
             
             self.callSuper(parent, attrs);
             
             for (const group of settings.getGroups()) {
                 const header = new WideView(self, {height:rowHeight + padding});
                 new PlainText(header, {x:padding, y:padding, text:group.label, fontSize:fontSizeLarge, textColor:colorText, fontWeight:'bold'});
-                header.rows = group.definitions.map(def => new ({boolean:BooleanRow, choice:ChoiceRow}[def.type] ?? NumberRow)(self, {def}));
-                headers.push(header);
-                rows.push(...header.rows);
+                rows.push(...group.definitions.map(def => new ({boolean:BooleanRow, choice:ChoiceRow}[def.type] ?? NumberRow)(self, {def})));
             }
             new SpacedLayout(self, {axis:'y', spacing, collapseParent:true});
         },
         
-        /*  Shows the settings the map being played shows (and the preferences, with
-            prefs), with their values. Returns whether the map shows any. */
+        /*  Shows each preference's value. */
         refresh: function() {
-            for (const row of this._rows) {
-                row.setVisible(row.def.app ? this.prefs : settings.isShown(row.def.id));
-                row.refresh();
-            }
-            for (const header of this._headers) header.setVisible(header.rows.some(row => row.visible));
-            return this._rows.some(row => row.visible && !row.def.app);
+            for (const row of this._rows) row.refresh();
         }
     });
     
-    /*  Edits hc.settings: a note, then the SettingsList. The footer puts the map's values
-        back. */
+    /*  Edits the preferences (hc.settings): a note, then the SettingsList. */
     pkg.SettingsDialog = new JSClass('SettingsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -179,9 +165,6 @@
             attrs.sizingStrategy = 'fit';
             attrs.tallWidth = PANEL_WIDTH;
             attrs.cancelable = true;
-            attrs.leftItemCfgs = [{klass:UnderlineBtn, attrs:{
-                name:'resetBtn', text:i18n('btn-reset-defaults'), fontSize:fontSizeMedium, valign:'middle'
-            }, mixins:[{doActivated: () => {self.resetToDefaults();}}]}];
             
             self.callSuper(parent, attrs);
             
@@ -196,7 +179,7 @@
                 fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
             });
             
-            self._list = new pkg.SettingsList(container, {prefs:true});
+            self._list = new pkg.SettingsList(container);
             
             new SpacedLayout(container, {axis:'y', inset:padding, spacing, outset:padding, collapseParent:true});
         },
@@ -207,21 +190,9 @@
             const self = this;
             self.callSuper();
             
-            // Settings could have changed elsewhere since the dialog was built.
-            self.refresh();
+            // Preferences could have changed elsewhere since the dialog was built.
+            self._list.refresh();
             self.setContentHeightToFit(self._container.height);
-        },
-        
-        /*  Shows the settings the map being played shows, with their values. */
-        refresh: function() {
-            const any = this._list.refresh();
-            this._note.setText(i18n(any ? 'settings-note' : 'settings-none'));
-            this.getFooterView().resetBtn.setVisible(any);
-        },
-        
-        resetToDefaults: function() {
-            settings.resetToDefaults();
-            this.refresh();
         }
     });
 })(hc);
