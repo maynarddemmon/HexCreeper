@@ -496,7 +496,7 @@
             }
             
             let hoverHits = null, hoverMove = null;
-            for (const m of game.legalMoves(sel)) {
+            for (const m of V.clickMoves(sel)) {
                 const isHover = sameCell(V.hover, m);
                 fillCell(m.x, m.y, m.attack ? (isHover ? '--attack-hover' : '--attack') : (isHover ? '--move-hover' : '--move'));
                 if (isHover && !m.attack) {

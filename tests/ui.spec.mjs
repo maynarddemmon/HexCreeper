@@ -113,6 +113,40 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
     expect(await page.evaluate(([dx, dy]) => {const c = hc.app.game.getPlayerCore(); return c.x === dx && c.y === dy;}, [dx, dy])).toBe(true);
 });
 
+test('shift-click moves in the other mode: Free, or Fixed if you\'re in Free', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.score = 100;
+        g.playerPlace(1, 0, c);
+        g.playerWait();
+        g.selectedId = c.id;
+        hc.app.centerOn(false);
+    });
+    // Where the core and the piece linked to it are, after a shift-click to the core's left
+    const shiftClick = async mode => {
+        await page.evaluate(mode => {
+            const g = hc.app.game;
+            g.moveMode = mode;
+            g.selectedId = g.playerCoreId;
+        }, mode);
+        await page.keyboard.down('Shift');
+        await page.mouse.click(...await cellOnPage(page, -1, 0));
+        await page.keyboard.up('Shift');
+        return page.evaluate(() => hc.app.game.piecesOf('player').map(p => [p.x, p.y]).sort());
+    };
+    expect(await shiftClick('fixed')).toEqual([[-1, 0], [1, 0]]); // free: the core alone
+    // Back where it was, on a new turn
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.playerWait();
+        g.playerAct(g.getPlayerCore(), 0, 0, 'free');
+        g.playerWait();
+    });
+    expect(await shiftClick('free')).toEqual([[-1, 0], [0, 0]]); // fixed: both
+});
+
 test('keyboard moves the selected piece, but not the arrow keys; Space ends the turn', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
