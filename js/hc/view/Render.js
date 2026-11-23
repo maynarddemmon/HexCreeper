@@ -1,5 +1,3 @@
-/*  Draws a frame: quadrant tint, tiles, highlights, grid lines, links, pieces and
-    effects. */
 (pkg => {
     'use strict';
     
@@ -361,6 +359,8 @@
             ctx.fillRect(x, y, w * Math.max(0, p.hp) / p.maxHp, h);
         };
     
+    /*  Draws a frame: floor and fog, quadrant tint, tiles, grid lines, highlights, the golden
+        path, links, pieces and effects. */
     V.render = (now) => {
         V.rafPending = false;
         const panning = V.stepPan(now);
