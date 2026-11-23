@@ -263,19 +263,28 @@
             return `rgba(${r}, ${g}, ${b}, 0)`;
         },
         
-        // Draws a translucent link from `from` to `to` (child -> parent) as a trapezoid between
-        // the two cell centres, behind the pieces. `chain` is the longest chain of pieces from
-        // `from` down, counting `from`: the link widens from that chain's width at `from` (a
-        // point for a lone piece) to one more at `to`, so widths match where links meet.
-        // `hidden` ('from' or 'to') says an end is out of sight: then only the part nearest
-        // the other end is drawn (LINK_STUB), fading out, so you can tell a piece is linked to
-        // something you can't see, but not quite where.
-        drawLink = (from, to, color, chain, hidden = null) => {
+        // Where a link to piece p ends: how far from its centre, at the outside of its
+        // border (see PieceTypes; half a pixel in, so no gap shows), so the link doesn't show
+        // through a piece drawn translucent, border and all. (No piece: an ordinary one's.)
+        linkEndOf = p => cam.size * (PIECE_R + (p?.id === game.playerCoreId ? CORE_BORDER : 0)) - 0.5,
+        
+        // Draws a translucent link from `from` to `to` (child -> parent), behind the pieces: a
+        // trapezoid along the line between the two cell centres, from piece to piece, each
+        // end curved to follow the piece's border it ends in, rFrom and rTo from the centres
+        // (see linkEndOf). `chain` is the longest chain of pieces from `from` down, counting
+        // `from`: the link widens from that chain's width at `from` (a point for a lone
+        // piece) to one more at `to`, so widths match where links meet. `hidden` ('from' or
+        // 'to') says an end is out of sight: then only the part nearest the other end is
+        // drawn (LINK_STUB), fading out and cut straight, so you can tell a piece is linked
+        // to something you can't see, but not quite where.
+        drawLink = (from, to, color, chain, hidden, rFrom, rTo) => {
             let [ax, ay] = cellCenter(from.x, from.y),
                 [bx, by] = cellCenter(to.x, to.y);
             const len = Math.hypot(bx - ax, by - ay);
-            if (!len) return;
-            const px = (ay - by) / len, py = (bx - ax) / len;
+            if (len <= rFrom + rTo) return; // (touching, or nearly, as they move)
+            // Along the link (from `from`), and across it
+            const ux = (bx - ax) / len, uy = (by - ay) / len,
+                px = -uy, py = ux;
             let w0 = linkHalfWidth(chain - 1),
                 w1 = linkHalfWidth(chain),
                 fill = css(color);
@@ -283,23 +292,47 @@
                 bx = ax + (bx - ax) * LINK_STUB;
                 by = ay + (by - ay) * LINK_STUB;
                 w1 = w0 + (w1 - w0) * LINK_STUB;
+                rTo = 0;
                 fill = ctx.createLinearGradient(ax, ay, bx, by);
             } else if (hidden === 'from') {
                 ax = bx + (ax - bx) * LINK_STUB;
                 ay = by + (ay - by) * LINK_STUB;
                 w0 = w1 + (w0 - w1) * LINK_STUB;
+                rFrom = 0;
                 fill = ctx.createLinearGradient(bx, by, ax, ay);
             }
             if (hidden) {
                 fill.addColorStop(0, css(color));
                 fill.addColorStop(1, clearOf(css(color)));
             }
+            // Where a side of the link (across: 1 or -1) meets the end at (cx, cy), r from
+            // it, toward the other end (toward: 1 along the link, -1 back); cut straight if r
+            // is 0. The sides are kept inside the piece.
+            const w = (half, r) => r ? Math.min(half, r * 0.9) : half;
+            w0 = w(w0, rFrom);
+            w1 = w(w1, rTo);
+            const side = (cx, cy, r, half, across, toward) => {
+                    const along = toward * Math.sqrt(r * r - half * half);
+                    return [cx + ux * along + px * half * across, cy + uy * along + py * half * across];
+                },
+                // An arc of the end at (cx, cy), r from it, from point a to point b, the short way
+                arc = (cx, cy, r, [x0, y0], [x1, y1]) => {
+                    const a0 = Math.atan2(y0 - cy, x0 - cx),
+                        a1 = Math.atan2(y1 - cy, x1 - cx),
+                        turn = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+                    ctx.arc(cx, cy, r, a0, a1, turn < 0);
+                },
+                a1 = side(ax, ay, rFrom, w0, 1, 1),
+                a2 = side(ax, ay, rFrom, w0, -1, 1),
+                b1 = side(bx, by, rTo, w1, 1, -1),
+                b2 = side(bx, by, rTo, w1, -1, -1);
             ctx.fillStyle = fill;
             ctx.beginPath();
-            ctx.moveTo(ax + px * w0, ay + py * w0);
-            ctx.lineTo(bx + px * w1, by + py * w1);
-            ctx.lineTo(bx - px * w1, by - py * w1);
-            ctx.lineTo(ax - px * w0, ay - py * w0);
+            ctx.moveTo(...a1);
+            ctx.lineTo(...b1);
+            if (rTo) arc(bx, by, rTo, b1, b2); else ctx.lineTo(...b2);
+            ctx.lineTo(...a2);
+            if (rFrom) arc(ax, ay, rFrom, a2, a1);
             ctx.closePath();
             ctx.fill();
             ctx.globalAlpha = 1;
@@ -410,53 +443,6 @@
             strokeRegion(hoverTile, game.tileType(hoverTile).area.radius, '--' + hoverTile.kind);
         }
         
-        // Tint occupied cells
-        for (const p of game.pieces.values()) {
-            if (!inView(p.x, p.y) || !shown(p)) continue;
-            fillCell(p.x, p.y, p.owner === 'player' ? '--core-tint' : '--enemy-tint');
-        }
-        
-        const sel = game.getSelected();
-        let selGroupIds = new Set(), ghost = null, linkTargets = new Set();
-        
-        if (V.placeMode && sel) {
-            // The cells next to the selected piece a piece could be placed on.
-            for (const q of game.placeCells(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
-        } else if (V.jumpMode && sel) {
-            // The cells the selected piece can jump to.
-            fillCell(sel.x, sel.y, '--sel-bg');
-            for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
-        } else if ((V.attachMode || V.swapMode) && sel) {
-            // The pieces the selected one can attach to, or swap with.
-            fillCell(sel.x, sel.y, '--sel-bg');
-            for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) linkTargets.add(p.id);
-        } else if (sel) {
-            // Link-range box around the selected piece's parent
-            const par = game.parent(sel);
-            if (par) strokeRegion(par, game.rules.linkRange, '--range');
-            const group = game.group(sel);
-            selGroupIds = new Set(group.map(g => g.id));
-            for (const g of group) if (g !== sel) fillCell(g.x, g.y, '--sel-tint');
-            fillCell(sel.x, sel.y, '--sel-bg');
-            let hoverHits = null, hoverMove = null;
-            for (const m of game.legalMoves(sel)) {
-                const isHover = sameCell(V.hover, m);
-                fillCell(m.x, m.y, m.attack ? (isHover ? '--attack-hover' : '--attack') : (isHover ? '--move-hover' : '--move'));
-                if (isHover && !m.attack) {
-                    hoverMove = m;
-                    if (group.length > 1) ghost = m.moves; // where each piece that moves would go
-                }
-                if (isHover && m.attack) hoverHits = m.hits;
-            }
-            // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
-            if (hoverMove) for (const [, x, y] of hoverMove.moves) {
-                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
-                if (kind) fillCell(x, y, '--' + kind + '-hover');
-            }
-            // Show every enemy a group attack would hit
-            if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
-        }
-        
         // Grid lines: the same everywhere (quadrants show only as the visited tint), and
         // none between solids or holes of the same subtype, which run together.
         ctx.lineWidth = 1;
@@ -480,6 +466,53 @@
         }
         ctx.strokeStyle = css('--grid');
         ctx.stroke();
+        
+        const sel = game.getSelected();
+        let selGroupIds = new Set(),
+            ghost = null,
+            linkTargets = new Set();
+        
+        if (V.placeMode && sel) {
+            // The cells next to the selected piece a piece could be placed on.
+            for (const q of game.placeCells(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
+        } else if (V.jumpMode && sel) {
+            // The cells the selected piece can jump to.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+        } else if ((V.attachMode || V.swapMode) && sel) {
+            // The pieces the selected one can attach to, or swap with.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) linkTargets.add(p.id);
+        } else if (sel) {
+            // Link-range box around the selected piece's parent
+            const par = game.parent(sel);
+            if (par) strokeRegion(par, game.rules.linkRange, '--range');
+            
+            // Fill the hex around selected (and descendant of selected) player pieces.
+            const group = game.group(sel);
+            selGroupIds = new Set(group.map(g => g.id));
+            for (const g of group) {
+                fillCell(g.x, g.y, sel.id === g.id ? '--sel-bg' : '--sel-tint');
+            }
+            
+            let hoverHits = null, hoverMove = null;
+            for (const m of game.legalMoves(sel)) {
+                const isHover = sameCell(V.hover, m);
+                fillCell(m.x, m.y, m.attack ? (isHover ? '--attack-hover' : '--attack') : (isHover ? '--move-hover' : '--move'));
+                if (isHover && !m.attack) {
+                    hoverMove = m;
+                    if (group.length > 1) ghost = m.moves; // where each piece that moves would go
+                }
+                if (isHover && m.attack) hoverHits = m.hits;
+            }
+            // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
+            if (hoverMove) for (const [, x, y] of hoverMove.moves) {
+                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
+                if (kind) fillCell(x, y, '--' + kind + '-hover');
+            }
+            // Show every enemy a group attack would hit
+            if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
+        }
         
         // Origin marker
         {
@@ -542,16 +575,16 @@
             if (par) {
                 const a = placeOf(p),
                     b = placeOf(par);
-                if (a.seen || b.seen) drawLink(a, b, '--enemy-link', chain(p), a.seen ? (b.seen ? null : 'to') : 'from');
+                if (a.seen || b.seen) drawLink(a, b, '--enemy-link', chain(p), a.seen ? (b.seen ? null : 'to') : 'from', linkEndOf(p), linkEndOf(par));
             }
         }
         for (const p of game.piecesOf('player')) {
             const par = game.parent(p);
-            if (par) drawLink(placeOf(p), placeOf(par), selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p));
+            if (par) drawLink(placeOf(p), placeOf(par), selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p), null, linkEndOf(p), linkEndOf(par));
         }
         // The link a piece placed on the hovered cell would have
         if (V.placeMode && sel && V.hover && game.placeCells(sel).some(q => sameCell(q, V.hover))) {
-            drawLink(V.hover, sel, '--place-ink', 1);
+            drawLink(V.hover, sel, '--place-ink', 1, null, linkEndOf(null), linkEndOf(sel));
         }
         
         // Effects state per cell (flash)
