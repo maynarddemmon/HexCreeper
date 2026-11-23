@@ -163,6 +163,39 @@ test('only caverns that can be moved to touch are joined, and they open straight
     }
 });
 
+test('crowding packs caverns closer, until they overlap; what can reach a block is still found', async ({page}) => {
+    await startGame(page);
+    const packed = async attrs => {
+        await inCaverns(page, attrs);
+        return page.evaluate(() => {
+            const T = hc.app.game.tileGenerator,
+                // Caverns sharing cells with a neighbour's.
+                overlaps = hc.hex.disk(0, 0, 2).filter(s => hc.hex.dirs.some(([di, dj]) => {
+                    const other = T.cavern(s.x + di, s.y + dj);
+                    return [...T.cavern(s.x, s.y)].some(k => other.has(k));
+                })).length;
+            // Looking farther than siteReach finds nothing more.
+            let same = true;
+            for (const b of hc.hex.disk(0, 0, 5)) {
+                const near = T.near(b.x, b.y);
+                T.siteReach += 3;
+                const wide = T.near(b.x, b.y);
+                T.siteReach -= 3;
+                for (const c of T.blocks.cells(b.x, b.y)) {
+                    if (JSON.stringify(T.cellOf(c.x, c.y, near)) !== JSON.stringify(T.cellOf(c.x, c.y, wide))) same = false;
+                }
+            }
+            return {spacing:T.spacing, overlaps, same};
+        });
+    };
+    const apart = await packed({junctionChance:0, cavernJoinChance:0}),
+        close = await packed({junctionChance:0, cavernJoinChance:0, crowding:100, tangle:100, cavernLoopChance:100});
+    expect(apart).toMatchObject({overlaps:0, same:true});
+    expect(close.spacing).toBeLessThan(apart.spacing);
+    expect(close.overlaps).toBeGreaterThan(5);
+    expect(close.same).toBe(true);
+});
+
 test('a cell comes out the same whatever order the blocks are made in', async ({page}) => {
     await startGame(page);
     const made = async order => {

@@ -45,7 +45,7 @@
         JUNCTION_JITTER = 0.3,   // a junction's (it has no cavern to keep apart)
         JOIN_SHIFT = 0.3,        // the most a cavern moves toward those it's joined to
         JOIN_GAP = 2,            // the most rock left between two caverns for them to be joined
-        MIN_GAP = 4,             // the least rock between two caverns, before tunnels
+        MIN_GAP = 4,             // the least rock between two caverns, before tunnels (without crowding)
         // A cavern's radius wobbles with the angle: harmonics [n, the most amplitude].
         WOBBLE = [[2, 0.12], [3, 0.1], [5, 0.06]],
         WOBBLE_MAX = WOBBLE.reduce((sum, [, amp]) => sum + amp, 0),
@@ -79,6 +79,7 @@
                 num('tunnelWidthMin', 2, 1, 6),        // a tunnel's minimum width, in cells
                 num('tunnelWidthMax', 3, 1, 9),        // a tunnel's maximum width, in cells
                 num('tangle', 40, 0, 100),             // how much tunnels wind (0: straight)
+                num('crowding', 0, 0, 100),            // how closely caverns are packed (0: never touching; 100: overlapping)
                 
                 num('loops', 30, 0, 100),              // % chance two neighbouring sites get another tunnel
                 num('junctionChance', 20, 0, 100),     // % of sites (not the start's) that are junctions, with no cavern
@@ -138,9 +139,13 @@
             a.cavernSizeMax = max(a.cavernSizeMin, a.cavernSizeMax);
             a.tunnelWidthMax = max(a.tunnelWidthMin, a.tunnelWidthMax);
             
-            // Sites far enough apart that no two caverns touch, however they're moved.
+            // Sites far enough apart that no two caverns touch, however they're moved, then
+            // closer by crowding: at 100, 40% of that, so they overlap.
             const radius = sqrt(a.cavernSizeMax * CELL_AREA / PI) * (1 + WOBBLE_MAX);
-            this.spacing = ceil((2 * radius + MIN_GAP) / (1 - 2 * JITTER));
+            this.spacing = max(4, Math.round(ceil((2 * radius + MIN_GAP) / (1 - 2 * JITTER)) * (1 - 0.6 * a.crowding / 100)));
+            // How far apart on the lattice a site can be from a block's and still reach it
+            // (see near): 2, or more when caverns are big for the spacing.
+            this.siteReach = max(2, ceil((radius + JUNCTION_JITTER * this.spacing + 2 * BLOCK_RADIUS) / (0.866 * this.spacing)));
             this.blocks = pkg.makeChunks(BLOCK_RADIUS);
             this.madeBlocks = new Set(); // keys of the blocks whose cells have been made
             
@@ -314,7 +319,7 @@
         settleNear: function(bi, bj) {
             const n = this.network,
                 c = this.blocks.center(bi, bj),
-                keys = new Set(hex.disk(...this.siteOf(c.x, c.y), 2).map(q => q.x + ',' + q.y));
+                keys = new Set(hex.disk(...this.siteOf(c.x, c.y), this.siteReach).map(q => q.x + ',' + q.y));
             if ([...keys].some(key => !this.isSettled(key))) {
                 this.grow(this.attrs.maxSize, this.game.rngFor('cave-grow', String(n.order.length)), keys);
                 for (const key of keys) {
@@ -682,10 +687,10 @@
         
         // The caverns and tunnels (lassos and cavern loops too) that may reach block (bi,
         // bj): {caverns, tunnels}, the keys of their cells (and the tunnels' spines). Sites
-        // more than 2 apart on the lattice are too far for theirs to.
+        // more than siteReach apart on the lattice are too far for theirs to.
         near: function(bi, bj) {
             const c = this.blocks.center(bi, bj),
-                sites = hex.disk(...this.siteOf(c.x, c.y), 2).map(q => [q.x, q.y]),
+                sites = hex.disk(...this.siteOf(c.x, c.y), this.siteReach).map(q => [q.x, q.y]),
                 inRange = new Set(sites.map(q => q.join())),
                 tunnelKeys = new Set();
             for (const q of sites) {

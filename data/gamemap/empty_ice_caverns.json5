@@ -5,6 +5,7 @@
 		"maxSize":10000,
 		"growth":0,
 		"sprawl":0,
+		"crowding":100,
 		
 		"cavernSizeMin":20,
 		"cavernSizeMax":400,
