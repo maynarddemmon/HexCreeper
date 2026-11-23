@@ -154,6 +154,57 @@ test('shift-click moves just the piece, in Fixed or Follow', async ({page}) => {
     expect(await shiftClick('follow')).toEqual([[-1, 0], [1, 0]]);
 });
 
+test('clicking a cell the selected piece can jump to jumps it there', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.selectedId = g.playerCoreId;
+        hc.app.centerOn(false);
+    });
+    const core = () => page.evaluate(() => {
+        const c = hc.app.game.getPlayerCore();
+        return [c.x, c.y, hc.app.game.canMove(c)];
+    });
+    // Not in Follow mode
+    await page.evaluate(() => {hc.app.game.moveMode = 'follow';});
+    await page.mouse.click(...await cellOnPage(page, 2, -1));
+    expect(await core()).toEqual([0, 0, true]);
+    await page.evaluate(() => {hc.app.game.moveMode = 'fixed';});
+    // Hovering shows it there, as a ghost, and a click jumps.
+    await page.mouse.move(...await cellOnPage(page, 2, -1));
+    expect(await page.evaluate(() => hc.view.jumpAt(hc.app.game.getPlayerCore(), hc.view.hover))).toEqual({x:2, y:-1});
+    await page.mouse.click(...await cellOnPage(page, 2, -1));
+    expect(await core()).toEqual([2, -1, false]);
+});
+
+test('alt-click on a piece the selected one can swap with swaps them; a click selects it', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.score = 100;
+        g.playerPlace(1, 0, c);
+        g.playerWait();
+        g.selectedId = c.id;
+        hc.app.centerOn(false);
+    });
+    const state = () => page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        return {core:[c.x, c.y], selected:[g.getSelected().x, g.getSelected().y]};
+    });
+    // Alt held over it: shown as the pair swapped
+    await page.mouse.move(...await cellOnPage(page, 1, 0));
+    await page.keyboard.down('Alt');
+    expect(await page.evaluate(() => [hc.view.alt, !!hc.view.swapAt(hc.app.game.getSelected(), hc.view.hover)])).toEqual([true, true]);
+    await page.mouse.click(...await cellOnPage(page, 1, 0));
+    await page.keyboard.up('Alt');
+    expect(await state()).toEqual({core:[1, 0], selected:[1, 0]});
+    // A plain click on the other piece selects it.
+    await page.mouse.click(...await cellOnPage(page, 0, 0));
+    expect(await state()).toEqual({core:[1, 0], selected:[0, 0]});
+});
+
 test('keyboard moves the selected piece, but not the arrow keys; Space ends the turn', async ({page}) => {
     await startGame(page);
     await clearBoard(page);

@@ -50,8 +50,9 @@
         
         /*  A click on a cell. Shift-click forces a move: if the selected piece can legally
             move to the clicked cell (e.g. onto a cell one of its own carried pieces is
-            vacating), it moves instead of selecting the piece there. */
-        handleClick: function(c, force=false) {
+            vacating), it moves instead of selecting the piece there. Alt-click (swap) on a
+            piece the selected one can swap with swaps them (see swapAt). */
+        handleClick: function(c, force=false, swap=false) {
             // Stops the selected piece going somewhere by itself, and that's all.
             if (pkg.app.interrupt()) return;
             // With the menu open, a click anywhere on the board just closes it.
@@ -97,6 +98,14 @@
                     }
                     return;
                 }
+                // Alt (swap): a swap with the piece there, if it can.
+                if (swap) {
+                    const sel = game.getSelected(), q = V.swapAt(sel, c);
+                    if (q && game.playerSwap(sel, q)) {
+                        this.afterTurn();
+                        return;
+                    }
+                }
                 // Shift (force): a move in Free mode (see clickMoves), else in yours, even onto a
                 // cell one of your pieces is on.
                 const sel = game.getSelected(),
@@ -113,7 +122,8 @@
                     draw();
                     return;
                 }
-                if (sel && game.playerAct(sel, c.x, c.y)) this.afterTurn();
+                // A move, or a jump to a cell it can jump to (see jumpAt)
+                if (sel && (game.playerAct(sel, c.x, c.y) || (V.jumpAt(sel, c) && game.playerJump(sel, c.x, c.y)))) this.afterTurn();
             }
         },
         
@@ -143,9 +153,10 @@
             
             canvas.addEventListener('pointermove', e => {
                 const c = cellAt(...eventPos(e));
-                if (!sameCell(V.hover, c) || V.shift !== e.shiftKey) {
+                if (!sameCell(V.hover, c) || V.shift !== e.shiftKey || V.alt !== e.altKey) {
                     V.hover = c;
                     V.shift = e.shiftKey;
+                    V.alt = e.altKey;
                     draw();
                 }
                 if (!drag) return;
@@ -165,21 +176,25 @@
                 const wasDrag = drag?.moved;
                 drag = null;
                 canvas.classList.remove('dragging');
-                if (!wasDrag) self.handleClick(cellAt(...eventPos(e)), e.shiftKey);
+                if (!wasDrag) self.handleClick(cellAt(...eventPos(e)), e.shiftKey, e.altKey);
             });
             
-            // Shift down or up redraws the moves a click can make (see clickMoves); losing
-            // focus counts as up, as the key up goes elsewhere. (Capture phase: myt's global
-            // key handling stops keys from bubbling up to the window.)
-            const shiftTo = on => {
-                if (V.shift !== on) {
-                    V.shift = on;
-                    draw();
-                }
-            };
-            window.addEventListener('keydown', e => {if (e.key === 'Shift') shiftTo(true);}, true);
-            window.addEventListener('keyup', e => {if (e.key === 'Shift') shiftTo(false);}, true);
-            window.addEventListener('blur', () => shiftTo(false));
+            // Shift or Alt down or up redraws what a click would do (see clickMoves and
+            // swapAt); losing focus counts as up, as the key up goes elsewhere. (Capture
+            // phase: myt's global key handling stops keys from bubbling up to the window.)
+            const held = {Shift:'shift', Alt:'alt'},
+                keyTo = (key, on) => {
+                    if (held[key] && V[held[key]] !== on) {
+                        V[held[key]] = on;
+                        draw();
+                    }
+                };
+            window.addEventListener('keydown', e => keyTo(e.key, true), true);
+            window.addEventListener('keyup', e => keyTo(e.key, false), true);
+            window.addEventListener('blur', () => {
+                keyTo('Shift', false);
+                keyTo('Alt', false);
+            });
             
             canvas.addEventListener('pointerleave', () => {
                 V.hover = null;

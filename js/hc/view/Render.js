@@ -479,10 +479,13 @@
             // The cells the selected piece can jump to.
             fillCell(sel.x, sel.y, '--sel-bg');
             for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+            if (V.jumpAt(sel, V.hover)) ghost = [[sel.id, V.hover.x, V.hover.y]];
         } else if ((V.attachMode || V.swapMode) && sel) {
             // The pieces the selected one can attach to, or swap with.
             fillCell(sel.x, sel.y, '--sel-bg');
             for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) linkTargets.add(p.id);
+            const q = V.swapMode && V.swapAt(sel, V.hover);
+            if (q) ghost = [[sel.id, q.x, q.y], [q.id, sel.x, sel.y]];
         } else if (sel) {
             // Link-range box around the selected piece's parent
             const par = game.parent(sel);
@@ -504,6 +507,20 @@
                     if (group.length > 1) ghost = m.moves; // where each piece that moves would go
                 }
                 if (isHover && m.attack) hoverHits = m.hits;
+            }
+            // With Alt held, the pieces it can swap with (an Alt-click swaps), and over one,
+            // the two as ghosts in each other's cells.
+            if (V.alt) {
+                for (const q of game.swapTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+                const q = V.swapAt(sel, V.hover);
+                if (q) ghost = [[sel.id, q.x, q.y], [q.id, sel.x, sel.y]];
+            }
+            // Over a cell it can jump to (a click jumps): that, and its ghost there.
+            const jump = !hoverMove && !hoverHits && V.jumpAt(sel, V.hover);
+            if (jump) {
+                fillCell(jump.x, jump.y, '--move-hover');
+                hoverMove = {moves:[[sel.id, jump.x, jump.y]]};
+                ghost = hoverMove.moves;
             }
             // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
             if (hoverMove) for (const [, x, y] of hoverMove.moves) {

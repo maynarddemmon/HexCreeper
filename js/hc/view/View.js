@@ -110,6 +110,7 @@
             jumpMode:false, // choosing the cell the selected piece jumps to
             gotoMode:false, // choosing the cell the selected piece goes to (see App: Go to)
             shift:false, // whether Shift is held: a click moves in Free mode (clickMoves)
+            alt:false, // whether Alt (Option) is held: a click swaps (swapAt)
             rafPending:false,
             css,
             draw,
@@ -126,6 +127,12 @@
                 const free = game.legalMoves(p, 'free');
                 return [...free, ...mine.filter(m => !free.some(o => o.x === m.x && o.y === m.y))];
             },
+            
+            /*  The piece on cell c, if piece p can swap with it (from swapTargets), else null. */
+            swapAt: (p, c) => c && p ? V.game.swapTargets(p).find(q => q.x === c.x && q.y === c.y) ?? null : null,
+            
+            /*  The cell c, if piece p can jump to it (from jumpTargets), else null. */
+            jumpAt: (p, c) => c && p ? V.game.jumpTargets(p).find(q => q.x === c.x && q.y === c.y) ?? null : null,
             
             /*  Where the camera is headed: the end of the pan under way, or where it is. */
             camTarget: () => pan.current ? [pan.current.toX, pan.current.toY] : [cam.x, cam.y],
