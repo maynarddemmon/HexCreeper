@@ -119,13 +119,13 @@ test('a detached piece moves freely, carrying what\'s linked below it', async ({
     expect(r).toEqual([false, true, 3, -1]);
 });
 
-test('X detaches the selected piece; L, then a ringed piece, attaches it', async ({page}) => {
+test('B detaches the selected piece; L, then a ringed piece, attaches it', async ({page}) => {
     await setUp(page);
     await page.evaluate(() => {
         hc.app.game.selectedId = window.ids.a;
         hc.view.draw();
     });
-    await page.keyboard.press('x');
+    await page.keyboard.press('b');
     expect(await piece(page, 'a')).toMatchObject({parent:null});
     await page.evaluate(() => {
         const g = hc.app.game;

@@ -79,9 +79,10 @@
             // The project's home, linked from the header's GitHub mark.
             GITHUB_URL:'https://github.com/maynarddemmon/HexCreeper',
             
-            // The camera. It pans (animated) to keep your core at least EDGE_MARGIN px from
-            // the edges of the board, one hex at a time, and pans over PAN_MS.
-            EDGE_MARGIN:100,
+            // The camera. It pans (animated) to keep your core at least FOLLOW_MARGIN % of the
+            // way from the edges of the board to its middle (a preference), one hex at a
+            // time, and pans over PAN_MS.
+            FOLLOW_MARGIN:30,
             PAN_MS:250,
             
             // Animation: a piece's step takes MOVE_MS and a jump JUMP_MS, during which it grows

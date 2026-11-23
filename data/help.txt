@@ -1,7 +1,7 @@
 You are a single core on an endless grid. Grow it into a swarm of linked pieces, hold off the enemy squads, and explore for healing and score. The game ends when your core is destroyed.
 
 <span style="font-size:16px;">YOUR TURN</span>
-Each turn you may move as many pieces as your highest rank, each once, in any order. Click a piece to select it, then click a highlighted cell to move it, or use the keys Q E / A D / Z C. Tab cycles your pieces. End Turn (Enter) lets the enemies act; the turn ends by itself once nothing can move.
+Each turn you may move as many pieces as your highest rank, each once, in any order. Click a piece to select it, then click a highlighted cell to move it, or use the keys Q E / A D / Z C; W and X go up and down, zigzagging between Q and E or Z and C. Tab cycles your pieces. End Turn (Space) lets the enemies act; the turn ends by itself once nothing can move.
 
 <span style="font-size:16px;">THE SWARM</span>
 - Every piece you place links to a neighbour, its parent. Arrows point from each piece to its parent.
@@ -36,9 +36,9 @@ You only see enemies within sight of your pieces: up to 12 steps away, with soli
 
 <span style="font-size:16px;">SPENDING SCORE</span>
 - Place (P): pick an empty cell next to the selected piece; the new piece is linked to it.
-- Click the selected piece again for its menu: Place, Swap, Jump, Attach, Detach, Heal, Recover and Quicken. Each has a key too, which works on the selected piece.
+- Click the selected piece again, or press Enter, for its menu: Place, Swap, Jump, Attach, Detach, Heal, Recover and Quicken. The arrow keys and Tab move between them. Each has a key too, which works on the selected piece.
 - Heal (H): heal HP equal to your core's rank, starting from the selected piece.
 - Recover (R): once a turn, let the selected piece move again if it has already moved (or was placed) this turn, for its rank in score. It still uses one of your moves.
 - Quicken (U): once a turn, one more move this turn, for your swarm's highest rank in score.
 
-Save your game with the save button at the top right; it carries on from there the next time you open HexCreeper, and you can go back to it if your core is destroyed. The buttons next to it export your game to a file and import one, and the map button lists the maps you can play. Maps other than Endless Play have goals to achieve and penalties to avoid, listed in the brief and at the top left as you play; meet every goal that isn't optional, without incurring a penalty, to win. Each game starts with the map's brief, where you can choose the seed: the same seed lays it out the same way. Drag to pan, scroll to zoom, Space to recenter, Esc to cancel. Settings has your preferences, such as whether pieces' moves are animated. Open this help again with the ? button at the top right.
+Save your game with the save button at the top right; it carries on from there the next time you open HexCreeper, and you can go back to it if your core is destroyed. The buttons next to it export your game to a file and import one, and the map button lists the maps you can play. Maps other than Endless Play have goals to achieve and penalties to avoid, listed in the brief and at the top left as you play; meet every goal that isn't optional, without incurring a penalty, to win. Each game starts with the map's brief, where you can choose the seed: the same seed lays it out the same way. Drag to pan, scroll to zoom, S to recenter, Esc to cancel. Settings has your preferences, such as whether pieces' moves are animated and how near the edge your core can get before the board follows it. Open this help again with the ? button at the top right.

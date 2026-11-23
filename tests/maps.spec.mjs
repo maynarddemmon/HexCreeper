@@ -144,7 +144,8 @@ test('Settings shows only the preferences, whatever the map', async ({page}) => 
     await playMap(page, 'Open Ground', 'open_ground');
     await button(page, 'Settings').click();
     await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toBeVisible();
-    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(0); // no number or choice rows
+    await expect(page.getByText('Follow margin (% of the board)', {exact:true}).filter({visible:true})).toBeVisible();
+    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(1); // the follow margin's number row
     await expect(page.getByText('Fog of war', {exact:true}).filter({visible:true})).toHaveCount(0);
     await expect(button(page, 'Reset to Defaults')).toHaveCount(0);
 });

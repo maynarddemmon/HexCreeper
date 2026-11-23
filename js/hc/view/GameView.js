@@ -6,7 +6,6 @@
     
     const V = pkg.view,
         {canvas, game, cam, screenToWorld, cellAt, sameCell, draw, eventPos} = V,
-        {EDGE_MARGIN} = pkg.cfg,
         
         MIN_SIZE = 12,
         MAX_SIZE = 140;
@@ -22,9 +21,9 @@
         
         // Methods /////////////////////////////////////////////////////////////
         /*  Called after the player acts: keeps the core on screen. When it comes within
-            EDGE_MARGIN px of an edge, the board pans (animated) by whole hexes until it's
-            clear of it. A core already off screen, e.g. after the player has dragged away,
-            is left alone. */
+            FOLLOW_MARGIN % of the way in from an edge (of the way to the middle), the board
+            pans (animated) by whole hexes until it's clear of it. A core already off screen,
+            e.g. after the player has dragged away, is left alone. */
         afterTurn: function() {
             const c = game.getPlayerCore();
             if (c) {
@@ -33,10 +32,10 @@
                     [wx, wy] = pkg.hex.center(c.x, c.y),
                     sx = (wx - tx) * cam.size + V.W / 2,
                     sy = (wy - ty) * cam.size + V.H / 2,
-                    margin = Math.min(EDGE_MARGIN, V.W / 2 - 1, V.H / 2 - 1),
                     // One hex across, and one row of hexes down, in world units.
                     stepX = 1, stepY = Math.sqrt(3) / 2,
                     steps = (pos, size, step) => {
+                        const margin = Math.min(size / 2 * pkg.cfg.FOLLOW_MARGIN / 100, size / 2 - 1);
                         if (pos < 0 || pos > size) return 0; // off screen: leave it
                         if (pos < margin) return -Math.ceil((margin - pos) / (step * cam.size));
                         if (pos > size - margin) return Math.ceil((pos - (size - margin)) / (step * cam.size));

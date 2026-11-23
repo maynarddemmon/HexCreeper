@@ -52,13 +52,13 @@ test('no swap that would leave a link out of range, with a piece not next to it,
     expect(r).toEqual([false, 1, false, false]);
 });
 
-test('S, then a ringed piece, swaps the selected piece with it', async ({page}) => {
+test('V, then a ringed piece, swaps the selected piece with it', async ({page}) => {
     await setUp(page);
     await page.evaluate(() => {
         hc.app.game.selectedId = window.ids.b;
         hc.view.draw();
     });
-    await page.keyboard.press('s');
+    await page.keyboard.press('v');
     await page.getByText('Swap: click a ringed piece to swap the selected piece with. Esc cancels.').waitFor();
     await page.mouse.click(...await cellOnPage(page, 1, 0));
     expect(await at(page)).toEqual({core:[0, 0], a:[2, 0], b:[1, 0], c:[-1, 0]});

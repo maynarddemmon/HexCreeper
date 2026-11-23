@@ -8,7 +8,7 @@
 		"tunnelWidthMax":3,
 		"tangle":100,
 		"loops":40,
-		"junctionChance":100,
+		"junctionChance":50,
 		
 		"cavernDeadEndSchema":"random",
 		"cavernDeadEndFactor":66,

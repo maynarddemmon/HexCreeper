@@ -21,7 +21,6 @@
             q: [0, -1], e: [1, -1],
             a: [-1, 0], d: [1, 0],
             z: [-1, 1], c: [0, 1],
-            ArrowLeft: [-1, 0], ArrowRight: [1, 0],
             Numpad7: [0, -1], Numpad9: [1, -1],
             Numpad4: [-1, 0], Numpad6: [1, 0],
             Numpad1: [-1, 1], Numpad3: [0, 1],

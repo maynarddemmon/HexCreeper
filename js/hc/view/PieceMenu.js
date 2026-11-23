@@ -8,7 +8,7 @@
         MENU_WIDTH = 120;
     
     /*  A small menu that floats beside the selected piece, listing what can be done on or by
-        it (opened by clicking the piece again). items: [{label(), tip(), enabled(), run()}];
+        it (opened by clicking the piece again, or with Enter: see App). items: [{label(), tip(), enabled(), run()}];
         labels, tooltips and whether each is enabled are refreshed every frame, so an item
         that can't be used shows, disabled. Picking an item calls onPick, then the item's
         run. */
@@ -51,6 +51,17 @@
                 btn.setText(item.label());
                 btn.setTooltip(item.tip());
                 btn.setDisabled(!item.enabled());
+            }
+        },
+        
+        /*  Moves the keyboard focus to the next (delta 1) or previous (-1) item that can be
+            used, wrapping round; with none focused, to the first or last. */
+        moveFocus: function(delta) {
+            const usable = this._buttons.filter(btn => btn.isFocusable());
+            if (usable.length) {
+                const i = usable.findIndex(btn => btn.focused),
+                    next = i < 0 ? (delta > 0 ? 0 : usable.length - 1) : (i + delta + usable.length) % usable.length;
+                usable[next].focus();
             }
         },
         

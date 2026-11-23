@@ -20,7 +20,9 @@
         gameOverShown = false,
         settingsDialog,
         mapsDialog,
-        mapBrief;
+        mapBrief,
+        
+        upDownSide = 0; // which side W and X go first, 0: left (Q, Z), 1: right (E, C); see stepUpDown
     
     const JSClass = JS.Class,
         
@@ -158,7 +160,33 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', s:'swap', j:'jump', l:'attach', x:'detach', h:'heal', r:'recover', u:'quicken'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken'},
+        
+        // The side of the board each move key goes to, for W and X (see stepUpDown).
+        SIDE_OF_KEY = {q:0, z:0, Numpad7:0, Numpad1:0, e:1, c:1, Numpad9:1, Numpad3:1},
+        
+        // Moves (or attacks with) the selected piece by d, [dx, dy]. Returns whether it did.
+        stepSelected = d => {
+            const sel = game.getSelected();
+            let retval = false;
+            if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) {
+                gameView.afterTurn();
+                retval = true;
+            }
+            return retval;
+        },
+        
+        /*  W and X: up or down, going to the left (Q or Z) and right (E or C) in turn so
+            the swarm heads straight up or down, or to the other side if the next one is
+            blocked. Each step, from these keys or the others, makes the other side next, so
+            W then X comes back to where it started. */
+        stepUpDown = up => {
+            const sel = game.getSelected(),
+                dirs = up ? [[0, -1], [1, -1]] : [[-1, 1], [0, 1]],
+                legal = sel ? game.legalMoves(sel) : [],
+                side = [upDownSide, 1 - upDownSide].find(s => legal.some(m => m.dx === dirs[s][0] && m.dy === dirs[s][1]));
+            if (side !== undefined && stepSelected(dirs[side])) upDownSide = 1 - side;
+        },
         
         cancelModes = () => {
             V.placeMode = false;
@@ -645,13 +673,20 @@
         
         
         // Keyboard ////////////////////////////////////////////////////////////
-        /** @private */
+        /*  Keys that are handled here are stopped (stopPropagation) so a focused button
+            doesn't act on them too, except Enter and Space in the open menu, which are for
+            its focused item.
+            @private */
         _keyDown: function(e) {
             if (e.metaKey || e.ctrlKey || e.altKey || isAnyShowing()) return;
             
-            const k = keyOf(e);
-            if (k === ' ') {
-                e.preventDefault();
+            const k = keyOf(e),
+                handled = () => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+            if (k === 's') {
+                handled();
                 centerOn();
             } else if (!game.over) {
                 if (k === 'Escape') {cancelModes(); return;}
@@ -661,6 +696,15 @@
                     if (item.enabled()) {
                         V.menuOpen = false;
                         item.run();
+                    }
+                    return;
+                }
+                if (V.menuOpen) {
+                    // The menu: arrows and Tab move between its items.
+                    const delta = {ArrowDown:1, ArrowRight:1, ArrowUp:-1, ArrowLeft:-1, Tab:e.shiftKey ? -1 : 1}[k];
+                    if (delta) {
+                        handled();
+                        pieceMenu.moveFocus(delta);
                     }
                     return;
                 }
@@ -675,17 +719,28 @@
                     return;
                 }
                 if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode) return;
-                if (k === '.' || k === 'Numpad5' || k === 'Enter') {
-                    e.preventDefault();
+                if (k === 'Enter') {
+                    // Opens the selected piece's menu, its first item focused.
+                    if (game.getSelected()) {
+                        handled();
+                        V.menuOpen = true;
+                        this.update(); // shows it now, so it can take the focus
+                        pieceMenu.moveFocus(1);
+                        draw();
+                    }
+                } else if (k === ' ' || k === '.' || k === 'Numpad5') {
+                    handled();
                     endTurn();
-                    return;
+                } else if (k === 'w' || k === 'x' || k === 'Numpad8' || k === 'Numpad2') {
+                    handled();
+                    stepUpDown(k === 'w' || k === 'Numpad8');
+                } else {
+                    const d = pkg.hex.keyDirs[k];
+                    if (d) {
+                        handled();
+                        if (stepSelected(d) && k in SIDE_OF_KEY) upDownSide = 1 - SIDE_OF_KEY[k];
+                    }
                 }
-                const d = pkg.hex.keyDirs[k];
-                if (!d) return;
-                
-                e.preventDefault();
-                const sel = game.getSelected();
-                if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) gameView.afterTurn();
             }
         }
     });

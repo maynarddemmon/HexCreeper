@@ -17,7 +17,7 @@
         {
             isObj,
             attrs:{num, bool, choice, normalize, resolve},
-            cfg:{ANIM}
+            cfg
         } = pkg,
         
         PREFS_KEY = 'hc.prefs',
@@ -33,7 +33,8 @@
         /*  Every preference. The SettingsDialog builds its UI from this list, so adding one
             here is enough to make it appear there. */
         PREFERENCES = [
-            pref(GROUP_DISPLAY, onto(ANIM, 'on', bool, 'animate'))
+            pref(GROUP_DISPLAY, onto(cfg.ANIM, 'on', bool, 'animate')),
+            pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45))
         ],
         
         GROUPS = [GROUP_DISPLAY].map(id => ({
