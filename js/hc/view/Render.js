@@ -249,7 +249,7 @@
         
         // Half the width of a link at the end where `chain` pieces hang below it: wider the
         // longer the chain, up to a limit.
-        linkHalfWidth = chain => cam.size * Math.min(0.03 * chain, 0.27),
+        linkHalfWidth = chain => cam.size * Math.min(0.02 * chain, 0.22),
         
         // How much of a link to a piece out of sight is drawn, from the end in sight.
         LINK_STUB = 0.5,
