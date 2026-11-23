@@ -25,6 +25,7 @@
         upDownSide = 0, // which side W and X go first, 0: left (Q, Z), 1: right (E, C); see stepUpDown
         
         nav = null,     // the selected piece going somewhere by itself (see startNav), or null
+        lastForm = null, // the swarm the last formation was for, {root, ids} (see startNav)
         navNote = '';   // why it last stopped, shown until you next press a key or click
     
     const JSClass = JS.Class,
@@ -163,12 +164,14 @@
                     }
                 },
                 {id:'goto', label:() => i18n('btn-goto'), tip:() => i18n('tip-goto'), enabled:() => !game.over && !!sel(), run:choose('gotoMode')},
-                {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')}
+                {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')},
+                {id:'snake', label:() => i18n('btn-snake'), tip:() => i18n('tip-snake'), enabled:() => !game.over && !!sel(), run:() => startNav('snake')},
+                {id:'tree', label:() => i18n('btn-tree'), tip:() => i18n('tip-tree'), enabled:() => !game.over && !!sel(), run:() => startNav('tree')}
             ];
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken', g:'goto', o:'explore'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -220,17 +223,38 @@
                 game.playerAct(q, x, y, kind);
         },
         
+        /*  Does an action from formationAction. Returns whether it did. */
+        doFormation = ({kind, id, target, x, y}) => {
+            const q = game.pieces.get(id);
+            return kind === 'detach' ? game.playerDetach(q) :
+                kind === 'attach' ? game.playerAttach(q, game.pieces.get(target)) :
+                game.playerAct(q, x, y, 'follow');
+        },
+        
         /*  The next step: plans the way from where the piece is now and takes a step along
             it in Follow mode (which tries Fixed, then Free, if it can't follow), ending the
             turn; then waits for that turn to play. If it can't, it untangles its swarm
             (planUntangle), an action at a time, using the moves the turn has, until it can
-            step on, keeping off positions the swarm has been in on the way. */
+            step on, keeping off positions the swarm has been in on the way. Getting into a
+            formation, it takes the next action for it (formationAction), using the moves
+            the turn has, then ends the turn. */
         navStep = () => {
             const p = game.pieces.get(nav.id),
                 turn = game.turn;
             let stop = '', did = '';
             if (!p || game.over) {
                 stop = game.over ? 'nav-over' : 'nav-lost';
+            } else if (nav.kind === 'snake' || nav.kind === 'tree') {
+                const action = game.formationAction(nav.ids, nav.root, nav.id, nav.kind);
+                if (action === 'done' || action === 'stuck') {
+                    stop = 'form-' + action;
+                } else if (action === 'wait') {
+                    endTurn();
+                } else if (doFormation(action)) {
+                    did = 'form';
+                } else {
+                    stop = 'form-stuck';
+                }
             } else {
                 const route = navRoute(p);
                 if (!route) {
@@ -258,7 +282,7 @@
             }
             if (did) {
                 gameView.afterTurn();
-                nav.visited.add(game.swarmKey(p));
+                if (did !== 'form') nav.visited.add(game.swarmKey(p));
                 if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
             }
             // A step ends the turn (if it didn't end by itself, with nothing else to do).
@@ -273,13 +297,21 @@
         },
         
         /*  The selected piece goes: kind 'goto' (to target, [x, y]) or 'explore' (on toward
-            the nearest place you haven't seen, again and again). */
+            the nearest place you haven't seen, again and again); or its swarm (its whole
+            tree) gets into formation: kind 'snake' (with it at the head) or 'tree'. */
         startNav = (kind, target) => {
             const p = game.getSelected();
             stopNav('');
             cancelModes();
             if (p && !game.over) {
-                nav = {kind, target, id:p.id, enemies:enemiesInSight(), hp:playerHp(), timer:null, visited:new Set()};
+                // The swarm: p's whole tree, and for a formation, the groups cut loose from it
+                // by the last one, if it stopped before it was done.
+                const topOf = q => game.parent(q) ? topOf(game.parent(q)) : q,
+                    root = topOf(p),
+                    loose = lastForm?.root === root.id ? lastForm.ids : [],
+                    ids = game.piecesOf('player').filter(q => topOf(q) === root || loose.includes(topOf(q).id)).map(q => q.id);
+                nav = {kind, target, id:p.id, enemies:enemiesInSight(), hp:playerHp(), timer:null, visited:new Set(), root:root.id, ids};
+                if (kind === 'snake' || kind === 'tree') lastForm = {root:root.id, ids};
                 navStep();
             }
         },
@@ -470,7 +502,7 @@
                     } else if (V.gotoMode) {
                         status = i18n('status-goto');
                     } else if (nav) {
-                        status = i18n(nav.kind === 'goto' ? 'status-going' : 'status-exploring');
+                        status = i18n({goto:'status-going', explore:'status-exploring'}[nav.kind] ?? 'status-forming');
                     } else if (navNote) {
                         status = navNote;
                     } else if (V.hover) {

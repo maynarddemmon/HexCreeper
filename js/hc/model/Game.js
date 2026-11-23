@@ -22,7 +22,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Navigation, pkg.Goals, pkg.EffectTiles],
+        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Goals, pkg.EffectTiles],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
