@@ -531,7 +531,14 @@
             
             // Capture phase: myt's global key handling stops keydown from bubbling.
             window.addEventListener('keydown', appView._keyDown.bind(appView), true);
-            window.addEventListener('resize', () => V.resize());
+            // The canvas is sized when it changes size, once it's laid out: a window resize
+            // comes before the layout (so it would get the size before, and the canvas would
+            // show stretched), and the canvas can change size without one. A window resize
+            // still catches a change of pixel ratio alone (as moving to another screen).
+            new ResizeObserver(V.resize).observe(V.canvas);
+            window.addEventListener('resize', () => {
+                if ((window.devicePixelRatio || 1) !== V.dpr) V.resize();
+            });
             
             game.reset(); // With the stored settings, now they're in effect.
             

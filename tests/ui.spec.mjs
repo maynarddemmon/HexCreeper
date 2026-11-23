@@ -240,6 +240,22 @@ test('the follow margin is a preference, kept from 5 to 45%', async ({page}) => 
     })).toEqual([30, 45, 45, 5]);
 });
 
+test('the canvas keeps its pixels matched to its size on the page as the window resizes', async ({page}) => {
+    await startGame(page);
+    // Its size on the page times the pixel ratio, and its backing store's
+    const sizes = () => page.evaluate(() => {
+        const c = hc.view.canvas, r = c.getBoundingClientRect();
+        return [[Math.round(r.width * devicePixelRatio), Math.round(r.height * devicePixelRatio)], [c.width, c.height]];
+    });
+    for (const [width, height] of [[1280, 500], [900, 700], [1280, 720]]) {
+        await page.setViewportSize({width, height});
+        await expect.poll(async () => {
+            const [shown, store] = await sizes();
+            return shown.join() === store.join();
+        }).toBe(true);
+    }
+});
+
 test('the selection stays on a piece after it moves', async ({page}) => {
     await startGame(page);
     await clearBoard(page);

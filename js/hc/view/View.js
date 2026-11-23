@@ -154,14 +154,19 @@
                 return [e.clientX - r.left, e.clientY - r.top];
             },
             
-            // Matches the canvas's backing store to its size on the page.
+            // Matches the canvas's backing store to its size on the page. Setting the size
+            // clears it, so only if it changed.
             resize: () => {
                 const r = canvas.getBoundingClientRect();
                 V.W = mathMax(1, r.width);
                 V.H = mathMax(1, r.height);
                 V.dpr = window.devicePixelRatio || 1;
-                canvas.width = mathRound(V.W * V.dpr);
-                canvas.height = mathRound(V.H * V.dpr);
+                const w = mathRound(V.W * V.dpr),
+                    h = mathRound(V.H * V.dpr);
+                if (canvas.width !== w || canvas.height !== h) {
+                    canvas.width = w;
+                    canvas.height = h;
+                }
                 draw();
             },
             
