@@ -1,4 +1,7 @@
 {
+	"rules":{
+		"corePathLength":10
+	},
 	"tileGenerator":{
 		"type":"caverns",
 		

@@ -485,7 +485,7 @@
             }
         }
         
-        // The golden path: a trail of small dots along every step the core has taken, kept
+        // The golden path: a trail of small dots along the core's latest steps, kept
         // faint and small since it's only a reminder of where you've been. Each step starts
         // at the centre of its cell and stops a gap short of the next one, where the next
         // step starts, so steps don't overlap; the last step goes all the way to the core.

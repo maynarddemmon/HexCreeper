@@ -74,7 +74,7 @@
             this.recomputeRanks();
             core.hp = core.maxHp;
             this.selectedId = core.id;
-            this.corePath = [[0, 0]];       // every cell the core has been on, in order (the golden path)
+            this.corePath = [[0, 0]];       // the cells the core has been on, in order (the golden path: see extendCorePath)
             this.tileGenerator.start();
             this.revealTiles();
             this.spawnGenerator.start();
@@ -203,8 +203,9 @@
             this.moveMode = pkg.MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
-            this.corePath = o.corePath.map(c => [...c]);
             this.rules = rules;
+            this.corePath = [];
+            for (const [x, y] of o.corePath) this.extendCorePath(x, y);
             this.gameMap = o.gameMap ?? null;
             this._sightKey = null;
         },
@@ -355,6 +356,16 @@
             const out = [p];
             for (let i = 0; i < out.length; i++) out.push(...this.children(out[i]));
             return out;
+        },
+        
+        // The core has moved to (x, y): adds it to the golden path, which keeps only the
+        // last corePathLength steps (the rule), and always where the core is, or was last
+        // (see Goals.js).
+        extendCorePath: function(x, y) {
+            const path = this.corePath,
+                most = this.rules.corePathLength + 1;
+            path.push([x, y]);
+            if (path.length > most) path.splice(0, path.length - most);
         },
         
         // Legal actions for a piece: [{x, y, dx, dy, attack, hits}]

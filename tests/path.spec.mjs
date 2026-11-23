@@ -19,6 +19,28 @@ test('the golden path records every cell the core moves to, in order, retraced s
     expect(r.path).toEqual(r.expected);
 });
 
+test('the golden path keeps only the core\'s last corePathLength steps; with 0, none', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, [a, b] = hc.hex.dirs, out = [];
+        for (const length of [3, 0]) {
+            g.rules.corePathLength = length;
+            g.corePath = [[0, 0]];
+            // Back and forth: a, a + b, a, a + b, a.
+            for (const [dx, dy] of [a, b, [-b[0], -b[1]], b, [-b[0], -b[1]]]) {
+                const c = g.getPlayerCore();
+                g.playerAct(c, c.x + dx, c.y + dy);
+                g.playerWait();
+            }
+            const c = g.getPlayerCore();
+            out.push(g.corePath, [c.x, c.y]);
+        }
+        return {out, ab:[a[0] + b[0], a[1] + b[1]], a};
+    });
+    const [three, at, none, end] = r.out;
+    expect([three, at]).toEqual([[r.ab, r.a, r.ab, r.a], r.a]);
+    expect(none).toEqual([end]); // just where the core is
+});
+
 test('moving another piece leaves the golden path alone', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs;

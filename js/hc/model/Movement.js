@@ -227,7 +227,7 @@
             this.board.set(this.key(a.x, a.y), a.id);
             this.board.set(this.key(b.x, b.y), b.id);
             const core = [a, b].find(p => p.id === this.playerCoreId);
-            if (core) this.corePath.push([core.x, core.y]);
+            if (core) this.extendCorePath(core.x, core.y);
             this.landOnTiles([a, b]);
             if (a.owner === 'player') this.piecesMoved();
         },
@@ -388,7 +388,7 @@
             });
             if (moved.some(g => g.id === this.playerCoreId)) {
                 const core = this.getPlayerCore();
-                this.corePath.push([core.x, core.y]);
+                this.extendCorePath(core.x, core.y);
             }
             if (piece.owner === 'player') {
                 this.landOnTiles(moved);

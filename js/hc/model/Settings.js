@@ -58,7 +58,8 @@
             bool('rankUpHeals', false),       // when max HP rises with rank, HP rises too (otherwise the new HP must be healed)
             num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's rank
             num('healActPer', 1, 1, 20),      // and heals this x your core's rank
-            num('healScore', 1, 0, 20)        // each unused heal point becomes this much score
+            num('healScore', 1, 0, 20),       // each unused heal point becomes this much score
+            num('corePathLength', 250, 0, 100000) // how many of the core's latest steps the golden path keeps (0: none)
         ],
         
         PREFERENCES_BY_ID = new Map(PREFERENCES.map(def => [def.id, def])),
