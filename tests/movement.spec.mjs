@@ -28,6 +28,12 @@ const step = (page, dx, dy, mode, who = 'core') => page.evaluate(([dx, dy, mode,
     return at;
 }, [dx, dy, mode, who]);
 
+// Steps a piece (the core, unless named) by (dx, dy) in mode, for real.
+const go = (page, dx, dy, mode, who = 'core') => page.evaluate(([dx, dy, mode, who]) => {
+    const g = hc.app.game, p = g.pieces.get(window.ids[who]);
+    return g.act(p, p.x + dx, p.y + dy, mode);
+}, [dx, dy, mode, who]);
+
 const solid = (page, x, y) => page.evaluate(([x, y]) => {
     const g = hc.app.game;
     g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', hc.app.game.tileGenerator.attrs.clumpSolid));
@@ -40,35 +46,109 @@ test('fixed moves the whole subtree, so one blocked piece stops the move', async
     expect(await step(page, 1, -1, 'fixed')).toBe(null);
 });
 
-test('follow moves the tree; a blocked piece takes the free cell nearest its place, and those after keep theirs', async ({page}) => {
+test('in follow each piece steps where the piece it follows just was, then along its trail', async ({page}) => {
     await setUp(page);
-    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[2, -1], b:[3, -1]}); // like fixed
-    await solid(page, 2, -1);
-    // a can't get to (2, -1): staying keeps its link at 1; b keeps its place beside a.
-    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
+    // a, off the core's footsteps, steps to the nearest of them: the core's old cell.
+    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[0, 0], b:[1, 0]});
+    expect(await go(page, 1, -1, 'follow')).toBe(true);
+    expect(await page.evaluate(() => hc.app.game.getPlayerCore().trail)).toEqual([[0, 0]]);
+    // Now each is on the footsteps of the one ahead of it, and files along them.
+    expect(await step(page, 1, -1, 'follow')).toEqual({core:[2, -2], a:[1, -1], b:[0, 0]});
+    expect(await go(page, 1, -1, 'follow')).toBe(true);
+    expect(await step(page, 1, 0, 'follow')).toEqual({core:[3, -2], a:[2, -2], b:[1, -1]});
+});
+
+test('a trail is as long as the link range; a jump starts it afresh', async ({page}) => {
+    await setUp(page);
+    const trail = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        g.rules.linkRange = 2;
+        for (let i = 0; i < 3; i++) g.act(core, core.x, core.y - 1, 'follow');
+        const walked = core.trail.map(c => [...c]);
+        g.rules.linkRange = 3;  // so the jump keeps its link to a in range
+        return [walked, g.jumpPiece(core, core.x, core.y - 2), core.trail];
+    });
+    expect(trail).toEqual([[[0, -2], [0, -1]], true, []]);
+});
+
+test('a step that can\'t be done in follow is tried in fixed (then free)', async ({page}) => {
+    await setUp(page);
+    // With links of 1, a can only follow to the core's old cell, but it won't go onto
+    // the harm tile there; in fixed it does.
+    await putTile(page, 0, 0, 'harm', 'harm');
+    await page.evaluate(() => {hc.app.game.rules.linkRange = 1;});
+    expect(await step(page, -1, 0, 'follow')).toEqual({core:[-1, 0], a:[0, 0], b:[1, 0]});
+});
+
+test('Go to and Explore may jump in follow mode, as a last resort; you may not', async ({page}) => {
+    await setUp(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        g.moveMode = 'follow';
+        return [g.jumpTargets(core).length, g.jumpTargets(core, true).length > 0];
+    });
+    expect(r).toEqual([0, true]);
+});
+
+test('in follow, turning back onto your own swarm swaps with the piece you step onto', async ({page}) => {
+    await setUp(page);
+    // A dead end: only (0, 0) to (3, 0) are open, with the core at its end.
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        for (let x = -3; x <= 6; x++) {
+            for (let y = -3; y <= 3; y++) {
+                if (y !== 0 || x < 0 || x > 3) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', g.tileGenerator.attrs.clumpSolid));
+            }
+        }
+    });
+    expect(await go(page, 1, 0, 'free')).toBe(false); // a is in the way
+    expect(await step(page, 1, 0, 'follow')).toEqual({core:[1, 0], a:[0, 0], b:[2, 0]});
+});
+
+test('in follow the swarm sorts itself out where a piece is behind its own children', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game;
+        // A tunnel along y = 0, the lead at (0, 0); c, linked to it, is behind its
+        // children d and e, as far from the lead as a link goes.
+        for (let x = -8; x <= 5; x++) {
+            for (let y = -2; y <= 2; y++) {
+                if (y !== 0 || x < -6 || x > 3) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', 'boulder'));
+            }
+        }
+        g.removePiece(g.getPlayerCore());
+        const lead = g.addPiece('core', 'player', 0, 0), c = g.addPiece('core', 'player', -3, 0, lead.id),
+            d = g.addPiece('core', 'player', -2, 0, c.id), e = g.addPiece('core', 'player', -1, 0, c.id),
+            names = new Map([[lead.id, 'lead'], [c.id, 'c'], [d.id, 'd'], [e.id, 'e']]);
+        return Object.fromEntries(g.resolveStep(g.boardView(), lead.id, 1, 0, 'follow').moves.map(([id, x, y]) => [names.get(id), [x, y]]));
+    });
+    // All shuffle up, though c can only go once d has, and d once e has.
+    expect(r).toEqual({lead:[1, 0], c:[-2, 0], d:[-1, 0], e:[0, 0]});
 });
 
 test('in follow a piece leads and its parent, grandparent and their other branches follow it', async ({page}) => {
     await setUp(page);
-    expect(await step(page, 1, -1, 'follow', 'a')).toEqual({core:[1, -1], a:[2, -1], b:[3, -1]});
-    expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[1, -1], a:[2, -1], b:[3, -1]});
-    // The core, blocked, takes the free cell nearest its place behind a.
+    // b, then the core (by then a's old cell is taken: it stays next to it).
+    expect(await step(page, 1, -1, 'follow', 'a')).toEqual({core:[0, 0], a:[2, -1], b:[1, 0]});
+    expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[1, 0], a:[2, 0], b:[3, -1]});
+    // a steps onto the core; b takes a's old cell, and the core steps aside.
     await solid(page, -1, 0);
-    expect(await step(page, -1, 0, 'follow', 'a')).toEqual({core:[-1, 1], a:[0, 0], b:[1, 0]});
+    expect(await step(page, -1, 0, 'follow', 'a')).toEqual({core:[1, -1], a:[0, 0], b:[1, 0]});
     // A detached group follows its own top piece, not the core.
     await page.evaluate(() => {
         const g = hc.app.game;
         g.playerDetach(g.pieces.get(window.ids.a));
     });
-    expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[0, 0], a:[2, -1], b:[3, -1]});
+    expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[0, 0], a:[2, 0], b:[3, -1]});
 });
 
 test('in follow, followers treat harm tiles you know of as walls; the lead may step on one', async ({page}) => {
     await setUp(page);
     const harm = (x, y) => putTile(page, x, y, 'harm', 'harm');
-    await harm(2, -1);                    // where a would go
-    await harm(3, -1);                    // where b would go
+    await harm(0, 0);                     // where a would go, the core's old cell
     expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
+    await harm(2, -1);
     expect(await step(page, 1, -1, 'fixed')).toEqual({core:[1, -1], a:[2, -1], b:[3, -1]}); // fixed walks onto them
     await harm(1, -1);
     expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]}); // the lead may
@@ -104,10 +184,10 @@ test('free moves only the piece, dragging along any that would be out of range',
 
 test('fixed attacks with the whole group; free and follow with the piece alone', async ({page}) => {
     await setUp(page);
-    await page.evaluate(() => {hc.app.game.addPiece('core', 'enemy', 3, -1);}); // where b would go
+    await page.evaluate(() => {hc.app.game.addPiece('core', 'enemy', 3, -1);}); // where b would go in fixed
     expect(await step(page, 1, -1, 'fixed')).toEqual({hits:['b']});
     expect(await step(page, 1, -1, 'free')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
-    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[2, -1], b:[2, 0]}); // b stays clear of it
+    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[0, 0], b:[1, 0]}); // only the core could hit
 });
 
 test('in follow only the lead breaks solids; the rest go round them', async ({page}) => {
@@ -115,10 +195,10 @@ test('in follow only the lead breaks solids; the rest go round them', async ({pa
     await page.evaluate(() => {
         hc.solids.define({mud:{name:'mud', hardness:0}}, {mud_wall:{name:'Mud', composition:'mud', hp:3}});
         const g = hc.app.game;
-        g.tiles.set('2,-1', g.makeTile(2, -1, 'solid', 'mud_wall'));    // where a would go
+        g.tiles.set('2,-1', g.makeTile(2, -1, 'solid', 'mud_wall'));    // where a would go in fixed
     });
     expect(await step(page, 1, -1, 'fixed')).toEqual({hits:['a']});
-    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
+    expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[0, 0], b:[1, 0]});
     expect(await step(page, 1, -1, 'follow', 'a')).toEqual({hits:['a']}); // leading, a breaks it
 });
 
@@ -136,9 +216,9 @@ test('your moves use the chosen mode; M (or the button) cycles it, and it\'s sav
         const g = hc.app.game, core = g.getPlayerCore(), done = g.playerAct(core, 1, -1),
             copy = new hc.Game();
         copy.importFromObj(JSON.parse(JSON.stringify(g.exportToObj())));
-        return [done, [core.x, core.y], [g.pieces.get(window.ids.a).x, g.pieces.get(window.ids.a).y], copy.moveMode];
+        return [done, [core.x, core.y], [g.pieces.get(window.ids.a).x, g.pieces.get(window.ids.a).y], copy.moveMode, copy.pieces.get(core.id).trail];
     });
-    expect(r).toEqual([true, [1, -1], [1, 0], 'follow']);
+    expect(r).toEqual([true, [1, -1], [0, 0], 'follow', [[0, 0]]]); // the trail is saved too
     await page.keyboard.press('m');
     await expect(button(page, 'Move: Fixed')).toBeVisible();
 });

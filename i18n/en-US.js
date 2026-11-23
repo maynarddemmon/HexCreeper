@@ -34,7 +34,7 @@ myt.I18N.setDictionary({
 "tip-place":"Place a piece next to this one, linked to it: choose the empty cell. Costs $0 score. (P)",
 "tip-heal":"Spend $0 score to heal $1 HP, starting from this piece and flowing along its links. (H)",
 "tip-quicken":"Once a turn, one more move this turn, for $0 score (your swarm's highest rank). (U)",
-"tip-mode":"How a piece's linked pieces move with it. Fixed: they all move with it, keeping their shape. Free: they stay put, unless the move would take one out of link range, which drags it along. Follow: it leads and the whole swarm it's linked to follows, flowing around obstacles; only it attacks. (M)",
+"tip-mode":"How a piece's linked pieces move with it. Fixed: they all move with it, keeping their shape. Free: they stay put, unless the move would take one out of link range, which drags it along. Follow: it leads and the whole swarm it's linked to follows in its footsteps; only it attacks. (M)",
 "tip-detach":"Break the selected piece's link to its parent, however far apart they are. Uses its move. (B)",
 "tip-swap":"Swap the selected piece with one of your pieces next to it. Their links stay with them. Uses a move, and both pieces are done for the turn. (V)",
 "tip-jump":"Jump the selected piece two cells, over holes and pieces but not solids. Nothing linked to it moves, so its links must stay in range. Uses its move, and it can't act this turn or next. Not in Follow mode. (J)",

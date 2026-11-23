@@ -46,6 +46,30 @@ test('a route keeps off solids and harm tiles you know of, and may go through ce
     expect(r).toEqual({around:[4, 0], viaGap:true, offHarm:true, walled:true, onSolid:null, unseen:[0, 30]});
 });
 
+test('a route goes through the piece\'s own swarm, which makes way, but not other pieces', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore();
+        hc.cfg.VISION.fog = false;
+        g.score = 1000;
+        // A tunnel east from the core, with a piece of its swarm in it.
+        for (let x = -2; x <= 6; x++) {
+            for (let y = -2; y <= 2; y++) {
+                if (y !== 0 || x < 0) g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', 'boulder'));
+            }
+        }
+        g.playerPlace(1, 0, core);
+        g.playerWait();
+        const through = g.routeTo(core, 4, 0),
+            moved = g.playerAct(core, 1, 0, 'follow') && [g.pieceAt(0, 0) && g.pieceAt(0, 0).id !== core.id, core.x];
+        // A detached piece of yours, or an enemy, blocks it.
+        g.playerWait();
+        g.playerDetach(g.pieceAt(0, 0));
+        const detached = g.routeTo(g.pieceAt(0, 0), 4, 0);
+        return {through:through?.length, moved, detached};
+    });
+    expect(r).toEqual({through:4, moved:[true, 1], detached:null});
+});
+
 test('exploring heads for the nearest cell you\'ve seen next to one you haven\'t', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
@@ -77,6 +101,48 @@ test('Go to: G, then a cell; the piece goes there a step a turn, its swarm follo
         const g = hc.app.game, core = g.getPlayerCore(), other = g.piecesOf('player').find(p => p !== core);
         return {core:[core.x, core.y], follows:hc.hexDist(core, other) === 1, turn:g.turn, mode:g.moveMode};
     })).toEqual({core:[3, 0], follows:true, turn:4, mode:'fixed'}); // turns 2 and 3 ended after the first two steps
+});
+
+// Rows of cells (the 2nd and 4th shifted right): O open, S solid; A leads, B and C are
+// linked to it, D to C. C is as far from A as a link goes, and can only close up through
+// the open cell below it, so A can't step straight down (south). Below is open ground.
+const tangle = page => page.evaluate(() => {
+    const g = hc.app.game, rows = ['ODCSS', 'SOSS', 'OSOOS', 'OOBA'], at = {};
+    for (let y = -3; y < 12; y++) {
+        for (let x = -6; x <= 8; x++) {
+            const ch = rows[y]?.[x + (y - (y & 1)) / 2] ?? (y < 3 ? 'S' : 'O');
+            if (ch === 'S') g.tiles.set(g.key(x, y), g.makeTile(x, y, 'solid', 'boulder'));
+            else if (ch !== 'O') at[ch] = [x, y];
+            if (y < 6) g.seenCells.add(g.key(x, y));
+        }
+    }
+    g.removePiece(g.getPlayerCore());
+    const A = g.addPiece('core', 'player', ...at.A),
+        C = g.addPiece('core', 'player', ...at.C, A.id);
+    g.addPiece('core', 'player', ...at.B, A.id);
+    g.addPiece('core', 'player', ...at.D, C.id);
+    g.playerCoreId = A.id;
+    g.selectedId = A.id;
+    g.tileGenerator.piecesMoved = () => {};
+    hc.app.centerOn(false);
+    window.A = A;
+});
+
+test('Go to untangles a swarm that can\'t follow it straight on', async ({page}) => {
+    await page.evaluate(() => {hc.cfg.VISION.fog = false;});
+    await tangle(page);
+    expect(await page.evaluate(() => hc.app.game.resolveStep(hc.app.game.boardView(), window.A.id, 0, 1, 'follow'))).toBe(null);
+    await page.keyboard.press('g');
+    await page.mouse.click(...await cellOnPage(page, 2, 7));
+    await expect(status(page, 'Arrived.')).toBeVisible({timeout:10000});
+});
+
+test('Explore untangles it too', async ({page}) => {
+    await page.evaluate(() => {hc.cfg.VISION.fog = true;});
+    await tangle(page);
+    await page.keyboard.press('o');
+    await expect.poll(() => page.evaluate(() => hc.hexDist(window.A, {x:2, y:3})), {timeout:10000}).toBeGreaterThan(3);
+    await expect(status(page, 'The way is blocked.')).toHaveCount(0);
 });
 
 test('going stops when an enemy comes into view, or one of your pieces is hurt', async ({page}) => {

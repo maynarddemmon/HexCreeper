@@ -208,39 +208,62 @@
             return game.over ? 'nav-over' : hurt ? 'nav-hurt' : seen ? 'nav-enemy' : '';
         },
         
-        /*  The next step: plans the way from where the piece is now, takes a step along it
-            and ends the turn, then waits for that turn to play. */
+        // The way on for piece p, going where nav says; and how far it is from each cell.
+        navRoute = p => nav.kind === 'goto' ? game.routeTo(p, ...nav.target) : game.exploreRoute(p),
+        navField = p => nav.kind === 'goto' ? game.fieldTo(p, ...nav.target) : game.exploreField(p),
+        
+        /*  Does one of the actions in a plan from planUntangle. Returns whether it did. */
+        doPlanned = ({id, kind, x, y, other}) => {
+            const q = game.pieces.get(id);
+            return kind === 'swap' ? game.playerSwap(q, game.pieces.get(other)) :
+                kind === 'jump' ? game.playerJump(q, x, y, true) :
+                game.playerAct(q, x, y, kind);
+        },
+        
+        /*  The next step: plans the way from where the piece is now and takes a step along
+            it in Follow mode (which tries Fixed, then Free, if it can't follow), ending the
+            turn; then waits for that turn to play. If it can't, it untangles its swarm
+            (planUntangle), an action at a time, using the moves the turn has, until it can
+            step on, keeping off positions the swarm has been in on the way. */
         navStep = () => {
-            const p = game.pieces.get(nav.id);
-            let stop;
+            const p = game.pieces.get(nav.id),
+                turn = game.turn;
+            let stop = '', did = '';
             if (!p || game.over) {
                 stop = game.over ? 'nav-over' : 'nav-lost';
-            } else if (!game.canMove(p)) {
-                // It's already acted this turn: on to the next.
-                endTurn();
-                stop = navStopReason();
             } else {
-                const [tx, ty] = nav.target ?? [],
-                    route = nav.kind === 'goto' ? game.routeTo(p, tx, ty) : game.exploreRoute(p),
-                    next = route?.[0],
-                    move = next && game.findMove(p, next[0], next[1], 'follow'),
-                    turn = game.turn;
+                const route = navRoute(p);
                 if (!route) {
                     stop = nav.kind === 'goto' ? 'nav-no-route' : 'nav-explored';
-                } else if (!move || move.attack) {
-                    stop = 'nav-blocked';
                 } else {
-                    game.playerAct(p, next[0], next[1], 'follow');
-                    gameView.afterTurn();
-                    stop = navStopReason();
-                    if (!stop && nav.kind === 'goto' && p.x === tx && p.y === ty) stop = 'nav-arrived';
-                    if (!stop) {
-                        // The turn may have ended by itself, with nothing else to do.
-                        if (game.turn === turn) endTurn();
-                        stop = navStopReason();
+                    const [x, y] = route[0],
+                        move = game.canMove(p) && game.findMove(p, x, y, 'follow');
+                    if (move && !move.attack && game.playerAct(p, x, y, 'follow')) {
+                        did = 'step';
+                    } else {
+                        const action = game.planUntangle(p, navField(p), nav.visited)?.[0],
+                            q = action && game.pieces.get(action.id);
+                        if (!action) {
+                            stop = 'nav-blocked';
+                        } else if (!game.canMove(q)) {
+                            // Its action is in a turn to come.
+                            endTurn();
+                        } else if (doPlanned(action)) {
+                            did = 'untangle';
+                        } else {
+                            stop = 'nav-blocked';
+                        }
                     }
                 }
             }
+            if (did) {
+                gameView.afterTurn();
+                nav.visited.add(game.swarmKey(p));
+                if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
+            }
+            // A step ends the turn (if it didn't end by itself, with nothing else to do).
+            if (!stop && did === 'step' && game.turn === turn) endTurn();
+            stop ||= navStopReason();
             if (stop) {
                 stopNav(stop === 'nav-over' ? '' : stop);
             } else {
@@ -256,7 +279,7 @@
             stopNav('');
             cancelModes();
             if (p && !game.over) {
-                nav = {kind, target, id:p.id, enemies:enemiesInSight(), hp:playerHp(), timer:null};
+                nav = {kind, target, id:p.id, enemies:enemiesInSight(), hp:playerHp(), timer:null, visited:new Set()};
                 navStep();
             }
         },

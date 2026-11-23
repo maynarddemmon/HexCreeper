@@ -192,7 +192,8 @@
             this.pieces = new Map();
             this.board = new Map();
             for (const p of o.pieces) {
-                this.pieces.set(p.id, {...p});
+                const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [];
+                this.pieces.set(p.id, {...p, trail});
                 this.board.set(this.key(p.x, p.y), p.id);
             }
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
@@ -300,7 +301,8 @@
                     hp, maxHp: hp, 
                     rank:this.rules.rankBase, 
                     scoreValue:s.scoreValue,
-                    score:0
+                    score:0,
+                    trail:[]    // the cells it was on, latest first (see Movement._leaveCell)
                 };
             this.pieces.set(piece.id, piece);
             this.board.set(this.key(x, y), piece.id);

@@ -5,12 +5,16 @@
     - free: only the piece moves, but any piece linked below it that would then be out of
       link range is dragged along by the same step (and so on down).
     - follow: the piece leads and its whole tree follows (what's below it, and its parent,
-      grandparent and so on, with their other branches), each piece keeping its place
-      relative to the piece it's linked to on the way back to the lead; a piece that
-      can't get there takes the free cell (within a step of where it is, or where it is)
-      nearest that place, keeping its link close to its old length. Followers keep off
-      harm tiles you know of as if they were walls (the lead may step on one). So a
-      swarm flows after its leader around obstacles, its links stretching and shrinking.
+      grandparent and so on, with their other branches): each piece stays or moves a
+      cell, and a search finds an arrangement that keeps the links in range, if there's
+      one, each piece trying first to follow in the footsteps of the piece it's linked
+      to on the way back to the lead (the cells that piece has just been on:
+      piece.trail). Followers keep off harm tiles you know of as if they were walls (the
+      lead may step on one). So a swarm files after its leader through tight places and
+      round corners, and sorts itself out where pieces are in each other's way.
+    
+    A step that can't be done in follow is tried in fixed, then free, as long as that
+    doesn't make it an attack, so a swarm stuck following can still get going.
     
     In every mode a link may not end out of range unless it got shorter. Attacks: in fixed,
     every piece of the subtree that would land on a target hits it (a group attack); in
@@ -32,6 +36,9 @@
     
     pkg.MOVE_MODES = ['fixed', 'free', 'follow'];
     
+    // How many cells a Follow step tries for its pieces before giving up (see _follow).
+    const FOLLOW_TRIES = 3000;
+    
     pkg.Movement = new JS.Module('Movement', {
         /*  The result of stepping piece id by (dx, dy) in mode, on view:
                 posOf(id) -> [x, y]
@@ -43,10 +50,25 @@
                     (it may still be blocked); open, if not given
                 harm(x, y) -> optional: whether there's a harm tile there you know of,
                     which followers treat as a wall
+                trailOf(id) -> optional: the cells the piece was on before, latest first
                 target(id, x, y) -> what the piece would hit by moving there, or null
             Returns null if it can't be done, {attack:true, hits} for an attack, or
-            {attack:false, moves:[[id, x, y], ...]} for the pieces that move and where. */
+            {attack:false, moves:[[id, x, y], ...]} for the pieces that move and where.
+            In follow, if it can't be done, it's tried in fixed, then free, but not to attack. */
         resolveStep: function(view, id, dx, dy, mode) {
+            let r = this._resolveStep(view, id, dx, dy, mode);
+            if (!r && mode === 'follow') {
+                for (const m of ['fixed', 'free']) {
+                    r = this._resolveStep(view, id, dx, dy, m);
+                    if (r?.attack) r = null;
+                    if (r) break;
+                }
+            }
+            return r;
+        },
+        
+        /*  resolveStep, in mode alone. @private */
+        _resolveStep: function(view, id, dx, dy, mode) {
             const {posOf, kidsOf, parentOf, open, target} = view,
                 range = this.rules.linkRange,
                 [px, py] = posOf(id);
@@ -129,71 +151,120 @@
             return after;
         },
         
-        /*  Follow: the lead goes first; then, working out from it along links (down to its
-            children, up to its parent, and on), each piece goes where it would keep its
-            place relative to the piece it was reached from (its guide). If it can't, it
-            takes the best free cell within a step of where it is (staying counts): one that
-            keeps its link to its guide in range, nearest that place, then keeping the link
-            closest to its old length, then staying put. Returns where each piece ends up,
-            or null if one has nowhere to go. @private */
+        /*  Follow: the lead goes to dest; the others each stay or move a cell, so that no
+            two end on the same cell, none ends where a piece outside the swarm is or on a
+            harm tile you know of (unless it's there already), no two followers trade cells
+            (a piece the lead steps onto may take the lead's), and no link ends out of
+            range unless it got shorter. A search finds such an arrangement, if there's one
+            (it gives up after FOLLOW_TRIES tries): working out from the lead along links
+            (down to its children, up to its parent, and on), each piece tries first the
+            cells it would rather take, then the others, and if that leaves no way on for a
+            piece after it, the next. A piece would rather keep its link to the one it was
+            reached from (its guide) in range, then follow it in its footsteps: the cell
+            the guide just left, then its trail, the furthest along them, not going back
+            along them (or, off them, nearest the latest of them), then stay put. Returns
+            where each piece ends up, or null if there's no such arrangement. @private */
         _follow: function(view, lead, pieces, dest, linkOk) {
             const {posOf, kidsOf, parentOf, occupant, open} = view,
                 harm = view.harm ?? (() => false),
+                trailOf = view.trailOf ?? (() => []),
+                range = this.rules.linkRange,
                 inTree = new Set(pieces),
-                after = new Map(),
-                claimed = new Set(),
                 keyOf = ([x, y]) => x + ',' + y,
-                // A cell gid can end on: open (and, for a follower, without a harm tile), not
-                // taken, and empty or left by a piece of the tree (one that hasn't gone yet
-                // only for where gid keeps its place).
-                free = (c, gid, ideal) => {
-                    const [x, y] = c,
-                        o = occupant(x, y);
-                    return open(x, y) && (gid === lead || !harm(x, y)) && !claimed.has(keyOf(c)) &&
-                        (o === undefined || o === gid || (inTree.has(o) && (after.has(o) || ideal)));
-                },
-                put = (gid, c) => {
-                    after.set(gid, c);
-                    claimed.add(keyOf(c));
+                same = (a, b) => a[0] === b[0] && a[1] === b[1],
+                to = dest(lead),
+                after = new Map([[lead, to]]),
+                claimed = new Map([[keyOf(to), lead]]),
+                top = pieces[0],
+                above = parentOf(top),
+                // The pieces each is linked to in the swarm
+                linksOf = gid => {
+                    const par = parentOf(gid);
+                    return [...kidsOf(gid), ...(par != null && inTree.has(par) ? [par] : [])];
                 };
+            {
+                const o = occupant(...to);
+                if (!open(...to) || (o !== undefined && o !== lead && !inTree.has(o))) return null;
+            }
             
-            if (!free(dest(lead), lead, true)) return null;
-            put(lead, dest(lead));
-            const queue = [lead], guideOf = new Map();
-            for (let i = 0; i < queue.length; i++) {
-                const g = queue[i], par = parentOf(g);
-                for (const n of [...kidsOf(g), ...(par != null && inTree.has(par) ? [par] : [])]) {
+            // The order: out from the lead along links, each with its guide
+            const order = [lead], guideOf = new Map();
+            for (let i = 0; i < order.length; i++) {
+                for (const n of linksOf(order[i])) {
                     if (n !== lead && !guideOf.has(n)) {
-                        guideOf.set(n, g);
-                        queue.push(n);
+                        guideOf.set(n, order[i]);
+                        order.push(n);
                     }
                 }
             }
-            for (const gid of queue.slice(1)) {
-                const guide = guideOf.get(gid),
-                    [px, py] = posOf(guide), [gx, gy] = posOf(gid), [ax, ay] = after.get(guide),
-                    ideal = [ax + gx - px, ay + gy - py];
-                if (free(ideal, gid, true)) {
-                    put(gid, ideal);
-                } else {
-                    const oldLink = dist([gx, gy], [px, py]);
-                    let best = null, bestKey = null;
-                    [[0, 0], ...pkg.hex.dirs].forEach(([ddx, ddy], i) => {
-                        const c = [gx + ddx, gy + ddy];
-                        if (free(c, gid, false)) {
-                            const link = dist(c, after.get(guide)),
-                                key = [linkOk([gx, gy], [px, py], c, after.get(guide)) ? 0 : 1, dist(c, ideal), Math.abs(link - oldLink), i];
-                            if (!bestKey || before(key, bestKey)) {
-                                best = c;
-                                bestKey = key;
-                            }
+            
+            // The cells gid may end on, those it would rather take first (once its guide has
+            // gone).
+            const choicesOf = gid => {
+                    const guide = guideOf.get(gid),
+                        from = posOf(guide),
+                        gto = after.get(guide),
+                        here = posOf(gid),
+                        cells = [...(same(from, gto) ? [] : [from]), ...trailOf(guide)],
+                        steps = cells.map(keyOf),
+                        stepOf = c => {
+                            const i = steps.indexOf(keyOf(c));
+                            return i < 0 ? steps.length : i;
+                        },
+                        at = stepOf(here),
+                        latest = cells[0] ?? gto,
+                        out = [];
+                    [[0, 0], ...pkg.hex.dirs].forEach(([dx, dy], i) => {
+                        const c = [here[0] + dx, here[1] + dy],
+                            o = occupant(...c);
+                        if (open(...c) && (i === 0 || !harm(...c)) && (o === undefined || inTree.has(o)) && !same(c, to)) {
+                            const step = stepOf(c);
+                            out.push({c, key:[
+                                linkOk(here, from, c, gto) ? 0 : 1,
+                                step <= at && step < steps.length ? step : steps.length + dist(c, latest),
+                                i
+                            ]});
                         }
                     });
-                    if (!best) return null;
-                    put(gid, best);
+                    return out.sort((a, b) => before(a.key, b.key) ? -1 : before(b.key, a.key) ? 1 : 0).map(o => o.c);
+                },
+                // Whether gid may end on c, given where those before it go.
+                fits = (gid, c) => {
+                    const here = posOf(gid),
+                        o = occupant(...c);
+                    if (claimed.has(keyOf(c))) return false;
+                    // No trading cells, but with the lead
+                    if (o !== undefined && o !== gid && o !== lead && after.has(o) && same(after.get(o), here)) return false;
+                    for (const n of linksOf(gid)) {
+                        if (after.has(n)) {
+                            if (!linkOk(here, posOf(n), c, after.get(n))) return false;
+                        } else {
+                            // n can get no nearer than a step: can it still make it?
+                            const d = dist(c, posOf(n)) - 1;
+                            if (d > range && d >= dist(here, posOf(n))) return false;
+                        }
+                    }
+                    return gid !== top || above == null || linkOk(here, posOf(above), c, posOf(above));
+                };
+            if (lead === top && above != null && !linkOk(posOf(lead), posOf(above), to, posOf(above))) return null;
+            
+            let tries = FOLLOW_TRIES;
+            const place = i => {
+                if (i === order.length) return true;
+                const gid = order[i];
+                for (const c of choicesOf(gid)) {
+                    if (tries-- <= 0) return false;
+                    if (fits(gid, c)) {
+                        after.set(gid, c);
+                        claimed.set(keyOf(c), gid);
+                        if (place(i + 1)) return true;
+                        after.delete(gid);
+                        claimed.delete(keyOf(c));
+                    }
                 }
-            }
-            return after;
+                return false;
+            };
+            return place(1) ? after : null;
         },
         
         /*  Whether pieces a and b (ids), next to each other and on the same side, can swap
@@ -220,6 +291,8 @@
             const [ax, ay, bx, by] = [a.x, a.y, b.x, b.y];
             this.motionFx(a, [ax, ay], [bx, by]);
             this.motionFx(b, [bx, by], [ax, ay]);
+            this._leaveCell(a);
+            this._leaveCell(b);
             a.x = bx;
             a.y = by;
             b.x = ax;
@@ -315,20 +388,21 @@
             return done;
         },
         
-        // A piece of yours that can move this turn can jump, except in follow mode. It uses
-        // a move, and the piece can't act again this turn or the next. Enemies can jump too
-        // (see planSquad).
-        jumpTargets: function(p) {
+        // A piece of yours that can move this turn can jump, except in follow mode (unless
+        // anyMode, for Go to and Explore, which jump as a last resort). It uses a move, and
+        // the piece can't act again this turn or the next. Enemies can jump too (see
+        // planSquad).
+        jumpTargets: function(p, anyMode=false) {
             let out = [];
-            if (!this.over && p?.owner === 'player' && this.canMove(p) && this.modeFor(p) !== 'follow') {
+            if (!this.over && p?.owner === 'player' && this.canMove(p) && (anyMode || this.modeFor(p) !== 'follow')) {
                 out = this.jumpCells(this.boardView(), p.id);
             }
             return out;
         },
         canJump: function(p) {return this.jumpTargets(p).length > 0;},
-        playerJump: function(p, x, y) {
+        playerJump: function(p, x, y, anyMode=false) {
             let done = false;
-            if (this.jumpTargets(p).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
+            if (this.jumpTargets(p, anyMode).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
                 this.useMove(p);
                 this.afterPlayerAction();
                 done = true;
@@ -352,6 +426,7 @@
                     return [p.x, p.y];
                 },
                 kidsOf: id => kids.get(id) ?? [],
+                trailOf: id => this.pieces.get(id).trail,
                 parentOf: id => this.parent(this.pieces.get(id))?.id ?? null,
                 occupant: (x, y) => this.board.get(this.key(x, y)),
                 open: (x, y) => this.isOpen(x, y) && !(avoidHarm && this.isHarm(x, y)),
@@ -374,6 +449,14 @@
         // The mode a piece moves in by default: the player's chosen mode, or fixed.
         modeFor: function(piece) {return piece?.owner === 'player' ? this.moveMode : 'fixed';},
         
+        /*  Adds the cell piece g is leaving to its trail, the cells it was on, latest first,
+            as many as the link range (Follow walks them). A jump starts it afresh, since
+            the cells aren't next to each other. A new array, so a copy of the piece
+            (exportToObj) doesn't change with it. @private */
+        _leaveCell: function(g, jump=false) {
+            g.trail = jump ? [] : [[g.x, g.y], ...g.trail].slice(0, this.rules.linkRange);
+        },
+        
         /*  Puts the pieces that move where resolveStep says (or where piece jumps to, with
             jump), to be animated. Returns the pieces moved. */
         applyMoves: function(piece, moves, jump = false) {
@@ -382,6 +465,7 @@
             moves.forEach(([, x, y], i) => {
                 const g = moved[i];
                 this.motionFx(g, [g.x, g.y], [x, y], jump);
+                this._leaveCell(g, jump);
                 g.x = x;
                 g.y = y;
                 this.board.set(this.key(x, y), g.id);
