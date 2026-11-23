@@ -1,6 +1,6 @@
 /*  The game area: a myt view that holds the canvas (see View.js and Render.js), handles
-    the mouse (select, move, attack, drag to pan, scroll to zoom, place, swap and attach
-    modes; clicking the selected piece again opens its menu) */
+    the mouse (select, move, attack, drag to pan, scroll to zoom, place, swap, attach, jump
+    and go to modes; clicking the selected piece again opens its menu) */
 (pkg => {
     'use strict';
     
@@ -52,6 +52,8 @@
             move to the clicked cell (e.g. onto a cell one of its own carried pieces is
             vacating), it moves instead of selecting the piece there. */
         handleClick: function(c, force=false) {
+            // Stops the selected piece going somewhere by itself, and that's all.
+            if (pkg.app.interrupt()) return;
             // With the menu open, a click anywhere on the board just closes it.
             if (V.menuOpen) {
                 V.menuOpen = false;
@@ -70,6 +72,11 @@
                     } else {
                         draw();
                     }
+                    return;
+                }
+                if (V.gotoMode) {
+                    V.gotoMode = false;
+                    pkg.app.goTo(c);
                     return;
                 }
                 if (V.jumpMode) {

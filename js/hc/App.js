@@ -22,7 +22,10 @@
         mapsDialog,
         mapBrief,
         
-        upDownSide = 0; // which side W and X go first, 0: left (Q, Z), 1: right (E, C); see stepUpDown
+        upDownSide = 0, // which side W and X go first, 0: left (Q, Z), 1: right (E, C); see stepUpDown
+        
+        nav = null,     // the selected piece going somewhere by itself (see startNav), or null
+        navNote = '';   // why it last stopped, shown until you next press a key or click
     
     const JSClass = JS.Class,
         
@@ -72,11 +75,13 @@
         
         /*  After the game has been replaced by a saved one. */
         afterLoad = () => {
+            stopNav('');
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.gotoMode = false;
             V.menuOpen = false;
             centerOn(false);
             draw();
@@ -96,6 +101,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.gotoMode = false;
             V.menuOpen = false;
             game.playerWait();
             gameView.afterTurn();
@@ -155,12 +161,105 @@
                         game.playerQuicken();
                         draw();
                     }
-                }
+                },
+                {id:'goto', label:() => i18n('btn-goto'), tip:() => i18n('tip-goto'), enabled:() => !game.over && !!sel(), run:choose('gotoMode')},
+                {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')}
             ];
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken', g:'goto', o:'explore'},
+        
+        // ---- Go to and Explore ----
+        // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
+        // rest of its swarm trails after it (see Navigation.js). After each step the turn
+        // ends, and the next step comes once that turn has played (or after a move's time,
+        // with animation off). It stops on getting there (Go to), when there's no way on,
+        // when one of your pieces is hurt or an enemy comes into view that wasn't in sight
+        // the step before, and when you press a key or click.
+        
+        // The ids of the enemies you can see.
+        enemiesInSight = () => {
+            const sight = game.cellsInSight();
+            return new Set(game.piecesOf('enemy').filter(e => !sight || sight.has(game.key(e.x, e.y))).map(e => e.id));
+        },
+        
+        // Your pieces' HP, by id.
+        playerHp = () => new Map(game.piecesOf('player').map(p => [p.id, p.hp])),
+        
+        /*  Stops going (if it was), saying why: note is an i18n key, or '' for nothing. */
+        stopNav = note => {
+            if (nav) clearTimeout(nav.timer);
+            nav = null;
+            navNote = note ? i18n(note) : '';
+            draw();
+        },
+        
+        /*  Why going on would stop, after a step or a turn (an i18n key, or '' if it goes
+            on): the game's over, one of your pieces was hurt, or an enemy came into view.
+            Remembers what's in sight and the HP for next time. */
+        navStopReason = () => {
+            const enemies = enemiesInSight(),
+                hp = playerHp(),
+                hurt = [...nav.hp].some(([id, was]) => !hp.has(id) || hp.get(id) < was),
+                seen = [...enemies].some(id => !nav.enemies.has(id));
+            nav.enemies = enemies;
+            nav.hp = hp;
+            return game.over ? 'nav-over' : hurt ? 'nav-hurt' : seen ? 'nav-enemy' : '';
+        },
+        
+        /*  The next step: plans the way from where the piece is now, takes a step along it
+            and ends the turn, then waits for that turn to play. */
+        navStep = () => {
+            const p = game.pieces.get(nav.id);
+            let stop;
+            if (!p || game.over) {
+                stop = game.over ? 'nav-over' : 'nav-lost';
+            } else if (!game.canMove(p)) {
+                // It's already acted this turn: on to the next.
+                endTurn();
+                stop = navStopReason();
+            } else {
+                const [tx, ty] = nav.target ?? [],
+                    route = nav.kind === 'goto' ? game.routeTo(p, tx, ty) : game.exploreRoute(p),
+                    next = route?.[0],
+                    move = next && game.findMove(p, next[0], next[1], 'follow'),
+                    turn = game.turn;
+                if (!route) {
+                    stop = nav.kind === 'goto' ? 'nav-no-route' : 'nav-explored';
+                } else if (!move || move.attack) {
+                    stop = 'nav-blocked';
+                } else {
+                    game.playerAct(p, next[0], next[1], 'follow');
+                    gameView.afterTurn();
+                    stop = navStopReason();
+                    if (!stop && nav.kind === 'goto' && p.x === tx && p.y === ty) stop = 'nav-arrived';
+                    if (!stop) {
+                        // The turn may have ended by itself, with nothing else to do.
+                        if (game.turn === turn) endTurn();
+                        stop = navStopReason();
+                    }
+                }
+            }
+            if (stop) {
+                stopNav(stop === 'nav-over' ? '' : stop);
+            } else {
+                const wait = Math.max(game.animationEnd() - performance.now(), pkg.cfg.ANIM.on ? 0 : pkg.cfg.ANIM.MOVE_MS);
+                nav.timer = setTimeout(navStep, wait + 20);
+            }
+        },
+        
+        /*  The selected piece goes: kind 'goto' (to target, [x, y]) or 'explore' (on toward
+            the nearest place you haven't seen, again and again). */
+        startNav = (kind, target) => {
+            const p = game.getSelected();
+            stopNav('');
+            cancelModes();
+            if (p && !game.over) {
+                nav = {kind, target, id:p.id, enemies:enemiesInSight(), hp:playerHp(), timer:null};
+                navStep();
+            }
+        },
         
         // The side of the board each move key goes to, for W and X (see stepUpDown).
         SIDE_OF_KEY = {q:0, z:0, Numpad7:0, Numpad1:0, e:1, c:1, Numpad9:1, Numpad3:1},
@@ -193,6 +292,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.gotoMode = false;
             V.menuOpen = false;
             draw();
         },
@@ -344,6 +444,12 @@
                         status = i18n('status-swap');
                     } else if (V.jumpMode) {
                         status = i18n('status-jump');
+                    } else if (V.gotoMode) {
+                        status = i18n('status-goto');
+                    } else if (nav) {
+                        status = i18n(nav.kind === 'goto' ? 'status-going' : 'status-exploring');
+                    } else if (navNote) {
+                        status = navNote;
                     } else if (V.hover) {
                         // A solid under the pointer: what it is and how tough. A hole, or a heal,
                         // harm or loot tile you know of: what it is.
@@ -541,12 +647,26 @@
             }
         },
         
+        /*  A key or a click: stops the selected piece going somewhere by itself, if it is,
+            and returns true if so (the key or click does nothing else). Clears why it last
+            stopped either way. */
+        interrupt: () => {
+            const going = !!nav;
+            stopNav('');
+            return going;
+        },
+        
+        /*  Go to: the selected piece sets off for cell c. */
+        goTo: c => {startNav('goto', [c.x, c.y]);},
+        
         newGame: () => {
+            stopNav('');
             gameOverShown = false;
             V.placeMode = false;
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.gotoMode = false;
             V.menuOpen = false;
             game.reset();
             centerOn(false);
@@ -685,7 +805,9 @@
                     e.preventDefault();
                     e.stopPropagation();
                 };
-            if (k === 's') {
+            if (this.interrupt()) {
+                handled();
+            } else if (k === 's') {
                 handled();
                 centerOn();
             } else if (!game.over) {
@@ -718,7 +840,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.gotoMode) return;
                 if (k === 'Enter') {
                     // Opens the selected piece's menu, its first item focused.
                     if (game.getSelected()) {

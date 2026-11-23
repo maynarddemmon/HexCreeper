@@ -17,7 +17,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Goals, pkg.EffectTiles],
+        include:[pkg.Movement, pkg.Navigation, pkg.Goals, pkg.EffectTiles],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
@@ -646,9 +646,10 @@
         // Each turn you may make up to moveLimit() moves, each piece moving at most once
         // (unless it's recovered), in any order. Only the piece you choose spends a move;
         // pieces it carries keep theirs.
-        playerAct: function(piece, x, y) {
+        // Your piece acts (moves or attacks): in its movement mode, or the one given.
+        playerAct: function(piece, x, y, mode = this.modeFor(piece)) {
             if (this.over || !piece || piece.owner !== 'player' || !this.canMove(piece)) return false;
-            if (!this.act(piece, x, y)) return false;
+            if (!this.act(piece, x, y, mode)) return false;
             if (this.pieces.has(piece.id)) this.useMove(piece);
             this.afterPlayerAction();
             return true;

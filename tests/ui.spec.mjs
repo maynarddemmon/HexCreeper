@@ -159,7 +159,7 @@ test('Enter opens the selected piece\'s menu; the arrow keys move between its it
     expect(await page.evaluate(() => hc.view.menuOpen)).toBe(true);
     expect(await focused()).toMatch(/^Place/);
     await page.keyboard.press('ArrowUp');     // wraps round to the last item that can be used
-    expect(await focused()).toMatch(/^Quicken/);
+    expect(await focused()).toMatch(/^Explore/);
     await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Place/);
     await page.keyboard.press('Space');       // the focused item's, not the end of the turn
