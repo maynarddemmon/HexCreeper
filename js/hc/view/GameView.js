@@ -97,8 +97,8 @@
                     }
                     return;
                 }
-                // Shift (force): a move in the other mode (see clickMoves), else in yours, even
-                // onto a cell one of your pieces is on.
+                // Shift (force): a move in Free mode (see clickMoves), else in yours, even onto a
+                // cell one of your pieces is on.
                 const sel = game.getSelected(),
                     move = force && sel && V.clickMoves(sel, true).find(m => m.x === c.x && m.y === c.y);
                 if (move && game.playerAct(sel, c.x, c.y, move.mode)) {
@@ -169,15 +169,16 @@
             });
             
             // Shift down or up redraws the moves a click can make (see clickMoves); losing
-            // focus counts as up, as the key up goes elsewhere.
+            // focus counts as up, as the key up goes elsewhere. (Capture phase: myt's global
+            // key handling stops keys from bubbling up to the window.)
             const shiftTo = on => {
                 if (V.shift !== on) {
                     V.shift = on;
                     draw();
                 }
             };
-            window.addEventListener('keydown', e => {if (e.key === 'Shift') shiftTo(true);});
-            window.addEventListener('keyup', e => {if (e.key === 'Shift') shiftTo(false);});
+            window.addEventListener('keydown', e => {if (e.key === 'Shift') shiftTo(true);}, true);
+            window.addEventListener('keyup', e => {if (e.key === 'Shift') shiftTo(false);}, true);
             window.addEventListener('blur', () => shiftTo(false));
             
             canvas.addEventListener('pointerleave', () => {

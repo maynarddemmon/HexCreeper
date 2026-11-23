@@ -3,7 +3,8 @@
     
     - fixed: the piece's whole subtree moves with it, keeping its shape.
     - free: only the piece moves, but any piece linked below it that would then be out of
-      link range is dragged along by the same step (and so on down).
+      link range is dragged along by the same step (and so on down). Not a mode you pick
+      (PLAYER_MOVE_MODES): you get it by Shift-clicking (see View: clickMoves).
     - follow: the piece leads and its whole tree follows (what's below it, and its parent,
       grandparent and so on, with their other branches): each piece stays or moves a
       cell, and a search finds an arrangement that keeps the links in range, if there's
@@ -35,6 +36,7 @@
         };
     
     pkg.MOVE_MODES = ['fixed', 'free', 'follow'];
+    pkg.PLAYER_MOVE_MODES = ['fixed', 'follow']; // those you can set your moves to
     
     // How many cells a Follow step tries for its pieces before giving up (see _follow).
     const FOLLOW_TRIES = 3000;

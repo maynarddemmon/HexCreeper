@@ -206,7 +206,7 @@
             this.movesUsed = o.movesUsed;
             this.recoverUsed = !!o.recoverUsed;
             this.quickenUsed = !!o.quickenUsed;
-            this.moveMode = pkg.MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
+            this.moveMode = pkg.PLAYER_MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             this.rules = rules;

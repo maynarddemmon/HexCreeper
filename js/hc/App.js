@@ -626,7 +626,7 @@
             }]);
             modeBtn = new Btn(ftrView, {text:i18n('btn-mode', i18n('mode-fixed')), fontSize:fontSizeMedium, tooltip:i18n('tip-mode')}, [{
                 doActivated: () => {
-                    const modes = pkg.MOVE_MODES;
+                    const modes = pkg.PLAYER_MOVE_MODES;
                     game.moveMode = modes[(modes.indexOf(game.moveMode) + 1) % modes.length];
                     draw();
                 }

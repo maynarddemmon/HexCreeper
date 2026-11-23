@@ -109,7 +109,7 @@
             swapMode:false, // choosing which piece the selected piece swaps with
             jumpMode:false, // choosing the cell the selected piece jumps to
             gotoMode:false, // choosing the cell the selected piece goes to (see App: Go to)
-            shift:false, // whether Shift is held: a click moves in the other mode (clickMoves)
+            shift:false, // whether Shift is held: a click moves in Free mode (clickMoves)
             rafPending:false,
             css,
             draw,
@@ -117,14 +117,14 @@
             stepPan,
             
             /*  The moves a click can make for piece p: in your mode; or, with Shift held (or
-                shift true), in the other one (Free, or Fixed if you're in Free), and where that
-                can't go, in yours. As legalMoves gives them. */
+                shift true), in Free mode (just it moves), and where that can't go, in yours.
+                As legalMoves gives them. */
             clickMoves: (p, shift=V.shift) => {
                 const game = V.game,
                     mine = game.legalMoves(p);
                 if (!shift) return mine;
-                const other = game.legalMoves(p, game.modeFor(p) === 'free' ? 'fixed' : 'free');
-                return [...other, ...mine.filter(m => !other.some(o => o.x === m.x && o.y === m.y))];
+                const free = game.legalMoves(p, 'free');
+                return [...free, ...mine.filter(m => !free.some(o => o.x === m.x && o.y === m.y))];
             },
             
             /*  Where the camera is headed: the end of the pan under way, or where it is. */

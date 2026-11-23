@@ -210,7 +210,6 @@ test('your moves use the chosen mode; M (or the button) cycles it, and it\'s sav
     await expect(mode).toBeVisible();
     expect(await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 1, -1))).toBe(false);
     await page.keyboard.press('m');
-    await page.keyboard.press('m');
     await expect(button(page, 'Move: Follow')).toBeVisible();
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), done = g.playerAct(core, 1, -1),
@@ -223,13 +222,15 @@ test('your moves use the chosen mode; M (or the button) cycles it, and it\'s sav
     await expect(button(page, 'Move: Fixed')).toBeVisible();
 });
 
-test('a game starts in the moveMode setting\'s mode', async ({page}) => {
+test('a game starts in the moveMode setting\'s mode: Fixed or Follow (Free is for shift-clicking)', async ({page}) => {
     await setUp(page);
-    expect(await page.evaluate(() => {
-        hc.app.game.gameMap = {...hc.app.game.gameMap, rules:{moveMode:'free'}};
-        hc.app.game.reset();
-        return hc.app.game.moveMode;
-    })).toBe('free');
+    expect(await page.evaluate(() => ['follow', 'free'].map(moveMode => {
+        const g = hc.app.game, copy = new hc.Game();
+        g.gameMap = {...g.gameMap, rules:{moveMode}};
+        g.reset();
+        copy.importFromObj({...JSON.parse(JSON.stringify(g.exportToObj())), moveMode});
+        return [g.moveMode, copy.moveMode];
+    }))).toEqual([['follow', 'follow'], ['fixed', 'fixed']]);
 });
 
 test('a squad far off that can\'t get through keeping its shape squeezes through', async ({page}) => {

@@ -5,13 +5,13 @@ Each turn you may move as many pieces as your highest rank, each once, in any or
 
 <span style="font-size:16px;">THE SWARM</span>
 - Every piece you place links to a neighbour, its parent. Arrows point from each piece to its parent.
-- Moving a piece carries everything linked below it, as the movement mode says (M, or Move in the footer). Fixed: all of it moves, keeping its shape. Free: only the piece moves, dragging along any linked piece that would end up out of range. Follow: the piece leads and the whole swarm it's linked to follows in its footsteps, filing through tight places and round obstacles (harm tiles included); only the leader attacks.
+- Moving a piece carries everything linked below it, as the movement mode says (M, or Move in the footer). Fixed: all of it moves, keeping its shape. Follow: the piece leads and the whole swarm it's linked to follows in its footsteps, filing through tight places and round obstacles (harm tiles included); only the leader attacks.
 - A linked piece must stay within 3 steps of its parent.
 - If a piece is destroyed, everything linked below it goes too.
 - Swap (S) swaps the selected piece with one of your pieces next to it; their links stay with them. It uses a move, and both are done for the turn.
 - Jump (J) moves the selected piece two cells, over holes and pieces but not solids, onto an empty cell. Nothing linked to it moves, so its links must stay in range. It uses a move, and the piece can't act this turn or the next. You can't jump in Follow mode. Enemies jump too.
 - Detach (X) breaks the selected piece's link to its parent, however far apart they are; it keeps what's linked below it and moves on its own. Attach (L) links a piece with no parent to one of your pieces next to it. Either uses that piece's move, and changes ranks.
-- Shift-click to move the selected piece in the other mode: Free (just that piece), or Fixed (it and everything below it) if you're in Free; where that can't go, it moves in your mode. Shift-click a cell held by one of your own pieces to move onto it instead of selecting it. Holding Shift shows the moves it would make.
+- Shift-click to move just the selected piece, dragging along any linked piece that would end up out of range; where that can't go, it moves in your mode. Shift-click a cell held by one of your own pieces to move onto it instead of selecting it. Holding Shift shows the moves it would make.
 
 <span style="font-size:16px;">RANK</span>
 A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. Max HP is 2 × rank. Your highest rank sets your moves per turn; your core's rank sets the cost of Heal (5 × rank). Place costs 4, plus 1 for every 2 pieces you have.
