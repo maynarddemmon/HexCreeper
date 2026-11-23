@@ -4,7 +4,7 @@
 		
 		"maxSize":10000,
 		"growth":25,
-		"sprawl":50,
+		"sprawl":10,
 		
 		"cavernSizeMin":20,
 		"cavernSizeMax":400,
@@ -21,6 +21,7 @@
 		"tunnelLassoChance":50,
 		"cavernLoopChance":50,
 		"cavernJoinChance":75,
+		"collapseChance":25,
 		
 		"stalagmiteFrequency":50,
 		"stalactiteFrequency":50,
@@ -34,7 +35,8 @@
 		
 		"rockSolid":"ice_wall",
 		"stalagmiteSolid":"icicle",
-		"stalactiteSolid":"icicle"
+		"stalactiteSolid":"icicle",
+		"rubbleSolid":"ice_boulder"
 	},
 	"spawnGenerator":{"type":"proximity", "initial":0, "pBase":0, "pPerRank":0},
 	"enemyAI":{"type":"squad"}

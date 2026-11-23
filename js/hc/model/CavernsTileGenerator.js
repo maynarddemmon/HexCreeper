@@ -49,6 +49,10 @@
         WOBBLE = [[2, 0.12], [3, 0.1], [5, 0.06]],
         WOBBLE_MAX = WOBBLE.reduce((sum, [, amp]) => sum + amp, 0),
         SPINE_RADIUS = 0.75,     // how near a tunnel's path a cell is kept clear
+        // The least a tunnel's cells reach either side of its path. Every point is within
+        // 1 / sqrt(3) (0.577) of a cell's centre, so no thinner tunnel can have a gap.
+        MIN_REACH = 0.6,
+        MAX_STEP = 0.25,         // the farthest apart the points along a tunnel's path are
         DEAD_END_SCHEMAS = () => ['random', 'adaptive'].map(value => ({value, label:value})),
         
         // Adds the keys of the cells whose centres are within r of world point (px, py).
@@ -88,6 +92,7 @@
                 num('tunnelLassoChance', 25, 0, 100),
                 num('cavernLoopChance', 15, 0, 100),   // % chance a cavern has a tunnel that comes back into it
                 num('cavernJoinChance', 15, 0, 100),   // % chance two caverns with a tunnel between them are joined directly instead
+                num('collapseChance', 0, 0, 100),      // % chance a tunnel is blocked part way along by rubble (rubbleSolid)
                 
                 // Tiles per 1000 open cells: in caverns, off the tunnels' paths...
                 num('stalagmiteFrequency', 30, 0, 100),
@@ -105,7 +110,8 @@
                 table('lootTable', {loot:1}, optionsOf(pkg.loots)),
                 choice('rockSolid', 'cave_rock', optionsOf(pkg.solids)),
                 choice('stalagmiteSolid', 'stalagmite', optionsOf(pkg.solids)),
-                choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids))
+                choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids)),
+                choice('rubbleSolid', 'rubble', optionsOf(pkg.solids))
             ],
             
             // The key of the tunnel between two sites ("i,j" keys), the same either way
@@ -482,10 +488,10 @@
                 this.game.rngFor('cave-join', pkg.CavernsTileGenerator.tunnelKey(a.join(), b.join()))() * 100 < this.attrs.cavernJoinChance;
         },
         
-        // The tunnel with key tk: the keys of its cells, and of the cells along its path
-        // kept clear (its spine). It runs from the centre of one site to the other's,
-        // swinging to the side and varying in width, or straight and wide if they're
-        // joined.
+        // The tunnel with key tk: the keys of its cells, of the cells along its path kept
+        // clear (its spine), and of those blocked by rubble (its plug: see collapseChance),
+        // {cells, spine, plug}. It runs from the centre of one site to the other's, swinging
+        // to the side and varying in width, or straight and wide if they're joined.
         tunnel: function(tk) {
             if (!this.tunnels.has(tk)) {
                 const [a, b] = tk.split('|').map(k => this.site(...k.split(',').map(Number))),
@@ -505,20 +511,43 @@
                     p2 = rng() * TAU,
                     fw = 0.5 + rng() * 1.5,                   // and its width's
                     pw = rng() * TAU,
-                    cells = new Set(),
-                    spine = new Set(),
-                    steps = ceil(length * 4);
-                for (let n = 0; n <= steps; n++) {
-                    const t = n / steps,
+                    // A collapse: where along it (0 to 1), and how long (in world units).
+                    collapse = !joined && rng() * 100 < this.attrs.collapseChance,
+                    collapseAt = 0.3 + rng() * 0.4,
+                    collapseLength = 1.5 + rng() * 1.5,
+                    // Where its path is at t (0 to 1, end to end), and how far either side of
+                    // it its cells reach there.
+                    at = t => {
                         // No swing at the ends, which are the sites' centres.
-                        side = swing * sin(PI * t) * (sin(TAU * f1 * t + p1) + 0.5 * sin(TAU * f2 * t + p2)) / 1.5,
-                        px = a.wx + dx * t + nx * side,
-                        py = a.wy + dy * t + ny * side,
-                        width = joined ? max(w1, 1.4 * Math.min(a.radius, b.radius)) : w0 + (w1 - w0) * (0.5 + 0.5 * sin(TAU * fw * t + pw));
-                    sweep(px, py, max(0.55, width / 2), cells);
-                    sweep(px, py, SPINE_RADIUS, spine);
+                        const side = swing * sin(PI * t) * (sin(TAU * f1 * t + p1) + 0.5 * sin(TAU * f2 * t + p2)) / 1.5,
+                            width = joined ? max(w1, 1.4 * Math.min(a.radius, b.radius)) : w0 + (w1 - w0) * (0.5 + 0.5 * sin(TAU * fw * t + pw));
+                        return {t, x:a.wx + dx * t + nx * side, y:a.wy + dy * t + ny * side, reach:max(MIN_REACH, width / 2)};
+                    },
+                    // The points along it, no more than MAX_STEP apart, with how far along it
+                    // each is (s, in world units).
+                    points = [{...at(0), s:0}];
+                for (let prev = points[0]; prev.t < 1;) {
+                    let dt = Math.min(1 - prev.t, 1 / (length * 4)),
+                        next = at(prev.t + dt);
+                    while (hypot(next.x - prev.x, next.y - prev.y) > MAX_STEP && dt > 1e-6) {
+                        dt /= 2;
+                        next = at(prev.t + dt);
+                    }
+                    if (dt === 1 - prev.t) next = at(1); // exactly the end, so it stops
+                    next.s = prev.s + hypot(next.x - prev.x, next.y - prev.y);
+                    points.push(next);
+                    prev = next;
                 }
-                this.tunnels.set(tk, {cells, spine});
+                const cells = new Set(),
+                    spine = new Set(),
+                    plug = new Set(),
+                    plugAt = (points.find(p => p.t >= collapseAt) ?? points[points.length - 1]).s;
+                for (const p of points) {
+                    sweep(p.x, p.y, p.reach, cells);
+                    sweep(p.x, p.y, SPINE_RADIUS, spine);
+                    if (collapse && Math.abs(p.s - plugAt) <= collapseLength / 2) sweep(p.x, p.y, p.reach, plug);
+                }
+                this.tunnels.set(tk, {cells, spine, plug});
             }
             return this.tunnels.get(tk);
         },
@@ -540,7 +569,7 @@
                         radius = 2 + rng() * 2,
                         cx = s.wx + (s.wx - p.wx) / d * radius,
                         cy = s.wy + (s.wy - p.wy) / d * radius,
-                        r = max(0.55, (w0 + rng() * (w1 - w0)) / 2),
+                        r = max(MIN_REACH, (w0 + rng() * (w1 - w0)) / 2),
                         cells = new Set(),
                         steps = ceil(TAU * radius * 4);
                     for (let n = 0; n < steps; n++) sweep(cx + radius * cos(TAU * n / steps), cy + radius * sin(TAU * n / steps), r, cells);
@@ -568,7 +597,7 @@
                         out = rng() * TAU,
                         back = out + (rng() < 0.5 ? -1 : 1) * (PI / 3 + rng() * PI / 3),
                         reach = (s.radius * (1 + WOBBLE_MAX) + 3 + rng() * 5) * 1.3,
-                        r = max(0.55, (w0 + rng() * (w1 - w0)) / 2),
+                        r = max(MIN_REACH, (w0 + rng() * (w1 - w0)) / 2),
                         [x1, y1] = [s.wx + reach * cos(out), s.wy + reach * sin(out)],
                         [x2, y2] = [s.wx + reach * cos(back), s.wy + reach * sin(back)],
                         cells = new Set(),
@@ -615,15 +644,17 @@
         
         // ---- Making cells ----
         
-        // What cell (x, y) is, given what's near it (see near): {open, cavern, clear}. Open
-        // cells are in a cavern or a tunnel; clear ones (the tunnels' spines, and the start
-        // cell and its neighbours) are kept free of stalagmites, stalactites and holes.
+        // What cell (x, y) is, given what's near it (see near): {open, cavern, clear,
+        // rubble}. Open cells are in a cavern or a tunnel; clear ones (the tunnels' spines,
+        // and the start cell and its neighbours) are kept free of stalagmites, stalactites
+        // and holes; rubble is where a tunnel has collapsed, outside the caverns.
         cellOf: function(x, y, near) {
             const k = x + ',' + y,
                 cavern = near.caverns.some(keys => keys.has(k));
             return {
                 open:cavern || near.tunnels.some(t => t.cells.has(k)),
                 cavern,
+                rubble:!cavern && near.tunnels.some(t => t.plug?.has(k)),
                 clear:hexDist({x, y}, {x:0, y:0}) <= 1 || near.tunnels.some(t => t.spine.has(k))
             };
         },
@@ -666,6 +697,8 @@
             let retval = null;
             if (!c.open) {
                 retval = [TILE_TYPE_SOLID, a.rockSolid];
+            } else if (c.rubble) {
+                retval = [TILE_TYPE_SOLID, a.rubbleSolid];
             } else {
                 if (c.cavern && !c.clear) {
                     // Its own stalagmite or stalactite, or a hole from a clump starting there

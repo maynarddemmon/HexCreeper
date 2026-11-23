@@ -41,6 +41,7 @@
 		"basalt":    {"name":"basalt",     "hardness":8,  "density":10, "description":""},
 		"serpentine":{"name":"serpentine", "hardness":7,  "density":10, "description":""},
 		"calcite":   {"name":"calcite",    "hardness":3,  "density":2.7, "description":"Calcite is the mineral stalagmites and stalactites are made of"},
+		"rubble":    {"name":"rubble",     "hardness":2,  "density":1.6, "description":"Loose broken rock, as from a collapse"},
 		
 		// See-through
 		"glass":  {"name":"glass",   "hardness":3, "density":2.5,  "opacity":10, "description":""},
@@ -78,11 +79,14 @@
 		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
 		"net":             {"name":"Net",              "composition":"rope",      "hp":3,  "coverage":30, "fillColor":"#8a7a5a", "borderColor":"#a8966e"},
 		// Caverns (see js/hc/model/CavernsTileGenerator.js). A stalactite hangs from the
-		// ceiling, so you can see past it more than a stalagmite.
+		// ceiling, so you can see past it more than a stalagmite, and over a pile of rubble
+		// a little.
 		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c"},
 		"stalagmite":      {"name":"Stalagmite",       "composition":"calcite",   "hp":8,  "fillColor":"#9a8f7e", "borderColor":"#b3a894"},
 		"stalactite":      {"name":"Stalactite",       "composition":"calcite",   "hp":6,  "coverage":40, "fillColor":"#a89c88", "borderColor":"#c0b49e"},
+		"rubble":          {"name":"Rubble",           "composition":"rubble",    "hp":6,  "coverage":70, "fillColor":"#7a6f63", "borderColor":"#8f8476"},
 		"icicle":          {"name":"Icicle",           "composition":"ice",       "hp":3,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"},
+		"ice_boulder":     {"name":"Ice Boulder",      "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"}
 	},
 	
 	// Kinds of hole tile: a name, a description and optionally the colour it's filled with

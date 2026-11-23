@@ -159,6 +159,58 @@ test('a cell comes out the same whatever order the blocks are made in', async ({
     expect(await made('out')).toEqual(await made('in'));
 });
 
+// Whether a tunnel's cells, but for those in skip (a set of keys), join the centres of the
+// sites at its ends ([i, j]).
+const tunnelJoins = (a, b, skip = new Set()) => {
+    const T = hc.app.game.tileGenerator,
+        cells = T.tunnel(hc.CavernsTileGenerator.tunnelKey(a.join(), b.join())).cells,
+        [ca, cb] = [a, b].map(q => {
+            const s = T.site(...q);
+            return hc.hex.cellAtWorld(s.wx, s.wy);
+        }),
+        seen = new Set([ca.x + ',' + ca.y]), todo = [[ca.x, ca.y]];
+    for (const [x, y] of todo) {
+        for (const [dx, dy] of hc.hex.dirs) {
+            const k = (x + dx) + ',' + (y + dy);
+            if (cells.has(k) && !skip.has(k) && !seen.has(k)) {
+                seen.add(k);
+                todo.push([x + dx, y + dy]);
+            }
+        }
+    }
+    return seen.has(cb.x + ',' + cb.y);
+};
+
+test('a tunnel is never broken, however thin and tangled', async ({page}) => {
+    await startGame(page);
+    for (const seed of [1, 2, 3]) {
+        await inCaverns(page, {tangle:100, tunnelWidthMin:1, tunnelWidthMax:1, junctionChance:0, cavernJoinChance:0}, seed);
+        expect(await page.evaluate(tunnelJoins => {
+            const T = hc.app.game.tileGenerator, joins = new Function('return ' + tunnelJoins)(),
+                ends = hc.hex.dirs.filter(d => T.hasTunnel([0, 0], d));
+            return ends.length > 0 && ends.every(d => joins([0, 0], d));
+        }, tunnelJoins.toString())).toBe(true);
+    }
+});
+
+test('with collapseChance, rubble blocks tunnels part way along, all the way across', async ({page}) => {
+    await startGame(page);
+    await inCaverns(page, {collapseChance:100, junctionChance:0, cavernJoinChance:0, tunnelWidthMin:2, tunnelWidthMax:4});
+    const r = await page.evaluate(tunnelJoins => {
+        const g = hc.app.game, T = g.tileGenerator, joins = new Function('return ' + tunnelJoins)(),
+            ends = hc.hex.dirs.filter(d => T.hasTunnel([0, 0], d)),
+            plugs = ends.map(d => T.tunnel(hc.CavernsTileGenerator.tunnelKey('0,0', d.join())).plug);
+        window.caves.make(6);
+        const rubble = [...g.tiles.values()].filter(t => t.subtype === 'rubble');
+        return {
+            plugged:ends.length > 0 && plugs.every(p => p.size > 0),
+            across:ends.every((d, n) => joins([0, 0], d) && !joins([0, 0], d, plugs[n])),
+            rubble:rubble.length > 0 && rubble.every(t => !T.cavern(0, 0).has(t.x + ',' + t.y))
+        };
+    }, tunnelJoins.toString());
+    expect(r).toEqual({plugged:true, across:true, rubble:true});
+});
+
 test('without tangle a tunnel runs straight; with it, it winds', async ({page}) => {
     await startGame(page);
     // How far a tunnel's cells get from the straight line between the caverns' centres.
