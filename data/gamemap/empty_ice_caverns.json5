@@ -19,7 +19,7 @@
 		"cavernDeadEndFactor":66,
 		"tunnelDeadEndSchema":"random",
 		"tunnelDeadEndFactor":66,
-		"tunnelLassoChance":50,
+		"deadEndTable":{"simple":1, "lasso":1},
 		"cavernLoopChance":50,
 		"cavernJoinChance":50,
 		"collapseChance":10,

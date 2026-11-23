@@ -10,7 +10,7 @@
     they're all joined, and more tunnels join neighbours at random (loops). A site may be
     a dead end, with no other tunnels (by its kind's dead end schema and factor), but
     only if no other site needs it on its way to the start (see isDeadEnd). A junction that's a dead end
-    is a tunnel ending in rock, which may curl into a ring first (a lasso). A cavern may
+    is a tunnel ending in rock, in one of several ways (deadEndTable). A cavern may
     also have a tunnel that leaves it and comes back (cavernLoopChance), and neighbouring
     caverns may be joined directly (cavernJoinChance) rather than by a tunnel.
     
@@ -55,6 +55,47 @@
         MIN_REACH = 0.6,
         MAX_STEP = 0.25,         // the farthest apart the points along a tunnel's path are
         DEAD_END_SCHEMAS = () => ['random', 'adaptive'].map(value => ({value, label:value})),
+        // How a dead-end tunnel ends (see deadEndShape), and the farthest its shape reaches
+        // from where it ends (world units).
+        DEAD_END_KINDS = () => ['simple', 'lasso', 'fork', 'knot'].map(value => ({value, label:value})),
+        DEAD_END_REACH = 16,
+        
+        // The points of a walk from (x, y), heading off at heading, for length (world
+        // units), turning in two waves as tunnels do (more with tangle, 0 to 1): [[x, y]].
+        wander = (rng, x, y, heading, length, tangle) => {
+            const turn = 0.5 * sqrt(tangle),
+                wave1 = 4 + rng() * 4,
+                wave2 = 2 + rng() * 2,
+                p1 = rng() * TAU,
+                p2 = rng() * TAU,
+                points = [[x, y]];
+            for (let s = 0; s < length; s += MAX_STEP) {
+                heading += turn * MAX_STEP * (sin(TAU * s / wave1 + p1) + 0.6 * sin(TAU * s / wave2 + p2));
+                x += cos(heading) * MAX_STEP;
+                y += sin(heading) * MAX_STEP;
+                points.push([x, y]);
+            }
+            return points;
+        },
+        
+        // The points of a loop through (x, y), going out the way heading points and coming
+        // back: about radius across, its radius wobbling with the angle, more with tangle
+        // (0 to 1). [[x, y]].
+        loop = (rng, x, y, heading, radius, tangle) => {
+            const wobble = WOBBLE.map(([n, amp]) => [n, amp * 2 * tangle * (0.5 + rng() / 2), rng() * TAU]),
+                at = angle => radius * (1 + wobble.reduce((sum, [n, amp, phase]) => sum + amp * cos(n * angle + phase), 0)),
+                // Its centre is ahead, so the point behind it is (x, y).
+                back = heading + PI,
+                cx = x - at(back) * cos(back),
+                cy = y - at(back) * sin(back),
+                steps = ceil(TAU * radius * 1.5 / MAX_STEP),
+                points = [];
+            for (let n = 0; n <= steps; n++) {
+                const angle = back + TAU * n / steps;
+                points.push([cx + at(angle) * cos(angle), cy + at(angle) * sin(angle)]);
+            }
+            return points;
+        },
         
         // Adds the keys of the cells whose centres are within r of world point (px, py).
         sweep = (px, py, r, keys) => {
@@ -85,13 +126,13 @@
                 num('junctionChance', 20, 0, 100),     // % of sites (not the start's) that are junctions, with no cavern
                 
                 // Dead ends: sites with only one tunnel (see wantsDeadEnd). A junction that's
-                // one is a tunnel that ends in rock, curling into a ring first at
-                // tunnelLassoChance (%).
+                // one is a tunnel that ends in rock, in a way from deadEndTable (see
+                // deadEndShape).
                 choice('cavernDeadEndSchema', 'random', DEAD_END_SCHEMAS),
                 num('cavernDeadEndFactor', 33, 0, 100),
                 choice('tunnelDeadEndSchema', 'random', DEAD_END_SCHEMAS),
                 num('tunnelDeadEndFactor', 33, 0, 100),
-                num('tunnelLassoChance', 25, 0, 100),
+                table('deadEndTable', {simple:2, lasso:1, fork:1, knot:1}, DEAD_END_KINDS),
                 num('cavernLoopChance', 15, 0, 100),   // % chance a cavern has a tunnel that comes back into it
                 num('cavernJoinChance', 15, 0, 100),   // % chance two caverns with a tunnel between them are joined directly instead
                 num('collapseChance', 0, 0, 100),      // % chance a tunnel is blocked part way along by rubble (rubbleSolid)
@@ -145,7 +186,7 @@
             this.spacing = max(4, Math.round(ceil((2 * radius + MIN_GAP) / (1 - 2 * JITTER)) * (1 - 0.6 * a.crowding / 100)));
             // How far apart on the lattice a site can be from a block's and still reach it
             // (see near): 2, or more when caverns are big for the spacing.
-            this.siteReach = max(2, ceil((radius + JUNCTION_JITTER * this.spacing + 2 * BLOCK_RADIUS) / (0.866 * this.spacing)));
+            this.siteReach = max(2, ceil((max(radius, DEAD_END_REACH) + JUNCTION_JITTER * this.spacing + 2 * BLOCK_RADIUS) / (0.866 * this.spacing)));
             this.blocks = pkg.makeChunks(BLOCK_RADIUS);
             this.madeBlocks = new Set(); // keys of the blocks whose cells have been made
             
@@ -155,7 +196,7 @@
             this.deadEnds = new Map();    // site key -> whether it's a dead end
             this.caverns = new Map();     // site key -> the keys of its cavern's cells
             this.tunnels = new Map();     // tunnel key -> {cells, spine}: the keys of its cells and of those kept clear
-            this.lassos = new Map();      // site key -> its lasso, or null
+            this.deadEndShapes = new Map(); // site key -> its dead end's shape, or null
             this.cavernLoops = new Map(); // site key -> its cavern loop, or null
             
             // With a maxSize, the network grown so far (see grow).
@@ -224,7 +265,7 @@
         // ---- A network of limited size ----
         // With a maxSize, the caverns are a network grown from the start's: each site
         // added is next to one already in it, joined to it by a tunnel (its parent), until
-        // the network's open cells (its caverns, tunnels, lassos and cavern loops) reach
+        // the network's open cells (its caverns, tunnels, dead ends and cavern loops) reach
         // maxSize (the last site may go over). Sites never added are rock. growth% of
         // maxSize is grown when the game starts, from the seed; the rest as your pieces
         // near the network's edge (see settleNear), so that part depends on where you go.
@@ -276,11 +317,11 @@
         },
         
         // Counts site (i, j)'s open cells in the network's: its cavern, its tunnels, and its
-        // lasso and cavern loop if it has them.
+        // dead end's shape and cavern loop if it has them.
         addCells: function(i, j) {
             const n = this.network,
                 key = i + ',' + j,
-                parts = [this.cavern(i, j), this.lasso(i, j)?.cells, this.cavernLoop(i, j)?.cells];
+                parts = [this.cavern(i, j), this.deadEndShape(i, j)?.cells, this.cavernLoop(i, j)?.cells];
             for (const tk of n.edges) {
                 if (tk.split('|').includes(key)) parts.push(this.tunnel(tk).cells);
             }
@@ -613,36 +654,80 @@
                     sweep(p.x, p.y, SPINE_RADIUS, spine);
                     if (collapse && Math.abs(p.s - plugAt) <= collapseLength / 2) sweep(p.x, p.y, p.reach, plug);
                 }
-                this.tunnels.set(tk, {cells, spine, plug});
+                this.tunnels.set(tk, {cells, spine, plug, path:points});
             }
             return this.tunnels.get(tk);
         },
         
-        // A ring at the end of the dead-end tunnel to junction (i, j), at tunnelLassoChance:
-        // {cells, spine, center, radius} (no spine: it's a dead end), or null.
-        lasso: function(i, j) {
+        // The shape at the end of the dead-end tunnel to junction (i, j), as picked from
+        // deadEndTable: {kind, cells, spine} (no spine: it's a dead end), or null if there's
+        // none ("simple": the tunnel just ends). The tunnel's width and tangle carry on into
+        // it.
+        //   lasso: it carries on into a loop and back, 4 to 10 across (about: the loop
+        //     wanders in and out with tangle), as narrow as tunnelWidthMin.
+        //   fork: 1 to 3 short branches (4 to 9 long, as narrow as tunnelWidthMin), off to
+        //     either side, from up to 6 back along the tunnel, so they're not all at the end.
+        //   knot: 2 or 3 shorter, thinner branches (2 to 5 long) from near the end, most of
+        //     them ending in a small loop (3 to 5 across).
+        deadEndShape: function(i, j) {
             const key = i + ',' + j;
-            let retval = this.lassos.get(key);
+            let retval = this.deadEndShapes.get(key);
             if (retval === undefined) {
-                let lasso = null;
                 const s = this.site(i, j),
-                    rng = this.game.rngFor('cave-lasso', key);
-                if (s.junction && this.isDeadEnd(i, j) && rng() * 100 < this.attrs.tunnelLassoChance) {
-                    // The ring carries on from the tunnel, the way it was going.
-                    const p = this.site(...this.parentOf(i, j)),
-                        {tunnelWidthMin:w0, tunnelWidthMax:w1} = this.attrs,
-                        d = hypot(s.wx - p.wx, s.wy - p.wy),
-                        radius = 2 + rng() * 2,
-                        cx = s.wx + (s.wx - p.wx) / d * radius,
-                        cy = s.wy + (s.wy - p.wy) / d * radius,
-                        r = max(MIN_REACH, (w0 + rng() * (w1 - w0)) / 2),
-                        cells = new Set(),
-                        steps = ceil(TAU * radius * 4);
-                    for (let n = 0; n < steps; n++) sweep(cx + radius * cos(TAU * n / steps), cy + radius * sin(TAU * n / steps), r, cells);
-                    lasso = {cells, spine:new Set(), center:[cx, cy], radius};
+                    rng = this.game.rngFor('cave-dead-end-shape', key);
+                retval = null;
+                if (s.junction && this.isDeadEnd(i, j)) {
+                    const kind = pick(this.attrs.deadEndTable, rng);
+                    if (kind && kind !== 'simple') {
+                        const {tunnelWidthMin:w0, tunnelWidthMax:w1, tangle:t} = this.attrs,
+                            tangle = t / 100,
+                            r = max(MIN_REACH, (w0 + rng() * (w1 - w0)) / 2),
+                            narrow = max(MIN_REACH, w0 / 2),
+                            // The tunnel's path, from its parent to here.
+                            parent = this.parentOf(i, j),
+                            path = [...this.tunnel(pkg.CavernsTileGenerator.tunnelKey(key, parent.join())).path],
+                            cells = new Set(),
+                            draw = (points, reach = r) => points.forEach(([x, y]) => sweep(x, y, reach, cells)),
+                            // Where the path is d back from its end, and which way it goes there.
+                            back = d => {
+                                const end = path[path.length - 1].s,
+                                    n = max(1, path.findIndex(q => q.s >= end - d)),
+                                    q = path[n];
+                                return {x:q.x, y:q.y, heading:atan2(q.y - path[n - 1].y, q.x - path[n - 1].x)};
+                            },
+                            // A branch off from up to most back, length long, as wide as reach
+                            // either side: its points.
+                            branch = (most, length, reach) => {
+                                const from = back(rng() * most),
+                                    side = (rng() < 0.5 ? -1 : 1) * (0.8 + rng() * 0.8),
+                                    points = wander(rng, from.x, from.y, from.heading + side, length, tangle);
+                                draw(points, reach);
+                                return points;
+                            };
+                        if (hypot(path[0].x - s.wx, path[0].y - s.wy) < hypot(path[path.length - 1].x - s.wx, path[path.length - 1].y - s.wy)) {
+                            // It was drawn from here: turn it round, and count from the other end.
+                            const total = path[path.length - 1].s;
+                            path.reverse();
+                            for (let n = 0; n < path.length; n++) path[n] = {...path[n], s:total - path[n].s};
+                        }
+                        const end = back(0);
+                        if (kind === 'lasso') {
+                            draw(loop(rng, end.x, end.y, end.heading, 2 + rng() * 3, tangle), narrow);
+                        } else if (kind === 'fork') {
+                            for (let n = 1 + floor(rng() * 3); n > 0; n--) branch(6, 4 + rng() * 5, narrow);
+                        } else if (kind === 'knot') {
+                            for (let n = 2 + floor(rng() * 2); n > 0; n--) {
+                                const points = branch(3, 2 + rng() * 3, MIN_REACH);
+                                if (rng() < 0.7) {
+                                    const [[px, py], [x, y]] = points.slice(-2);
+                                    draw(loop(rng, x, y, atan2(y - py, x - px), 1.5 + rng(), tangle), MIN_REACH);
+                                }
+                            }
+                        }
+                        retval = {kind, cells, spine:new Set()};
+                    }
                 }
-                retval = lasso;
-                if (this.isSettled(key)) this.lassos.set(key, lasso);
+                if (this.isSettled(key)) this.deadEndShapes.set(key, retval);
             }
             return retval;
         },
@@ -685,7 +770,7 @@
             return retval;
         },
         
-        // The caverns and tunnels (lassos and cavern loops too) that may reach block (bi,
+        // The caverns and tunnels (dead ends' shapes and cavern loops too) that may reach block (bi,
         // bj): {caverns, tunnels}, the keys of their cells (and the tunnels' spines). Sites
         // more than siteReach apart on the lattice are too far for theirs to.
         near: function(bi, bj) {
@@ -703,7 +788,7 @@
                 caverns:sites.map(q => this.cavern(...q)),
                 tunnels:[
                     ...[...tunnelKeys].map(tk => this.tunnel(tk)),
-                    ...sites.flatMap(q => [this.lasso(...q), this.cavernLoop(...q)]).filter(Boolean)
+                    ...sites.flatMap(q => [this.deadEndShape(...q), this.cavernLoop(...q)]).filter(Boolean)
                 ]
             };
         },

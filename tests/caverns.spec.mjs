@@ -103,24 +103,74 @@ test('with a dead end factor of 0 there are no dead ends', async ({page}) => {
     }
 });
 
-test('junctions have no cavern; a dead-end tunnel can curl into a ring', async ({page}) => {
+test('junctions have no cavern', async ({page}) => {
     await startGame(page);
-    await inCaverns(page, {junctionChance:100, tunnelDeadEndFactor:60, tunnelLassoChance:100});
-    const r = await page.evaluate(() => {
-        const T = hc.app.game.tileGenerator, sites = hc.hex.disk(0, 0, 3),
-            lassos = sites.map(s => T.lasso(s.x, s.y)).filter(Boolean),
-            // A lasso's cells go all the way round its centre, and not over it.
-            ring = l => [0, 1, 2, 3, 4, 5, 6, 7].every(n => {
-                const c = hc.hex.cellAtWorld(l.center[0] + l.radius * Math.cos(n * Math.PI / 4), l.center[1] + l.radius * Math.sin(n * Math.PI / 4));
-                return l.cells.has(c.x + ',' + c.y);
-            }) && !l.cells.has(Object.values(hc.hex.cellAtWorld(...l.center)).join());
-        return {
-            start:T.cavern(0, 0).size > 0,
-            others:sites.filter(s => s.x || s.y).every(s => T.cavern(s.x, s.y).size === 0),
-            lassos:lassos.length > 0 && lassos.every(ring)
-        };
-    });
-    expect(r).toEqual({start:true, others:true, lassos:true});
+    await inCaverns(page, {junctionChance:100});
+    expect(await page.evaluate(() => {
+        const T = hc.app.game.tileGenerator;
+        return [T.cavern(0, 0).size > 0, hc.hex.disk(0, 0, 3).filter(s => s.x || s.y).every(s => T.cavern(s.x, s.y).size === 0)];
+    })).toEqual([true, true]);
+});
+
+test('a dead-end tunnel ends in a way picked from deadEndTable, joined on to the tunnel', async ({page}) => {
+    await startGame(page);
+    const shapes = async table => {
+        await inCaverns(page, {junctionChance:100, tunnelDeadEndFactor:60, deadEndTable:table});
+        return page.evaluate(() => {
+            const T = hc.app.game.tileGenerator,
+                ends = hc.hex.disk(0, 0, 4).filter(s => T.isDeadEnd(s.x, s.y));
+            return ends.map(s => {
+                const shape = T.deadEndShape(s.x, s.y);
+                if (!shape) return null;
+                const tunnel = T.tunnel(hc.CavernsTileGenerator.tunnelKey(s.x + ',' + s.y, T.parentOf(s.x, s.y).join())).cells,
+                    open = new Set([...tunnel, ...shape.cells]),
+                    // Walk from the tunnel over it and the shape: all of the shape is reached.
+                    seen = new Set(tunnel), todo = [...tunnel];
+                for (const k of todo) {
+                    const [x, y] = k.split(',').map(Number);
+                    for (const [dx, dy] of hc.hex.dirs) {
+                        const n = (x + dx) + ',' + (y + dy);
+                        if (open.has(n) && !seen.has(n)) {
+                            seen.add(n);
+                            todo.push(n);
+                        }
+                    }
+                }
+                // Whether it goes round some rock: a cell near it, not in it, that can't be
+                // reached from outside without crossing it.
+                const keys = [...shape.cells].map(k => k.split(',').map(Number)),
+                    cx = Math.round(keys.reduce((sum, [x]) => sum + x, 0) / keys.length),
+                    cy = Math.round(keys.reduce((sum, [, y]) => sum + y, 0) / keys.length),
+                    area = new Set(hc.hex.disk(cx, cy, 14).map(q => q.x + ',' + q.y)),
+                    start = [...area].find(k => {
+                        const [x, y] = k.split(',').map(Number);
+                        return hc.hexDist({x, y}, {x:cx, y:cy}) === 14;
+                    }),
+                    outside = new Set([start]), out = [start];
+                for (const k of out) {
+                    const [x, y] = k.split(',').map(Number);
+                    for (const [dx, dy] of hc.hex.dirs) {
+                        const n = (x + dx) + ',' + (y + dy);
+                        if (area.has(n) && !shape.cells.has(n) && !outside.has(n)) {
+                            outside.add(n);
+                            out.push(n);
+                        }
+                    }
+                }
+                return {kind:shape.kind, joined:[...shape.cells].every(k => seen.has(k)), ring:outside.size + shape.cells.size < area.size};
+            });
+        });
+    };
+    const simple = await shapes({simple:1});
+    expect(simple.length).toBeGreaterThan(2);
+    expect(simple.every(s => s === null)).toBe(true);
+    for (const kind of ['lasso', 'fork', 'knot']) {
+        const made = await shapes({[kind]:1});
+        expect(made.length).toBeGreaterThan(2);
+        expect(made.every(s => s.kind === kind && s.joined)).toBe(true);
+        if (kind === 'lasso') expect(made.every(s => s.ring)).toBe(true); // a loop round some rock
+        if (kind === 'knot') expect(made.some(s => s.ring)).toBe(true);
+    }
 });
 
 test('a cavern loop leaves its cavern and comes back', async ({page}) => {
@@ -189,11 +239,13 @@ test('crowding packs caverns closer, until they overlap; what can reach a block 
         });
     };
     const apart = await packed({junctionChance:0, cavernJoinChance:0}),
-        close = await packed({junctionChance:0, cavernJoinChance:0, crowding:100, tangle:100, cavernLoopChance:100});
+        close = await packed({junctionChance:0, cavernJoinChance:0, crowding:100, tangle:100, cavernLoopChance:100}),
+        knotted = await packed({junctionChance:70, tunnelDeadEndFactor:70, deadEndTable:{lasso:1, fork:1, knot:1}, crowding:100, tangle:100});
     expect(apart).toMatchObject({overlaps:0, same:true});
     expect(close.spacing).toBeLessThan(apart.spacing);
     expect(close.overlaps).toBeGreaterThan(5);
     expect(close.same).toBe(true);
+    expect(knotted.same).toBe(true);
 });
 
 test('a cell comes out the same whatever order the blocks are made in', async ({page}) => {
