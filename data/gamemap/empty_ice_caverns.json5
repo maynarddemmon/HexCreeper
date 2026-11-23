@@ -2,6 +2,10 @@
 	"tileGenerator":{
 		"type":"caverns",
 		
+		"maxSize":10000,
+		"growth":25,
+		"sprawl":50,
+		
 		"cavernSizeMin":20,
 		"cavernSizeMax":400,
 		"tunnelWidthMin":1,

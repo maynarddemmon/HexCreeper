@@ -252,3 +252,83 @@ test('the Caverns map plays in caverns, and a saved game in it carries on the sa
     })));
     expect(r).toEqual(['caverns', true, true]);
 });
+
+test('with a maxSize, the network is grown from the seed to that many open cells, and the rest is rock', async ({page}) => {
+    await startGame(page);
+    const grown = async () => {
+        await inCaverns(page, {maxSize:3000, cavernDeadEndFactor:100, tunnelDeadEndFactor:100, stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0});
+        return page.evaluate(() => {
+            const g = hc.app.game, T = g.tileGenerator, n = T.network;
+            window.caves.make(12);
+            // Walk from the start; the sites in the network can be reached.
+            const seen = new Set(['0,0']), todo = [[0, 0]];
+            for (const [x, y] of todo) {
+                for (const [dx, dy] of hc.hex.dirs) {
+                    const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
+                    if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || g.isEffectTile(t))) {
+                        seen.add(k);
+                        todo.push([x + dx, y + dy]);
+                    }
+                }
+            }
+            // (Those within 2 of the start's on the lattice, whose cells have all been made.)
+            const near = n.order.map(key => key.split(',').map(Number)).filter(([i, j]) => hc.hexDist({x:i, y:j}, {x:0, y:0}) <= 2),
+                reached = near.length > 3 && near.every(([i, j]) => {
+                    const s = T.site(i, j), c = hc.hex.cellAtWorld(s.wx, s.wy);
+                    return seen.has(c.x + ',' + c.y);
+                }),
+                outside = hc.hex.disk(0, 0, 3).filter(q => !n.sites.has(q.x + ',' + q.y));
+            return {
+                order:n.order.join(' '),
+                size:n.cells.size >= 3000 && n.cells.size < 3000 + 1500,
+                reached,
+                walked:seen.size <= n.cells.size,
+                outside:outside.length > 0 && outside.every(q => T.cavern(q.x, q.y).size === 0)
+            };
+        });
+    };
+    const a = await grown(), b = await grown();
+    expect(a).toEqual(b); // the same seed grows the same network
+    expect(a).toMatchObject({size:true, reached:true, walked:true, outside:true});
+});
+
+test('sprawl makes the network reach farther; without a maxSize there\'s no network', async ({page}) => {
+    await startGame(page);
+    const farthest = async (sprawl, seed) => {
+        await inCaverns(page, {maxSize:4000, sprawl}, seed);
+        return page.evaluate(() => Math.max(...hc.app.game.tileGenerator.network.order.map(k => {
+            const [i, j] = k.split(',').map(Number);
+            return hc.hexDist({x:i, y:j}, {x:0, y:0});
+        })));
+    };
+    let blob = 0, sprawled = 0;
+    for (const seed of [1, 2, 3, 4]) {
+        blob += await farthest(0, seed);
+        sprawled += await farthest(100, seed);
+    }
+    expect(sprawled).toBeGreaterThan(blob);
+    await inCaverns(page, {maxSize:0, growth:50});
+    expect(await page.evaluate(() => hc.app.game.tileGenerator.network)).toBeNull();
+});
+
+test('growth is how much is grown at the start; the rest grows as you explore, and a save carries on the same', async ({page}) => {
+    await startGame(page);
+    await inCaverns(page, {maxSize:4000, growth:50});
+    expect(await page.evaluate(() => hc.app.game.tileGenerator.network.cells.size >= 2000)).toBe(true);
+    // Without growth, only what's near the start is grown at first (here, not all of it).
+    await inCaverns(page, {maxSize:20000, growth:0});
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, T = g.tileGenerator, n = T.network,
+            atStart = n.cells.size,
+            data = JSON.parse(JSON.stringify(g.exportToObj())),
+            more = () => {
+                for (const b of hc.hex.disk(0, 0, 10)) g.tileGenerator.makeBlock(b.x, b.y);
+                return [...g.tiles.values()].map(t => JSON.stringify(t)).sort().join();
+            },
+            explored = more(),
+            size = n.cells.size;
+        g.importFromObj(data);
+        return {atStart:atStart < 20000, grew:size > atStart, capped:size < 20000 + 1500, same:more() === explored};
+    });
+    expect(r).toEqual({atStart:true, grew:true, capped:true, same:true});
+});

@@ -64,11 +64,17 @@
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
             ATTRS:[
-                num('cavernSizeMin', 60, 20, 600),     // a cavern's area, in cells
-                num('cavernSizeMax', 200, 20, 600),
-                num('tunnelWidthMin', 2, 1, 6),        // a tunnel's width, in cells
-                num('tunnelWidthMax', 3, 1, 8),
+                // A network of limited size (see grow): open cells, or 0 for no limit.
+                num('maxSize', 0, 0, 50000),           // The maximum number of non-solid cells in the map.
+                num('growth', 100, 0, 100),            // % of maxSize grown when the game starts; the rest as you explore
+                num('sprawl', 0, 0, 100),              // % chance it grows from its newest site (0: a round blob; 100: long and branching)
+                
+                num('cavernSizeMin', 60, 20, 600),     // a cavern's minimum area, in cells
+                num('cavernSizeMax', 200, 20, 600),    // a cavern's maximum area, in cells
+                num('tunnelWidthMin', 2, 1, 6),        // a tunnel's minimum width, in cells
+                num('tunnelWidthMax', 3, 1, 8),        // a tunnel's maximum width, in cells
                 num('tangle', 40, 0, 100),             // how much tunnels wind (0: straight)
+                
                 num('loops', 30, 0, 100),              // % chance two neighbouring sites get another tunnel
                 num('junctionChance', 20, 0, 100),     // % of sites (not the start's) that are junctions, with no cavern
                 
@@ -139,17 +145,57 @@
             this.tunnels = new Map();     // tunnel key -> {cells, spine}: the keys of its cells and of those kept clear
             this.lassos = new Map();      // site key -> its lasso, or null
             this.cavernLoops = new Map(); // site key -> its cavern loop, or null
+            
+            // With a maxSize, the network grown so far (see grow).
+            this.network = a.maxSize > 0 ? {
+                sites:new Map(),   // site key -> {parent:[i, j] or null, deadEnd}
+                order:[],          // their keys, in the order they were added
+                excluded:new Set(), // keys of the sites that will never be in it
+                edges:new Set(),   // its tunnels' keys
+                cells:new Set()    // the keys of its open cells
+            } : null;
         },
         
         // Methods /////////////////////////////////////////////////////////////
-        start: function() {this.piecesMoved();},
+        start: function() {
+            const n = this.network;
+            if (n) {
+                this.addSite(0, 0, null);
+                this.grow(this.attrs.maxSize * this.attrs.growth / 100, this.game.rngFor('cave-grow', 'start'));
+            }
+            this.piecesMoved();
+        },
         
         exportState: function() {
-            return {madeBlocks:[...this.madeBlocks]};
+            const n = this.network;
+            return {
+                madeBlocks:[...this.madeBlocks],
+                network:n ? {
+                    sites:n.order.map(key => {
+                        const s = n.sites.get(key);
+                        return [key, s.parent?.join() ?? null, s.deadEnd];
+                    }),
+                    excluded:[...n.excluded],
+                    edges:[...n.edges]
+                } : null
+            };
         },
         importState: function(state) {
-            if (!Array.isArray(state?.madeBlocks)) throw new Error('Malformed tile generator state');
+            const n = this.network,
+                saved = state?.network;
+            if (!Array.isArray(state?.madeBlocks) || (n && !(Array.isArray(saved?.sites) && Array.isArray(saved.excluded) && Array.isArray(saved.edges)))) {
+                throw new Error('Malformed tile generator state');
+            }
             this.madeBlocks = new Set(state.madeBlocks);
+            if (n) {
+                for (const [key, parent, deadEnd] of saved.sites) {
+                    n.sites.set(key, {parent:parent === null ? null : parent.split(',').map(Number), deadEnd:!!deadEnd});
+                    n.order.push(key);
+                }
+                saved.excluded.forEach(key => n.excluded.add(key));
+                saved.edges.forEach(tk => n.edges.add(tk));
+                for (const key of n.order) this.addCells(...key.split(',').map(Number));
+            }
         },
         
         // Makes the blocks within reach of your pieces: every cell they could see.
@@ -160,6 +206,113 @@
             for (const p of this.game.piecesOf('player')) {
                 const [bi, bj] = this.blocks.of(p.x, p.y);
                 for (const b of hex.disk(bi, bj, reach)) this.makeBlock(b.x, b.y);
+            }
+        },
+        
+        // ---- A network of limited size ----
+        // With a maxSize, the caverns are a network grown from the start's: each site
+        // added is next to one already in it, joined to it by a tunnel (its parent), until
+        // the network's open cells (its caverns, tunnels, lassos and cavern loops) reach
+        // maxSize (the last site may go over). Sites never added are rock. growth% of
+        // maxSize is grown when the game starts, from the seed; the rest as your pieces
+        // near the network's edge (see settleNear), so that part depends on where you go.
+        // A site that would be a dead end (see wantsDeadEnd) is one if some other site can
+        // still grow, and then nothing grows from it.
+        
+        // Whether site key is in the network, or never will be (always, without a maxSize).
+        isSettled: function(key) {
+            const n = this.network;
+            return !n || n.sites.has(key) || n.excluded.has(key);
+        },
+        
+        // Whether site (i, j) is in the network, or there's no maxSize.
+        inNetwork: function(i, j) {
+            return !this.network || this.network.sites.has(i + ',' + j);
+        },
+        
+        // The neighbours [i, j] of site (i, j) in the network that could still be added
+        // from it (not settled, and in within, a set of keys, if given), or none if it's a
+        // dead end or not in it.
+        growable: function(i, j, within) {
+            const s = this.network.sites.get(i + ',' + j);
+            return s && !s.deadEnd ? hex.dirs.map(([di, dj]) => [i + di, j + dj])
+                .filter(q => !this.isSettled(q.join()) && (!within || within.has(q.join()))) : [];
+        },
+        
+        // Adds site (i, j) to the network, with a tunnel to its parent ([i, j], or null
+        // for the start's), and tunnels to its other neighbours in it at loops%.
+        addSite: function(i, j, parent) {
+            const n = this.network,
+                key = i + ',' + j,
+                CTG = pkg.CavernsTileGenerator;
+            n.sites.set(key, {parent, deadEnd:false});
+            n.order.push(key);
+            if (parent) {
+                n.edges.add(CTG.tunnelKey(key, parent.join()));
+                n.sites.get(key).deadEnd = this.wantsDeadEnd(i, j) && n.order.some(k => k !== key && this.growable(...k.split(',').map(Number)).length > 0);
+                if (!n.sites.get(key).deadEnd) {
+                    for (const [di, dj] of hex.dirs) {
+                        const nk = (i + di) + ',' + (j + dj),
+                            tk = CTG.tunnelKey(key, nk);
+                        if (nk !== parent.join() && n.sites.has(nk) && !n.sites.get(nk).deadEnd && this.game.rngFor('cave-loop', tk)() * 100 < this.attrs.loops) {
+                            n.edges.add(tk);
+                        }
+                    }
+                }
+            }
+            this.addCells(i, j);
+        },
+        
+        // Counts site (i, j)'s open cells in the network's: its cavern, its tunnels, and its
+        // lasso and cavern loop if it has them.
+        addCells: function(i, j) {
+            const n = this.network,
+                key = i + ',' + j,
+                parts = [this.cavern(i, j), this.lasso(i, j)?.cells, this.cavernLoop(i, j)?.cells];
+            for (const tk of n.edges) {
+                if (tk.split('|').includes(key)) parts.push(this.tunnel(tk).cells);
+            }
+            for (const keys of parts) keys?.forEach(k => n.cells.add(k));
+        },
+        
+        // Grows the network until its open cells reach budget or nothing can be added,
+        // from sites in within (a set of keys) if given. rng picks: at sprawl%, a site
+        // next to the newest site that can grow; otherwise any site next to one that can.
+        grow: function(budget, rng, within) {
+            const n = this.network;
+            let done = false;
+            while (!done && n.cells.size < budget) {
+                const options = n.order.map(key => {
+                        const [i, j] = key.split(',').map(Number);
+                        return {from:[i, j], to:this.growable(i, j, within)};
+                    }).filter(o => o.to.length),
+                    pairs = options.flatMap(o => o.to.map(to => [o.from, to]));
+                if (pairs.length) {
+                    let pair;
+                    if (rng() * 100 < this.attrs.sprawl) {
+                        const newest = options[options.length - 1];
+                        pair = [newest.from, newest.to[floor(rng() * newest.to.length)]];
+                    } else {
+                        pair = pairs[floor(rng() * pairs.length)];
+                    }
+                    this.addSite(...pair[1], pair[0]);
+                } else {
+                    done = true;
+                }
+            }
+        },
+        
+        // Before block (bi, bj)'s cells are made: grows the network into the sites that may
+        // reach it (see near), as far as maxSize allows, and settles the rest as rock.
+        settleNear: function(bi, bj) {
+            const n = this.network,
+                c = this.blocks.center(bi, bj),
+                keys = new Set(hex.disk(...this.siteOf(c.x, c.y), 2).map(q => q.x + ',' + q.y));
+            if ([...keys].some(key => !this.isSettled(key))) {
+                this.grow(this.attrs.maxSize, this.game.rngFor('cave-grow', String(n.order.length)), keys);
+                for (const key of keys) {
+                    if (!this.isSettled(key)) n.excluded.add(key);
+                }
             }
         },
         
@@ -200,20 +353,26 @@
         
         // Site (i, j): its base (see siteBase), with a cavern moved toward the caverns it's
         // joined to (by half the gap to each, all of it to the start's, which doesn't move).
+        // In a network of limited size, a cavern is only joined to its parent, which is in
+        // place before it's added, and moves all the way to it.
         site: function(i, j) {
             const key = i + ',' + j;
-            if (!this.sites.has(key)) {
-                const b = this.siteBase(i, j);
+            let retval = this.sites.get(key);
+            if (!retval) {
+                const b = this.siteBase(i, j),
+                    parent = this.network ? this.parentOf(i, j) : null;
                 let mx = 0,
                     my = 0;
                 if (!b.junction && (i !== 0 || j !== 0)) {
-                    for (const [di, dj] of hex.dirs) {
+                    // (In a network, only its parent.)
+                    for (const [di, dj] of parent ? [[parent[0] - i, parent[1] - j]] : this.network ? [] : hex.dirs) {
                         if (this.isJoined([i, j], [i + di, j + dj])) {
-                            const p = this.siteBase(i + di, j + dj),
+                            const toParent = parent?.[0] === i + di && parent[1] === j + dj,
+                                p = toParent ? this.site(i + di, j + dj) : this.siteBase(i + di, j + dj),
                                 dx = p.wx - b.wx,
                                 dy = p.wy - b.wy,
                                 d = hypot(dx, dy),
-                                move = max(0, d - b.radius - p.radius) / (p.i === 0 && p.j === 0 ? 1 : 2);
+                                move = max(0, d - b.radius - p.radius) / (toParent || p.i === 0 && p.j === 0 ? 1 : 2);
                             mx += dx / d * move;
                             my += dy / d * move;
                         }
@@ -225,17 +384,20 @@
                         my *= most / m;
                     }
                 }
-                this.sites.set(key, {...b, wx:b.wx + mx, wy:b.wy + my});
+                retval = {...b, wx:b.wx + mx, wy:b.wy + my};
+                if (this.isSettled(key)) this.sites.set(key, retval);
             }
-            return this.sites.get(key);
+            return retval;
         },
         
-        // The keys of the cells in site (i, j)'s cavern (none for a junction).
+        // The keys of the cells in site (i, j)'s cavern (none for a junction, or a site not
+        // in the network).
         cavern: function(i, j) {
             const s = this.site(i, j);
-            if (!this.caverns.has(s.key)) {
+            let retval = this.caverns.get(s.key);
+            if (!retval) {
                 const keys = new Set();
-                if (!s.junction) {
+                if (!s.junction && this.inNetwork(i, j)) {
                     const c = hex.cellAtWorld(s.wx, s.wy);
                     for (const q of hex.disk(c.x, c.y, ceil(s.radius * (1 + WOBBLE_MAX)) + 1)) {
                         const [wx, wy] = hex.center(q.x, q.y),
@@ -246,9 +408,10 @@
                         if (hypot(dx, dy) <= r) keys.add(q.x + ',' + q.y);
                     }
                 }
-                this.caverns.set(s.key, keys);
+                retval = keys;
+                if (this.isSettled(s.key)) this.caverns.set(s.key, keys);
             }
-            return this.caverns.get(s.key);
+            return retval;
         },
         
         // A dead end's roll for site (i, j), 0 to 100 (the start's is 100: it's never one).
@@ -277,6 +440,7 @@
         // parentOf). Every site still has a parent, so a dead end never cuts anything off.
         isDeadEnd: function(i, j) {
             const key = i + ',' + j;
+            if (this.network) return this.network.sites.get(key)?.deadEnd ?? false;
             if (!this.deadEnds.has(key)) {
                 this.deadEnds.set(key, this.wantsDeadEnd(i, j) && pkg.CavernsTileGenerator.fartherOf(i, j).every(n => {
                     const p = this.parentOf(...n);
@@ -290,6 +454,7 @@
         // start, or null for the start's: one of its neighbours nearer the start, at random,
         // but one that wouldn't be a dead end if there is one.
         parentOf: function(i, j) {
+            if (this.network) return this.network.sites.get(i + ',' + j)?.parent ?? null;
             if (i === 0 && j === 0) return null;
             const nearer = pkg.CavernsTileGenerator.nearerOf(i, j),
                 open = nearer.filter(n => !this.wantsDeadEnd(...n)),
@@ -302,6 +467,7 @@
         hasTunnel: function(a, b) {
             const same = (p, q) => p !== null && p[0] === q[0] && p[1] === q[1],
                 tk = pkg.CavernsTileGenerator.tunnelKey(a.join(), b.join());
+            if (this.network) return this.network.edges.has(tk);
             return same(this.parentOf(...a), b) || same(this.parentOf(...b), a) ||
                 !this.isDeadEnd(...a) && !this.isDeadEnd(...b) && this.game.rngFor('cave-loop', tk)() * 100 < this.attrs.loops;
         },
@@ -310,7 +476,9 @@
         // rather than by a winding tunnel: they're moved toward each other (see site), and
         // the tunnel between them is straight and as wide as most of the smaller one.
         isJoined: function(a, b) {
+            const parentOf = (p, q) => this.parentOf(...p)?.join() === q.join();
             return !this.siteBase(...a).junction && !this.siteBase(...b).junction && this.hasTunnel(a, b) &&
+                (!this.network || parentOf(a, b) || parentOf(b, a)) &&
                 this.game.rngFor('cave-join', pkg.CavernsTileGenerator.tunnelKey(a.join(), b.join()))() * 100 < this.attrs.cavernJoinChance;
         },
         
@@ -359,7 +527,8 @@
         // {cells, spine, center, radius} (no spine: it's a dead end), or null.
         lasso: function(i, j) {
             const key = i + ',' + j;
-            if (!this.lassos.has(key)) {
+            let retval = this.lassos.get(key);
+            if (retval === undefined) {
                 let lasso = null;
                 const s = this.site(i, j),
                     rng = this.game.rngFor('cave-lasso', key);
@@ -377,20 +546,22 @@
                     for (let n = 0; n < steps; n++) sweep(cx + radius * cos(TAU * n / steps), cy + radius * sin(TAU * n / steps), r, cells);
                     lasso = {cells, spine:new Set(), center:[cx, cy], radius};
                 }
-                this.lassos.set(key, lasso);
+                retval = lasso;
+                if (this.isSettled(key)) this.lassos.set(key, lasso);
             }
-            return this.lassos.get(key);
+            return retval;
         },
         
         // A tunnel out of cavern (i, j) that comes back into it elsewhere, at
         // cavernLoopChance: {cells, spine} (no spine: it's an extra), or null.
         cavernLoop: function(i, j) {
             const key = i + ',' + j;
-            if (!this.cavernLoops.has(key)) {
+            let retval = this.cavernLoops.get(key);
+            if (retval === undefined) {
                 let loop = null;
                 const s = this.site(i, j),
                     rng = this.game.rngFor('cave-cavern-loop', key);
-                if (!s.junction && rng() * 100 < this.attrs.cavernLoopChance) {
+                if (!s.junction && this.inNetwork(i, j) && rng() * 100 < this.attrs.cavernLoopChance) {
                     // A curve from the centre, out past the edge one way and back in another
                     // 60 to 120 degrees round.
                     const {tunnelWidthMin:w0, tunnelWidthMax:w1} = this.attrs,
@@ -413,9 +584,10 @@
                     }
                     loop = {cells, spine:new Set()};
                 }
-                this.cavernLoops.set(key, loop);
+                retval = loop;
+                if (this.isSettled(key)) this.cavernLoops.set(key, loop);
             }
-            return this.cavernLoops.get(key);
+            return retval;
         },
         
         // The caverns and tunnels (lassos and cavern loops too) that may reach block (bi,
@@ -530,6 +702,7 @@
             const bk = bi + ',' + bj;
             if (!this.madeBlocks.has(bk)) {
                 this.madeBlocks.add(bk);
+                if (this.network) this.settleNear(bi, bj);
                 const game = this.game,
                     near = this.near(bi, bj);
                 for (const {x, y} of this.blocks.cells(bi, bj)) {
