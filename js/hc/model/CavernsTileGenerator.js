@@ -44,6 +44,7 @@
         JITTER = 0.12,           // how far a site moves, as a fraction of the spacing
         JUNCTION_JITTER = 0.3,   // a junction's (it has no cavern to keep apart)
         JOIN_SHIFT = 0.3,        // the most a cavern moves toward those it's joined to
+        JOIN_GAP = 2,            // the most rock left between two caverns for them to be joined
         MIN_GAP = 4,             // the least rock between two caverns, before tunnels
         // A cavern's radius wobbles with the angle: harmonics [n, the most amplitude].
         WOBBLE = [[2, 0.12], [3, 0.1], [5, 0.06]],
@@ -73,10 +74,10 @@
                 num('growth', 100, 0, 100),            // % of maxSize grown when the game starts; the rest as you explore
                 num('sprawl', 0, 0, 100),              // % chance it grows from its newest site (0: a round blob; 100: long and branching)
                 
-                num('cavernSizeMin', 60, 20, 600),     // a cavern's minimum area, in cells
-                num('cavernSizeMax', 200, 20, 600),    // a cavern's maximum area, in cells
+                num('cavernSizeMin', 60, 20, 2000),     // a cavern's minimum area, in cells
+                num('cavernSizeMax', 200, 20, 2000),    // a cavern's maximum area, in cells
                 num('tunnelWidthMin', 2, 1, 6),        // a tunnel's minimum width, in cells
-                num('tunnelWidthMax', 3, 1, 8),        // a tunnel's maximum width, in cells
+                num('tunnelWidthMax', 3, 1, 9),        // a tunnel's maximum width, in cells
                 num('tangle', 40, 0, 100),             // how much tunnels wind (0: straight)
                 
                 num('loops', 30, 0, 100),              // % chance two neighbouring sites get another tunnel
@@ -372,7 +373,7 @@
                 if (!b.junction && (i !== 0 || j !== 0)) {
                     // (In a network, only its parent.)
                     for (const [di, dj] of parent ? [[parent[0] - i, parent[1] - j]] : this.network ? [] : hex.dirs) {
-                        if (this.isJoined([i, j], [i + di, j + dj])) {
+                        if (this.canJoin([i, j], [i + di, j + dj])) {
                             const toParent = parent?.[0] === i + di && parent[1] === j + dj,
                                 p = toParent ? this.site(i + di, j + dj) : this.siteBase(i + di, j + dj),
                                 dx = p.wx - b.wx,
@@ -479,69 +480,129 @@
         },
         
         // Whether neighbouring sites a and b are caverns joined directly (cavernJoinChance)
-        // rather than by a winding tunnel: they're moved toward each other (see site), and
-        // the tunnel between them is straight and as wide as most of the smaller one.
+        // rather than by a winding tunnel: they're moved toward each other (see canJoin and
+        // site) until there's no more than JOIN_GAP of rock between them, and the tunnel
+        // between them is straight and as wide as most of the smaller one.
         isJoined: function(a, b) {
-            const parentOf = (p, q) => this.parentOf(...p)?.join() === q.join();
-            return !this.siteBase(...a).junction && !this.siteBase(...b).junction && this.hasTunnel(a, b) &&
-                (!this.network || parentOf(a, b) || parentOf(b, a)) &&
+            return this.canJoin(a, b) && this.gapBetween(this.site(...a), this.site(...b)) <= JOIN_GAP;
+        },
+        
+        // How much rock there is between the edges of two sites' caverns (ignoring their
+        // wobble).
+        gapBetween: (s, t) => hypot(t.wx - s.wx, t.wy - s.wy) - s.radius - t.radius,
+        
+        // Whether neighbouring sites a and b ([i, j]) would be joined (cavernJoinChance), and
+        // they'd touch once moved toward each other (see site), as far as this join goes:
+        // each by half the gap, or all of it toward one that doesn't move (the start's, or
+        // in a network the parent), by at most JOIN_SHIFT of the spacing. They're moved
+        // toward each other if so. Whether they're joined depends on their other joins
+        // too, which may pull them apart again: see isJoined.
+        canJoin: function(a, b) {
+            const parentOf = (p, q) => this.parentOf(...p)?.join() === q.join(),
+                // The one that doesn't move, if one doesn't.
+                fixed = this.network ? (parentOf(a, b) ? b : parentOf(b, a) ? a : null) :
+                    (a[0] === 0 && a[1] === 0 ? a : b[0] === 0 && b[1] === 0 ? b : null);
+            let retval = !this.siteBase(...a).junction && !this.siteBase(...b).junction && this.hasTunnel(a, b) &&
+                (!this.network || fixed !== null) &&
                 this.game.rngFor('cave-join', pkg.CavernsTileGenerator.tunnelKey(a.join(), b.join()))() * 100 < this.attrs.cavernJoinChance;
+            if (retval) {
+                const most = JOIN_SHIFT * this.spacing,
+                    pos = q => q === fixed && this.network ? this.site(...q) : this.siteBase(...q),
+                    gap = this.gapBetween(pos(a), pos(b)),
+                    closed = fixed ? Math.min(gap, most) : 2 * Math.min(gap / 2, most);
+                retval = gap - closed <= JOIN_GAP;
+            }
+            return retval;
         },
         
         // The tunnel with key tk: the keys of its cells, of the cells along its path kept
         // clear (its spine), and of those blocked by rubble (its plug: see collapseChance),
-        // {cells, spine, plug}. It runs from the centre of one site to the other's, swinging
-        // to the side and varying in width, or straight and wide if they're joined.
+        // {cells, spine, plug}. It runs from the centre of one site to the other's (or
+        // straight and wide, if they're joined), heading off a little to one side and
+        // turning as it goes: the more tangle, the more it turns and the less it's pulled
+        // toward the far end, so above about 25 it can turn back on itself for a while, and
+        // even cross itself. The longer it gets, the harder it's pulled, so it always
+        // arrives. Its width varies as it goes.
         tunnel: function(tk) {
             if (!this.tunnels.has(tk)) {
                 const [a, b] = tk.split('|').map(k => this.site(...k.split(',').map(Number))),
                     joined = this.isJoined([a.i, a.j], [b.i, b.j]),
                     rng = this.game.rngFor('cave-tunnel', tk),
                     {tunnelWidthMin:w0, tunnelWidthMax:w1} = this.attrs,
-                    tangle = joined ? 0 : this.attrs.tangle,
-                    dx = b.wx - a.wx,
-                    dy = b.wy - a.wy,
-                    length = hypot(dx, dy),
-                    nx = -dy / length,
-                    ny = dx / length,
-                    swing = tangle / 100 * 0.3 * length,      // the most it swings to the side
-                    f1 = 0.5 + tangle / 100 * 1.5 + rng() * 0.5, // waves along its length
-                    f2 = f1 * (2 + rng()),
+                    tangle = joined ? 0 : this.attrs.tangle / 100,
+                    length = hypot(b.wx - a.wx, b.wy - a.wy),
+                    ux = (b.wx - a.wx) / length,
+                    uy = (b.wy - a.wy) / length,
+                    // How fast it turns as it goes (radians per world unit), in two waves.
+                    turn = 0.5 * sqrt(tangle),
+                    wave1 = 6 + rng() * 6,
+                    wave2 = 2.5 + rng() * 2,
                     p1 = rng() * TAU,
                     p2 = rng() * TAU,
-                    fw = 0.5 + rng() * 1.5,                   // and its width's
+                    fw = 0.5 + rng() * 1.5,                   // its width's waves along it
                     pw = rng() * TAU,
+                    // The way it sets off: up to 60 degrees to one side at full tangle.
+                    offAngle = (rng() - 0.5) * tangle * TAU / 3,
                     // A collapse: where along it (0 to 1), and how long (in world units).
                     collapse = !joined && rng() * 100 < this.attrs.collapseChance,
                     collapseAt = 0.3 + rng() * 0.4,
                     collapseLength = 1.5 + rng() * 1.5,
-                    // Where its path is at t (0 to 1, end to end), and how far either side of
-                    // it its cells reach there.
-                    at = t => {
-                        // No swing at the ends, which are the sites' centres.
-                        const side = swing * sin(PI * t) * (sin(TAU * f1 * t + p1) + 0.5 * sin(TAU * f2 * t + p2)) / 1.5,
-                            width = joined ? max(w1, 1.4 * Math.min(a.radius, b.radius)) : w0 + (w1 - w0) * (0.5 + 0.5 * sin(TAU * fw * t + pw));
-                        return {t, x:a.wx + dx * t + nx * side, y:a.wy + dy * t + ny * side, reach:max(MIN_REACH, width / 2)};
-                    },
-                    // The points along it, no more than MAX_STEP apart, with how far along it
-                    // each is (s, in world units).
-                    points = [{...at(0), s:0}];
-                for (let prev = points[0]; prev.t < 1;) {
-                    let dt = Math.min(1 - prev.t, 1 / (length * 4)),
-                        next = at(prev.t + dt);
-                    while (hypot(next.x - prev.x, next.y - prev.y) > MAX_STEP && dt > 1e-6) {
-                        dt /= 2;
-                        next = at(prev.t + dt);
-                    }
-                    if (dt === 1 - prev.t) next = at(1); // exactly the end, so it stops
-                    next.s = prev.s + hypot(next.x - prev.x, next.y - prev.y);
-                    points.push(next);
-                    prev = next;
+                    widthAt = s => joined ? max(w1, 1.4 * Math.min(a.radius, b.radius)) : w0 + (w1 - w0) * (0.5 + 0.5 * sin(TAU * fw * s / length + pw)),
+                    point = (x, y, s) => ({x, y, s, reach:max(MIN_REACH, widthAt(s) / 2)}),
+                    // Where it heads for on the way: evenly along it, more of them the more
+                    // tangle, each moved to the side and onward or back at random. Above
+                    // about 25 tangle one can be behind the one before, so it turns back.
+                    stops = floor(1 + 4 * tangle),
+                    back = max(0, (tangle - 0.1) / 0.9) * 2,
+                    waypoints = [];
+                for (let n = 1; n <= stops; n++) {
+                    const along = Math.min(1.15, max(-0.15, (n + (rng() - 0.5) * (0.6 + back)) / (stops + 1))) * length,
+                        aside = (rng() - 0.5) * 0.6 * tangle * length;
+                    waypoints.push([a.wx + ux * along - uy * aside, a.wy + uy * along + ux * aside]);
                 }
+                waypoints.push([b.wx, b.wy]);
+                let x = a.wx,
+                    y = a.wy,
+                    s = 0,
+                    leg = 0,      // which waypoint it's heading for
+                    legS = 0,     // how far it's gone since the last
+                    legLength = hypot(waypoints[0][0] - x, waypoints[0][1] - y),
+                    heading = atan2(waypoints[0][1] - y, waypoints[0][0] - x) + offAngle;
+                const points = [point(x, y, 0)];
+                while (hypot(b.wx - x, b.wy - y) > MAX_STEP) {
+                    const [tx, ty] = waypoints[leg],
+                        toward = atan2(ty - y, tx - x),
+                        along = (x - a.wx) * ux + (y - a.wy) * uy,
+                        aside = (x - a.wx) * -uy + (y - a.wy) * ux,
+                        // Out of bounds (the lookups only reach so far: see near), gone on too
+                        // long, or nearly there: straight for the waypoint.
+                        straight = Math.abs(aside) > 0.45 * length || along < -0.2 * length || along > 1.2 * length ||
+                            legS > 3 * legLength + 4 || hypot(tx - x, ty - y) < 2;
+                    if (straight) {
+                        heading = toward;
+                    } else {
+                        // Pulled toward the waypoint, harder the longer it's been going, and turned.
+                        const pull = 0.15 * (1 + 4 * (legS / max(1, legLength)) ** 2),
+                            diff = atan2(sin(toward - heading), cos(toward - heading));
+                        heading += diff * Math.min(1, pull * MAX_STEP) +
+                            turn * MAX_STEP * (sin(TAU * s / wave1 + p1) + 0.6 * sin(TAU * s / wave2 + p2));
+                    }
+                    x += cos(heading) * MAX_STEP;
+                    y += sin(heading) * MAX_STEP;
+                    s += MAX_STEP;
+                    legS += MAX_STEP;
+                    points.push(point(x, y, s));
+                    if (leg < waypoints.length - 1 && hypot(tx - x, ty - y) < 1.5) {
+                        leg++;
+                        legS = 0;
+                        legLength = hypot(waypoints[leg][0] - x, waypoints[leg][1] - y);
+                    }
+                }
+                points.push(point(b.wx, b.wy, s + hypot(b.wx - x, b.wy - y)));
                 const cells = new Set(),
                     spine = new Set(),
                     plug = new Set(),
-                    plugAt = (points.find(p => p.t >= collapseAt) ?? points[points.length - 1]).s;
+                    plugAt = collapseAt * points[points.length - 1].s;
                 for (const p of points) {
                     sweep(p.x, p.y, p.reach, cells);
                     sweep(p.x, p.y, SPINE_RADIUS, spine);

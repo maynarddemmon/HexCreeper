@@ -123,25 +123,44 @@ test('junctions have no cavern; a dead-end tunnel can curl into a ring', async (
     expect(r).toEqual({start:true, others:true, lassos:true});
 });
 
-test('a cavern loop leaves its cavern and comes back; joined caverns open straight into each other', async ({page}) => {
+test('a cavern loop leaves its cavern and comes back', async ({page}) => {
     await startGame(page);
-    await inCaverns(page, {junctionChance:0, cavernLoopChance:100, cavernJoinChance:100, stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0});
+    await inCaverns(page, {junctionChance:0, cavernLoopChance:100});
     const r = await page.evaluate(() => {
-        const g = hc.app.game, T = g.tileGenerator, start = T.cavern(0, 0),
-            loop = [...T.cavernLoop(0, 0).cells],
-            [i, j] = hc.hex.dirs.find(([i, j]) => T.isJoined([0, 0], [i, j])),
-            a = T.site(0, 0), b = T.site(i, j);
-        window.caves.make(6);
-        // The straight line between the joined caverns' centres.
-        const line = [];
-        for (let n = 0; n <= 100; n++) line.push(hc.hex.cellAtWorld(a.wx + (b.wx - a.wx) * n / 100, a.wy + (b.wy - a.wy) * n / 100));
-        return {
-            loopOut:loop.some(k => !start.has(k)),
-            loopBack:loop.filter(k => start.has(k)).length > 1,
-            joined:line.every(c => window.caves.cell(c.x, c.y) !== 'rock')
-        };
+        const T = hc.app.game.tileGenerator, start = T.cavern(0, 0),
+            loop = [...T.cavernLoop(0, 0).cells];
+        return {loopOut:loop.some(k => !start.has(k)), loopBack:loop.filter(k => start.has(k)).length > 1};
     });
-    expect(r).toEqual({loopOut:true, loopBack:true, joined:true});
+    expect(r).toEqual({loopOut:true, loopBack:true});
+});
+
+test('only caverns that can be moved to touch are joined, and they open straight into each other', async ({page}) => {
+    await startGame(page);
+    for (const seed of [1, 2, 3]) {
+        await inCaverns(page, {junctionChance:0, cavernJoinChance:100, cavernSizeMin:20, cavernSizeMax:200, stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0}, seed);
+        const r = await page.evaluate(() => {
+            const g = hc.app.game, T = g.tileGenerator,
+                pairs = hc.hex.disk(0, 0, 3).flatMap(s => hc.hex.dirs.map(([di, dj]) => [[s.x, s.y], [s.x + di, s.y + dj]])),
+                joined = pairs.filter(([a, b]) => T.isJoined(a, b)),
+                // Joined to the start's cavern: the straight line between the centres is open.
+                toStart = joined.filter(([a]) => a[0] === 0 && a[1] === 0);
+            window.caves.make(6);
+            return {
+                // Some caverns with tunnels between them aren't joined: too far apart.
+                some:joined.length > 0 && joined.length < pairs.filter(([a, b]) => T.hasTunnel(a, b)).length,
+                touching:joined.every(([a, b]) => T.gapBetween(T.site(...a), T.site(...b)) <= 2),
+                open:toStart.every(([a, b]) => {
+                    const p = T.site(...a), q = T.site(...b);
+                    for (let n = 0; n <= 100; n++) {
+                        const c = hc.hex.cellAtWorld(p.wx + (q.wx - p.wx) * n / 100, p.wy + (q.wy - p.wy) * n / 100);
+                        if (window.caves.cell(c.x, c.y) === 'rock') return false;
+                    }
+                    return true;
+                })
+            };
+        });
+        expect(r).toEqual({some:true, touching:true, open:true});
+    }
 });
 
 test('a cell comes out the same whatever order the blocks are made in', async ({page}) => {
@@ -209,6 +228,41 @@ test('with collapseChance, rubble blocks tunnels part way along, all the way acr
         };
     }, tunnelJoins.toString());
     expect(r).toEqual({plugged:true, across:true, rubble:true});
+});
+
+test('with a lot of tangle, a tunnel can turn back on itself for a while', async ({page}) => {
+    await startGame(page);
+    // The most times any line across a tunnel (square to the way between its ends) crosses
+    // it: once if it only ever heads onward, at least three times if it turns back.
+    const crossings = async tangle => {
+        await inCaverns(page, {tangle, junctionChance:0, cavernJoinChance:0});
+        return page.evaluate(() => {
+            const T = hc.app.game.tileGenerator;
+            let most = 0;
+            for (const s of hc.hex.disk(0, 0, 2)) {
+                for (const [di, dj] of hc.hex.dirs.slice(0, 3)) {
+                    const a = [s.x, s.y], b = [s.x + di, s.y + dj];
+                    if (T.hasTunnel(a, b)) {
+                        const p = T.site(...a), q = T.site(...b), len = Math.hypot(q.wx - p.wx, q.wy - p.wy),
+                            ux = (q.wx - p.wx) / len, uy = (q.wy - p.wy) / len,
+                            cells = [...T.tunnel(hc.CavernsTileGenerator.tunnelKey(a.join(), b.join())).cells].map(k => {
+                                const [wx, wy] = hc.hex.center(...k.split(',').map(Number));
+                                return {along:(wx - p.wx) * ux + (wy - p.wy) * uy, aside:(wx - p.wx) * -uy + (wy - p.wy) * ux};
+                            });
+                        // Lines across, away from the ends; runs of cells on one, a cell or more apart.
+                        for (let d = len * 0.25; d < len * 0.75; d += 0.5) {
+                            const on = cells.filter(c => Math.abs(c.along - d) < 0.5).map(c => c.aside).sort((x, y) => x - y);
+                            const runs = on.filter((x, n) => n === 0 || x - on[n - 1] > 1.5).length;
+                            most = Math.max(most, runs);
+                        }
+                    }
+                }
+            }
+            return most;
+        });
+    };
+    expect(await crossings(0)).toBe(1);
+    expect(await crossings(100)).toBeGreaterThanOrEqual(3);
 });
 
 test('without tangle a tunnel runs straight; with it, it winds', async ({page}) => {

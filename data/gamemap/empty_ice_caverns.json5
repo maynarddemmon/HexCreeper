@@ -3,14 +3,14 @@
 		"type":"caverns",
 		
 		"maxSize":10000,
-		"growth":25,
-		"sprawl":10,
+		"growth":0,
+		"sprawl":0,
 		
 		"cavernSizeMin":20,
 		"cavernSizeMax":400,
 		"tunnelWidthMin":1,
 		"tunnelWidthMax":3,
-		"tangle":100,
+		"tangle":75,
 		"loops":40,
 		"junctionChance":50,
 		
@@ -20,12 +20,12 @@
 		"tunnelDeadEndFactor":66,
 		"tunnelLassoChance":50,
 		"cavernLoopChance":50,
-		"cavernJoinChance":75,
-		"collapseChance":25,
+		"cavernJoinChance":50,
+		"collapseChance":10,
 		
-		"stalagmiteFrequency":50,
-		"stalactiteFrequency":50,
-		"holeFrequency":25,
+		"stalagmiteFrequency":15,
+		"stalactiteFrequency":15,
+		"holeFrequency":15,
 		
 		"healFrequency":2,
 		"harmFrequency":8,
