@@ -10,8 +10,13 @@
             WORLD_LIMIT, VISION, ANIM
         },
         TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
+        hex:{keysNear, lineCellInto},
         hexDist, PIECE_TYPES
-    } = pkg;
+    } = pkg,
+        
+        // Cells along the two sides of a line of sight (see canSee), filled in each time.
+        LEFT = [0, 0],
+        RIGHT = [0, 0];
     
     // ---------------------------------------------------------------------------
     // Game state
@@ -235,11 +240,23 @@
             const players = this.piecesOf('player'),
                 sightKey = [this.rules.visionRadius, this.tiles.size, ...players.map(p => this.key(p.x, p.y))].join(';');
             if (sightKey !== this._sightKey) {
-                const sight = new Set();
+                const sight = new Set(),
+                    // How much sight gets through each cell, worked out once.
+                    throughs = new Map(),
+                    {key:numKey} = keysNear(players[0]?.x ?? 0, players[0]?.y ?? 0),
+                    through = (x, y) => {
+                        const nk = numKey(x, y);
+                        let v = throughs.get(nk);
+                        if (v === undefined) {
+                            v = this.seeThrough(x, y);
+                            throughs.set(nk, v);
+                        }
+                        return v;
+                    };
                 for (const p of players) {
                     for (const c of pkg.hex.disk(p.x, p.y, this.rules.visionRadius)) {
                         const k = this.key(c.x, c.y);
-                        if (!sight.has(k) && this.canSee(p, c)) sight.add(k);
+                        if (!sight.has(k) && this.canSee(p, c, through)) sight.add(k);
                     }
                 }
                 for (const k of sight) this.seenCells.add(k);
@@ -254,15 +271,15 @@
         // distance to the solid) is cut to the share the solid lets through (seeThrough).
         // So an opaque solid blocks it; one 50% opaque halves what's left. Along an edge
         // the clearer of the cells on either side counts. The end cells don't count, so
-        // solid cells themselves can be seen.
-        canSee: function(a, b) {
-            const left = pkg.hex.line(a, b, 1),
-                right = pkg.hex.line(a, b, -1),
-                dist = left.length - 1;
+        // solid cells themselves can be seen. through(x, y) is seeThrough, or the same
+        // remembered (see cellsInSight).
+        canSee: function(a, b, through = (x, y) => this.seeThrough(x, y)) {
+            const dist = hexDist(a, b);
             let range = this.rules.visionRadius;
             for (let i = 1; i < dist && range >= dist; i++) {
-                const through = Math.max(this.seeThrough(left[i].x, left[i].y), this.seeThrough(right[i].x, right[i].y));
-                range = i + (range - i) * through;
+                lineCellInto(a, b, dist, i, 1, LEFT);
+                lineCellInto(a, b, dist, i, -1, RIGHT);
+                range = i + (range - i) * Math.max(through(LEFT[0], LEFT[1]), through(RIGHT[0], RIGHT[1]));
             }
             return range >= dist;
         },
@@ -807,18 +824,36 @@
         // takes a turn, and so does a jump (see jumpOffsets) but the piece then sits out the
         // next: it counts 2, so it's no quicker than walking, but it can cross holes.
         distanceField: function(sources, radius = 30) {
-            const dist = new Map(),
+            // Each cell's numeric key (see keysNear) is used while searching, and what's on
+            // it looked up only once, so the search makes as little as it can.
+            const {key:numKey} = keysNear(sources[0]?.x ?? 0, sources[0]?.y ?? 0),
+                OPEN = 1,
+                SOLID = 2,
+                dist = new Map(),     // numeric key -> distance
+                kinds = new Map(),    // numeric key -> OPEN (open and not harm you know of), SOLID, or 0
+                kindAt = (x, y) => {
+                    const nk = numKey(x, y);
+                    let v = kinds.get(nk);
+                    if (v === undefined) {
+                        v = this.isOpen(x, y) ? (this.isHarm(x, y) ? 0 : OPEN) : this.isSolid(x, y) ? SOLID : 0;
+                        kinds.set(nk, v);
+                    }
+                    return v;
+                },
                 buckets = [], // the cells reached, by distance: [x, y, x, y, ...]
-                jumps = this.jumpOffsets(),
                 reach = (x, y, d) => {
-                    const k = this.key(x, y);
-                    if (d <= radius && !(dist.get(k) <= d) && this.isOpen(x, y) && !this.isHarm(x, y)) {
-                        dist.set(k, d);
+                    const nk = numKey(x, y);
+                    if (d <= radius && !(dist.get(nk) <= d) && kindAt(x, y) === OPEN) {
+                        dist.set(nk, d);
                         (buckets[d] ??= []).push(x, y);
                     }
-                };
+                },
+                // The steps, as [dx, dy, ...], and the jumps, as [dx, dy, ox1, oy1, ox2, oy2,
+                // ...] (the second cell jumped over the same as the first for a straight jump).
+                steps = pkg.hex.dirs.flat(),
+                jumps = this.jumpOffsets().flatMap(({dx, dy, over}) => [dx, dy, ...over[0], ...(over[1] ?? over[0])]);
             for (const p of sources) {
-                dist.set(this.key(p.x, p.y), 0);
+                dist.set(numKey(p.x, p.y), 0);
                 (buckets[0] ??= []).push(p.x, p.y);
             }
             for (let d = 0; d < buckets.length; d++) {
@@ -827,18 +862,28 @@
                     const x = cells[i],
                         y = cells[i + 1];
                     // Reached more cheaply since it was put here: skip it.
-                    if (dist.get(this.key(x, y)) === d && d < radius) {
-                        for (const [dx, dy] of pkg.hex.dirs) reach(x + dx, y + dy, d + 1);
-                        // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is as quick.
-                        for (const {dx, dy, over} of jumps) {
-                            if (this.canJumpOver(x, y, over) && !over.some(([ox, oy]) => this.isOpen(x + ox, y + oy) && !this.isHarm(x + ox, y + oy))) {
-                                reach(x + dx, y + dy, d + 2);
-                            }
+                    if (dist.get(numKey(x, y)) === d && d < radius) {
+                        for (let s = 0; s < steps.length; s += 2) reach(x + steps[s], y + steps[s + 1], d + 1);
+                        // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is
+                        // as quick. A jump can't pass over solids only (see canJumpOver).
+                        for (let j = 0; j < jumps.length; j += 6) {
+                            const ka = kindAt(x + jumps[j + 2], y + jumps[j + 3]),
+                                kb = kindAt(x + jumps[j + 4], y + jumps[j + 5]);
+                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumps[j], y + jumps[j + 1], d + 2);
                         }
                     }
                 }
             }
-            return dist;
+            // As a map from the cells' usual keys.
+            const retval = new Map();
+            for (let d = 0; d < buckets.length; d++) {
+                const cells = buckets[d] ?? [];
+                for (let i = 0; i < cells.length; i += 2) {
+                    const k = this.key(cells[i], cells[i + 1]);
+                    if (!retval.has(k)) retval.set(k, d);
+                }
+            }
+            return retval;
         },
         
         fx: function(x, y, text, color, opts = {}) {

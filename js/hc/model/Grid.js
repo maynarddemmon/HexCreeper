@@ -29,12 +29,26 @@
         hexDist = (dq, dr) => (mathAbs(dq) + mathAbs(dr) + mathAbs(dq + dr)) / 2,
         
         // The cell holding fractional axial coordinates (q, r).
-        cubeRound = (q, r) => {
+        // The cell fractional axial (q, r) is in, as out = [x, y] (so nothing's made).
+        cubeRoundInto = (q, r, out) => {
             let rx = mathRound(q), rz = mathRound(r), ry = mathRound(-q - r);
             const dx = mathAbs(rx - q), dz = mathAbs(rz - r), dy = mathAbs(ry - (-q - r));
             if (dx > dy && dx > dz) rx = -ry - rz;
             else if (dz > dy) rz = -rx - ry;
-            return {x:rx, y:rz};
+            out[0] = rx;
+            out[1] = rz;
+            return out;
+        },
+        cubeRound = (q, r) => {
+            const [x, y] = cubeRoundInto(q, r, [0, 0]);
+            return {x, y};
+        },
+        
+        // Cell i of the n + 1 a straight line from cell a to cell b passes through (n
+        // their distance apart), as out = [x, y]: see line.
+        lineCellInto = (a, b, n, i, nudge, out) => {
+            const t = n ? i / n : 0;
+            return cubeRoundInto(a.x + (b.x - a.x) * t + nudge * 1e-6, a.y + (b.y - a.y) * t + nudge * 2e-6, out);
         },
         
         cornerOff = [0, 1, 2, 3, 4, 5].map(i => {
@@ -75,11 +89,25 @@
             const n = hexDist(b.x - a.x, b.y - a.y),
                 out = [];
             for (let i = 0; i <= n; i++) {
-                const t = n ? i / n : 0;
-                out.push(cubeRound(a.x + (b.x - a.x) * t + nudge * 1e-6, a.y + (b.y - a.y) * t + nudge * 2e-6));
+                const [x, y] = lineCellInto(a, b, n, i, nudge, [0, 0]);
+                out.push({x, y});
             }
             return out;
         },
+        lineCellInto,
+        // Numeric keys for cells, for searches that look at a lot of them: {key(x, y),
+        // cell(k) -> [x, y]}. Within 16384 steps of (cx, cy) a key is a small whole number,
+        // which costs nothing to make; farther off (anywhere in the world: see
+        // WORLD_LIMIT) a bigger one.
+        keysNear: (cx, cy) => ({
+            key: (x, y) => {
+                const dx = x - cx + 16384,
+                    dy = y - cy + 16384;
+                return dx >= 0 && dx < 32768 && dy >= 0 && dy < 32768 ? dx * 32768 + dy : (x + 2097152) * 4194304 + (y + 2097152);
+            },
+            cell: k => k < 1073741824 ? [mathFloor(k / 32768) - 16384 + cx, k % 32768 - 16384 + cy] :
+                [mathFloor(k / 4194304) - 2097152, k % 4194304 - 2097152]
+        }),
         corners: (q, r) => {
             const cx = q + r / 2,
                 cy = r * HALF_SQRT3;

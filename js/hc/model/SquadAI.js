@@ -39,7 +39,8 @@
         // Each squad, nearest the player first.
         takeTurn: function() {
             let players = this.game.piecesOf('player');
-            if (players.length) {
+            // (Without enemies there's nothing to plan, so no distances to work out.)
+            if (players.length && this.game.piecesOf('enemy').length) {
                 const field = this.game.distanceField(players),
                     fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
                     front = squad => Math.min(...squad.map(fd)),

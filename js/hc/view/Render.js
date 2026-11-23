@@ -17,6 +17,11 @@
         
         FX_MS = 650,
         
+        // A hole's rim lines fade into it in this many steps (see drawTile): each a part of
+        // the line drawn fainter, rather than a gradient, since making a gradient for every
+        // line every frame made the browser hold on to a lot of memory.
+        FADE_STEPS = 6,
+        
         // Where a heal, harm or loot tile's magnitude goes, from its centre, in cells (and
         // its other numbers, mirrored; see drawTileLabels).
         TILE_LABEL_OFFSET = [0.3, 0.32],
@@ -145,6 +150,7 @@
                     pts = pkg.hex.corners(t.x, t.y).map(([wx, wy]) => worldToScreen(wx, wy)),
                     same = pkg.hex.edges.map(([dx, dy]) => sameTerrain(t, t.x + dx, t.y + dy));
                 ctx.lineWidth = 1;
+                ctx.strokeStyle = css('--hole-line');
                 pts.forEach(([px, py], i) => {
                     const before = same[(i + 5) % 6],
                         after = same[i];
@@ -152,16 +158,20 @@
                         const [hx, hy] = before ? pts[(i + 5) % 6] : after ? pts[(i + 1) % 6] : [cx, cy],
                             choke = before ? !same[(i + 4) % 6] : after && !same[(i + 1) % 6],
                             len = choke ? 0.5 : 1,
-                            tx = px + (hx - px) * len,
-                            ty = py + (hy - py) * len,
-                            fade = ctx.createLinearGradient(px, py, tx, ty);
-                        fade.addColorStop(0, css('--hole-line'));
-                        fade.addColorStop(0.8, fill);
-                        ctx.strokeStyle = fade;
-                        ctx.beginPath();
-                        ctx.moveTo(px, py);
-                        ctx.lineTo(tx, ty);
-                        ctx.stroke();
+                            dx = (hx - px) * len,
+                            dy = (hy - py) * len;
+                        // From the rim's colour to the hole's, 80% of the way along: drawn over
+                        // the hole, fading out.
+                        for (let n = 0; n < FADE_STEPS; n++) {
+                            const a = 0.8 * n / FADE_STEPS,
+                                b = 0.8 * (n + 1) / FADE_STEPS;
+                            ctx.globalAlpha = 1 - n / FADE_STEPS;
+                            ctx.beginPath();
+                            ctx.moveTo(px + dx * a, py + dy * a);
+                            ctx.lineTo(px + dx * b, py + dy * b);
+                            ctx.stroke();
+                        }
+                        ctx.globalAlpha = 1;
                     }
                 });
                 return;
@@ -451,8 +461,9 @@
         // none between solids or holes of the same subtype, which run together.
         ctx.lineWidth = 1;
         // each hex draws its NE, E and SE edges, so every edge is drawn once; only edges
-        // touching a known cell
-        const grid = new Path2D();
+        // touching a known cell. One path on the context, not a Path2D: like gradients, a
+        // Path2D made every frame holds native memory until a GC, which comes rarely.
+        ctx.beginPath();
         for (const c of visible) {
             const cKnown = isKnown(c.x, c.y),
                 tile = game.tiles.get(game.key(c.x, c.y));
@@ -462,12 +473,13 @@
                 if ((cKnown || isKnown(c.x + dx, c.y + dy)) && !(tile && sameTerrain(tile, c.x + dx, c.y + dy))) {
                     cs ??= pkg.hex.corners(c.x, c.y);
                     const [ax, ay] = worldToScreen(...cs[a]), [bx, by] = worldToScreen(...cs[b]);
-                    grid.moveTo(ax, ay); grid.lineTo(bx, by);
+                    ctx.moveTo(ax, ay);
+                    ctx.lineTo(bx, by);
                 }
             }
         }
         ctx.strokeStyle = css('--grid');
-        ctx.stroke(grid);
+        ctx.stroke();
         
         // Origin marker
         {

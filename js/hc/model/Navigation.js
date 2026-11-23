@@ -19,7 +19,21 @@
             route to the nearest cell (not p's own) that isGoal(x, y) accepts, as the cells
             after p's, [[x, y], ...], or null if there's none within RADIUS. */
         searchRoute: function(p, isGoal, unseen) {
-            const start = this.key(p.x, p.y),
+            const {key, cell} = pkg.hex.keysNear(p.x, p.y), // (numbers, which cost nothing to make)
+                // What each cell is to the search, worked out once: 1, seen and one it can go
+                // on; UNSEEN_COST, not seen and it may go on those; 0, neither.
+                costs = new Map(),
+                costOf = (x, y, nk) => {
+                    let v = costs.get(nk);
+                    if (v === undefined) {
+                        const k = this.key(x, y);
+                        v = this.hasSeen(k) ? (this.isOpen(x, y) && !this.board.has(k) && !this.isHarm(x, y) ? 1 : 0) :
+                            unseen && Math.abs(x) <= cfg.WORLD_LIMIT && Math.abs(y) <= cfg.WORLD_LIMIT ? UNSEEN_COST : 0;
+                        costs.set(nk, v);
+                    }
+                    return v;
+                },
+                start = key(p.x, p.y),
                 cost = new Map([[start, 0]]),
                 from = new Map(),
                 buckets = [[p.x, p.y]]; // the cells reached, by cost: [x, y, x, y, ...]
@@ -28,24 +42,22 @@
                 for (let i = 0; i < cells.length; i += 2) {
                     const x = cells[i],
                         y = cells[i + 1],
-                        k = this.key(x, y);
+                        k = key(x, y);
                     // Reached more cheaply since it was put here: skip it.
                     if (cost.get(k) === d) {
                         if (d > 0 && isGoal(x, y)) {
                             const route = [];
-                            for (let at = k; at !== start; at = from.get(at)) route.unshift(at.split(',').map(Number));
+                            for (let at = k; at !== start; at = from.get(at)) route.unshift(cell(at));
                             return route;
                         }
                         if (d < RADIUS) {
                             for (const [dx, dy] of pkg.hex.dirs) {
                                 const nx = x + dx,
                                     ny = y + dy,
-                                    nk = this.key(nx, ny),
-                                    seen = this.hasSeen(nk),
-                                    next = d + (seen ? 1 : UNSEEN_COST),
-                                    ok = seen ? this.isOpen(nx, ny) && !this.pieceAt(nx, ny) && !this.isHarm(nx, ny) :
-                                        unseen && Math.abs(nx) <= cfg.WORLD_LIMIT && Math.abs(ny) <= cfg.WORLD_LIMIT;
-                                if (ok && !(cost.get(nk) <= next)) {
+                                    nk = key(nx, ny),
+                                    step = costOf(nx, ny, nk),
+                                    next = d + step;
+                                if (step && !(cost.get(nk) <= next)) {
                                     cost.set(nk, next);
                                     from.set(nk, k);
                                     (buckets[next] ??= []).push(nx, ny);
