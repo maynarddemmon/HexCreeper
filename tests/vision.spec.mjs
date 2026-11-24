@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage} from './helpers.mjs';
 
 test.describe('fog of war', () => {
     test.beforeEach(async ({page}) => {
@@ -55,6 +55,34 @@ test.describe('fog of war', () => {
             return {inSight:g.cellsInSight().has('3,0'), seen:g.seenCells.has('3,0'), neverSeen:g.seenCells.has('13,0')};
         });
         expect(r).toEqual({inSight:false, seen:true, neverSeen:false});
+    });
+    
+    test('an enemy\'s link to a piece out of sight shows as a stub, either way round', async ({page}) => {
+        // The canvas's colour a third of the way from the cell (x, y) to (x + 1, y)
+        const colourAt = async (x, y) => {
+            const [ax, ay] = await cellOnPage(page, x, y), [bx, by] = await cellOnPage(page, x + 1, y);
+            return page.evaluate(([px, py]) => {
+                const c = hc.view.canvas, r = c.getBoundingClientRect(), dpr = hc.view.dpr;
+                return [...c.getContext('2d').getImageData(Math.round((px - r.left) * dpr), Math.round((py - r.top) * dpr), 1, 1).data].join();
+            }, [ax + (bx - ax) / 3, ay + (by - ay) / 3]);
+        };
+        await page.evaluate(() => {
+            hc.app.game.rules.visionRadius = 3;
+            hc.app.centerOn(false);
+        });
+        const floor = await colourAt(3, 0);
+        // An enemy at the edge of sight, linked to one beyond it; then the other way round.
+        for (const [child, parent] of [[3, 4], [4, 3]]) {
+            await page.evaluate(([cx, px]) => {
+                const g = hc.app.game;
+                for (const e of g.piecesOf('enemy')) g.removePiece(e);
+                const par = g.addPiece('core', 'enemy', px, 0);
+                g.addPiece('core', 'enemy', cx, 0, par.id);
+                g.recomputeRanks();
+                hc.view.draw();
+            }, [child, parent]);
+            await expect.poll(() => colourAt(3, 0)).not.toBe(floor);
+        }
     });
 });
 

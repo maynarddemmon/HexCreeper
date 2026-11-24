@@ -286,18 +286,21 @@
             let w0 = linkHalfWidth(chain - 1),
                 w1 = linkHalfWidth(chain),
                 fill = css(color);
+            // A stub is as wide all along as the link at its parent's end (else a lone
+            // piece's would be a sliver too thin to see), and fades from the piece's edge,
+            // where it shows, not its centre, under it.
             if (hidden === 'to') {
                 bx = ax + (bx - ax) * LINK_STUB;
                 by = ay + (by - ay) * LINK_STUB;
-                w1 = w0 + (w1 - w0) * LINK_STUB;
+                w0 = w1;
                 rTo = 0;
-                fill = ctx.createLinearGradient(ax, ay, bx, by);
+                fill = ctx.createLinearGradient(ax + ux * rFrom, ay + uy * rFrom, bx, by);
             } else if (hidden === 'from') {
                 ax = bx + (ax - bx) * LINK_STUB;
                 ay = by + (ay - by) * LINK_STUB;
-                w0 = w1 + (w0 - w1) * LINK_STUB;
+                w0 = w1;
                 rFrom = 0;
-                fill = ctx.createLinearGradient(bx, by, ax, ay);
+                fill = ctx.createLinearGradient(bx - ux * rTo, by - uy * rTo, ax, ay);
             }
             if (hidden) {
                 fill.addColorStop(0, css(color));
@@ -310,7 +313,7 @@
             w0 = w(w0, rFrom);
             w1 = w(w1, rTo);
             const side = (cx, cy, r, half, across, toward) => {
-                    const along = toward * Math.sqrt(r * r - half * half);
+                    const along = r ? toward * Math.sqrt(r * r - half * half) : 0;
                     return [cx + ux * along + px * half * across, cy + uy * along + py * half * across];
                 },
                 // An arc of the end at (cx, cy), r from it, from point a to point b, the short way
