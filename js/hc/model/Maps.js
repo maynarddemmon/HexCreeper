@@ -57,9 +57,11 @@
         warning). A map whose goals or components can't be used isn't loaded. */
     pkg.maps = {
         /*  Calls back with init.json5's contents, {defaultMap, maps:[...], materials,
-            solids, holes, heals, harms, loots}, or null if it couldn't be loaded. It's loaded
-            once, and its materials and solid subtypes go to pkg.solids, and its hole, heal,
-            harm and loot subtypes to pkg.holes, pkg.heals, pkg.harms and pkg.loots. */
+            solids, holes, heals, harms, loots, enemies, enemyGroups}, or null if it couldn't
+            be loaded. It's loaded once, and its materials and solid subtypes go to
+            pkg.solids, its hole, heal, harm and loot subtypes to pkg.holes, pkg.heals,
+            pkg.harms and pkg.loots, and its enemies and groups to pkg.enemies and
+            pkg.enemyGroups (see Enemies.js). */
         loadIndex: callback => {
             if (index) {
                 callback(index);
@@ -72,6 +74,7 @@
                         pkg.heals.define(data.heals);
                         pkg.harms.define(data.harms);
                         pkg.loots.define(data.loots);
+                        pkg.defineEnemies(data.enemies, data.enemyGroups);
                     }
                     callback(index);
                 });

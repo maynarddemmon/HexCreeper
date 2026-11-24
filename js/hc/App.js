@@ -506,13 +506,18 @@
                     } else if (navNote) {
                         status = navNote;
                     } else if (V.hover) {
-                        // A solid under the pointer: what it is and how tough. A hole, or a heal,
-                        // harm or loot tile you know of: what it is.
-                        const tile = game.tileAt(V.hover.x, V.hover.y),
+                        // A named enemy you can see under the pointer: what it is. A solid: what
+                        // it is and how tough. A hole, or a heal, harm or loot tile you know of:
+                        // what it is.
+                        const at = game.pieceAt(V.hover.x, V.hover.y),
+                            enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId),
+                            tile = game.tileAt(V.hover.x, V.hover.y),
                             solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
                             other = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : game.isEffectTile(tile) ? game.tileType(tile) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
-                        if (known) {
+                        if (enemy && (!game.cellsInSight() || game.cellsInSight().has(game.key(V.hover.x, V.hover.y)))) {
+                            status = enemy.description ? i18n('status-tile', enemy.name, enemy.description) : enemy.name;
+                        } else if (known) {
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
                                 if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));

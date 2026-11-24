@@ -45,6 +45,7 @@
             if (!Number.isInteger(this.seed)) this.seed = pkg.randomSeed();
             this.turn = 1;
             this.nextId = 1;
+            this.nextBand = 1;               // for enemies spawned together (see newBand)
             this.pieces = new Map();         // id -> piece
             this.board = new Map();          // "x,y" -> id
             this.score = 0;                  // score you have to spend
@@ -192,10 +193,15 @@
             this.pieces = new Map();
             this.board = new Map();
             for (const p of o.pieces) {
-                const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [];
-                this.pieces.set(p.id, {...p, trail});
+                const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
+                    piece = {...p, trail};
+                // A named enemy's id and band (see newBand), if it has them and they're usable
+                if (typeof piece.enemyId !== 'string') delete piece.enemyId;
+                if (!Number.isInteger(piece.band)) delete piece.band;
+                this.pieces.set(p.id, piece);
                 this.board.set(this.key(p.x, p.y), p.id);
             }
+            this.nextBand = 1 + Math.max(0, ...[...this.pieces.values()].map(p => p.band ?? 0));
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
@@ -291,6 +297,10 @@
             const tile = this.tiles.get(this.key(x, y));
             return tile?.kind === TILE_TYPE_SOLID ? 1 - (pkg.solids.get(tile.subtype)?.opacity ?? 100) / 100 : 1;
         },
+        
+        /*  A number for enemies spawned together, so they can be known as a band: each
+            piece of theirs has it (piece.band). */
+        newBand: function() {return this.nextBand++;},
         
         addPiece: function(type, owner, x, y, parentId = null) {
             const s = PIECE_TYPES[type].stats[owner],

@@ -174,6 +174,48 @@
 		}
 	},
 	
+	// Named enemies: what a single enemy piece is, by id ("name", "description"; more to
+	// come). Every piece of one is a core for now: its rank comes from how it's linked.
+	"enemies":{
+		"goblin":{
+			"name":"Goblin",
+			"description":"A small humanoid with green skin, big eyes and sharp teeth."
+		}
+	},
+	
+	// Enemies as they come, linked into trees ("name", "description", "members"). members
+	// is a list of nodes, each an enemy's id (one piece, on its own), {"<enemy id>":[nodes]}
+	// for an enemy with those linked below it, or a group's id, standing for all its trees
+	// (so a group can't have nodes below it). An id names an enemy or a group, not both. A
+	// spawn generator's table can name either (see js/hc/model/Enemies.js).
+	"enemyGroups":{
+		"goblin_pair":{
+			"name":"Goblin Pair",
+			"description":"A pair of goblins.",
+			"members":[{"goblin":["goblin"]}]
+		},
+		"goblin_trio":{
+			"name":"Goblin Trio",
+			"description":"A trio of goblins.",
+			"members":[{"goblin":["goblin", "goblin"]}]
+		},
+		"goblin_pack":{
+			"name":"Goblin Pack",
+			"description":"A pack of goblins: a leader and three trios.",
+			"members":[{"goblin":["goblin_trio", "goblin_trio", "goblin_trio"]}]
+		},
+		"goblin_horde":{
+			"name":"Goblin Horde",
+			"description":"A horde of goblins.",
+			"members":[
+				"goblin_pack",
+				"goblin_trio","goblin_trio",
+				"goblin_pair","goblin_pair","goblin_pair",
+				"goblin","goblin","goblin","goblin","goblin","goblin","goblin"
+			]
+		}
+	},
+	
 	// Every map, in the order the Maps dialog lists them, with what a list of maps
 	// needs. Each map's own file is data/gamemap/<id>.json5. A map with no "number" is
 	// listed without one. A map's file names its "tileGenerator", "spawnGenerator" and
