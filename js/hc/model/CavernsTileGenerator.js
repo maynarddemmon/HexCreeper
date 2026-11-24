@@ -793,6 +793,41 @@
             };
         },
         
+        /*  The cavern or tunnel cell (x, y) is in, as the seed makes them: {kind:'cavern' or
+            'tunnel', id (one for each cavern and tunnel, dead end shapes and loops counting
+            as tunnels), cells (the keys of its cells), size (how many), start (whether you
+            start in it)}, or null if it's in neither. A cavern counts first, where a tunnel
+            runs into one. For spawn generators (see CavernsSpawnGenerator). */
+        regionAt: function(x, y) {
+            const k = x + ',' + y,
+                sites = hex.disk(...this.siteOf(x, y), this.siteReach).map(q => [q.x, q.y]);
+            for (const q of sites) {
+                const keys = this.cavern(...q);
+                if (keys.has(k)) return {kind:'cavern', id:'cavern ' + q.join(), cells:keys, size:keys.size, start:keys.has('0,0')};
+            }
+            const inRange = new Set(sites.map(q => q.join()));
+            for (const q of sites) {
+                for (const [di, dj] of hex.dirs) {
+                    const n = [q[0] + di, q[1] + dj];
+                    if (inRange.has(n.join()) && this.hasTunnel(q, n)) {
+                        const tk = pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()),
+                            t = this.tunnel(tk);
+                        if (t.cells.has(k)) return {kind:'tunnel', id:'tunnel ' + tk, cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                    }
+                }
+                for (const [name, t] of [['dead end', this.deadEndShape(...q)], ['loop', this.cavernLoop(...q)]]) {
+                    if (t?.cells.has(k)) return {kind:'tunnel', id:name + ' ' + q.join(), cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                }
+            }
+            return null;
+        },
+        
+        /*  Makes the tiles of the cells of region (from regionAt), and those round them, if
+            they're not made yet: so what's open there is known, as before spawning there. */
+        makeRegion: function(region) {
+            for (const k of region.cells) this.makeBlock(...this.blocks.of(...k.split(',').map(Number)));
+        },
+        
         // ---- Making cells ----
         
         // What cell (x, y) is, given what's near it (see near): {open, cavern, clear,

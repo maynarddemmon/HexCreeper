@@ -523,11 +523,12 @@
         },
         
         // ---- Tiles ----
-        // Your pieces have moved (or one was placed): the tiles they now need, and the
-        // ones they now find.
+        // Your pieces have moved (or one was placed): the tiles they now need, the ones
+        // they now find, and any enemies that come of where they've gone.
         piecesMoved: function() {
             this.tileGenerator.piecesMoved();
             this.revealTiles();
+            this.spawnGenerator.piecesMoved();
         },
         
         /*  A tile of the given kind and subtype: a solid (see Solids.js) with its hit

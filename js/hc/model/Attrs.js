@@ -6,6 +6,94 @@
     
     const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
+        // The functions an expr attr's formula can call
+        FUNCTIONS = {min:Math.min, max:Math.max, floor:Math.floor, ceil:Math.ceil, round:Math.round, sqrt:Math.sqrt, log:Math.log, abs:Math.abs},
+        
+        /*  An expr attr's formula, text, made into a function of its variables, f({name:n}),
+            or an Error saying what's wrong with it. names: the variables it may use. Numbers,
+            + - * / % and ^ (power), with the usual precedence, unary minus, parentheses and
+            FUNCTIONS. Made once for each text (formulas). */
+        formulas = new Map(),
+        compile = (text, names) => {
+            const key = names.join() + '|' + text;
+            let retval = formulas.get(key);
+            if (!retval) {
+                const tokens = text.match(/\d+(\.\d+)?|[A-Za-z_]\w*|\S/g) ?? [];
+                let i = 0;
+                const peek = () => tokens[i],
+                    take = t => {
+                        if (tokens[i] !== t) throw new Error('expected ' + t + (tokens[i] ? ' at ' + tokens[i] : ' at the end'));
+                        i++;
+                    },
+                    binary = (next, ops) => () => {
+                        let f = next();
+                        while (ops[peek()]) {
+                            const op = ops[tokens[i++]], a = f, b = next();
+                            f = v => op(a(v), b(v));
+                        }
+                        return f;
+                    },
+                    primary = () => {
+                        const t = tokens[i++];
+                        if (t === undefined) throw new Error('it ends too soon');
+                        if (/^\d/.test(t)) {
+                            const n = Number(t);
+                            return () => n;
+                        }
+                        if (t === '(') {
+                            const f = sum();
+                            take(')');
+                            return f;
+                        }
+                        if (t === '-') {
+                            const f = power();
+                            return v => -f(v);
+                        }
+                        if (/^[A-Za-z_]/.test(t)) {
+                            if (peek() === '(') {
+                                const fn = FUNCTIONS[t];
+                                if (!fn) throw new Error('no function ' + t);
+                                i++;
+                                const args = [sum()];
+                                while (peek() === ',') {
+                                    i++;
+                                    args.push(sum());
+                                }
+                                take(')');
+                                return v => fn(...args.map(a => a(v)));
+                            }
+                            if (!names.includes(t)) throw new Error('no variable ' + t);
+                            return v => v[t];
+                        }
+                        throw new Error('unexpected ' + t);
+                    },
+                    power = () => {
+                        const a = primary();
+                        if (peek() !== '^') return a;
+                        i++;
+                        const b = power();
+                        return v => a(v) ** b(v);
+                    },
+                    product = binary(power, {'*':(a, b) => a * b, '/':(a, b) => a / b, '%':(a, b) => a % b}),
+                    sum = binary(product, {'+':(a, b) => a + b, '-':(a, b) => a - b});
+                try {
+                    const f = sum();
+                    if (i < tokens.length) throw new Error('unexpected ' + tokens[i]);
+                    retval = f;
+                } catch (err) {
+                    retval = err;
+                }
+                formulas.set(key, retval);
+            }
+            return retval;
+        },
+        
+        // Whether value is a tiers attr's list of tiers: [{min, max?, table}], min and max
+        // whole numbers (max no less than min), and table as a table attr's value.
+        isTiers = (def, value) => Array.isArray(value) && value.length > 0 && value.every(t => isObj(t) &&
+            Number.isInteger(t.min) && (t.max === undefined || (Number.isInteger(t.max) && t.max >= t.min)) &&
+            isObj(t.table) && Object.entries(t.table).every(([k, w]) => isOption(def, k) && Number.isInteger(w) && w >= 0 && w <= 1000)),
+        
         // Whether value is one of a choice or table attr's options (anything, before the
         // options are known).
         isOption = (def, value) => {
@@ -15,7 +103,8 @@
         
         /*  A value the attr can hold, or undefined: booleans must be booleans, choices one of
             the options, tables {option:weight} with whole-number weights from 0 to 1000,
-            and numbers are rounded (to a whole number of steps) and clamped. */
+            exprs formulas that make sense (see compile), tiers lists of tiers (see
+            isTiers), and numbers are rounded (to a whole number of steps) and clamped. */
         normalize = (def, value) => {
             let retval;
             if (def.type === 'boolean') {
@@ -26,6 +115,10 @@
                 if (isObj(value) && Object.entries(value).every(([k, w]) => isOption(def, k) && Number.isInteger(w) && w >= 0 && w <= 1000)) {
                     retval = {...value};
                 }
+            } else if (def.type === 'expr') {
+                if (typeof value === 'string' && !(compile(value, def.names) instanceof Error)) retval = value;
+            } else if (def.type === 'tiers') {
+                if (isTiers(def, value)) retval = value.map(t => ({...t, table:{...t.table}}));
             } else {
                 const n = Math.round(Number(value) / def.step) / (1 / def.step);
                 if (Number.isFinite(n)) retval = Math.min(def.max, Math.max(def.min, n));
@@ -47,6 +140,38 @@
         /*  Weights for some of the values options() gives, {value:weight}, to pick one of
             them at random (see pick). */
         table: (id, defaultValue, options) => ({id, type:'table', defaultValue, options}),
+        
+        /*  A formula (text) of the variables names (['rank', ...]) to work out with values
+            given for them (see evaluate). */
+        expr: (id, defaultValue, names) => ({id, type:'expr', defaultValue, names}),
+        
+        /*  Tables (as for table) for ranges of a number, [{min, max, table}, ...] (no max:
+            min and up), to pick one of the values options() gives from by the number (see
+            pickTier). */
+        tiers: (id, defaultValue, options) => ({id, type:'tiers', defaultValue, options}),
+        
+        /*  What an expr attr's formula (text) comes to, with values for its variables
+            ({name:n}; names, the variables it may use): a number, or NaN if the formula
+            doesn't make sense. */
+        evaluate: (text, names, values) => {
+            const f = compile(text, names);
+            return f instanceof Error ? NaN : f(values);
+        },
+        
+        /*  What's wrong with formula text for the variables names, or '' if nothing. */
+        formulaProblem: (text, names) => {
+            const f = compile(text, names);
+            return f instanceof Error ? f.message : '';
+        },
+        
+        /*  A value from a tiers attr's value for the number n: picked (see pick) from the
+            first tier n is in, or the highest if n is above them all; undefined if n is
+            below them all (or the tier's weights are all 0). */
+        pickTier: (tiers, n, rng) => {
+            const tier = tiers.find(t => n >= t.min && (t.max === undefined || n <= t.max)) ??
+                (n > Math.max(...tiers.map(t => t.max ?? Infinity)) ? tiers.reduce((a, b) => b.min > a.min ? b : a) : null);
+            return tier ? pkg.attrs.pick(tier.table, rng) : undefined;
+        },
         
         /*  A value from a table attr's value ({value:weight}), picked at random by rng in
             proportion to the weights, or undefined if they're all 0 (or there are none). */

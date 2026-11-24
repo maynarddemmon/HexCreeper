@@ -1,5 +1,5 @@
 {
 	"tileGenerator":{"type":"caverns"},
-	"spawnGenerator":{"type":"proximity"},
+	"spawnGenerator":{"type":"caverns"},
 	"enemyAI":{"type":"squad"}
 }

@@ -49,6 +49,9 @@
         /*  A new turn has begun (the enemies have moved and the turn count gone up). */
         turnEnded: NOOP, // function() {}
         
+        /*  Your pieces have moved (or one was placed), and the tiles they need are made. */
+        piecesMoved: NOOP, // function() {}
+        
         /*  Spawns enemy or group id (see Enemies.js) at the first of spots ([[x, y], ...],
             tried in turn) it fits at: its first tree's top piece there, each piece below on
             a free cell next to the one it's linked to, and each other tree's top piece on
