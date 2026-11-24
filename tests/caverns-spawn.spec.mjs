@@ -106,7 +106,7 @@ test('going into a cavern or tunnel for the first time may spawn a band, by the 
 
 test('the challenge comes from the enemyChallenge formula', async ({page}) => {
     // A challenge of 0 is below every tier: nothing spawns, and the chance goes up.
-    const found = await caverns(page, {cavernSpawnChance:100, cavernSpawnChanceModifierOnFailure:-30, enemyChallenge:'rank - 1',
+    const found = await caverns(page, {cavernSpawnChance:100, cavernSpawnChanceModifierOnFailure:-30, enemyChallenge:'level - 1',
         challengeTable:[{min:1, table:{goblin:1}}]});
     expect(await moveCore(page, ...found.cavern)).toEqual([]);
     expect(await page.evaluate(() => hc.app.game.spawnGenerator.chance.cavern)).toBe(70);

@@ -60,8 +60,8 @@
             solids, holes, heals, harms, loots, enemies, enemyGroups}, or null if it couldn't
             be loaded. It's loaded once, and its materials and solid subtypes go to
             pkg.solids, its hole, heal, harm and loot subtypes to pkg.holes, pkg.heals,
-            pkg.harms and pkg.loots, and its enemies and groups to pkg.enemies and
-            pkg.enemyGroups (see Enemies.js). */
+            pkg.harms and pkg.loots, its characters to pkg.characters (see Combat.js), and its
+            enemies and groups to pkg.enemies and pkg.enemyGroups (see Enemies.js). */
         loadIndex: callback => {
             if (index) {
                 callback(index);
@@ -74,6 +74,7 @@
                         pkg.heals.define(data.heals);
                         pkg.harms.define(data.harms);
                         pkg.loots.define(data.loots);
+                        pkg.characters.define(data.characters);
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
                     }
                     callback(index);

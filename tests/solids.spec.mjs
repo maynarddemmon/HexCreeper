@@ -83,7 +83,7 @@ test('walls and clumps are made of the subtypes the tile generator\'s attrs choo
     expect(kinds).toEqual(['fungus:3', 'iron_bars:15']);
 });
 
-test('a piece whose rank beats a solid\'s DR breaks it, a rank less the DR at a time, then advances', async ({page}) => {
+test('a piece whose damage beats a solid\'s DR breaks it, its damage less the DR at a time, then advances', async ({page}) => {
     await startGame(page);
     await useTestSolids(page);
     await clearBoard(page);
@@ -98,8 +98,8 @@ test('a piece whose rank beats a solid\'s DR breaks it, a rank less the DR at a 
     expect(await hit()).toEqual([true, 1, 0]);
     expect(await hit()).toEqual([true, null, 1]); // broken: open floor, and the core moves in
     
-    await page.evaluate(() => {hc.app.game.getPlayerCore().rank = 3;});
-    await putSolid(page, 2, 0, 'wall_of_flesh'); // DR 0, 6 HP: 3 a hit at rank 3
+    await page.evaluate(() => {hc.app.game.getPlayerCore().damage = [3, 3];});
+    await putSolid(page, 2, 0, 'wall_of_flesh'); // DR 0, 6 HP: 3 a hit at 3 damage
     expect((await page.evaluate(() => {
         const g = hc.app.game;
         g.playerAct(g.getPlayerCore(), 2, 0);
@@ -107,7 +107,7 @@ test('a piece whose rank beats a solid\'s DR breaks it, a rank less the DR at a 
     }))).toBe(3);
 });
 
-test('a solid whose DR is at least the piece\'s rank blocks it, as before', async ({page}) => {
+test('a solid whose DR is at least the most damage the piece can do blocks it', async ({page}) => {
     await startGame(page);
     await useTestSolids(page);
     await clearBoard(page);
@@ -117,9 +117,12 @@ test('a solid whose DR is at least the piece\'s rank blocks it, as before', asyn
         return g.legalMoves(g.getPlayerCore()).some(m => m.x === 1 && m.y === 0);
     });
     expect(await moves()).toBe(false);
-    await page.evaluate(() => {hc.app.game.getPlayerCore().rank = 4;});
+    await page.evaluate(() => {hc.app.game.getPlayerCore().damage = [1, 4];});
     expect(await moves()).toBe(false);
-    await page.evaluate(() => {hc.app.game.getPlayerCore().rank = 5;});
+    await page.evaluate(() => {hc.app.game.getPlayerCore().damage = [1, 5];});
+    expect(await moves()).toBe(true);
+    await page.evaluate(() => {hc.app.game.getPlayerCore().penetration = 1;}); // as if DR 3
+    await page.evaluate(() => {hc.app.game.getPlayerCore().damage = [1, 4];});
     expect(await moves()).toBe(true);
 });
 

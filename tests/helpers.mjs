@@ -41,12 +41,20 @@ export const waitForGame = async page => {
 };
 
 /*  Clears the board for a rules test: no enemies, no tiles, and no waves, so a test can
-    place exactly what it needs. */
+    place exactly what it needs. Combat is made sure, so rules tests don't depend on the
+    dice (see Combat.js; combat.spec tests the rolls): every attack hits and does 1 damage,
+    an adventurer (yours) has 2 HP and a creeper (an enemy without a name) 1. */
 export const clearBoard = page => page.evaluate(() => {
-    const g = hc.app.game;
+    const g = hc.app.game,
+        sure = (table, id, hp) => table.byId.set(id, {...table.get(id), damage:[1, 1], penetration:0, armor:0, hp});
     for (const e of g.piecesOf('enemy')) g.removePiece(e);
     g.tiles.clear();
     g.spawnGenerator.spawnWave = () => {};
+    g.rules.hitMin = g.rules.hitMax = 100;
+    g.rules.damageBonus = g.rules.penetrationBonus = '0';
+    sure(hc.characters, 'adventurer', 2);
+    sure(hc.enemies, 'creeper', 1);
+    for (const p of g.piecesOf('player')) g.giveProfile(p);
 });
 
 /*  Gives the map being played these attrs for its components ({tile, spawn, ai}: its tile

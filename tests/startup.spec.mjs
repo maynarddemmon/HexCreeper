@@ -15,5 +15,5 @@ test('starts with the core at the origin, centred in its quadrant, and 3 enemies
         const g = hc.app.game, c = g.getPlayerCore();
         return {x:c.x, y:c.y, rank:c.rank, hp:c.hp, chunk:hc.app.game.tileGenerator.quads.of(0, 0).join(), enemies:g.piecesOf('enemy').length};
     });
-    expect(s).toEqual({x:0, y:0, rank:1, hp:2, chunk:'0,0', enemies:3});
+    expect(s).toEqual({x:0, y:0, rank:1, hp:15, chunk:'0,0', enemies:3}); // an adventurer at level 1: 15 HP
 });

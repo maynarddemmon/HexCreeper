@@ -9,27 +9,26 @@ test.beforeEach(async ({page}) => {
 });
 
 test.describe('waves', () => {
-    test('wave size and squad size follow the highest player rank, not the turn', async ({page}) => {
+    test('wave size and squad size follow the highest player level, not the turn', async ({page}) => {
         const r = await page.evaluate(() => {
-            const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs, out = [];
+            const g = hc.app.game, out = [];
             out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             g.turn = 300;
             out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
-            g.score = 1000;
-            g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
+            g.getPlayerCore().level = 2;
             out.push([g.spawnGenerator.waveSize(), g.spawnGenerator.squadCap()]);
             return out;
         });
         expect(r).toEqual([[1, 2], [1, 2], [3, 3]]);
     });
     
-    test('squads spawn as binary link trees with ranks', async ({page}) => {
+    test('squads spawn as binary link trees, of creepers', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game;
             const sizes = [3, 7].map(n => { const root = g.spawnGenerator.spawnSquad(n); return [g.group(root).length, root.rank, root.hp]; });
             return sizes;
         });
-        expect(r).toEqual([[3, 2, 2], [7, 3, 3]]);
+        expect(r).toEqual([[3, 2, 1], [7, 3, 1]]); // (a creeper has 1 HP, with clearBoard)
     });
 });
 

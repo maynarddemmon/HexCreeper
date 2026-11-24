@@ -80,11 +80,11 @@
                 ctx.strokeStyle = pkg.view.css(inv ? o.fill : o.stroke);
                 ctx.beginPath(); ctx.arc(cx, cy, r - border / 2, 0, TWO_PI); ctx.stroke();
                 
-                // The rank, as a symbol filling the inside of the border.
+                // The level, as a symbol filling the inside of the border (see drawRankSymbol).
                 ctx.fillStyle = ctx.strokeStyle = pkg.view.css(inv ? o.stroke : '--bg');
                 ctx.lineWidth = mathMax(1, size * 0.035);
                 ctx.lineJoin = 'round';
-                drawRankSymbol(ctx, cx, cy, r - border, piece.rank);
+                drawRankSymbol(ctx, cx, cy, r - border, piece.level);
                 ctx.lineJoin = 'miter';
                 
                 ctx.globalAlpha = 1;

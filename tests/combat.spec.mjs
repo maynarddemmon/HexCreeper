@@ -123,3 +123,108 @@ test('score earned is kept as a total; spending only lowers what you have', asyn
     expect(r).toEqual({afterKill:[1, 1], afterPlace:[6, 11]});
 });
 
+
+// ---- Stats and the dice (see Combat.js) ----
+
+// Combat as the game has it (clearBoard makes it sure): the rules' and profiles' own.
+const realCombat = page => page.evaluate(() => new Promise(done => hc.maps.loadIndex(data => {
+    const g = hc.app.game;
+    hc.characters.define(data.characters);
+    hc.defineEnemies(data.enemies, data.enemyGroups);
+    for (const id of ['hitMin', 'hitMax', 'damageBonus', 'penetrationBonus']) g.rules[id] = hc.settings.resolveRules({})[id];
+    for (const p of g.piecesOf('player')) g.giveProfile(p);
+    done();
+})));
+
+test('pieces get their profiles: you an adventurer\'s, an enemy its own, or a creeper\'s', async ({page}) => {
+    await realCombat(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(),
+            gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin'),
+            plain = g.addPiece('core', 'enemy', 5, 0);
+        return [[c.level, c.hp, c.maxHp, c.stats.con, c.damage], [gob.hp, gob.stats.agl, gob.xpValue], [plain.hp, plain.xpValue]];
+    });
+    expect(r).toEqual([[1, 15, 15, 10, [1, 6]], [5, 12, 5], [4, 4]]);
+});
+
+test('the hit chance comes from accuracy against defence, kept from hitMin to hitMax', async ({page}) => {
+    await realCombat(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin'),
+            out = [g.hitChance(c, gob), g.hitChance(gob, c)]; // str 10 + 1 vs agl 12 + 1; str 8 + 1 vs agl 10 + 1
+        g.rules.hitChance = '200';
+        out.push(g.hitChance(c, gob));
+        g.rules.hitChance = '-50';
+        out.push(g.hitChance(c, gob));
+        return out;
+    });
+    expect(r).toEqual([44, 44, 95, 5]);
+});
+
+test('damage: the weapon\'s plus the str bonus, less armor after penetration; armor can soak a hit', async ({page}) => {
+    await realCombat(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin');
+        const out = [g.damageRange(c), g.damageRange(gob)]; // str 10: +0; str 8: -1 (not below 0)
+        c.stats.str = 18;                                    // +4 damage, +2 penetration
+        out.push(g.damageRange(c), g.armorAgainst(c, 5), g.armorAgainst(c, 1));
+        // A hit that always lands on armor it can't get through does nothing.
+        g.rules.hitMin = g.rules.hitMax = 100;
+        gob.armor = 100;
+        for (let i = 0; i < 20; i++) g.strike(c, gob);
+        out.push(gob.hp);
+        return out;
+    });
+    expect(r).toEqual([[1, 6], [0, 3], [5, 10], 3, 0, 5]);
+});
+
+test('attacks roll from the seed, and hit about as often as the chance says', async ({page}) => {
+    await realCombat(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(),
+            // 1000 attacks on a goblin that can't die; how many hit, and their damage
+            run = () => {
+                g.combatRolls = 0;
+                const gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin');
+                gob.fixedHp = gob.hp = gob.maxHp = 1e9;
+                let hits = 0, total = 0;
+                for (let i = 0; i < 1000; i++) {
+                    const before = gob.hp;
+                    g.strike(c, gob);
+                    if (gob.hp < before) {
+                        hits++;
+                        total += before - gob.hp;
+                    }
+                }
+                g.removePiece(gob);
+                return [hits, total];
+            };
+        return [run(), run(), g.hitChance(c, g.addPiece('core', 'enemy', 9, 0, null, 'goblin'))];
+    });
+    const [[hits, total], again, chance] = r;
+    expect(again).toEqual([hits, total]);           // the same rolls again
+    expect(Math.abs(hits / 10 - chance)).toBeLessThan(5); // within 5% of 44%
+    expect(Math.abs(total / hits - 3.5)).toBeLessThan(0.3); // 1 to 6, 3.5 on average
+});
+
+test('killing enemies gives xp; enough goes up a level, with its HP', async ({page}) => {
+    await realCombat(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.hitMin = g.rules.hitMax = 100;
+        g.rules.advance = false; // the core stays where it is
+        c.damage = [99, 99];
+        c.hp = 10;
+        // Goblins (5 xp each) next to the core, killed one at a time
+        for (let i = 0; i < 4; i++) {
+            g.addPiece('core', 'enemy', 1, 0, null, 'goblin');
+            g.acted.clear();
+            g.movesUsed = 0;
+            g.playerAct(c, 1, 0);
+            out.push([c.xp, c.level]);
+        }
+        return [out, c.hp, c.maxHp];
+    });
+    // 20 xp for level 2: max HP 10 + 5 + 1 x (2 + 2) = 19, and HP up by the 4 more.
+    expect(r).toEqual([[[5, 1], [10, 1], [15, 1], [0, 2]], 14, 19]);
+});

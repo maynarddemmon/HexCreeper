@@ -22,7 +22,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Goals, pkg.EffectTiles],
+        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.EffectTiles],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
@@ -54,6 +54,7 @@
             this.outcome = null;             // once over: 'won' or 'lost'
             this.lostBy = null;              // when lost: the index of the objective that lost it, or null for the core
             this.kills = 0;                  // enemy pieces destroyed
+            this.combatRolls = 0;            // rolls made in combat, for the next (see Combat.js)
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
             this.lootOpened = 0;             // loot tiles emptied
@@ -109,6 +110,7 @@
                 outcome:this.outcome,
                 lostBy:this.lostBy,
                 kills:this.kills,
+                combatRolls:this.combatRolls,
                 piecesLost:this.piecesLost,
                 piecesPlaced:this.piecesPlaced,
                 lootOpened:this.lootOpened,
@@ -180,6 +182,7 @@
             this.outcome = this.over ? (o.outcome === 'won' ? 'won' : 'lost') : null;
             this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
             this.kills = o.kills;
+            this.combatRolls = Number.isInteger(o.combatRolls) ? o.combatRolls : 0;
             this.piecesLost = o.piecesLost;
             this.piecesPlaced = o.piecesPlaced;
             this.lootOpened = o.lootOpened;
@@ -195,6 +198,12 @@
             for (const p of o.pieces) {
                 const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
                     piece = {...p, trail};
+                // From before pieces had profiles (see Combat.js): an ordinary one, at the
+                // HP it had, if that fits.
+                if (!piece.stats) {
+                    this.giveProfile(piece, piece.enemyId);
+                    piece.hp = Math.min(piece.maxHp, Math.max(1, p.hp | 0));
+                }
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -302,18 +311,19 @@
             piece of theirs has it (piece.band). */
         newBand: function() {return this.nextBand++;},
         
-        addPiece: function(type, owner, x, y, parentId = null) {
+        /*  A new piece, with the profile profileId (see Combat.giveProfile: if not given,
+            yours are adventurers, enemies creepers), at full HP. */
+        addPiece: function(type, owner, x, y, parentId = null, profileId) {
             const s = PIECE_TYPES[type].stats[owner],
-                hp = (owner === 'player' ? this.rules.hpPer : this.rules.enemyHpPer) * this.rules.rankBase,
                 piece = {
                     id:this.nextId++, 
                     type, owner, x, y, parentId,
-                    hp, maxHp: hp, 
                     rank:this.rules.rankBase, 
                     scoreValue:s.scoreValue,
                     score:0,
                     trail:[]    // the cells it was on, latest first (see Movement._leaveCell)
                 };
+            this.giveProfile(piece, profileId);
             this.pieces.set(piece.id, piece);
             this.board.set(this.key(x, y), piece.id);
             return piece;
@@ -339,7 +349,8 @@
         
         // ---- Rank ----
         // rank = max(base, 1 + min(two highest child ranks)), missing children count as 0.
-        // Max HP follows rank; HP is clamped down, and only raised with the rankUpHeals rule.
+        // Worked out from the links, for rank-based features to come: nothing else uses it
+        // now (HP, moves and costs come from level: see Combat.js).
         recomputeRanks: function() {
             const all = [...this.pieces.values()],
                 kids = new Map(all.map(p => [p.id, []]));
@@ -352,25 +363,17 @@
                     memo.set(p.id, r);
                     return r;
                 };
-            for (const p of all) {
-                const r = rankOf(p),
-                    player = p.owner === 'player',
-                    newMax = (player ? this.rules.hpPer : this.rules.enemyHpPer) * r;
-                if (newMax > p.maxHp && player && this.rules.rankUpHeals) p.hp += newMax - p.maxHp;
-                p.rank = r; p.maxHp = newMax;
-                p.hp = Math.min(p.hp, p.maxHp);
-            }
+            for (const p of all) p.rank = rankOf(p);
         },
         
-        coreRank: function() {
+        coreLevel: function() {
             const c = this.getPlayerCore();
-            return c ? c.rank : 0;
+            return c ? c.level : 0;
         },
         maxRank: function() {return Math.max(0, ...this.piecesOf('player').map(p => p.rank)); },
         moveLimit: function() {return this.rules.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
-        // Placing costs more the more pieces you have (the core and detached ones too), but
-        // not with rank, so detaching to keep ranks down doesn't make pieces cheaper.
-        placeCost: function() {return this.rules.placeBase + Math.ceil(this.piecesOf('player').length / Math.max(1, this.rules.placePerPieces));},
+        // Placing costs more the more levels your pieces have between them.
+        placeCost: function() {return this.rules.placeBase + Math.ceil(this.totalLevels() / Math.max(1, this.rules.placePerPieces));},
         
         // Can this player piece still move this turn?
         canMove: function(p) {
@@ -436,8 +439,13 @@
                         if (h.solid) {
                             if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
                         } else if (this.pieces.has(h.target.id)) {
-                            const lost = this.damage(h.target, 1, h.attacker);   // includes pieces linked below the target
+                            const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
                             for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
+                            // Your piece learns from the enemies it killed (see Combat.js).
+                            if (h.attacker.owner === 'player' && this.pieces.has(h.attacker.id)) {
+                                const xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
+                                if (xp) this.gainXp(h.attacker, xp);
+                            }
                         }
                     }
                 }
@@ -490,16 +498,20 @@
         },
         
         /*  Whether a piece can break the tile: only player pieces can attack solids, and only
-            if they'd do damage, i.e. their rank is more than the solid's DR (its material's
-            hardness). A solid of an unknown subtype can't be broken. */
+            if they could do damage, i.e. their most damage is more than the solid's DR (its
+            material's hardness) after their penetration (see Combat.js). A solid of an
+            unknown subtype can't be broken. */
         canBreak: function(piece, tile) {
-            return piece.owner === 'player' && tile?.kind === TILE_TYPE_SOLID && piece.rank > (pkg.solids.get(tile.subtype)?.dr ?? Infinity);
+            return piece.owner === 'player' && tile?.kind === TILE_TYPE_SOLID &&
+                this.damageRange(piece)[1] > this.armorAgainst(piece, pkg.solids.get(tile.subtype)?.dr ?? Infinity);
         },
         
-        /*  An attack on a solid tile: it takes the attacker's rank less its DR in damage.
-            Returns whether that broke it, leaving open floor. */
+        /*  An attack on a solid tile: it can't dodge, so it takes the attacker's damage
+            roll less its DR (after penetration). Returns whether that broke it, leaving
+            open floor. */
         damageSolid: function(tile, attacker) {
-            const dmg = attacker.rank - (pkg.solids.get(tile.subtype)?.dr ?? Infinity);
+            const [min, max] = this.damageRange(attacker),
+                dmg = min + Math.floor(this.combatRoll() * (max - min + 1)) - this.armorAgainst(attacker, pkg.solids.get(tile.subtype)?.dr ?? Infinity);
             let broken = false;
             if (dmg > 0) {
                 tile.hp -= dmg;
@@ -565,8 +577,8 @@
         canAffordPlace: function() { return this.score >= this.placeCost(); },
         
         // ---- Heal action ----
-        healCost: function() {return this.rules.healCostPer * this.coreRank();},
-        healAmount: function() {return this.rules.healActPer * this.coreRank();},
+        healCost: function() {return this.rules.healCostPer * this.coreLevel();},
+        healAmount: function() {return this.rules.healActPer * this.coreLevel();},
         anyDamaged: function() {return this.piecesOf('player').some(p => p.hp < p.maxHp);},
         canAffordHeal: function() {return this.score >= this.healCost();},
         
@@ -743,10 +755,10 @@
         
         // ---- Recover ----
         // Once a turn, a piece that has moved, or was placed, this turn can be made ready to
-        // move again, for its rank in score. It doesn't add a move: moving it again uses one
+        // move again, for its level in score. It doesn't add a move: moving it again uses one
         // of the turn's moves left, so it's only offered while there's one. A piece tired
         // from a jump can't be recovered.
-        recoverCost: function(p) {return p.rank;},
+        recoverCost: function(p) {return p.level;},
         canRecover: function(p) {
             return !this.over && !this.recoverUsed && p?.owner === 'player' && !this.isTired(p) &&
                 (this.acted.has(p.id) || this.fresh.has(p.id)) &&
@@ -755,8 +767,8 @@
         anyRecoverable: function() {return this.piecesOf('player').some(p => this.canRecover(p));},
         
         // ---- Quicken ----
-        // Once a turn, one more move this turn, for the swarm's rank (its highest) in score.
-        quickenCost: function() {return this.maxRank();},
+        // Once a turn, one more move this turn, for your highest level in score.
+        quickenCost: function() {return this.maxLevel();},
         canQuicken: function() {return !this.over && !this.quickenUsed && this.score >= this.quickenCost();},
         playerQuicken: function() {
             let quickened = false;

@@ -39,6 +39,6 @@
 		"stalactiteSolid":"icicle",
 		"rubbleSolid":"ice_boulder"
 	},
-	"spawnGenerator":{"type":"proximity", "initial":0, "pBase":0, "pPerRank":0},
+	"spawnGenerator":{"type":"proximity", "initial":0, "pBase":0, "pPerLevel":0},
 	"enemyAI":{"type":"squad"}
 }

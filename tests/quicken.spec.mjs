@@ -6,12 +6,13 @@ const state = page => page.evaluate(() => {
     return {turn:g.turn, score:g.score, limit:g.moveLimit(), movesUsed:g.movesUsed, canQuicken:g.canQuicken(), quickenUsed:g.quickenUsed};
 });
 
-test('Quicken adds a move this turn, for the swarm\'s highest rank, once a turn', async ({page}) => {
+test('Quicken adds a move this turn, for your highest level, once a turn', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game;
-        g.getPlayerCore().rank = 3;
+        g.getPlayerCore().rank = 3;  // 3 moves a turn
+        g.getPlayerCore().level = 3; // Quicken costs 3
         g.score = 10;
     });
     expect(await state(page)).toEqual({turn:1, score:10, limit:3, movesUsed:0, canQuicken:true, quickenUsed:false});

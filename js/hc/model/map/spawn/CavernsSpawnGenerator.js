@@ -5,8 +5,8 @@
     or down by its modifier each time (...OnSuccess after a band spawns, ...OnFailure after
     none does), from 0 to 100. What spawns is picked from challengeTable by how much of a
     challenge it should be, enemyChallenge, a formula of
-        rank     your highest piece rank
-        pieces   how many pieces you have
+        level    your highest piece level
+        levels   your pieces' levels, all together
         distance how far from the start (in steps) the piece that went in is
         size     how many cells the cavern or tunnel has
     rounded to a whole number. It spawns where you can't see, as far from the piece that
@@ -18,7 +18,7 @@
         attrs:{num, expr, tiers, evaluate, pickTier},
         hexDist
     } = pkg,
-        CHALLENGE_VARS = ['rank', 'pieces', 'distance', 'size'],
+        CHALLENGE_VARS = ['level', 'levels', 'distance', 'size'],
         KINDS = ['cavern', 'tunnel'],
         // The enemies and groups a table can name
         enemyOptions = () => [...pkg.enemies.list(), ...pkg.enemyGroups.list()].map(e => ({value:e.id, label:e.name}));
@@ -33,7 +33,7 @@
                 num('cavernSpawnChanceModifierOnFailure', 10, -100, 100),  // or after none does
                 num('tunnelSpawnChanceModifierOnSuccess', -5, -100, 100),  // and in a tunnel
                 num('tunnelSpawnChanceModifierOnFailure', 5, -100, 100),
-                expr('enemyChallenge', 'rank + floor(pieces / 5) + floor(distance / 40) + floor(size / 100)', CHALLENGE_VARS),
+                expr('enemyChallenge', 'level + floor(levels / 5) + floor(distance / 40) + floor(size / 100)', CHALLENGE_VARS),
                 tiers('challengeTable', [
                     {min:0, max:2, table:{goblin:60, goblin_pair:40}},
                     {min:3, max:5, table:{goblin_pair:30, goblin_trio:70}},
@@ -86,8 +86,8 @@
             let pieces = null;
             if (rng() * 100 < this.chance[kind]) {
                 const challenge = Math.round(evaluate(a.enemyChallenge, CHALLENGE_VARS, {
-                        rank:Math.max(1, game.maxRank()),
-                        pieces:game.piecesOf('player').length,
+                        level:Math.max(1, game.maxLevel()),
+                        levels:game.totalLevels(),
                         distance:hexDist(p, {x:0, y:0}),
                         size:region.size
                     })),

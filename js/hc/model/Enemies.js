@@ -1,6 +1,7 @@
 /*  Named enemies, from data/init.json5 (see Maps.loadIndex):
     
-    - enemies: {id:{name, description}}, what a single enemy piece is (more to come).
+    - enemies: {id:{name, description, ...}}, what a single enemy piece is, with its
+      stats (see Combat.js, which makes the table, pkg.enemies).
     - enemyGroups: {id:{name, description, members}}, enemies as they come, linked into
       trees: members is a list of nodes, each the id of an enemy (one piece, on its own),
       or {id:[nodes]} for an enemy with those linked below it, or the id of a group,
@@ -19,7 +20,6 @@
             (n && typeof n === 'object' && !Array.isArray(n) && Object.keys(n).length === 1 && isNodes(Object.values(n)[0])),
         isNodes = v => Array.isArray(v) && v.every(isNode);
     
-    pkg.enemies = new Subtypes('enemy', () => ({}));
     pkg.enemyGroups = new Subtypes('enemy group', entry => isNodes(entry.members) && entry.members.length ? {members:entry.members} : null);
     
     /*  Replaces the enemies and groups with those given, as init.json5 has them. */

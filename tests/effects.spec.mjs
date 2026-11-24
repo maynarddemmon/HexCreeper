@@ -86,8 +86,6 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     // The core at (0, 0), a at (2, 0) linked to it, and an enemy at (1, 1): the tile goes at (1, 0).
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        hc.app.game.rules.hpPer = 10;
-        hc.app.game.rules.enemyHpPer = 10;
         g.score = 100;
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
@@ -97,7 +95,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
         g.moveMode = 'free';                // so a stays put when the core moves
         g.enemyPhase = () => {};            // and the enemy too
         g.recomputeRanks();
-        for (const p of g.pieces.values()) p.hp = p.maxHp;
+        for (const p of g.pieces.values()) p.hp = p.maxHp = 20;
         g.playerWait();
     });
     const scores = () => page.evaluate(() => {

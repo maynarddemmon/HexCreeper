@@ -96,14 +96,13 @@
                     const band = game.newBand(),
                         pieces = [];
                     for (const [node, px, py, parent] of layout) {
-                        const p = game.addPiece('core', 'enemy', px, py, parent < 0 ? null : pieces[parent].id);
+                        const p = game.addPiece('core', 'enemy', px, py, parent < 0 ? null : pieces[parent].id, node.enemyId);
                         p.enemyId = node.enemyId;
                         p.band = band;
                         pieces.push(p);
                         game.fx(px, py, '', '--enemy', {spawn:true});
                     }
                     game.recomputeRanks();
-                    for (const p of pieces) p.hp = p.maxHp;
                     return pieces;
                 }
             }

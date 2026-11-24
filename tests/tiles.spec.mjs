@@ -268,7 +268,7 @@ test.describe('rules', () => {
         expect(r).toBe(2);
     });
     
-    test('the paid heal costs 5 x core rank, heals core rank, and wastes leftovers', async ({page}) => {
+    test('the paid heal costs 5 x core level, heals 4 x core level, and wastes leftovers', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
             g.score = 100;
@@ -279,6 +279,6 @@ test.describe('rules', () => {
             g.playerHeal(c);
             return {cost, amount, paid:s0 - g.score, full:c.hp === c.maxHp, sameTurn:g.turn === t0, again:g.playerHeal(c)};
         });
-        expect(r).toEqual({cost:10, amount:2, paid:10, full:true, sameTurn:true, again:false});
+        expect(r).toEqual({cost:5, amount:4, paid:5, full:true, sameTurn:true, again:false});
     });
 });

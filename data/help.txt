@@ -13,21 +13,22 @@ Each turn you may move as many pieces as your highest rank, each once, in any or
 - Detach (X) breaks the selected piece's link to its parent, however far apart they are; it keeps what's linked below it and moves on its own. Attach (L) links a piece with no parent to one of your pieces next to it. Either uses that piece's move, and changes ranks.
 - Shift-click to move just the selected piece, dragging along any linked piece that would end up out of range; where that can't go, it moves in your mode. Shift-click a cell held by one of your own pieces to move onto it instead of selecting it. Holding Shift shows the moves it would make. Alt-click (Option-click on a Mac) a piece next to the selected one to swap them: holding Alt shows the pieces it can swap with, and the pair swapped over the one you point at.
 
-<span style="font-size:16px;">RANK</span>
-A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. Max HP is 2 × rank. Your highest rank sets your moves per turn; your core's rank sets the cost of Heal (5 × rank). Place costs 4, plus 1 for every 2 pieces you have.
-A piece shows its rank as a symbol: rank 1 is a plain circle, 2 a line, 3 a triangle, 4 a cross, 5 a star, 6 three lines, 7 a seven-point star, 8 four lines, and from 9 a star with that many points.
+<span style="font-size:16px;">LEVELS AND RANK</span>
+Each piece has a level, stats and XP. Killing enemies gives the piece that does it XP, and enough XP raises its level, and its max HP with it. Your core's level sets the cost of Heal (5 × level) and how much it heals (4 × level). Place costs 4, plus 1 for every 2 levels your pieces have between them.
+A piece shows its level as a symbol: level 1 is a plain circle, 2 a line, 3 a triangle, 4 a cross, 5 a star, 6 three lines, 7 a seven-point star, 8 four lines, and from 9 a star with that many points.
+A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. Your highest rank sets your moves per turn.
 
 <span style="font-size:16px;">ATTACKING</span>
-Moving onto an enemy attacks it. When a group moves, every piece in it that would land on an enemy hits it. Killing n enemies in one move scores n², and pieces destroyed below a killed piece count too. After a kill, the attacker advances into the empty cell if it can.
+Moving onto an enemy attacks it: a roll decides whether it hits (from the attacker's str and level against the target's agl and level), then how much damage it does, less the target's armor. When a group moves, every piece in it that would land on an enemy attacks it. Killing n enemies in one move scores n², and pieces destroyed below a killed piece count too. After a kill, the attacker advances into the empty cell if it can.
 
 <span style="font-size:16px;">ENEMIES</span>
-Enemies arrive in waves of linked squads, and waves grow with your rank. A squad acts as often as its rank and plans its turn: it will carry a piece into reach, strike, and pull back out of reach. Kill a squad's leader to destroy the whole squad.
+Enemies arrive in waves of linked squads, and waves grow with your level. A squad acts as often as its rank and plans its turn: it will carry a piece into reach, strike, and pull back out of reach. Kill a squad's leader to destroy the whole squad.
 
 <span style="font-size:16px;">TILES</span>
 - A green heart heals, a red blood drop does damage, and a gold coin is loot: score. They act when one of your pieces moves onto them (or is placed on one), and the number in the corner, if it shows, is what each gives. Spare healing flows along links (up first, then down), and any left over becomes score. Enemies walk around harm.
 - There are kinds of each: point at one to see what it is. Some only show when you're close, or when you step on them; some affect every piece around them (pointing at one outlines where); some last only a few turns once found (the turns left show top right), and some hold more than one go (what's left shows bottom left).
 - The trail of gold dots is the path your core has taken; it's darker where you've gone that way more than once.
-- Grey hexes are solid: nothing can move onto them or see past them. Point at one to see what it's made of. A piece whose rank is more than a solid's DR can attack it, doing its rank less the DR in damage, and break through.
+- Grey hexes are solid: nothing can move onto them or see past them. Point at one to see what it's made of. A piece whose damage can be more than a solid's DR can attack it, doing its damage less the DR, and break through.
 - Black hexes are holes: nothing can move onto them, but you can see across them.
 - Dashed cells with a number are tiles counting down to appear. Quadrants you've visited are tinted blue.
 
@@ -37,8 +38,8 @@ You only see enemies within sight of your pieces: up to 12 steps away, with soli
 <span style="font-size:16px;">SPENDING SCORE</span>
 - Place (P): pick an empty cell next to the selected piece; the new piece is linked to it.
 - Click the selected piece again, or press Enter, for its menu: Place, Swap, Jump, Attach, Detach, Heal, Recover and Quicken. The arrow keys and Tab move between them. Each has a key too, which works on the selected piece. Go to (G) and Explore (O) send it off by itself, a step a turn with its swarm following (untangling the swarm, with free steps, swaps and jumps, where it can't follow), ending each turn, until it gets there, an enemy comes into view, one of your pieces is hurt, or you press a key or click. Snake (N) and Tree (T) get its swarm into formation, detaching, walking and attaching pieces with your moves each turn: a snake is a single chain with the piece at its head, which gets through the narrowest tunnels but has the lowest rank; a tree is as near a complete binary tree as it can be, with the highest rank for its size, but a big one can't get through a tunnel a step wide.
-- Heal (H): heal HP equal to your core's rank, starting from the selected piece.
-- Recover (R): once a turn, let the selected piece move again if it has already moved (or was placed) this turn, for its rank in score. It still uses one of your moves.
-- Quicken (U): once a turn, one more move this turn, for your swarm's highest rank in score.
+- Heal (H): heal 4 × your core's level in HP, starting from the selected piece.
+- Recover (R): once a turn, let the selected piece move again if it has already moved (or was placed) this turn, for its level in score. It still uses one of your moves.
+- Quicken (U): once a turn, one more move this turn, for your highest level in score.
 
 Save your game with the save button at the top right; it carries on from there the next time you open HexCreeper, and you can go back to it if your core is destroyed. The buttons next to it export your game to a file and import one, and the map button lists the maps you can play. Maps other than Endless Play have goals to achieve and penalties to avoid, listed in the brief and at the top left as you play; meet every goal that isn't optional, without incurring a penalty, to win. Each game starts with the map's brief, where you can choose the seed: the same seed lays it out the same way. Drag to pan, scroll to zoom, S to recenter, Esc to cancel. Settings has your preferences, such as whether pieces' moves are animated and how near the edge your core can get before the board follows it. Open this help again with the ? button at the top right.

@@ -1,13 +1,13 @@
 /*  The "proximity" spawn generator: enemies arrive around your core. A game starts with
     `initial` lone enemies, and every `spawnEvery` turns a wave comes, sized by your
-    strongest piece's rank (and, optionally, the turn): squads shaped as binary trees, each
+    strongest piece's level (and, optionally, the turn): squads shaped as binary trees, each
     set down minDist to maxDist steps from your core, clear of your pieces (SPAWN.clearance).
+    Its enemies are creepers (see Combat.js).
     
-    Enemy pressure follows the player's strength, not the clock. R = your highest piece
-    rank (the same number that sets your moves per turn):
-        enemies per wave = pBase + pPerRank x (R - 1)  [+ 1 per pTime turns, if set]
-        largest squad    = R + pSquadExtra (capped at maxSquad)
-    Losing rank lowers the pressure again. */
+    Enemy pressure follows the player's strength, not the clock. L = your highest piece
+    level:
+        enemies per wave = pBase + pPerLevel x (L - 1)  [+ 1 per pTime turns, if set]
+        largest squad    = L + pSquadExtra (capped at maxSquad) */
 (pkg => {
     'use strict';
     
@@ -22,9 +22,9 @@
         extend: {
             ATTRS:[
                 num('spawnEvery', 3, 1, 50),  // a wave every this many turns
-                num('pBase', 1, 0, 50),       // enemies per wave at rank 1
-                num('pPerRank', 2, 0, 20),    // extra enemies per wave for each rank above 1
-                num('pSquadExtra', 1, 0, 10), // largest squad = rank + this
+                num('pBase', 1, 0, 50),       // enemies per wave at level 1
+                num('pPerLevel', 2, 0, 20),   // extra enemies per wave for each level above 1
+                num('pSquadExtra', 1, 0, 10), // largest squad = level + this
                 num('maxSquad', 16, 1, 31),   // but never larger than this
                 num('pTime', 0, 0, 500),      // optional slow clock ramp: +1 enemy per wave every this many turns (0: off)
                 num('initial', 3, 0, 50),     // enemies at the start
@@ -53,15 +53,15 @@
         // How many enemies a wave brings now.
         waveSize: function() {
             const game = this.game,
-                {pBase, pPerRank, pTime} = this.attrs,
-                R = Math.max(1, game.maxRank()),
+                {pBase, pPerLevel, pTime} = this.attrs,
+                L = Math.max(1, game.maxLevel()),
                 clock = pTime ? Math.floor(game.turn / pTime) : 0;
-            return Math.max(0, pBase + pPerRank * (R - 1) + clock);
+            return Math.max(0, pBase + pPerLevel * (L - 1) + clock);
         },
         // The largest squad a wave brings now.
         squadCap: function() {
-            const R = Math.max(1, this.game.maxRank());
-            return Math.max(1, Math.min(this.attrs.maxSquad, R + this.attrs.pSquadExtra));
+            const L = Math.max(1, this.game.maxLevel());
+            return Math.max(1, Math.min(this.attrs.maxSquad, L + this.attrs.pSquadExtra));
         },
         
         // Split the wave's enemies into squads of (cap or cap-1) pieces.
@@ -111,7 +111,6 @@
                     if (!game.isOpen(x, y) || game.pieceAt(x, y) || game.isHarm(x, y)) continue;
                     if (players.some(p => hexDist(p, { x, y }) < SPAWN.clearance)) continue;
                     const p = game.addPiece('core', 'enemy', x, y);
-                    p.hp = p.maxHp = this.game.rules.enemyHpPer * this.game.rules.rankBase;
                     game.fx(x, y, '', '--enemy', { spawn: true });
                     return p;
                 }

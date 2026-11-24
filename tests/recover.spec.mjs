@@ -1,11 +1,11 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, menuItem, openMenu} from './helpers.mjs';
 
-/*  A lone core of the given rank (so that many moves a turn) with the given score, on an
-    empty board. */
+/*  A lone core of the given rank (so that many moves a turn) and level (so recovering
+    costs that much), with the given score, on an empty board. */
 const setUp = (page, rank, score) => page.evaluate(([rank, score]) => {
     const g = hc.app.game, core = g.getPlayerCore();
-    core.rank = rank;
+    core.rank = core.level = rank;
     g.score = score;
 }, [rank, score]);
 
@@ -19,7 +19,7 @@ const state = page => page.evaluate(() => {
     return {turn:g.turn, score:g.score, movesUsed:g.movesUsed, canMove:g.canMove(core), canRecover:g.canRecover(core), recoverUsed:g.recoverUsed};
 });
 
-test('recovering a piece that has moved lets it move again, for its rank, using one of the moves left', async ({page}) => {
+test('recovering a piece that has moved lets it move again, for its level, using one of the moves left', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await setUp(page, 2, 10);                    // 2 moves a turn
@@ -97,7 +97,7 @@ test('Recover in the menu (or R) recovers the selected piece; it\'s disabled whe
     });
     expect(await page.evaluate(() => [hc.app.game.getPlayerCore().rank, hc.app.game.moveLimit()])).toEqual([2, 2]);
     await openMenu(page);
-    const recover = menuItem(page, 'Recover · 2');
+    const recover = menuItem(page, 'Recover · 1'); // the core is level 1
     await expect(recover).toHaveClass(/\bdisabled\b/);       // hasn't moved
     await openMenu(page);                                     // closes it
     await expect(recover).toHaveCount(0);
@@ -105,7 +105,7 @@ test('Recover in the menu (or R) recovers the selected piece; it\'s disabled whe
     await openMenu(page);
     await expect(recover).not.toHaveClass(/\bdisabled\b/);
     await recover.click();
-    expect(await state(page)).toMatchObject({score:8, canMove:true, recoverUsed:true});
+    expect(await state(page)).toMatchObject({score:9, canMove:true, recoverUsed:true});
     await expect(recover).toHaveCount(0);                     // the menu closes
     
     await page.evaluate(() => {
@@ -115,7 +115,7 @@ test('Recover in the menu (or R) recovers the selected piece; it\'s disabled whe
         g.playerAct(g.getPlayerCore(), 2, 0);
     });
     await page.keyboard.press('r');
-    expect(await state(page)).toMatchObject({score:8, canMove:true, recoverUsed:true});
+    expect(await state(page)).toMatchObject({score:9, canMove:true, recoverUsed:true});
 });
 
 test('moves used and Recover are saved with the game', async ({page}) => {

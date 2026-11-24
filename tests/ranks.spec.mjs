@@ -6,7 +6,7 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
-test('rank needs two children; it sets max HP and moves', async ({page}) => {
+test('rank needs two children; it sets moves, but not max HP (level does)', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.hex.dirs[0], hc.hex.dirs[3]];
         g.score = 100;
@@ -18,8 +18,8 @@ test('rank needs two children; it sets max HP and moves', async ({page}) => {
     });
     expect(r.before).toEqual({rank:1, hp:2, max:2, moves:1, cost:5});
     expect(r.oneChild).toBe(1);
-    // Rank 2: max HP 4, but ranking up doesn't add HP. Place cost follows the 3 pieces.
-    expect(r.after).toEqual({rank:2, hp:2, max:4, moves:2, cost:6});
+    // Rank 2: 2 moves, but the same max HP. Place cost follows the 3 pieces' levels.
+    expect(r.after).toEqual({rank:2, hp:2, max:2, moves:2, cost:6});
     expect(r.score).toBe(90);
 });
 

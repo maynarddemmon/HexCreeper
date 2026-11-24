@@ -174,12 +174,39 @@
 		}
 	},
 	
-	// Named enemies: what a single enemy piece is, by id ("name", "description"; more to
-	// come). Every piece of one is a core for now: its rank comes from how it's linked.
+	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "stats" (str, agl,
+	// con, dex, int, wis, wil, cha: 10 if not given), "level" (1), "damage" ([min, max], its
+	// weapon's, before its str bonus), "penetration" (how much damage reduction its weapon
+	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
+	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: 5 x its level).
+	
+	// Your pieces: all adventurers for now.
+	"characters":{
+		"adventurer":{
+			"name":"Adventurer",
+			"description":"Someone setting out to see what's down there.",
+			"damage":[1, 6]
+		}
+	},
+	
+	// Named enemies: what a single enemy piece is, by id ("name", "description", and its
+	// profile). An enemy without a name is a creeper.
 	"enemies":{
+		"creeper":{
+			"name":"Creeper",
+			"description":"Something that crawls out of the dark.",
+			"stats":{"str":8, "agl":8, "con":8},
+			"damage":[1, 4],
+			"hp":4,
+			"xp":4
+		},
 		"goblin":{
 			"name":"Goblin",
-			"description":"A small humanoid with green skin, big eyes and sharp teeth."
+			"description":"A small humanoid with green skin, big eyes and sharp teeth.",
+			"stats":{"str":8, "agl":12, "con":8, "dex":10, "int":6, "wis":8, "wil":6, "cha":6},
+			"damage":[1, 4],
+			"hp":5,
+			"xp":5
 		}
 	},
 	

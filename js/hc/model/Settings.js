@@ -16,7 +16,7 @@
         
         {
             isObj,
-            attrs:{num, bool, choice, normalize, resolve},
+            attrs:{num, bool, choice, expr, normalize, resolve},
             cfg
         } = pkg,
         
@@ -49,15 +49,23 @@
             bool('advance', true),            // after a kill, the attacker (with its group) steps into the attacked cell if the whole group can (not onto harm)
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
-            num('rankBase', 1, 1, 10),        // the rank of a piece without two children
-            num('hpPer', 2, 1, 20),           // max HP = this x the piece's own rank
-            num('enemyHpPer', 1, 1, 20),      // an enemy's max HP = this x its rank
+            num('rankBase', 1, 1, 10),        // the rank of a piece without two children (rank isn't used for now: see Combat.js)
             num('movesPer', 1, 1, 10),        // pieces you may move per turn = this x the highest rank of any piece
-            num('placeBase', 4, 0, 100),      // the cost to place a piece = this + 1 per placePerPieces of your pieces (rounded up)
+            // Combat (see Combat.js): formulas of a piece's level and stats (pkg.STAT_VARS),
+            // rounded down, but the hit chance, of accuracy and defence.
+            expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS), // unless its profile fixes it
+            expr('meleeAccuracy', 'str + level', pkg.STAT_VARS),
+            expr('defence', 'agl + level', pkg.STAT_VARS),
+            expr('hitChance', '50 + 3 * (accuracy - defence)', ['accuracy', 'defence']), // in %, kept from hitMin to hitMax
+            num('hitMin', 5, 0, 100),
+            num('hitMax', 95, 0, 100),
+            expr('damageBonus', '(str - 10) / 2', pkg.STAT_VARS),     // added to the weapon's damage (never below 0)
+            expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS), // added to the weapon's penetration (if more than 0)
+            expr('xpToLevel', '20 * level', pkg.STAT_VARS),            // the xp to go up from this level
+            num('placeBase', 4, 0, 100),      // the cost to place a piece = this + 1 per placePerPieces of your pieces' levels (rounded up)
             num('placePerPieces', 2, 1, 100),
-            bool('rankUpHeals', false),       // when max HP rises with rank, HP rises too (otherwise the new HP must be healed)
-            num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's rank
-            num('healActPer', 1, 1, 20),      // and heals this x your core's rank
+            num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's level
+            num('healActPer', 4, 1, 20),      // and heals this x your core's level
             num('healScore', 1, 0, 20),       // each unused heal point becomes this much score
             num('corePathLength', 250, 0, 100000) // how many of the core's latest steps the golden path keeps (0: none)
         ],

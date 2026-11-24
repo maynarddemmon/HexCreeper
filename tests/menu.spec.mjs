@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 1 · 5', 'Recover · 1', 'Quicken · 1', 'Go to', 'Explore', 'Snake', 'Tree'];
+const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Recover · 1', 'Quicken · 1', 'Go to', 'Explore', 'Snake', 'Tree'];
 
 /*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. */
 const setUp = async page => {
@@ -39,7 +39,7 @@ test('clicking the selected piece again opens its menu beside it, with what it c
 
 test('the actions are no longer in the footer', async ({page}) => {
     await setUp(page);
-    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Recover', 'Heal 1 · 5', 'Quicken · 1']) {
+    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Recover', 'Heal 4 · 5', 'Quicken · 1']) {
         await expect(button(page, name)).toHaveCount(0);
     }
 });
@@ -80,6 +80,7 @@ test('Heal in the menu (or H) heals starting from the selected piece', async ({p
     await setUp(page);
     await page.evaluate(() => {
         const g = hc.app.game;
+        g.rules.healActPer = 1; // 1 HP, so it shows where healing starts
         g.pieceAt(1, 0).hp = 1;
         g.getPlayerCore().hp = 1;
     });

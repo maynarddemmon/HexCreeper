@@ -413,7 +413,7 @@
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
                 if (sel) {
                     self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.rank, sel.hp, sel.maxHp)
+                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, sel.xp, game.statRule('xpToLevel', sel))
                     );
                 } else {
                     self.selected.update(i18n('info-none'));
