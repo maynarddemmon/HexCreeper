@@ -2,9 +2,17 @@ JS.Packages(file => {
     const HC_ROOT = globalThis.HC_ROOT ?? '',
         COMPONENT_ROOT = HC_ROOT + 'component/',
         MODEL_ROOT = HC_ROOT + 'model/',
+        MAP_ROOT = MODEL_ROOT + 'map/',
+        MAP_TILE_ROOT = MAP_ROOT + 'tile/',
+        MAP_SPAWN_ROOT = MAP_ROOT + 'spawn/',
+        MAP_ENEMY_AI_ROOT = MAP_ROOT + 'enemy_ai/',
+        TILE_ROOT = MODEL_ROOT + 'tile/',
         VIEW_ROOT = HC_ROOT + 'view/';
     
     file(HC_ROOT + 'hc.js').provides('hc','hc.theme','hc.cfg');
+    
+    file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
+    
     
     // Component //
     file(COMPONENT_ROOT + 'Misc.js').provides(
@@ -17,6 +25,7 @@ JS.Packages(file => {
         'hc.dialogUtil','hc.ModalDialog','hc.AckDialog','hc.ConfirmDialog'
     ).requires('hc.IconBtn','hc.UnderlineBtn','hc.Spacer','hc.WideView','hc.Panel');
     
+    
     // Model //
     file(MODEL_ROOT + 'Grid.js').provides('hc.hex','hc.makeChunks','hc.hexDist').requires('hc.cfg');
     file(MODEL_ROOT + 'PieceTypes.js').provides('hc.PIECE_TYPES').requires('hc.hex');
@@ -26,23 +35,34 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'Expr.js').provides('hc.expr').requires('hc');
     file(MODEL_ROOT + 'Goals.js').provides('hc.goals','hc.Goals').requires('hc.hex','hc.expr');
     file(MODEL_ROOT + 'Attrs.js').provides('hc.attrs').requires('hc');
-    file(MODEL_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
-    file(MODEL_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc.Subtypes');
-    file(MODEL_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
-    file(MODEL_ROOT + 'MapComponent.js').provides('hc.MapComponent').requires('hc.attrs');
+    
+    // Tile
+    file(TILE_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
+    file(TILE_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc.Subtypes');
+    file(TILE_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
+    
+    // Map
+    file(MAP_ROOT + 'MapComponent.js').provides('hc.MapComponent').requires('hc.attrs');
+    file(MAP_ROOT + 'Maps.js').provides('hc.maps').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles','hc.defineEnemies','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
+    file(MAP_ROOT + 'Generators.js').provides('hc.TileGenerator','hc.SpawnGenerator').requires('hc.MapComponent','hc.enemyTrees','hc.hex','hc.hexDist');
+    
+    // Map Spawn Generators
+    file(MAP_SPAWN_ROOT + 'ProximitySpawnGenerator.js').provides('hc.ProximitySpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist');
+    file(MAP_SPAWN_ROOT + 'CavernsSpawnGenerator.js').provides('hc.CavernsSpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist','hc.attrs','hc.enemies');
+    
+    // Map Tile Generators
+    file(MAP_TILE_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
+    file(MAP_TILE_ROOT + 'CavernsTileGenerator.js').provides('hc.CavernsTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
+    
+    // Map EnemyAI Generators
+    file(MAP_ENEMY_AI_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.MapComponent');
+    file(MAP_ENEMY_AI_ROOT + 'SquadAI.js').provides('hc.SquadAI').requires('hc.EnemyAI','hc.hex','hc.PIECE_TYPES');
+    
     file(MODEL_ROOT + 'Enemies.js').provides('hc.enemies','hc.enemyGroups','hc.defineEnemies','hc.enemyTrees').requires('hc.Subtypes');
-    file(MODEL_ROOT + 'Generators.js').provides('hc.TileGenerator','hc.SpawnGenerator').requires('hc.MapComponent','hc.enemyTrees','hc.hex','hc.hexDist');
-    file(MODEL_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
-    file(MODEL_ROOT + 'CavernsTileGenerator.js').provides('hc.CavernsTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
-    file(MODEL_ROOT + 'ProximitySpawnGenerator.js').provides('hc.ProximitySpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist');
-    file(MODEL_ROOT + 'CavernsSpawnGenerator.js').provides('hc.CavernsSpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist','hc.attrs','hc.enemies');
-    file(MODEL_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.MapComponent');
-    file(MODEL_ROOT + 'SquadAI.js').provides('hc.SquadAI').requires('hc.EnemyAI','hc.hex','hc.PIECE_TYPES');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Goals','hc.solids','hc.EffectTiles','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.attrs','hc.PLAYER_MOVE_MODES');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
-    file(HC_ROOT + '../../lib/json5.min.js').provides('JSON5');
-    file(MODEL_ROOT + 'Maps.js').provides('hc.maps').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles','hc.defineEnemies','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
+    
     
     // View //
     file(VIEW_ROOT + 'View.js').provides('hc.view').requires('hc.Game','hc.settings');

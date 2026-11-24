@@ -60,7 +60,7 @@
 	// or a net: its opacity is its material's times its coverage. A solid that can be seen
 	// through is drawn see-through too.
 	// Maps choose which kinds walls, clumps and cave rock are made of (their tile
-	// generator's attrs; see js/hc/model/ProximityTileGenerator.js and
+	// generator's attrs; see js/hc/model/map/tile/ProximityTileGenerator.js and
 	// CavernsTileGenerator.js).
 	"solids":{
 		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
@@ -78,7 +78,7 @@
 		"plastic_wall":    {"name":"Plastic wall",     "composition":"plastic",   "hp":6,  "fillColor":"#d8d0b0", "borderColor":"#ece6cc"},
 		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
 		"net":             {"name":"Net",              "composition":"rope",      "hp":3,  "coverage":30, "fillColor":"#8a7a5a", "borderColor":"#a8966e"},
-		// Caverns (see js/hc/model/CavernsTileGenerator.js). A stalactite hangs from the
+		// Caverns (see js/hc/model/map/tile/CavernsTileGenerator.js). A stalactite hangs from the
 		// ceiling, so you can see past it more than a stalagmite, and over a pile of rubble
 		// a little.
 		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c"},
@@ -99,7 +99,7 @@
 	},
 	
 	// Kinds of heal, harm and loot tile. Each has a name, a description, and how it works
-	// (see js/hc/model/EffectTiles.js for the details):
+	// (see js/hc/model/tile/EffectTiles.js for the details):
 	//   revealMode: when it shows: "instant" (default: once its cell is in sight),
 	//     "hidden" (once a piece of yours enters it) or {"proximity":n} (once a piece of
 	//     yours is within n cells).
@@ -114,7 +114,7 @@
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
 	// Maps choose which kinds their tiles are (their tile generator's attrs; see
-	// js/hc/model/ProximityTileGenerator.js and CavernsTileGenerator.js).
+	// js/hc/model/map/tile/ProximityTileGenerator.js and CavernsTileGenerator.js).
 	"heals":{
 		"heal": {
 			"name":"Heal",
@@ -220,7 +220,7 @@
 	// needs. Each map's own file is data/gamemap/<id>.json5. A map with no "number" is
 	// listed without one. A map's file names its "tileGenerator", "spawnGenerator" and
 	// "enemyAI", {"type":..., ...attrs}, and may give "rules", {id:value}: gameplay values in place of
-	// hc.cfg's (see js/hc/model/Maps.js), a "seed", so it's always laid out the same
+	// hc.cfg's (see js/hc/model/map/Maps.js), a "seed", so it's always laid out the same
 	// (otherwise the brief offers a random one), and "goals" and "penalties" (see
 	// docs/DESIGN.md, Maps).
 	"maps":[
