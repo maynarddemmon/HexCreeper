@@ -52,6 +52,10 @@
         DAMAGE_VARS = pkg.DAMAGE_VARS = ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
         isInt = v => Number.isInteger(v) && v >= 0,
         
+        /*  What the damageRoll rule (of rules) comes to for a range of min to max and the
+            rolls roll and roll2: a whole number, not below 0. */
+        rolled = (rules, min, max, roll, roll2) => Math.max(0, Math.floor(evaluate(rules.damageRoll, DAMAGE_VARS, {min, max, roll, roll2})) || 0),
+        
         /*  A profile as init.json5 has it, made usable, or null if it isn't. */
         parseProfile = entry => {
             const stats = {}, level = entry.level ?? 1, damage = entry.damage ?? [1, 4];
@@ -75,6 +79,7 @@
         FALLBACK = parseProfile({}),
         
         LOG_MAX = 200,                       // combat log entries kept
+        ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
         
         AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
         MIN_COST = 10;                       // the least an action can cost (so there's an end to them)
@@ -187,8 +192,26 @@
             and two rolls), a whole number, not below 0. */
         rollDamage: function(a) {
             const [min, max] = this.damageRange(a);
-            return Math.max(0, Math.floor(evaluate(this.rules.damageRoll, DAMAGE_VARS,
-                {min, max, roll:this.combatRoll(), roll2:this.combatRoll()})) || 0);
+            return rolled(this.rules, min, max, this.combatRoll(), this.combatRoll());
+        },
+        
+        /*  How likely each amount of damage is when attacker a hits piece d, after its
+            armor: an array, [k] the chance (0 to 1) that a hit does k. Worked out from the
+            damageRoll rule over an even grid of ODDS_STEPS by ODDS_STEPS rolls, so it's
+            exact for one roll over a range whose size divides ODDS_STEPS, and close
+            otherwise. */
+        damageOdds: function(a, d) {
+            const [min, max] = this.damageRange(a),
+                armor = this.armorAgainst(a, d.armor),
+                each = 1 / (ODDS_STEPS * ODDS_STEPS),
+                odds = [];
+            for (let i = 0; i < ODDS_STEPS; i++) {
+                for (let j = 0; j < ODDS_STEPS; j++) {
+                    const k = Math.max(0, rolled(this.rules, min, max, (i + 0.5) / ODDS_STEPS, (j + 0.5) / ODDS_STEPS) - armor);
+                    odds[k] = (odds[k] ?? 0) + each;
+                }
+            }
+            return Array.from(odds, v => v ?? 0);
         },
         
         /*  Attacker a's penetration: its weapon's, and its penetrationBonus if more than 0. */

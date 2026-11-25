@@ -178,6 +178,26 @@ test('damage: the weapon\'s plus the str bonus, less armor after penetration; ar
     expect(r).toEqual([[1, 6], [0, 3], [5, 10], 3, 0, 5]);
 });
 
+test('damage odds: the chance of each amount a hit does, after armor, from the damageRoll rule', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), e = g.addPiece('core', 'enemy', 3, 0),
+            sixths = odds => odds.map(o => Math.round(o * 6 * 1000) / 1000);
+        g.rules.damageRoll = 'min + floor(roll * (max - min + 1))';
+        c.damage = [1, 6];
+        e.armor = 2;
+        const one = sixths(g.damageOdds(c, e));
+        // Two d6: 2 to 12, 7 (5 after armor) the likeliest.
+        g.rules.damageRoll = 'min + floor(roll * 6) + floor(roll2 * 6)';
+        c.damage = [2, 12];
+        const two = g.damageOdds(c, e);
+        return {one, total:two.reduce((a, o) => a + o, 0), likeliest:two.indexOf(Math.max(...two))};
+    });
+    // 1 and 2 are soaked; 3 to 6 do 1 to 4.
+    expect(r.one).toEqual([2, 1, 1, 1, 1]);
+    expect(r.total).toBeCloseTo(1, 9);
+    expect(r.likeliest).toBe(5);
+});
+
 test('attacks roll from the seed, and hit about as often as the chance says', async ({page}) => {
     await realCombat(page);
     const r = await page.evaluate(() => {

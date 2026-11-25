@@ -97,10 +97,11 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 The "squad" enemy AI (`model/map/enemy_ai/SquadAI.js`); its numbers are its attrs (see Settings).
 - **Far squads** (nearest piece more than 6 steps from yours, by the distance field) march: the whole squad steps one cell along the shortest path that avoids harm tiles, keeping its shape, or, if no step gets it closer, one of its pieces jumps (see Jump).
 - **Near squads** plan their turn with a **beam search** (12 plans kept per step) over sequences of single-piece actions, up to their action budget. A plan is scored on:
-  - damage dealt: +10 per hit, +15 for hitting the core, +6 per player piece destroyed (including pieces linked below it), +1000 for destroying the core;
-  - exposure at the end of the turn: −**caution** (12, *setting*) × (pieces in its subtree) for every squad piece left next to a player piece (×0.6 if it has more than 1 HP);
+  - expected damage (2026-11-25; until then every hit was a sure 1 damage): +10 per HP a strike can be expected to take (its hit chance × its damage odds, `Combat.damageOdds`, capped by the HP left), +15 more per HP on the core, and +6 per player piece destroyed (including pieces linked below it) and +1000 for the core, each times the chance of it. A plan keeps the odds of each struck piece's HP, so a second strike on the same piece is worth what it can still take. A piece the plan is sure to have destroyed is gone (its cell can be stepped into); one it might have is still in the way. So a goblin's swing at the adventurer (44%, 0–3) is worth about 6.6 and a reaver's (56%, 3–7) about 28: goblins hang back until patience runs out, reavers press;
+  - exposure at the end of the turn: −**caution** (12, *setting*) × (pieces in its subtree) for every squad piece left next to a player piece (×0.6 if it has more than 1 HP), times the chance one of those player pieces is still there;
   - position: +1 for each piece ending exactly 2 steps away (can strike next turn, can't be hit), −0.5 per step for pieces further out.
-  - While searching, a partial plan also gets credit for strikes it has set up but not made yet, so "carry into reach → strike → pull back with an ancestor" isn't pruned at its first, bad-looking step.
+  - While searching, a partial plan also gets credit for strikes it has set up but not made yet (each piece's best strike's expected damage, up to the actions left), so "carry into reach → strike → pull back with an ancestor" isn't pruned at its first, bad-looking step.
+- **Stale plans** (2026-11-25): a plan is made before any dice are rolled, so it can go stale: a strike kills its target, and the next attack planned there would now be a step into the empty cell. When an action no longer does what was planned (an attack is now a step), the squad plans the rest of its turn again, from there, with the points left (but not twice in a row without acting).
 - **Patience** (2 turns, *setting*): each turn a nearby squad goes without landing a hit, its caution drops (to 0 after 2 idle turns), so it can't hang back at a safe distance forever. A hit resets it. Without patience, cautious squads hovered 2 steps away indefinitely.
 - Observed against a wall of player pieces: a leader moves the squad in for a 6-hit group strike, then the mid pieces pull their branches back; or a mid piece strikes and the leader pulls everything back, with idle turns at a safe distance in between. Against a lone, surrounded target there is no safe retreat (any step back carries a piece onto the target, which counts as another attack), so squads keep attacking.
 
@@ -267,8 +268,8 @@ Rules and attrs are never shown to the player: they're tuned in code (combat and
 |---|---|
 | `planRange` (squads this near plan their turn; farther ones march) | 6 |
 | `beam` (plans kept per search step) | 12 |
-| `hit` / `coreHit` (per hit; extra for the core) | 10 / 15 |
-| `killPer` / `coreKill` (per piece destroyed; the core) | 6 / 1000 |
+| `hit` / `coreHit` (per HP of expected damage; extra for the core) | 10 / 15 |
+| `killPer` / `coreKill` (per piece destroyed; the core; times the chance) | 6 / 1000 |
 | `expose` (caution; 0 = reckless) | 12 |
 | `patience` (turns) | 2 |
 | `poise` (ending 2 steps away) | 1 |

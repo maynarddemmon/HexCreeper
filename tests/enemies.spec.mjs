@@ -80,6 +80,47 @@ test('a squad facing a wall strikes and pulls back out of reach', async ({page})
     expect(r.safeStrikes).toBeGreaterThan(0);
 });
 
+// A creeper two steps from your core, with the points to step in and strike (but not to
+// pull back), and 3 HP, so standing next to you costs it 0.6 of expose (12): it steps in
+// only if the strike is worth more, at its hit chance (hit 10 per HP it can expect to do).
+for (const [chance, strikes] of [[100, true], [5, false]]) {
+    test(`a squad strikes by its odds: at ${chance}% a creeper ${strikes ? 'steps in to strike' : 'keeps its distance'}`, async ({page}) => {
+        const r = await page.evaluate(chance => {
+            const g = hc.app.game, c = g.getPlayerCore();
+            g.rules.apPool = g.rules.apRecovery = '2';
+            g.rules.hitMin = g.rules.hitMax = chance;
+            hc.enemies.byId.set('creeper', {...hc.enemies.get('creeper'), hp:3});
+            g.addPiece('core', 'enemy', c.x, c.y - 2);
+            g.playerWait();
+            return g.combatLog.filter(e => e.a?.owner === 'enemy').length;
+        }, chance);
+        expect(r > 0).toBe(strikes);
+    });
+}
+
+test('a plan gone stale is made again: once a strike kills a piece, the next one planned on it isn\'t a step into its cell', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.score = 100;
+        g.playerPlace(c.x, c.y - 1, c);
+        const p = g.pieceAt(c.x, c.y - 1);
+        // Two creepers next to that piece (2 HP), but not the core: each hit does 1 or 2
+        // as they plan it (so the second strike is worth making), but does 2.
+        hc.enemies.byId.set('creeper', {...hc.enemies.get('creeper'), damage:[1, 2], hp:3});
+        const a = g.addPiece('core', 'enemy', c.x, c.y - 2),
+            b = g.addPiece('core', 'enemy', c.x + 1, c.y - 2, a.id);
+        g.recomputeRanks();
+        g.rollDamage = () => 2;
+        g.playerWait();
+        return {
+            gone:!g.pieces.has(p.id),
+            strikes:g.combatLog.filter(e => e.a?.owner === 'enemy').length,
+            inItsCell:!!g.pieceAt(c.x, c.y - 1)
+        };
+    });
+    expect(r).toEqual({gone:true, strikes:1, inItsCell:false});
+});
+
 test('patience: a squad that can only wait commits within a few turns', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();

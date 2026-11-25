@@ -72,7 +72,7 @@ test('a piece destroyed in a squad\'s later action stays drawn until then', asyn
         // The squad steps its leader, then strikes your piece with the other.
         const e = g.addPiece('core', 'enemy', 2, -3), e2 = g.addPiece('core', 'enemy', 1, -2, e.id);
         g.recomputeRanks();
-        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
+        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free', attack:true}];
         g.enemyAI.attrs.planRange = 100;
         g.effects = [];
         const now = performance.now();
@@ -96,7 +96,7 @@ test('with Animate pieces off, nothing is animated, and the enemies\' turn shows
         kid.hp = 1;
         const e = g.addPiece('core', 'enemy', 3, -3), e2 = g.addPiece('core', 'enemy', 2, -2, e.id);
         g.recomputeRanks();
-        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free'}];
+        g.enemyAI.planSquad = () => [{id:e.id, dx:0, dy:1, mode:'free'}, {id:e2.id, dx:-1, dy:1, mode:'free', attack:true}];
         g.enemyAI.attrs.planRange = 100;
         g.effects = [];
         g.enemyPhase();
