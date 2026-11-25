@@ -27,7 +27,8 @@
         
         nav = null,     // the selected piece going somewhere by itself (see startNav), or null
         lastForm = null, // the swarm the last formation was for, {root, ids} (see startNav)
-        navNote = '';   // why it last stopped, shown until you next press a key or click
+        navNote = '',   // why it last stopped, shown until you next press a key or click, or point at another cell
+        navNoteAt = null; // the cell pointed at when it stopped (V.hover then)
     
     const JSClass = JS.Class,
         
@@ -240,6 +241,7 @@
             if (nav) clearTimeout(nav.timer);
             nav = null;
             navNote = note ? i18n(note) : '';
+            navNoteAt = V.hover;
             draw();
         },
         
@@ -572,6 +574,8 @@
                 /*  Updates the overlays, once per frame. */
                 update: function() {
                     let status = '';
+                    // Why going stopped gives way once you point at another cell.
+                    if (navNote && !(V.hover?.x === navNoteAt?.x && V.hover?.y === navNoteAt?.y)) navNote = '';
                     if (V.placeMode) {
                         status = i18n('status-place');
                     } else if (V.attachMode) {
