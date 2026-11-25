@@ -38,6 +38,7 @@
             here is enough to make it appear there. */
         PREFERENCES = [
             pref(GROUP_DISPLAY, onto(cfg.ANIM, 'on', bool, 'animate')),
+            pref(GROUP_DISPLAY, onto(cfg.ANIM, 'speed', num, 'animSpeed', 25, 200)),
             pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45)),
             pref(GROUP_DISPLAY, onto(cfg, 'COMBAT_LOG', bool, 'combatLog'))
         ],

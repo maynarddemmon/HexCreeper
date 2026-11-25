@@ -850,7 +850,7 @@
         
         fx: function(x, y, text, color, opts = {}) {
             this.effects.push({x, y, text, color, t0:this.actionStart() + (opts.delay || 0), ...opts});
-            if (opts.bump) this.actionTakes(ANIM.BUMP_MS);
+            if (opts.bump && this.inSight(x, y)) this.actionTakes(pkg.animMs(ANIM.BUMP_MS));
         },
         
         // ---- Animation ----
@@ -859,7 +859,8 @@
         // one after another, so you can follow them, and all squads play at once. A move or
         // effect made during an action starts when the action does. Your actions play at
         // once (no track), and a piece you move drops any move of its still playing. None
-        // of this is saved.
+        // of this is saved. What you can't see takes no time (an enemy's move between cells
+        // out of sight, a bump out of sight), so it holds nothing up.
         clearAnimation: function() {
             this.motions = [];
             this.track = null;            // the squad (its leader's id) acting, or null for you
@@ -890,13 +891,19 @@
             this.openAction = null;
         },
         
+        // Whether cell (x, y) is in your sight (everything is, without fog).
+        inSight: function(x, y) {
+            const sight = this.cellsInSight();
+            return !sight || sight.has(this.key(x, y));
+        },
+        
         // Piece p moved from one cell to another (by a jump, or a step). Nothing to animate
-        // with animation off.
+        // with animation off, or for an enemy that's out of your sight before and after.
         motionFx: function(p, from, to, jump = false) {
             const now = performance.now(),
-                dur = jump ? ANIM.JUMP_MS : ANIM.MOVE_MS;
+                dur = pkg.animMs(jump ? ANIM.JUMP_MS : ANIM.MOVE_MS);
             this.motions = this.motions.filter(m => now < m.t0 + m.dur && !(this.track == null && m.id === p.id));
-            if (ANIM.on) {
+            if (ANIM.on && (p.owner !== 'enemy' || this.inSight(...from) || this.inSight(...to))) {
                 this.motions.push({id:p.id, from, to, jump, t0:this.actionStart(), dur});
                 this.actionTakes(dur);
             }

@@ -656,7 +656,7 @@
             if (sp) { const a = Math.min(1, Math.max(0, (now - sp.t0) / 250)); scale *= 0.3 + 0.7 * a; }
             for (const f of game.effects) {
                 if (!f.bump || f.bump.from !== p) continue;
-                const age = (now - f.t0) / ANIM.BUMP_MS;
+                const age = (now - f.t0) / pkg.animMs(ANIM.BUMP_MS);
                 if (age >= 0 && age < 1) {
                     const k = Math.sin(age * Math.PI) * 0.28 * s;
                     const [tx, ty] = cellCenter(f.x, f.y), dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1;

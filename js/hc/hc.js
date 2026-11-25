@@ -90,13 +90,15 @@
             
             // Animation: a piece's step takes MOVE_MS and a jump JUMP_MS, during which it grows
             // by up to JUMP_GROW (as if rising towards you) and back. An attack's bump takes
-            // BUMP_MS. on: whether pieces' moves are animated at all (a preference).
+            // BUMP_MS. on: whether pieces' moves are animated at all; speed: how fast, in %
+            // (the times are divided by it: see animMs). Both are preferences.
             ANIM:{
                 on:true,
-                MOVE_MS:160,
-                JUMP_MS:320,
+                speed:100,
+                MOVE_MS:250,
+                JUMP_MS:500,
                 JUMP_GROW:0.35,
-                BUMP_MS:180
+                BUMP_MS:250
             },
             
             // Look //
@@ -180,6 +182,9 @@
         /*  A new seed for a map: a random whole number below a million, easy to note down. */
         randomSeed: () => Math.floor(Math.random() * 1000000),
         
-        isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v)
+        isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v),
+        
+        /*  An animation time (ms, one of cfg.ANIM's) at the Animation speed preference. */
+        animMs: ms => ms * 100 / pkg.hc.cfg.ANIM.speed
     };
 })(window);

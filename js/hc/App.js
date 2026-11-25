@@ -285,7 +285,8 @@
             action for it (formationAction), with the points the swarm has, then ends the
             turn. */
         navStep = () => {
-            const p = game.pieces.get(nav.id);
+            const p = game.pieces.get(nav.id),
+                turn = game.turn;
             let stop = '', did = '';
             if (!p || game.over) {
                 stop = game.over ? 'nav-over' : 'nav-lost';
@@ -334,10 +335,18 @@
                 if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
             }
             stop ||= navStopReason();
+            // A step that leaves the piece without the points for another ends the turn
+            // with it (so the turn is one beat, below).
+            if (!stop && did === 'step' && game.turn === turn && !game.canMove(p)) endTurn();
             if (stop) {
                 stopNav(stop === 'nav-over' ? '' : stop);
             } else {
-                const wait = Math.max(game.animationEnd() - performance.now(), pkg.cfg.ANIM.on ? 0 : pkg.cfg.ANIM.MOVE_MS);
+                // The next step once what's shown has played; and a turn takes at least a
+                // beat (a step's time), even one where nothing you can see happens, so the
+                // pace is the same whatever's out of sight, and you see the points come back.
+                const {ANIM} = pkg.cfg,
+                    beat = pkg.animMs(ANIM.MOVE_MS),
+                    wait = Math.max(game.animationEnd() - performance.now(), ANIM.on ? 0 : beat, game.turn !== turn ? beat : 0);
                 nav.timer = setTimeout(navStep, wait + 20);
             }
         },

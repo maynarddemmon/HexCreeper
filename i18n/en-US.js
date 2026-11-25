@@ -153,6 +153,7 @@ myt.I18N.setDictionary({
 "settings-group-display":"Display",
 "setting-combatLog":"Show the combat log",
 "setting-animate":"Animate pieces",
+"setting-animSpeed":"Animation speed (%)",
 "setting-followMargin":"Follow margin (% of the board)",
 "save-problem-not-save":"it is not a HexCreeper save",
 

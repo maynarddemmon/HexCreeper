@@ -120,3 +120,41 @@ test('Animate pieces is a preference: in Settings, kept for the whole app, not s
     await expect(page.getByText('1. Open Ground', {exact:true}).filter({visible:true})).toBeVisible();
     await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toHaveCount(0);
 });
+
+test('an enemy\'s move out of your sight takes no time; one into sight does', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, {MOVE_MS} = hc.cfg.ANIM;
+        // The first cell north that's out of sight, and the one past it.
+        let k = 1;
+        while (g.inSight(0, -k)) k++;
+        g.rules.apPool = '2';   // (two actions)
+        const hidden = g.addPiece('core', 'enemy', 0, -k - 1),
+            edge = g.addPiece('core', 'enemy', 3, -k - 3);
+        g.recomputeRanks();
+        g.enemyAI.planSquad = squad => squad[0] === hidden
+            ? [{id:hidden.id, dx:0, dy:1, mode:'free'}, {id:hidden.id, dx:0, dy:1, mode:'free'}]
+            : [];
+        g.enemyAI.attrs.planRange = 1000;
+        g.motions = [];
+        const t0 = performance.now();
+        g.enemyPhase();
+        // Its first step, from (0, -k - 1) to (0, -k), is all out of sight: no time; its
+        // second, into sight, plays at once, as if the first weren't there.
+        const ms = g.motions.filter(m => m.id === hidden.id);
+        return {seen:[g.inSight(0, -k - 1), g.inSight(0, -k)], moves:ms.map(m => m.to[1] + k), soon:ms[0].t0 - t0 < MOVE_MS / 2, edge:g.motions.some(m => m.id === edge.id)};
+    });
+    expect(r).toEqual({seen:[false, false], moves:[1], soon:true, edge:false});
+});
+
+test('Animation speed is a preference that scales the animation times', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), {MOVE_MS} = hc.cfg.ANIM;
+        hc.settings.set('animSpeed', 200);
+        g.motions = [];
+        g.playerAct(c, 1, 0);
+        const fast = g.motions[0].dur;
+        hc.settings.set('animSpeed', 100);
+        return [fast === MOVE_MS / 2, hc.settings.set('animSpeed', 1000), hc.cfg.ANIM.speed];
+    });
+    expect(r).toEqual([true, 400, 400]);
+});
