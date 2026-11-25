@@ -21,7 +21,7 @@ test('floor kinds come from init.json5, with a moveCost; bad ones are refused', 
     const errors = [];
     page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
     expect(await page.evaluate(() => hc.floors.list().map(f => [f.id, f.moveCost]))).toEqual([
-        ['stone_floor', 1], ['cave_floor', 1], ['dirt_floor', 1], ['frozen_floor', 1], ['loose_stone', 1.5], ['mud', 1.75], ['ice', 1.5], ['pool', 2]
+        ['stone_floor', 1], ['cave_floor', 1], ['dirt_floor', 1], ['frozen_floor', 1], ['loose_stone', 1.5], ['mud', 1.75], ['ice', 1.5], ['stream', 1.5], ['stream_frozen', 1.5], ['pool', 2]
     ]);
     expect(await page.evaluate(() => {
         hc.floors.define({ok:{name:'Ok'}, free:{name:'Free', moveCost:0}, odd:{name:'Odd', moveCost:'lots'}});

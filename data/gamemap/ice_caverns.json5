@@ -3,6 +3,9 @@
 		"type":"caverns",
 		"baseFloor":"frozen_floor",
 		"floorTable":{"ice":3, "loose_stone":1},
+		"streamChance":15,
+		"streamFloor":"stream_frozen",
+		"poolFloor":"ice",
 		
 		"maxSize":10000,
 		"growth":0,

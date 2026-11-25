@@ -83,7 +83,7 @@
 		"wall_of_flesh":   {"name":"Wall of flesh",    "composition":"flesh",     "hp":6,  "fillColor":"#9c5058", "borderColor":"#b6666f"},
 		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447", "floor":"dirt_floor"},
 		"glass_wall":      {"name":"Glass wall",       "composition":"glass",     "hp":4,  "fillColor":"#9cc8d8", "borderColor":"#c4e4ee"},
-		"ice_wall":        {"name":"Ice wall",         "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8", "floor":"ice"},
+		"ice_wall":        {"name":"Ice wall",         "composition":"ice",       "hp":6,  "fillColor":"#9cf", "borderColor":"#e8f4f8", "floor":"ice"},
 		"crystal_wall":    {"name":"Crystal wall",     "composition":"crystal",   "hp":20, "fillColor":"#c8b8e8", "borderColor":"#e0d4f6"},
 		"plastic_wall":    {"name":"Plastic wall",     "composition":"plastic",   "hp":6,  "fillColor":"#d8d0b0", "borderColor":"#ece6cc"},
 		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
@@ -126,13 +126,15 @@
 		"stone_floor": {"name":"Stone floor",  "description":"Plain stone.",                   "fillColor":"--bg"},
 		"cave_floor":  {"name":"Cave floor",   "description":"The rock floor of the caves.",   "fillColor":"#46423e"},
 		"dirt_floor":  {"name":"Dirt floor",   "description":"Packed earth.",                  "fillColor":"#48413a"},
-		"frozen_floor":{"name":"Frozen floor", "description":"Rock under a crust of frost.",   "fillColor":"#454c52"},
+		"frozen_floor":{"name":"Frozen floor", "description":"Rock under a crust of frost.",   "fillColor":"#678"},
 		// Harder going
 		"loose_stone":{"name":"Loose stone", "description":"Rocks that shift underfoot.",        "moveCost":1.5, "fillColor":"#4e4b47"},
 		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":1.75,"fillColor":"#4a3f33"},
-		"ice":        {"name":"Ice",         "description":"Slick ice: slow, careful steps.",    "moveCost":1.5, "fillColor":"#4c5860"},
+		"ice":        {"name":"Ice",         "description":"Slick ice.",                         "moveCost":1.5, "fillColor":"#8ac"},
 		// Water
-		"pool":       {"name":"Pool",        "description":"A pool of water.",                   "moveCost":2.0, "fillColor":"#039"}
+		"stream":       {"name":"Stream",        "description":"Shallow running water.",         "moveCost":1.5, "fillColor":"#039"},
+		"stream_frozen":{"name":"Frozen Stream", "extends":"ice", "description":"A stream frozen solid."},
+		"pool":         {"name":"Pool",          "description":"A pool of water.",               "moveCost":2.0, "fillColor":"#039"}
 	},
 	
 	// Fixtures: what sits on the ground of a cell (over its open floor) and does something

@@ -18,6 +18,11 @@
     width (tunnelWidthMin to tunnelWidthMax) as it goes. Everything else is rock
     (rockSolid).
     
+    Streams (streamChance, off by default): some sites are springs, and from each a stream
+    wanders along tunnels from site to site, in any direction, branching now and then, a
+    channel of streamFloor down the middle of each tunnel it takes. Where it runs through a
+    cavern there may be a pool of poolFloor, which may be where it ends (see streams).
+    
     In the caverns, off the paths the tunnels take through them (so nothing cuts a cavern
     off), there are stalagmites and stalactites, and small clumps of holes (holeTable).
     Heal, harm and loot tiles (their tables) are on any open cell but the start. The
@@ -135,7 +140,17 @@
                 table('deadEndTable', {simple:2, lasso:1, fork:1, knot:1}, DEAD_END_KINDS),
                 num('cavernLoopChance', 15, 0, 100),   // % chance a cavern has a tunnel that comes back into it
                 num('cavernJoinChance', 15, 0, 100),   // % chance two caverns with a tunnel between them are joined directly instead
-                num('collapseChance', 0, 0, 100),      // % chance a tunnel is blocked part way along by rubble (rubbleSolid)
+                num('collapseChance', 0, 0, 100),      // % chance a tunnel is blocked part way along by rubble (rubbleSolid), but not a stream's
+                
+                // Streams (see streams).
+                num('streamChance', 0, 0, 100),        // % of sites that are springs (0: no streams)
+                num('streamLength', 8, 2, 30),         // the most sites a stream (each branch of it) runs through
+                num('streamBranchChance', 25, 0, 100), // % chance a stream also goes on down another tunnel, at a site
+                num('streamWidth', 70, 10, 100),       // % of a tunnel's width its stream takes up (but at least a cell)
+                num('poolChance', 40, 0, 100),         // % chance a cavern a stream runs through has a pool
+                num('poolSizeMin', 15, 1, 100),        // a pool's size, % of its cavern
+                num('poolSizeMax', 40, 1, 100),
+                num('poolTerminusChance', 30, 0, 100), // % chance a pool is where the stream ends
                 
                 // Tiles per 1000 open cells: in caverns, off the tunnels' paths...
                 num('stalagmiteFrequency', 30, 0, 100),
@@ -164,7 +179,9 @@
                 choice('rockSolid', 'cave_rock', optionsOf(pkg.solids)),
                 choice('stalagmiteSolid', 'stalagmite', optionsOf(pkg.solids)),
                 choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids)),
-                choice('rubbleSolid', 'rubble', optionsOf(pkg.solids))
+                choice('rubbleSolid', 'rubble', optionsOf(pkg.solids)),
+                choice('streamFloor', 'stream', optionsOf(pkg.floors)),
+                choice('poolFloor', 'pool', optionsOf(pkg.floors))
             ],
             
             // The key of the tunnel between two sites ("i,j" keys), the same either way
@@ -189,6 +206,7 @@
             const a = this.attrs;
             a.cavernSizeMax = max(a.cavernSizeMin, a.cavernSizeMax);
             a.tunnelWidthMax = max(a.tunnelWidthMin, a.tunnelWidthMax);
+            a.poolSizeMax = max(a.poolSizeMin, a.poolSizeMax);
             
             // Sites far enough apart that no two caverns touch, however they're moved, then
             // closer by crowding: at 100, 40% of that, so they overlap.
@@ -209,6 +227,8 @@
             this.tunnels = new Map();     // tunnel key -> {cells, spine}: the keys of its cells and of those kept clear
             this.deadEndShapes = new Map(); // site key -> its dead end's shape, or null
             this.cavernLoops = new Map(); // site key -> its cavern loop, or null
+            this.springs = new Map();     // site key -> the stream from it, or null (see spring)
+            this.pools = new Map();       // site key -> its pool, or null (see poolOf)
             
             // With a maxSize, the network grown so far (see grow).
             this.network = a.maxSize > 0 ? {
@@ -216,6 +236,7 @@
                 order:[],          // their keys, in the order they were added
                 excluded:new Set(), // keys of the sites that will never be in it
                 edges:new Set(),   // its tunnels' keys
+                wetEdges:new Set(), // those with a stream along them (see addStream)
                 cells:new Set()    // the keys of its open cells
             } : null;
         },
@@ -237,10 +258,11 @@
                 network:n ? {
                     sites:n.order.map(key => {
                         const s = n.sites.get(key);
-                        return [key, s.parent?.join() ?? null, s.deadEnd];
+                        return [key, s.parent?.join() ?? null, s.deadEnd, s.stream];
                     }),
                     excluded:[...n.excluded],
-                    edges:[...n.edges]
+                    edges:[...n.edges],
+                    wetEdges:[...n.wetEdges]
                 } : null
             };
         },
@@ -252,12 +274,14 @@
             }
             this.madeBlocks = new Set(state.madeBlocks);
             if (n) {
-                for (const [key, parent, deadEnd] of saved.sites) {
-                    n.sites.set(key, {parent:parent === null ? null : parent.split(',').map(Number), deadEnd:!!deadEnd});
+                for (const [key, parent, deadEnd, stream] of saved.sites) {
+                    n.sites.set(key, {parent:parent === null ? null : parent.split(',').map(Number), deadEnd:!!deadEnd, stream:Number.isInteger(stream) ? stream : null});
                     n.order.push(key);
                 }
                 saved.excluded.forEach(key => n.excluded.add(key));
                 saved.edges.forEach(tk => n.edges.add(tk));
+                // (From before streams, none.)
+                if (Array.isArray(saved.wetEdges)) saved.wetEdges.forEach(tk => n.wetEdges.add(tk));
                 for (const key of n.order) this.addCells(...key.split(',').map(Number));
             }
         },
@@ -304,12 +328,13 @@
         },
         
         // Adds site (i, j) to the network, with a tunnel to its parent ([i, j], or null
-        // for the start's), and tunnels to its other neighbours in it at loops%.
+        // for the start's), and tunnels to its other neighbours in it at loops%, and its
+        // stream if it has one (see addStream).
         addSite: function(i, j, parent) {
             const n = this.network,
                 key = i + ',' + j,
                 CTG = pkg.CavernsTileGenerator;
-            n.sites.set(key, {parent, deadEnd:false});
+            n.sites.set(key, {parent, deadEnd:false, stream:null});
             n.order.push(key);
             if (parent) {
                 n.edges.add(CTG.tunnelKey(key, parent.join()));
@@ -324,7 +349,40 @@
                     }
                 }
             }
+            // (Before its cells are worked out: a stream's tunnel never collapses.)
+            if (this.attrs.streamChance > 0) this.addStream(i, j, parent);
             this.addCells(i, j);
+        },
+        
+        // In a network, streams are worked out as sites are added, from what's in it
+        // already, since what's added later depends on where you go: a site added from one
+        // with a stream that has sites left to run through (its stream, a count) carries it
+        // on, always if it's the first to (so a stream goes on while it can), and at
+        // streamBranchChance% if not; otherwise it's a spring at streamChance%. A pool there
+        // may end it (poolOf: its count is then 0). A tunnel from it to a site already in the
+        // network has the stream along it only if that site has one too (it rejoins it):
+        // that site may have been made already, so it doesn't get one now.
+        addStream: function(i, j, parent) {
+            const n = this.network,
+                key = i + ',' + j,
+                s = n.sites.get(key),
+                CTG = pkg.CavernsTileGenerator,
+                rng = this.game.rngFor('cave-stream', key),
+                from = parent ? n.sites.get(parent.join()) : null,
+                carried = from?.stream > 0 && (rng() * 100 < this.attrs.streamBranchChance ||
+                    !n.order.some(k => n.sites.get(k).parent?.join() === parent.join() && k !== key && n.wetEdges.has(CTG.tunnelKey(k, parent.join()))));
+            if (carried) {
+                s.stream = this.poolOf(i, j)?.terminus ? 0 : from.stream - 1;
+            } else if (this.isSpring(i, j)) {
+                s.stream = this.attrs.streamLength - 1;
+            }
+            if (s.stream !== null) {
+                for (const [di, dj] of hex.dirs) {
+                    const nk = (i + di) + ',' + (j + dj),
+                        tk = CTG.tunnelKey(key, nk);
+                    if (n.edges.has(tk) && (carried && nk === parent.join() || nk !== parent?.join() && n.sites.get(nk).stream !== null)) n.wetEdges.add(tk);
+                }
+            }
         },
         
         // Counts site (i, j)'s open cells in the network's: its cavern, its tunnels, and its
@@ -601,7 +659,7 @@
                     // The way it sets off: up to 60 degrees to one side at full tangle.
                     offAngle = (rng() - 0.5) * tangle * TAU / 3,
                     // A collapse: where along it (0 to 1), and how long (in world units).
-                    collapse = !joined && rng() * 100 < this.attrs.collapseChance,
+                    collapse = !joined && rng() * 100 < this.attrs.collapseChance && !(this.attrs.streamChance > 0 && this.isWetTunnel(tk)),
                     collapseAt = 0.3 + rng() * 0.4,
                     collapseLength = 1.5 + rng() * 1.5,
                     widthAt = s => joined ? max(w1, 1.4 * Math.min(a.radius, b.radius)) : w0 + (w1 - w0) * (0.5 + 0.5 * sin(TAU * fw * s / length + pw)),
@@ -665,7 +723,7 @@
                     sweep(p.x, p.y, SPINE_RADIUS, spine);
                     if (collapse && Math.abs(p.s - plugAt) <= collapseLength / 2) sweep(p.x, p.y, p.reach, plug);
                 }
-                this.tunnels.set(tk, {cells, spine, plug, path:points});
+                this.tunnels.set(tk, {cells, spine, plug, path:points, strokes:points.map(p => [p.x, p.y, p.reach])});
             }
             return this.tunnels.get(tk);
         },
@@ -698,7 +756,11 @@
                             parent = this.parentOf(i, j),
                             path = [...this.tunnel(pkg.CavernsTileGenerator.tunnelKey(key, parent.join())).path],
                             cells = new Set(),
-                            draw = (points, reach = r) => points.forEach(([x, y]) => sweep(x, y, reach, cells)),
+                            strokes = [],
+                            draw = (points, reach = r) => points.forEach(([x, y]) => {
+                                sweep(x, y, reach, cells);
+                                strokes.push([x, y, reach]);
+                            }),
                             // Where the path is d back from its end, and which way it goes there.
                             back = d => {
                                 const end = path[path.length - 1].s,
@@ -735,7 +797,7 @@
                                 }
                             }
                         }
-                        retval = {kind, cells, spine:new Set()};
+                        retval = {kind, cells, spine:new Set(), strokes};
                     }
                 }
                 if (this.isSettled(key)) this.deadEndShapes.set(key, retval);
@@ -781,12 +843,152 @@
             return retval;
         },
         
+        // ---- Streams ----
+        // Some sites are springs (streamChance), and from each a stream wanders along the
+        // tunnels, in any direction: at each site it gets to it goes on down a tunnel it
+        // hasn't come along, picked at random, and at streamBranchChance% down another
+        // too. Each branch runs through at most streamLength sites, and ends sooner at a
+        // site the stream has been to already (it rejoins itself), at a pool that ends it
+        // (see poolOf), at a dead end (it fills the dead end's shape too), or where there's
+        // no tunnel left. So every tunnel or cavern with a stream has one next to it with
+        // the stream too. It's a channel of streamFloor along the middle of each tunnel it
+        // takes (streamWidth% of it), through the caverns, where it may make a pool of
+        // poolFloor. The start cell and its neighbours stay dry. A stream's tunnel never
+        // collapses.
+        //
+        // Without a maxSize, it's all from the seed, so a cell comes out the same whatever
+        // order it's made in: no spring is more than streamLength sites from where its
+        // water gets to, so only so many are looked at for a block. In a network, streams
+        // are worked out as sites are added instead (see addStream).
+        
+        // Whether site (i, j) is a spring (streamChance).
+        isSpring: function(i, j) {
+            return this.game.rngFor('cave-spring', i + ',' + j)() * 100 < this.attrs.streamChance;
+        },
+        
+        // The stream from spring (i, j), {sites, edges} (the keys of the sites it gets to, and
+        // of the tunnels it runs along), or null if it isn't one. Without a maxSize.
+        spring: function(i, j) {
+            const key = i + ',' + j;
+            let retval = this.springs.get(key);
+            if (retval === undefined) {
+                retval = null;
+                if (this.isSpring(i, j)) {
+                    const CTG = pkg.CavernsTileGenerator,
+                        a = this.attrs,
+                        rng = this.game.rngFor('cave-stream', key),
+                        sites = new Set([key]),
+                        edges = new Set(),
+                        // [i, j, the key of the site it came from (or null), sites left to run through]
+                        todo = [[i, j, null, a.streamLength - 1]];
+                    for (const [ci, cj, from, left] of todo) {
+                        const ck = ci + ',' + cj,
+                            ends = left <= 0 || from !== null && this.poolOf(ci, cj)?.terminus,
+                            ways = ends ? [] : hex.dirs.map(([di, dj]) => [ci + di, cj + dj])
+                                .filter(q => q.join() !== from && !edges.has(CTG.tunnelKey(ck, q.join())) && this.hasTunnel([ci, cj], q));
+                        if (ways.length) {
+                            const first = ways.splice(floor(rng() * ways.length), 1),
+                                taken = ways.length && rng() * 100 < a.streamBranchChance ? [...first, ways[floor(rng() * ways.length)]] : first;
+                            for (const q of taken) {
+                                const qk = q.join();
+                                edges.add(CTG.tunnelKey(ck, qk));
+                                if (!sites.has(qk)) {
+                                    sites.add(qk);
+                                    todo.push([...q, ck, left - 1]);
+                                }
+                            }
+                        }
+                    }
+                    retval = {sites, edges};
+                }
+                this.springs.set(key, retval);
+            }
+            return retval;
+        },
+        
+        // The sites and tunnels with a stream that may be within r sites of site (i, j):
+        // {sites, edges}, their keys.
+        streamsAround: function(i, j, r) {
+            const n = this.network,
+                retval = {sites:new Set(), edges:new Set()};
+            if (n) {
+                for (const key of n.order) {
+                    if (n.sites.get(key).stream !== null) retval.sites.add(key);
+                }
+                n.wetEdges.forEach(tk => retval.edges.add(tk));
+            } else if (this.attrs.streamChance > 0) {
+                for (const q of hex.disk(i, j, r + this.attrs.streamLength)) {
+                    const s = this.spring(q.x, q.y);
+                    if (s) {
+                        s.sites.forEach(k => retval.sites.add(k));
+                        s.edges.forEach(tk => retval.edges.add(tk));
+                    }
+                }
+            }
+            return retval;
+        },
+        
+        // Whether the tunnel with key tk has a stream along it.
+        isWetTunnel: function(tk) {
+            const [i, j] = tk.split('|')[0].split(',').map(Number);
+            return this.network ? this.network.wetEdges.has(tk) : this.streamsAround(i, j, 1).edges.has(tk);
+        },
+        
+        // The pool cavern (i, j) has if a stream runs through it, {size (% of the cavern),
+        // terminus (whether the stream ends there)}, or null: at poolChance%, poolSizeMin to
+        // poolSizeMax% of it, the stream ending there at poolTerminusChance% (not at a
+        // spring, which it starts from).
+        poolOf: function(i, j) {
+            const key = i + ',' + j;
+            let retval = this.pools.get(key);
+            if (retval === undefined) {
+                const a = this.attrs,
+                    rng = this.game.rngFor('cave-pool', key);
+                retval = !this.siteBase(i, j).junction && rng() * 100 < a.poolChance ?
+                    {size:a.poolSizeMin + rng() * (a.poolSizeMax - a.poolSizeMin), terminus:rng() * 100 < a.poolTerminusChance} : null;
+                this.pools.set(key, retval);
+            }
+            return retval;
+        },
+        
+        // The keys of the cells of cavern (i, j)'s pool (see poolOf): those of its cells
+        // nearest its middle, as many as its size, or none.
+        poolCells: function(i, j) {
+            const pool = this.poolOf(i, j),
+                keys = new Set();
+            if (pool) {
+                const s = this.site(i, j),
+                    cells = [...this.cavern(i, j)].map(k => {
+                        const [wx, wy] = hex.center(...k.split(',').map(Number));
+                        return [k, hypot(wx - s.wx, wy - s.wy)];
+                    }).sort((p, q) => p[1] - q[1]);
+                cells.slice(0, Math.round(cells.length * pool.size / 100)).forEach(([k]) => keys.add(k));
+            }
+            return keys;
+        },
+        
+        // The keys of the cells of the stream along a tunnel, a dead end's shape or the
+        // like (t, with its strokes: [[x, y, reach]] of its path): along the middle,
+        // streamWidth% as wide (no wider than tunnelWidthMax), but at least MIN_REACH
+        // either side, so it never has a gap. Worked out once each.
+        waterOf: function(t) {
+            if (!t.water) {
+                const {streamWidth, tunnelWidthMax} = this.attrs;
+                t.water = new Set();
+                for (const [x, y, reach] of t.strokes) sweep(x, y, max(MIN_REACH, Math.min(reach, tunnelWidthMax / 2) * streamWidth / 100), t.water);
+            }
+            return t.water;
+        },
+        
         // The caverns and tunnels (dead ends' shapes and cavern loops too) that may reach block (bi,
-        // bj): {caverns, tunnels}, the keys of their cells (and the tunnels' spines). Sites
-        // more than siteReach apart on the lattice are too far for theirs to.
+        // bj): {caverns, tunnels, streams, pools}, the keys of their cells (and the
+        // tunnels' spines), and of the cells of the streams and pools there. Sites more than
+        // siteReach apart on the lattice are too far for theirs to.
         near: function(bi, bj) {
             const c = this.blocks.center(bi, bj),
-                sites = hex.disk(...this.siteOf(c.x, c.y), this.siteReach).map(q => [q.x, q.y]),
+                centre = this.siteOf(c.x, c.y),
+                sites = hex.disk(...centre, this.siteReach).map(q => [q.x, q.y]),
+                wet = this.streamsAround(...centre, this.siteReach),
                 inRange = new Set(sites.map(q => q.join())),
                 tunnelKeys = new Set();
             for (const q of sites) {
@@ -795,12 +997,18 @@
                     if (inRange.has(n.join()) && this.hasTunnel(q, n)) tunnelKeys.add(pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()));
                 }
             }
+            const wetSites = sites.filter(q => wet.sites.has(q.join()));
             return {
                 caverns:sites.map(q => this.cavern(...q)),
                 tunnels:[
                     ...[...tunnelKeys].map(tk => this.tunnel(tk)),
                     ...sites.flatMap(q => [this.deadEndShape(...q), this.cavernLoop(...q)]).filter(Boolean)
-                ]
+                ],
+                streams:[
+                    ...[...tunnelKeys].filter(tk => wet.edges.has(tk)).map(tk => this.waterOf(this.tunnel(tk))),
+                    ...wetSites.map(q => this.deadEndShape(...q)).filter(Boolean).map(t => this.waterOf(t))
+                ],
+                pools:wetSites.map(q => this.poolCells(...q))
             };
         },
         
@@ -842,25 +1050,30 @@
         // ---- Making cells ----
         
         // What cell (x, y) is, given what's near it (see near): {open, cavern, clear,
-        // rubble}. Open cells are in a cavern or a tunnel; clear ones (the tunnels' spines,
-        // and the start cell and its neighbours) are kept free of stalagmites, stalactites
-        // and holes; rubble is where a tunnel has collapsed, outside the caverns.
+        // rubble, water}. Open cells are in a cavern or a tunnel; clear ones (the tunnels'
+        // spines, and the start cell and its neighbours) are kept free of stalagmites,
+        // stalactites and holes; rubble is where a tunnel has collapsed, outside the
+        // caverns; water is 'pool' or 'stream' where there's one (not by the start), or null.
         cellOf: function(x, y, near) {
             const k = x + ',' + y,
-                cavern = near.caverns.some(keys => keys.has(k));
+                cavern = near.caverns.some(keys => keys.has(k)),
+                open = cavern || near.tunnels.some(t => t.cells.has(k)),
+                start = hexDist({x, y}, {x:0, y:0}) <= 1,
+                water = !open || start ? null : near.pools.some(keys => keys.has(k)) ? 'pool' : near.streams.some(keys => keys.has(k)) ? 'stream' : null;
             return {
-                open:cavern || near.tunnels.some(t => t.cells.has(k)),
+                open,
                 cavern,
-                rubble:!cavern && near.tunnels.some(t => t.plug?.has(k)),
-                clear:hexDist({x, y}, {x:0, y:0}) <= 1 || near.tunnels.some(t => t.spine.has(k))
+                rubble:!cavern && !water && near.tunnels.some(t => t.plug?.has(k)),
+                clear:start || near.tunnels.some(t => t.spine.has(k)),
+                water
             };
         },
         
-        // Whether cell (x, y) can have a stalagmite, stalactite or hole: it's in a cavern
-        // and not kept clear.
+        // Whether cell (x, y) can have a stalagmite, stalactite or hole: it's in a cavern,
+        // not kept clear, and dry.
         isCavernFloor: function(x, y, near) {
             const c = this.cellOf(x, y, near);
-            return c.cavern && !c.clear;
+            return c.cavern && !c.clear && !c.water;
         },
         
         // What the seed puts on cavern floor cell (x, y) by itself: {solid:subtype},
@@ -930,14 +1143,16 @@
             return subtype === undefined || (x === 0 && y === 0) ? null : [type, subtype];
         },
         
-        // What tile cell (x, y) gets, as [kind, subtype]: a solid, a hole or a floor (from a
-        // patch), or null for the base floor.
+        // What tile cell (x, y) gets, as [kind, subtype]: a solid, a hole or a floor (a
+        // stream's or a pool's, or from a patch), or null for the base floor.
         tileOf: function(x, y, near) {
             const a = this.attrs,
                 c = this.cellOf(x, y, near);
             let retval = null;
             if (!c.open) {
                 retval = [TILE_TYPE_SOLID, a.rockSolid];
+            } else if (c.water) {
+                retval = [TILE_TYPE_FLOOR, c.water === 'pool' ? a.poolFloor : a.streamFloor];
             } else if (c.rubble) {
                 retval = [TILE_TYPE_SOLID, a.rubbleSolid];
             } else {
