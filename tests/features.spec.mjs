@@ -149,3 +149,50 @@ test('pointing at a fixture that can be broken says how tough it is', async ({pa
     await page.mouse.move(...await cellOnPage(page, 2, 0));
     await expect(page.getByText(/^Wall \(flesh\) · HP 2\/2 · DR 0/)).toBeVisible();
 });
+
+// A new game with the tile generator type and attrs, made out to r blocks or quadrants
+// around the start: where its fixtures are, {x,y: [type, subtype]}.
+const generated = (page, type, attrs, r) => page.evaluate(([type, attrs, r]) => {
+    const g = hc.app.game;
+    g.gameMap = {...g.gameMap, tileGenerator:{type, attrs}};
+    g.seed = 7;
+    g.reset();
+    const T = g.tileGenerator;
+    if (type === 'caverns') {
+        for (const b of hc.hex.disk(0, 0, r)) T.makeBlock(b.x, b.y);
+    } else {
+        for (const q of hc.hex.disk(0, 0, r)) T.generateTiles(q.x, q.y);
+    }
+    return Object.fromEntries([...g.fixtures.values()].map(f => [f.x + ',' + f.y, [f.type, f.subtype]]));
+}, [type, attrs, r]);
+
+test('the caverns put features (featureTable) on cavern floor, off the tunnels\' paths; the rest are where they were', async ({page}) => {
+    const none = await generated(page, 'caverns', {featureFrequency:0}, 5),
+        some = await generated(page, 'caverns', {featureFrequency:60, featureTable:{wall:1}, streamChance:10}, 5),
+        features = Object.keys(some).filter(k => some[k][0] === 'feature');
+    expect(features.length).toBeGreaterThan(20);
+    expect(features.every(k => some[k][1] === 'wall')).toBe(true);
+    expect(Object.fromEntries(Object.entries(some).filter(([, f]) => f[0] !== 'feature'))).toEqual(none);
+    expect(await page.evaluate(keys => {
+        const T = hc.app.game.tileGenerator;
+        return keys.every(k => {
+            const [x, y] = k.split(',').map(Number);
+            return T.isCavernFloor(x, y, T.near(...T.blocks.of(x, y)));
+        });
+    }, features)).toBe(true);
+});
+
+// Steps from the start to cell key k.
+const stepsFromStart = k => {
+    const [x, y] = k.split(',').map(Number);
+    return (Math.abs(x) + Math.abs(y) + Math.abs(x + y)) / 2;
+};
+
+test('the proximity generator puts features (featureTable) on free cells, not by the start; the rest are where they were', async ({page}) => {
+    const none = await generated(page, 'proximity', {featureFrequency:0}, 3),
+        some = await generated(page, 'proximity', {featureFrequency:100, featureTable:{wall:1}}, 3),
+        features = Object.keys(some).filter(k => some[k][0] === 'feature');
+    expect(features.length).toBeGreaterThan(20);
+    expect(features.every(k => some[k][1] === 'wall' && stepsFromStart(k) > 1)).toBe(true);
+    expect(Object.fromEntries(Object.entries(some).filter(([, f]) => f[0] !== 'feature'))).toEqual(none);
+});

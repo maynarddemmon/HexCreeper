@@ -51,7 +51,7 @@ JS.Packages(file => {
     file(MAP_SPAWN_ROOT + 'CavernsSpawnGenerator.js').provides('hc.CavernsSpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist','hc.attrs','hc.enemies');
     
     // Map Tile Generators
-    file(MAP_TILE_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.Fixtures');
+    file(MAP_TILE_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.Fixtures','hc.hexDist');
     file(MAP_TILE_ROOT + 'CavernsTileGenerator.js').provides('hc.CavernsTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.Fixtures');
     
     // Map EnemyAI Generators

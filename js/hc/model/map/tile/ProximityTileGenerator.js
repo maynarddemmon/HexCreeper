@@ -2,15 +2,15 @@
     is divided into quadrants (chunks of cells, of radius quadRadius: see makeChunks, in
     Grid.js). When a piece of yours is in a quadrant, it's visited, and the quadrants around it get their tiles, once each:
     solid and hole tiles (border walls and clumps) out to where you could see, and heal,
-    harm and loot tiles in it and its 6 neighbours. Everything comes from the game's seed
+    harm and loot tiles and features in it and its 6 neighbours. Everything comes from the game's seed
     (Game.rngFor), so a quadrant comes out the same whatever order it's made in. */
 (pkg => {
     'use strict';
     
     const {
-        attrs:{num, choice},
+        attrs:{num, choice, table, pick},
         TileGenerator:{optionsOf},
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, fixtureOptions, hexDist
     } = pkg;
     
     const ProximityTileGenerator = pkg.ProximityTileGenerator = new JS.Class('ProximityTileGenerator', pkg.TileGenerator, {
@@ -28,6 +28,10 @@
                 choice('healType', 'heal', fixtureOptions(FIXTURE_HEAL)),
                 choice('harmType', 'harm', fixtureOptions(FIXTURE_HARM)),
                 choice('lootType', 'loot', fixtureOptions(FIXTURE_LOOT)),
+                // Features (barricades and the like, which may be in the way) per 1000 cells,
+                // of the kinds in featureTable, by weight.
+                num('featureFrequency', 5, 0, 100),
+                table('featureTable', {barricade:1}, fixtureOptions(FIXTURE_FEATURE)),
                 
                 // Border walls, and the clumps of solid and hole tiles in each quadrant.
                 num('wallChance', 50, 0, 100),     // % chance a border between quadrants is a wall
@@ -104,8 +108,10 @@
             }
         },
         
-        // A quadrant's heals and harms (fixtures), once, on random free cells (open floor
-        // with nothing on it), of the kinds in its attrs (healType, harmType, lootType).
+        // A quadrant's heals, harms and features (fixtures), once, on random free cells
+        // (open floor with nothing on it), of the kinds in its attrs (healType, harmType,
+        // lootType, featureTable): features after the rest, each cell at featureFrequency
+        // per 1000, but not the start cell or next to it.
         generateTiles: function(qx, qy) {
             const game = this.game,
                 k = qx + ',' + qy;
@@ -131,6 +137,18 @@
                 };
             for (let i = 0; i < this.attrs.healPerQuad; i++) place(FIXTURE_HEAL);
             for (let i = 0; i < this.attrs.harmPerQuad; i++) place(FIXTURE_HARM);
+            // (Features have their own generator, so the rest come out as they would
+            // without them.)
+            const featureRng = game.rngFor('features', k);
+            for (const {x, y} of cells) {
+                if (featureRng() * 1000 < this.attrs.featureFrequency) {
+                    const subtype = pick(this.attrs.featureTable, featureRng),
+                        kk = game.key(x, y);
+                    if (subtype !== undefined && game.isOpen(x, y) && !game.fixtures.has(kk) && !game.pieceAt(x, y) && hexDist({x, y}, {x:0, y:0}) > 1) {
+                        game.fixtures.set(kk, game.makeFixture(x, y, subtype, rollRng, FIXTURE_FEATURE));
+                    }
+                }
+            }
         },
         
         // A quadrant's terrain, once: the walls on its side of its borders, then a clump of

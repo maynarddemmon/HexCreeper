@@ -233,7 +233,7 @@
 			"showMagnitude":{"proximity":1}
 		},
 		
-		// Features (none placed yet)
+		// Features (featureTable in the tile generators' attrs)
 		"barricade":{
 			"type":"feature",
 			"name":"Barricade",

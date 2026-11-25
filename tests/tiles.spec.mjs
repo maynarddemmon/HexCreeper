@@ -5,8 +5,8 @@ test('solids and holes go out to the vision radius; heals and harms only 1 quadr
     await startGame(page);
     // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from
     // the start, a hexagon of 19; heals and harms (fixtures) in the start quadrant and its 6
-    // neighbours. No loot, or some heals are loot.
-    await setComponentAttrs(page, {tile:{quadRadius:3, lootChance:0}});
+    // neighbours. No loot, or some heals are loot, and no features.
+    await setComponentAttrs(page, {tile:{quadRadius:3, lootChance:0, featureFrequency:0}});
     const r = await page.evaluate(() => {
         hc.app.game.reset();
         const g = hc.app.game, n = 7, tiles = [...g.fixtures.values()],

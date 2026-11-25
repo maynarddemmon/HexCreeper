@@ -25,8 +25,9 @@
     
     In the caverns, off the paths the tunnels take through them (so nothing cuts a cavern
     off), there are stalagmites and stalactites, and small clumps of holes (holeTable).
-    Heal, harm and loot tiles (their tables) are on any open cell but the start. The
-    frequencies are tiles per 1000 open cells.
+    Heal, harm and loot tiles (their tables) are on any open cell but the start, and
+    features (featureTable: barricades and the like) on cavern floor off the tunnels'
+    paths. The frequencies are tiles per 1000 open cells.
     
     Cells are made as your pieces go, out to where they could see, a block at a time (the
     blocks are just bookkeeping: there are no quadrants). Everything comes from the game's
@@ -38,7 +39,7 @@
         attrs:{num, choice, table, pick},
         TileGenerator:{optionsOf},
         hex, hexDist,
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, fixtureOptions
     } = pkg,
         
         {sqrt, sin, cos, atan2, hypot, ceil, floor, max, PI} = Math,
@@ -167,6 +168,9 @@
                 num('healFrequency', 4, 0, 100),
                 num('harmFrequency', 4, 0, 100),
                 num('lootFrequency', 2, 0, 100),
+                // ...and features (barricades and the like, which may be in the way) on
+                // cavern floor, off the tunnels' paths, so none cuts a cavern off.
+                num('featureFrequency', 5, 0, 100),
                 
                 // Which kinds, by weight (data/init.json5; heals, harms and loot are fixtures:
                 // see Fixtures.js).
@@ -176,6 +180,7 @@
                 table('healTable', {heal:1}, fixtureOptions(FIXTURE_HEAL)),
                 table('harmTable', {harm:1}, fixtureOptions(FIXTURE_HARM)),
                 table('lootTable', {loot:1}, fixtureOptions(FIXTURE_LOOT)),
+                table('featureTable', {barricade:1}, fixtureOptions(FIXTURE_FEATURE)),
                 choice('rockSolid', 'cave_rock', optionsOf(pkg.solids)),
                 choice('stalagmiteSolid', 'stalagmite', optionsOf(pkg.solids)),
                 choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids)),
@@ -1130,15 +1135,16 @@
             return best;
         },
         
-        // A heal, harm or loot (fixture) the seed puts on open cell (x, y), as [type,
-        // subtype], or null.
+        // A heal, harm, loot or feature (fixture) the seed puts on open cell (x, y), as
+        // [type, subtype], or null. (A feature only goes on cavern floor: see makeBlock.)
         fixtureOf: function(x, y) {
             const a = this.attrs,
                 rng = this.game.rngFor('cave-item', x + ',' + y),
                 roll = rng() * 1000,
                 type = roll < a.healFrequency ? FIXTURE_HEAL :
                     roll < a.healFrequency + a.harmFrequency ? FIXTURE_HARM :
-                    roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? FIXTURE_LOOT : null,
+                    roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? FIXTURE_LOOT :
+                    roll < a.healFrequency + a.harmFrequency + a.lootFrequency + a.featureFrequency ? FIXTURE_FEATURE : null,
                 subtype = type ? pick(a[type + 'Table'], rng) : undefined;
             return subtype === undefined || (x === 0 && y === 0) ? null : [type, subtype];
         },
@@ -1197,7 +1203,9 @@
                         if (kind) game.tiles.set(k, game.makeTile(x, y, kind, subtype));
                         if (game.isOpen(x, y)) {
                             const [type, fixture] = this.fixtureOf(x, y) ?? [];
-                            if (type) game.fixtures.set(k, game.makeFixture(x, y, fixture, game.rngFor('rolls', k), type));
+                            if (type && (type !== FIXTURE_FEATURE || this.isCavernFloor(x, y, near))) {
+                                game.fixtures.set(k, game.makeFixture(x, y, fixture, game.rngFor('rolls', k), type));
+                            }
                         }
                     }
                 }
