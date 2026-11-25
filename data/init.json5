@@ -310,13 +310,18 @@
 			"name":"Caverns",
 			"description":"Caverns deep in the rock, joined by winding tunnels."
 		},{
-			"id":"empty_caverns",
+			"id":"ice_caverns",
 			"number":5,
+			"name":"Ice Caverns",
+			"description":"Caverns deep in the ice, joined by twisty tunnels."
+		},{
+			"id":"empty_caverns",
+			"number":6,
 			"name":"Empty Caverns",
 			"description":"Empty Caverns deep in the rock, joined by winding tunnels."
 		},{
 			"id":"empty_ice_caverns",
-			"number":6,
+			"number":7,
 			"name":"Empty Ice Caverns",
 			"description":"Empty Caverns deep in the ice, joined by twisty tunnels."
 		}
