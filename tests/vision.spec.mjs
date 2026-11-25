@@ -57,6 +57,43 @@ test.describe('fog of war', () => {
         expect(r).toEqual({inSight:false, seen:true, neverSeen:false});
     });
     
+    test('a squad you can see but that\'s off the board has a red arrow at the edge, pointing at its leader', async ({page}) => {
+        // The canvas's colour where the arrow for cell (x, y) goes: at the edge of the
+        // board, towards it from the middle (see Render.js).
+        const arrowColour = (x, y) => page.evaluate(([x, y]) => {
+            const V = hc.view, [sx, sy] = V.cellCenter(x, y), pad = 22,
+                ax = Math.min(V.W - pad, Math.max(pad, sx)), ay = Math.min(V.H - pad, Math.max(pad, sy));
+            hc.view.render(performance.now());
+            return [...V.canvas.getContext('2d').getImageData(Math.round(ax * V.dpr), Math.round(ay * V.dpr), 1, 1).data].join();
+        }, [x, y]);
+        const RED = '255,51,51,255';
+        // Zoomed in, so a cell 6 away is off the board, but in sight.
+        await page.evaluate(() => {
+            const g = hc.app.game;
+            hc.view.cam.size = hc.view.W / 6;
+            hc.app.centerOn(false);
+            const lead = g.addPiece('core', 'enemy', 6, 0);
+            g.addPiece('core', 'enemy', 7, 0, lead.id);
+            g.recomputeRanks();
+        });
+        expect(await page.evaluate(() => [hc.app.game.inSight(6, 0), hc.view.cellCenter(6, 0)[0] > hc.view.W])).toEqual([true, true]);
+        expect(await arrowColour(6, 0)).toBe(RED);
+        // Not once a piece of it is on the board,
+        await page.evaluate(() => {
+            const g = hc.app.game, kid = g.pieceAt(7, 0);
+            g.removePiece(kid);
+            g.addPiece('core', 'enemy', 1, 0, g.pieceAt(6, 0).id);
+        });
+        expect(await arrowColour(6, 0)).not.toBe(RED);
+        // nor for a squad out of sight.
+        await page.evaluate(() => {
+            const g = hc.app.game;
+            for (const e of g.piecesOf('enemy')) g.removePiece(e);
+            g.addPiece('core', 'enemy', 0, -40);
+        });
+        expect(await arrowColour(0, -40)).not.toBe(RED);
+    });
+    
     test('an enemy\'s link to a piece out of sight shows as a stub, either way round', async ({page}) => {
         // The canvas's colour a third of the way from the cell (x, y) to (x + 1, y)
         const colourAt = async (x, y) => {

@@ -14,6 +14,7 @@
         } = pkg,
         
         FX_MS = 650,
+        ENEMY_ARROW_SIZE = 0.75,     // an off-board enemy squad's arrow, of your core's
         
         // A hole's rim lines fade into it in this many steps (see drawTile): each a part of
         // the line drawn fainter, rather than a gradient, since making a gradient for every
@@ -713,19 +714,29 @@
             ctx.globalAlpha = 1;
         }
         
-        // Off-screen indicator for the player's core
+        // Off-screen indicators: an arrow at the edge of the board, pointing (from the
+        // middle) at what's off it. Red, and smaller, for each enemy squad you can see none
+        // of on the board, at its leader (or, if you can't see that, a piece of it you
+        // can); gold for your core, over them.
+        const pad = 22,
+            offBoard = (sx, sy) => sx < 0 || sx > W || sy < 0 || sy > H,
+            edgeArrow = (sx, sy, color, size) => {
+                const ax = Math.min(W - pad, Math.max(pad, sx)), ay = Math.min(H - pad, Math.max(pad, sy));
+                ctx.save(); ctx.translate(ax, ay); ctx.rotate(Math.atan2(sy - H / 2, sx - W / 2)); ctx.scale(size, size);
+                ctx.fillStyle = css(color);
+                ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -8); ctx.lineTo(-8, 8); ctx.closePath(); ctx.fill();
+                ctx.restore();
+            };
+        for (const leader of game.piecesOf('enemy').filter(e => !game.parent(e))) {
+            const seen = game.group(leader).filter(e => game.inSight(e.x, e.y)).map(e => [e, cellCenter(e.x, e.y)]);
+            if (seen.length && seen.every(([, [sx, sy]]) => offBoard(sx, sy))) {
+                edgeArrow(...(seen.find(([e]) => e === leader) ?? seen[0])[1], '--enemy-arrow', ENEMY_ARROW_SIZE);
+            }
+        }
         const core = game.getPlayerCore();
         if (core) {
             const [sx, sy] = cellCenter(core.x, core.y);
-            const pad = 22;
-            if (sx < 0 || sx > W || sy < 0 || sy > H) {
-                const ax = Math.min(W - pad, Math.max(pad, sx)), ay = Math.min(H - pad, Math.max(pad, sy));
-                const ang = Math.atan2(sy - H / 2, sx - W / 2);
-                ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang);
-                ctx.fillStyle = css('--core');
-                ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -8); ctx.lineTo(-8, 8); ctx.closePath(); ctx.fill();
-                ctx.restore();
-            }
+            if (offBoard(sx, sy)) edgeArrow(sx, sy, '--core', 1);
         }
         
         game.effects = game.effects.filter(f => now - f.t0 < FX_MS);

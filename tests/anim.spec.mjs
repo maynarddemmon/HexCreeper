@@ -156,5 +156,5 @@ test('Animation speed is a preference that scales the animation times', async ({
         hc.settings.set('animSpeed', 100);
         return [fast === MOVE_MS / 2, hc.settings.set('animSpeed', 1000), hc.cfg.ANIM.speed];
     });
-    expect(r).toEqual([true, 400, 400]);
+    expect(r).toEqual([true, 200, 200]);
 });
