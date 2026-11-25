@@ -31,13 +31,15 @@ const brightness = (page, x, y, fy) => page.evaluate(([x, y, fy]) => {
 test('the light comes from init.json5\'s "shadow", and a subtype may have its own shadowLength', async ({page}) => {
     expect(await page.evaluate(() => new Promise(done => hc.maps.loadIndex(data => {
         const {on, ...light} = hc.cfg.SHADOW;
-        done([on, light, data.shadow, hc.solids.get('stone_wall').shadowLength]);
-    })))).toEqual([true, {angle:90, color:'#0003', blur:2, length:0.5}, {angle:90, color:'#0003', blur:2, length:0.5}, null]);
+        done([on, Object.keys(light).sort(), Object.keys(light).every(k => light[k] === data.shadow[k]), hc.solids.get('stone_wall').shadowLength]);
+    })))).toEqual([true, ['angle', 'blur', 'color', 'length'], true, null]);
 });
 
-test('a solid casts a shadow on the floor below it, and a hole one into it from its top rim', async ({page}) => {
+test('with the light above, a solid casts a shadow on the floor below it, and a hole one into it from its top rim', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game;
+        // A light straight above (whatever init.json5 has)
+        Object.assign(hc.cfg.SHADOW, {angle:90, color:'#0003', blur:2, length:0.5});
         g.tiles.set(g.key(2, 0), g.makeTile(2, 0, 'solid', 'stone_wall'));
         g.tiles.set(g.key(-2, 0), g.makeTile(-2, 0, 'hole', 'pit'));
         hc.app.centerOn(false);

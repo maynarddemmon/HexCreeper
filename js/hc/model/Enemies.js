@@ -20,7 +20,8 @@
             (n && typeof n === 'object' && !Array.isArray(n) && Object.keys(n).length === 1 && isNodes(Object.values(n)[0])),
         isNodes = v => Array.isArray(v) && v.every(isNode);
     
-    pkg.enemyGroups = new Subtypes('enemy group', entry => isNodes(entry.members) && entry.members.length ? {members:entry.members} : null);
+    // (Groups are only their members, so there's nothing for one to extend: see Subtypes.js.)
+    pkg.enemyGroups = new Subtypes('enemy group', entry => isNodes(entry.members) && entry.members.length ? {members:entry.members} : null, false);
     
     /*  Replaces the enemies and groups with those given, as init.json5 has them. */
     pkg.defineEnemies = (enemies, groups) => {

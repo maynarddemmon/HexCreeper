@@ -2,8 +2,15 @@
 	// The map played when there's no saved game.
 	"defaultMap":"endless",
 	
+	// Any entry in the tables below (materials, solids, holes, heals, harms, loots,
+	// characters, enemies; not enemy groups) may extend another in the same table:
+	// "extends":"<id>" starts it as that one, with its own properties over it. Objects (like
+	// "stats") merge a property at a time; anything else (text, numbers, arrays like
+	// "damage") replaces the parent's. An entry may extend one that extends another, and so
+	// on. See js/hc/model/tile/Subtypes.js.
+	
 	// Materials solids are made of. hardness is the damage reduction (DR) of a solid made of
-	// it: an attack does the attacker's rank less the DR. density isn't used yet. opacity
+	// it: an attack does the attacker's damage less the DR (after its penetration). density isn't used yet. opacity
 	// (0-100, default 100) is how much it blocks sight: 100 blocks it, 0 not at all, and in
 	// between, sight past it is shortened (see docs/DESIGN.md, Fog of war).
 	"materials":{
@@ -85,10 +92,10 @@
 		// a little.
 		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c"},
 		"stalagmite":      {"name":"Stalagmite",       "composition":"calcite",   "hp":8,  "fillColor":"#9a8f7e", "borderColor":"#b3a894"},
-		"stalactite":      {"name":"Stalactite",       "composition":"calcite",   "hp":6,  "coverage":40, "fillColor":"#a89c88", "borderColor":"#c0b49e"},
+		"stalactite":      {"name":"Stalactite", "extends":"stalagmite", "hp":6, "coverage":40},
 		"rubble":          {"name":"Rubble",           "composition":"rubble",    "hp":6,  "coverage":70, "fillColor":"#7a6f63", "borderColor":"#8f8476"},
-		"icicle":          {"name":"Icicle",           "composition":"ice",       "hp":3,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"},
-		"ice_boulder":     {"name":"Ice Boulder",      "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"}
+		"ice_boulder":     {"name":"Ice Boulder", "extends":"ice_wall"},
+		"icicle":          {"name":"Icicle",      "extends":"ice_boulder", "hp":3}
 	},
 	
 	// The light that solids and holes cast shadows from (see js/hc/model/tile/Solids.js):
@@ -249,6 +256,15 @@
 			"damage":[1, 4],
 			"hp":5,
 			"xp":5
+		},
+		"goblin_reaver":{
+			"extends":"goblin",
+			"name":"Goblin Reaver",
+			"description":"A big goblin with a cruel blade.",
+			"stats":{"str":12, "con":12},
+			"damage":[2, 6],
+			"hp":8,
+			"xp":10
 		}
 	},
 	
@@ -266,12 +282,12 @@
 		"goblin_trio":{
 			"name":"Goblin Trio",
 			"description":"A trio of goblins.",
-			"members":[{"goblin":["goblin", "goblin"]}]
+			"members":[{"goblin_reaver":["goblin", "goblin"]}]
 		},
 		"goblin_pack":{
 			"name":"Goblin Pack",
 			"description":"A pack of goblins: a leader and three trios.",
-			"members":[{"goblin":["goblin_trio", "goblin_trio", "goblin_trio"]}]
+			"members":[{"goblin_reaver":["goblin_trio", "goblin_trio", "goblin_trio"]}]
 		},
 		"goblin_horde":{
 			"name":"Goblin Horde",
