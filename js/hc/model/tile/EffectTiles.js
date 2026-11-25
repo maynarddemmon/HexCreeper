@@ -205,6 +205,7 @@
             if (t.kind === TILE_TYPE_HEAL) {
                 this.applyHeal(p, amount, true);
             } else if (t.kind === TILE_TYPE_HARM) {
+                this.logCombat({kind:'harm', d:this.whoOf(p), dmg:amount});
                 this.damage(p, amount, null);
             } else {
                 p.score += amount;

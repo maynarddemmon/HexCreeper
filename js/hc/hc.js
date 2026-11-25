@@ -85,6 +85,9 @@
             FOLLOW_MARGIN:30,
             PAN_MS:250,
             
+            // Whether the combat log shows (a preference; K toggles it).
+            COMBAT_LOG:true,
+            
             // Animation: a piece's step takes MOVE_MS and a jump JUMP_MS, during which it grows
             // by up to JUMP_GROW (as if rising towards you) and back. An attack's bump takes
             // BUMP_MS. on: whether pieces' moves are animated at all (a preference).

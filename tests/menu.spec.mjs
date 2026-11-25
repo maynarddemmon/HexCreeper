@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Go to', 'Explore', 'Snake', 'Tree'];
+const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Character', 'Go to', 'Explore', 'Snake', 'Tree'];
 
 /*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. Pools are
     2 action points, all of it back each turn, so a can jump. */
@@ -29,9 +29,9 @@ test('clicking the selected piece again opens its menu beside it, with what it c
     await expect(items(page)).toHaveText(ITEMS);
     const disabled = await items(page).evaluateAll(els => els.map(e => e.classList.contains('disabled')));
     // A piece can go next to a; a can swap with the core, jump and be detached; it has a
-    // parent, so it can't attach; nothing is hurt, so no heal. It can always go to a cell,
-    // explore or get into formation.
-    expect(disabled).toEqual([false, false, false, true, false, true, false, false, false, false]);
+    // parent, so it can't attach; nothing is hurt, so no heal. It always has a character
+    // sheet, and can always go to a cell, explore or get into formation.
+    expect(disabled).toEqual([false, false, false, true, false, true, false, false, false, false, false]);
     // Beside the piece.
     const [px, py] = await cellOnPage(page, 1, 0),
         box = await page.getByRole('menu').filter({visible:true}).boundingBox();

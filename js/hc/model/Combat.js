@@ -22,6 +22,14 @@
     Killing enemies gives the piece that did it their xp; at the xpToLevel rule's xp it
     goes up a level, and its max HP with it (and its HP by as much).
     
+    What happens is kept in the combat log (Game.combatLog, the last LOG_MAX entries, not
+    saved), as plain data for the view to put into words: {turn, kind, ...}, kind one of
+    'hit' (a, d, roll, chance, dmg), 'soak' and 'miss' (a, d, roll, chance), 'harm' (d,
+    dmg: from a harm tile), 'destroyed' (d, linked: how many linked below it went too),
+    'xp' (a, xp) and 'level' (a, level).
+    a and d (attacker, defender) are who they were (see whoOf), so an entry still reads
+    the same once the piece is gone.
+    
     Action points: a piece acts (moves, attacks, swaps, detaches, attaches...) by spending
     them, ACTION_COST an action (a jump JUMP_COST), so only with that many. They're kept
     in hundredths (AP_UNIT a point), as whole numbers, so they add up exactly. At the end
@@ -59,6 +67,8 @@
         DEFAULT_ENEMTY = 'creeper',
         DEFAULT_CHARACTER_CLASS = 'adventurer',
         FALLBACK = parseProfile({}),
+        
+        LOG_MAX = 200,                       // combat log entries kept
         
         AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
         ACTION_COST = pkg.ACTION_COST = 100; // what an action costs
@@ -152,9 +162,31 @@
             return a.damage.map(n => Math.max(0, n + bonus));
         },
         
+        /*  Attacker a's penetration: its weapon's, and its penetrationBonus if more than 0. */
+        penetrationOf: function(a) {return a.penetration + Math.max(0, this.statRule('penetrationBonus', a));},
+        
         /*  How much of armor (damage reduction) gets through attacker a's penetration. */
-        armorAgainst: function(a, armor) {
-            return Math.max(0, armor - a.penetration - Math.max(0, this.statRule('penetrationBonus', a)));
+        armorAgainst: function(a, armor) {return Math.max(0, armor - this.penetrationOf(a));},
+        
+        /*  The damage attacker a's hit does to piece d, after its armor: [min, max]. */
+        damageAgainst: function(a, d) {
+            const armor = this.armorAgainst(a, d.armor);
+            return this.damageRange(a).map(n => Math.max(0, n - armor));
+        },
+        
+        // ---- The combat log ----
+        /*  Who piece p is, for the log: {owner, core (whether it's your core), enemyId}. */
+        whoOf: function(p) {
+            const who = {owner:p.owner, core:p.id === this.playerCoreId};
+            if (p.enemyId) who.enemyId = p.enemyId;
+            return who;
+        },
+        
+        /*  Adds entry ({kind, ...}) to the combat log, for this turn. */
+        logCombat: function(entry) {
+            const log = this.combatLog;
+            log.push({turn:this.turn, ...entry});
+            if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
         },
         
         /*  The next roll for combat, from 0 up to (not including) 1, in turn from the seed
@@ -167,15 +199,20 @@
             Returns the pieces destroyed (see damage), or [] if none. */
         strike: function(a, d) {
             let lost = [];
-            const roll = 1 + Math.floor(this.combatRoll() * 100);
-            if (roll > this.hitChance(a, d)) {
+            const roll = 1 + Math.floor(this.combatRoll() * 100),
+                chance = this.hitChance(a, d),
+                entry = {a:this.whoOf(a), d:this.whoOf(d), roll, chance};
+            if (roll > chance) {
+                this.logCombat({kind:'miss', ...entry});
                 this.fx(d.x, d.y, 'miss', '--miss', {bump:{from:a}});
             } else {
                 const [min, max] = this.damageRange(a),
                     dmg = Math.max(0, min + Math.floor(this.combatRoll() * (max - min + 1)) - this.armorAgainst(a, d.armor));
                 if (dmg > 0) {
+                    this.logCombat({kind:'hit', ...entry, dmg});
                     lost = this.damage(d, dmg, a);
                 } else {
+                    this.logCombat({kind:'soak', ...entry});
                     this.fx(d.x, d.y, '0', '--miss', {bump:{from:a}});
                 }
             }
@@ -184,6 +221,7 @@
         
         /*  Piece p gains xp, going up a level (or more) at the xpToLevel rule's xp. */
         gainXp: function(p, xp) {
+            this.logCombat({kind:'xp', a:this.whoOf(p), xp});
             p.xp += xp;
             for (let need = this.statRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.statRule('xpToLevel', p)) {
                 p.xp -= need;
@@ -191,6 +229,7 @@
                 const max = this.maxHpOf(p);
                 p.hp += Math.max(0, max - p.maxHp);
                 p.maxHp = max;
+                this.logCombat({kind:'level', a:this.whoOf(p), level:p.level});
                 this.fx(p.x, p.y, 'Level ' + p.level + '!', '--gain', {delay:200});
             }
         },

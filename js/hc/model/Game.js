@@ -55,6 +55,7 @@
             this.lostBy = null;              // when lost: the index of the objective that lost it, or null for the core
             this.kills = 0;                  // enemy pieces destroyed
             this.combatRolls = 0;            // rolls made in combat, for the next (see Combat.js)
+            this.combatLog = [];             // what happened in combat (see Combat.js; not saved)
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
             this.lootOpened = 0;             // loot tiles emptied
@@ -177,6 +178,7 @@
             this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
             this.kills = o.kills;
             this.combatRolls = Number.isInteger(o.combatRolls) ? o.combatRolls : 0;
+            this.combatLog = [];
             this.piecesLost = o.piecesLost;
             this.piecesPlaced = o.piecesPlaced;
             this.lootOpened = o.lootOpened;
@@ -465,6 +467,7 @@
             if (target.hp > 0) return [];
             const lost = this.group(target),
                 col = target.owner === 'player' ? '--core' : '--enemy';
+            this.logCombat({kind:'destroyed', d:this.whoOf(target), linked:lost.length - 1});
             for (const g of lost) {
                 this.removePiece(g);
                 if (g.owner === 'player') {

@@ -1,7 +1,7 @@
 /*  Preferences and map rules.
     
-    Preferences are the player's, for the whole app (so far only whether pieces' moves are
-    animated), and stand in for hc.cfg's values. They're shown in Settings and saved in
+    Preferences are the player's, for the whole app (whether pieces' moves are animated,
+    the follow margin, whether the combat log shows), and stand in for hc.cfg's values. They're shown in Settings and saved in
     the browser (hc.prefs, {id:value}, only those changed from the default).
     
     Map rules are gameplay values, with their defaults here (RULES), that a map can set:
@@ -34,7 +34,8 @@
             here is enough to make it appear there. */
         PREFERENCES = [
             pref(GROUP_DISPLAY, onto(cfg.ANIM, 'on', bool, 'animate')),
-            pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45))
+            pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45)),
+            pref(GROUP_DISPLAY, onto(cfg, 'COMBAT_LOG', bool, 'combatLog'))
         ],
         
         GROUPS = [GROUP_DISPLAY].map(id => ({

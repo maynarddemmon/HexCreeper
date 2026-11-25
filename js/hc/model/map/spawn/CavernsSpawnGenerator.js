@@ -33,12 +33,15 @@
                 num('cavernSpawnChanceModifierOnFailure', 10, -100, 100),  // or after none does
                 num('tunnelSpawnChanceModifierOnSuccess', -5, -100, 100),  // and in a tunnel
                 num('tunnelSpawnChanceModifierOnFailure', 5, -100, 100),
-                expr('enemyChallenge', 'level + floor(levels / 5) + floor(distance / 40) + floor(size / 100)', CHALLENGE_VARS),
+                expr('enemyChallenge', 'level + floor(levels / 5) + floor(distance / 300) + floor(size / 100)', CHALLENGE_VARS),
                 tiers('challengeTable', [
-                    {min:0, max:2, table:{goblin:60, goblin_pair:40}},
-                    {min:3, max:5, table:{goblin_pair:30, goblin_trio:70}},
-                    {min:6, max:9, table:{goblin_trio:40, goblin_pack:60}},
-                    {min:10, table:{goblin_pack:60, goblin_horde:40}}
+                    {min:0,  max:2,  table:{goblin:100}},
+                    {min:3,  max:4,  table:{goblin:50, goblin_pair:50}},
+                    {min:5,  max:6,  table:{goblin:10, goblin_pair:90}},
+                    {min:7,  max:8,  table:{goblin:10, goblin_pair:40, goblin_trio:50}},
+                    {min:9,  max:12, table:{goblin_pair:10, goblin_trio:40, goblin_pack:50}},
+                    {min:13, max:16, table:{goblin_trio:10, goblin_pack:40, goblin_horde:50}},
+                    {min:17,         table:{goblin_pack:10, goblin_horde:90}}
                 ], enemyOptions)
             ]
         },

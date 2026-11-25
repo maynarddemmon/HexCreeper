@@ -4,6 +4,7 @@
     let appView,
         infoPanel,
         statusTxt,
+        logTxt,
         gameView,
         
         scoreView,
@@ -75,6 +76,65 @@
         // Action points (kept in hundredths: see Combat.js) as points, e.g. "1.75"
         formatAp = ap => String(ap / pkg.AP_UNIT),
         
+        // Shows or hides the combat log (the combatLog preference, so it's kept).
+        toggleLog = () => {pkg.settings.set('combatLog', !pkg.cfg.COMBAT_LOG);},
+        
+        // A damage range, [min, max], as "1–6", or "3" if there's only the one
+        formatRange = ([min, max]) => min === max ? String(min) : min + '–' + max,
+        
+        // ---- The combat log ----
+        LOG_LINES = 8,
+        LOG_WIDTH = 360,
+        
+        /*  The name of who (see Combat.whoOf) in the log: an enemy's, or your core or piece.
+            Capitalised if first in the line. */
+        logName = (who, first=false) => {
+            const name = who.owner === 'enemy'
+                ? pkg.enemies.get(who.enemyId ?? 'creeper')?.name ?? who.enemyId ?? '?'
+                : i18n(who.core ? 'log-your-core' : 'log-your-piece');
+            return first ? name.charAt(0).toUpperCase() + name.slice(1) : name;
+        },
+        
+        /*  An entry of the combat log (see Combat.js) in words, after its turn. */
+        logLine = e => {
+            const a = e.a && logName(e.a, true),
+                d = e.d && logName(e.d, !e.a);
+            let text;
+            switch (e.kind) {
+                case 'hit': text = i18n('log-hit', a, d, e.roll, e.chance, e.dmg); break;
+                case 'soak': text = i18n('log-soak', a, d, e.roll, e.chance); break;
+                case 'miss': text = i18n('log-miss', a, d, e.roll, e.chance); break;
+                case 'harm': text = i18n('log-harm', d, e.dmg); break;
+                case 'destroyed': text = e.linked ? i18n('log-destroyed-linked', d, e.linked) : i18n('log-destroyed', d); break;
+                case 'xp': text = i18n('log-xp', a, e.xp); break;
+                case 'level': text = i18n('log-level', a, e.level); break;
+                default: text = e.kind;
+            }
+            return i18n('log-line', e.turn, text);
+        },
+        
+        /*  The character sheet for your piece p: a dialog with its level, XP, HP, action
+            points, stats, and what they make it in combat. */
+        openSheet = p => {
+            const row = (label, value) => `<tr><td style="padding-right:16px;opacity:0.7;">${label}</td><td>${value}</td></tr>`,
+                head = key => `<tr><td colspan="2" style="padding-top:8px;font-weight:bold;">${i18n(key)}</td></tr>`,
+                rows = [
+                    row(i18n('sheet-xp'), p.xp + '/' + game.statRule('xpToLevel', p)),
+                    row(i18n('sheet-hp'), p.hp + '/' + p.maxHp),
+                    row(i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(p.ap), formatAp(game.apMax(p)),
+                        formatAp(game.apRecovery(p)), formatAp(game.apRule('apInitiative', p)))),
+                    head('sheet-stats'),
+                    ...pkg.STATS.map(s => row(i18n('stat-' + s), p.stats[s])),
+                    head('sheet-combat'),
+                    row(i18n('sheet-accuracy'), game.statRule('meleeAccuracy', p)),
+                    row(i18n('sheet-defence'), game.statRule('defence', p)),
+                    row(i18n('sheet-damage'), formatRange(game.damageRange(p))),
+                    row(i18n('sheet-penetration'), game.penetrationOf(p)),
+                    row(i18n('sheet-armor'), p.armor)
+                ];
+            openAckMsgDialog(i18n('dlg-sheet-title', logName(game.whoOf(p), true), p.level), '<table>' + rows.join('') + '</table>', null, null, I18N_CLOSE_BTN);
+        },
+        
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
         
         /*  After the game has been replaced by a saved one. */
@@ -113,7 +173,8 @@
         
         /*  What the selected piece's menu offers, in its order: place (next to it), swap,
             jump and attach (which then ask for the cell, or the piece to swap with or attach to),
-            detach, and heal (flowing from it). */
+            detach, heal (flowing from it), its character sheet, and going places and into
+            formations. */
         menuItems = () => {
             const sel = () => game.getSelected(),
                 choose = mode => () => {
@@ -146,6 +207,7 @@
                         draw();
                     }
                 },
+                {id:'sheet', label:() => i18n('btn-sheet'), tip:() => i18n('tip-sheet'), enabled:() => !!sel(), run:() => openSheet(sel())},
                 {id:'goto', label:() => i18n('btn-goto'), tip:() => i18n('tip-goto'), enabled:() => !game.over && !!sel(), run:choose('gotoMode')},
                 {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')},
                 {id:'snake', label:() => i18n('btn-snake'), tip:() => i18n('tip-snake'), enabled:() => !game.over && !!sel(), run:() => startNav('snake')},
@@ -154,7 +216,7 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -466,6 +528,28 @@
             appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
             
             infoPanel = new InfoPanel(appView, {x:padding, y:HEADER_HEIGHT + padding});
+            
+            // The combat log: its last lines, newest at the bottom, over the board's bottom
+            // left; clicks go through it. Shown unless the combatLog preference is off.
+            logTxt = new PaddedPlainText(appView, {
+                x:padding, valign:'bottom', valignOffset:FOOTER_HEIGHT + padding, width:LOG_WIDTH,
+                padding:padding/2, visible:false,
+                textColor:colorText, fontSize:fontSizeSmall, fontFamily:fontFamilyMono, whiteSpace:'pre-wrap'
+            }, [{
+                update: function() {
+                    const log = game.combatLog,
+                        last = log[log.length - 1],
+                        shown = pkg.cfg.COMBAT_LOG && !!last;
+                    if (shown && (this._last !== last || this._count !== log.length)) {
+                        this._last = last;
+                        this._count = log.length;
+                        this.setText(log.slice(-LOG_LINES).map(logLine).join('\n'));
+                        this.sizeViewToDom();
+                    }
+                    this.setVisible(shown);
+                }
+            }]);
+            logTxt.getIDS().pointerEvents = 'none';
             pieceMenu = new pkg.PieceMenu(gameView, {items:menuItems(), onPick:() => {V.menuOpen = false;}});
             
             statusTxt = new PaddedPlainText(appView, {
@@ -495,13 +579,20 @@
                         // it is and how tough. A hole, or a heal, harm or loot tile you know of:
                         // what it is.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
-                            enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId),
+                            enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
+                            sel = game.getSelected(),
                             tile = game.tileAt(V.hover.x, V.hover.y),
                             solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
                             other = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : game.isEffectTile(tile) ? game.tileType(tile) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
                         if (enemy && (!game.cellsInSight() || game.cellsInSight().has(game.key(V.hover.x, V.hover.y)))) {
+                            // With one of your pieces selected, then how it and the enemy
+                            // would do against each other.
                             status = enemy.description ? i18n('status-tile', enemy.name, enemy.description) : enemy.name;
+                            if (sel?.owner === 'player') {
+                                status = i18n('status-odds', status, game.hitChance(sel, at), formatRange(game.damageAgainst(sel, at)),
+                                    game.hitChance(at, sel), formatRange(game.damageAgainst(at, sel)));
+                            }
                         } else if (known) {
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
@@ -632,6 +723,9 @@
             new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
                 doActivated: () => {centerOn();}
             }]);
+            new IconBtn(ftrView, {icon:'scroll-text', label:i18n('lbl-log'), tooltip:i18n('tip-log')}, [{
+                doActivated: () => {toggleLog();}
+            }]);
             
             new Spacer(ftrView);
             
@@ -668,6 +762,7 @@
             
             
             infoPanel.update();
+            logTxt.update();
             statusTxt.update();
             
             if (game.over && !gameOverShown) {
@@ -864,6 +959,9 @@
             } else if (k === 's') {
                 handled();
                 centerOn();
+            } else if (k === 'k') {
+                handled();
+                toggleLog();
             } else if (!game.over) {
                 if (k === 'Escape') {cancelModes(); return;}
                 // The selected piece's menu items, by key.
