@@ -554,14 +554,16 @@
         },
         
         // Above the piece, as far out as its bars are below it: an icon for each of its
-        // status effects (see Effects.js; one whose icon hasn't loaded yet is skipped),
+        // status effects but muted and hidden ones (see Effects.js; one whose icon hasn't
+        // loaded yet is skipped),
         // left to right from the left side of its hex (half a cell from its middle).
         drawEffects = (p, cx, cy, s) => {
             const size = Math.max(8, s * 0.2),
                 y = cy - barGap(p, s) - size;
             let x = cx - s / 2;
             for (const e of p.effects ?? []) {
-                const name = pkg.effects.get(e.id)?.icon,
+                const kind = pkg.effects.get(e.id),
+                    name = kind && !kind.muted && !kind.hidden ? kind.icon : '',
                     path = name ? iconPath(name) : null;
                 if (path) {
                     ctx.save();

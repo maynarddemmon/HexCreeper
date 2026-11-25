@@ -58,14 +58,13 @@ test('the damage roll is a rule', async ({page}) => {
     })).toBe(3);
 });
 
-test('place and heal costs are formulas of your levels', async ({page}) => {
+test('the place cost is a formula of your levels', async ({page}) => {
     await clearBoard(page);
     expect(await page.evaluate(() => {
-        const g = hc.app.game, out = [g.placeCost(), g.healCost(), g.healAmount()];
+        const g = hc.app.game, out = [g.placeCost()];
         g.getPlayerCore().level = 3;
         g.rules.placeCost = 'levels * 10';
-        g.rules.healAmount = '0';
-        out.push(g.placeCost(), g.healCost(), g.healAmount());
+        out.push(g.placeCost());
         return out;
-    })).toEqual([5, 5, 4, 30, 15, 1]);
+    })).toEqual([5, 30]);
 });

@@ -83,8 +83,9 @@
         // A damage range, [min, max], as "1–6", or "3" if there's only the one
         formatRange = ([min, max]) => min === max ? String(min) : min + '–' + max,
         
-        // Piece p's status effects (see Effects.js), as "Exhausted (2 more turns)", or ''
-        formatEffects = p => (p.effects ?? []).map(e => i18n(e.countdown === 1 ? 'effect-turn' : 'effect-turns',
+        // Piece p's status effects (see Effects.js), but hidden ones, as "Exhausted (2 more
+        // turns)", or ''
+        formatEffects = p => (p.effects ?? []).filter(e => !pkg.effects.get(e.id)?.hidden).map(e => i18n(e.countdown === 1 ? 'effect-turn' : 'effect-turns',
             pkg.effects.get(e.id)?.name ?? e.id, e.countdown)).join(', '),
         
         // ---- The combat log ----
@@ -179,7 +180,7 @@
         
         /*  What the selected piece's menu offers, in its order: place (next to it), swap,
             jump and attach (which then ask for the cell, or the piece to swap with or attach to),
-            detach, heal (flowing from it), its character sheet, and going places and into
+            detach, rally, its character sheet, and going places and into
             formations. */
         menuItems = () => {
             const sel = () => game.getSelected(),
@@ -204,12 +205,16 @@
                     draw();
                 }},
                 {
-                    id:'heal',
-                    label:() => i18n('btn-heal', game.healAmount(), game.healCost()),
-                    tip:() => i18n('tip-heal', game.healCost(), game.healAmount()),
-                    enabled:() => !game.over && game.canAffordHeal() && game.anyDamaged(),
+                    id:'rally',
+                    label:() => i18n('btn-rally'),
+                    tip:() => {
+                        const p = sel();
+                        return p ? i18n('tip-rally', formatAp(game.rallyCost(p)), Math.max(0, game.statRule('rallyAmount', p)),
+                            Math.max(1, game.statRule('rallyTurns', p))) : '';
+                    },
+                    enabled:() => game.canRally(sel()),
                     run:() => {
-                        game.playerHeal(sel());
+                        if (game.playerRally(sel())) gameView.afterTurn();
                         draw();
                     }
                 },
@@ -222,7 +227,7 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -612,7 +617,7 @@
                             // With one of your pieces selected, then how it and the enemy
                             // would do against each other.
                             status = enemy.description ? i18n('status-tile', enemy.name, enemy.description) : enemy.name;
-                            if (at.effects?.length) status = i18n('status-tile', status, formatEffects(at));
+                            if (formatEffects(at)) status = i18n('status-tile', status, formatEffects(at));
                             if (sel?.owner === 'player') {
                                 status = i18n('status-odds', status, game.hitChance(sel, at), formatRange(game.damageAgainst(sel, at)),
                                     game.hitChance(at, sel), formatRange(game.damageAgainst(at, sel)));

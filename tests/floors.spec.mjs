@@ -6,6 +6,11 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
+// Mud costs 2 here, whatever init.json5 says.
+const mudCosts2 = page => page.evaluate(() => {
+    hc.floors.get('mud').moveCost = 2;
+});
+
 // Floor tiles of kind subtype at the cells given, [[x, y], ...]
 const putFloors = (page, subtype, cells) => page.evaluate(([subtype, cells]) => {
     const g = hc.app.game;
@@ -16,7 +21,7 @@ test('floor kinds come from init.json5, with a moveCost; bad ones are refused', 
     const errors = [];
     page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
     expect(await page.evaluate(() => hc.floors.list().map(f => [f.id, f.moveCost]))).toEqual([
-        ['stone_floor', 1], ['cave_floor', 1], ['dirt_floor', 1], ['frozen_floor', 1], ['loose_stone', 1.5], ['mud', 2], ['ice', 1.5]
+        ['stone_floor', 1], ['cave_floor', 1], ['dirt_floor', 1], ['frozen_floor', 1], ['loose_stone', 1.5], ['mud', 1.75], ['ice', 1.5], ['pool', 2]
     ]);
     expect(await page.evaluate(() => {
         hc.floors.define({ok:{name:'Ok'}, free:{name:'Free', moveCost:0}, odd:{name:'Odd', moveCost:'lots'}});
@@ -39,6 +44,7 @@ test('a floor blocks neither sight nor movement, and a fixture can sit on it', a
 });
 
 test('a step onto dear going costs its moveCost times an action; a group pays for its dearest cell', async ({page}) => {
+    await mudCosts2(page);
     await putFloors(page, 'mud', [[1, 0], [1, -1]]);
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
@@ -63,6 +69,7 @@ test('a step onto dear going costs its moveCost times an action; a group pays fo
 });
 
 test('dear going never costs more than a piece\'s whole pool, but needs all of it', async ({page}) => {
+    await mudCosts2(page);
     await putFloors(page, 'mud', [[1, 0]]);
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
@@ -77,6 +84,7 @@ test('dear going never costs more than a piece\'s whole pool, but needs all of i
 });
 
 test('enemies count dear going on their way to you', async ({page}) => {
+    await mudCosts2(page);
     // A corridor along y = 0, walled in, with mud at (1, 0)
     expect(await page.evaluate(() => {
         const g = hc.app.game;
@@ -91,6 +99,7 @@ test('enemies count dear going on their way to you', async ({page}) => {
 });
 
 test('Go to goes round dear going when that\'s cheaper', async ({page}) => {
+    await mudCosts2(page);
     await putFloors(page, 'mud', [[1, 0], [2, 0], [3, 0]]);
     const route = await page.evaluate(() => {
         hc.cfg.VISION.fog = false;
@@ -101,6 +110,7 @@ test('Go to goes round dear going when that\'s cheaper', async ({page}) => {
 });
 
 test('pointing at a floor says what it is and what a step onto it costs', async ({page}) => {
+    await mudCosts2(page);
     await putFloors(page, 'mud', [[2, 0]]);
     await page.evaluate(() => {
         hc.app.centerOn(false);
@@ -111,6 +121,7 @@ test('pointing at a floor says what it is and what a step onto it costs', async 
 });
 
 test('a cell with no tile is the map\'s base floor, and costs what it does', async ({page}) => {
+    await mudCosts2(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game, out = [g.baseFloor().id, g.moveCostAt(5, 5)];
         g.tileGenerator.attrs.baseFloor = 'mud';

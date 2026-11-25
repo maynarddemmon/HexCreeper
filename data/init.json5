@@ -249,21 +249,30 @@
 		
 		// Action points, in points (not rounded: kept in hundredths). A pool is at least a
 		// point, and an action; an action or a jump costs at least 0.1.
-		"apPool":"1 + con / 10",          // the most a piece can have
-		"apRecovery":"0.5 + agl / 40",    // what it gets back at the end of each turn
+		"apPool":"1 + con / 10",           // the most a piece can have
+		"apRecovery":"0.5 + agl / 40",     // what it gets back at the end of each turn
 		"apInitiative":"(wis + agl) / 40", // what it gets when an enemy first comes into your sight
-		"actionCost":"1",                 // what an action costs (a step, an attack, a jump, a swap, a detach or attach)
-		"jumpExhaustion":"2"              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
+		"actionCost":"1",                  // what an action costs (a step, an attack, a jump, a swap, a detach or attach)
+		"jumpExhaustion":"2",              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
+		"rallyCost":"0.5",                 // what rallying costs, in action points
+		"rallyTurns":"3",                  // the turns a rally lasts (a piece can't rally again until it's over)
+		"rallyAmount":"(con / 10) * level" // the HP a rallying piece gets back at the end of each of them
 	},
 	
 	// Status effects a piece can have for a while ("name" and "description", to show, and
-	// "icon", drawn above a piece that has it: one of img/icons', by name). What each does
-	// is the game's, by its id (see js/hc/model/Effects.js).
+	// "icon", drawn above a piece that has it: one of img/icons', by name). "muted":true:
+	// no icon, but it shows in the character sheet; "hidden":true: it shows nowhere. What
+	// each does is the game's, by its id (see js/hc/model/Effects.js).
 	"effects":{
 		"exhausted":{
 			"name":"Exhausted",
 			"description":"Gets no action points back at the end of the turn.",
 			"icon":"battery-low"
+		},
+		"rallying":{
+			"name":"Rallying",
+			"description":"Gets back some HP at the end of each turn, and can't rally again until it's over.",
+			"hidden":true
 		}
 	},
 	

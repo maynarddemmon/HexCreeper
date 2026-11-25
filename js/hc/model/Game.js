@@ -588,30 +588,12 @@
         
         canAffordPlace: function() { return this.score >= this.placeCost(); },
         
-        // ---- Heal action ----
-        healCost: function() {return Math.max(0, this.costRule('healCost'));},
-        healAmount: function() {return Math.max(1, this.costRule('healAmount'));},
-        
-        /*  A cost rule's formula (placeCost, healCost, healAmount: see Settings.js), of your
+        /*  A cost rule's formula (placeCost: see Settings.js), of your
             core's level, your highest and your pieces' levels together, rounded down. */
         costRule: function(rule) {
             return Math.floor(pkg.attrs.evaluate(this.rules[rule], pkg.COST_VARS,
                 {coreLevel:this.coreLevel(), maxLevel:this.maxLevel(), levels:this.totalLevels()})) || 0;
         },
-        anyDamaged: function() {return this.piecesOf('player').some(p => p.hp < p.maxHp);},
-        canAffordHeal: function() {return this.score >= this.healCost();},
-        
-        // Spend score to heal: healAmount() units start at the chosen piece and flow
-        // along links exactly like a heal tile. Unused units are lost. Doesn't use a move.
-        playerHeal: function(piece) {
-            if (this.over || !piece || piece.owner !== 'player' || !this.canAffordHeal() || !this.anyDamaged()) return false;
-            const cost = this.healCost();
-            this.score -= cost;
-            this.fx(piece.x, piece.y, `-${cost} score`, '--place-ink', {});
-            this.applyHeal(piece, this.healAmount(), false);
-            return true;
-        },
-        
         // Empty cells adjacent to at least one player piece.
         // Empty cells a piece could be placed on: next to any of your pieces, or with from
         // given, next to that piece.
@@ -650,7 +632,7 @@
         },
         
         // ---- Heal flow ----
-        // Heal units (from a heal tile, or the Heal action) heal the piece first; any
+        // Heal units (from a heal tile) heal the piece first; any
         // surplus flows along links: up to the nearest damaged ancestor, or down toward the
         // most damaged child. Units alternate up / down, starting up (so with two spare
         // units one goes up and one goes down). Units that find nobody to heal become
@@ -660,7 +642,7 @@
             if (self > 0) {
                 piece.hp += self;
                 units -= self;
-                this.fx(piece.x, piece.y, `+${self} HP`, '--heal', { delay: 60 });
+                this.fx(piece.x, piece.y, `+${self} HP`, '--heal', {delay: 60});
             }
             let up = true;
             while (units > 0) {
@@ -668,12 +650,12 @@
                     : (this.healTargetDown(piece) || this.healTargetUp(piece));
                 if (!t) break;
                 t.hp += 1; units -= 1; up = !up;
-                this.fx(t.x, t.y, '+1 HP', '--heal', { delay: 160 });
+                this.fx(t.x, t.y, '+1 HP', '--heal', {delay: 160});
             }
             if (units > 0 && leftoverToScore) {
                 const gain = units * this.rules.healScore;
                 piece.score += gain; this.earn(gain);
-                this.fx(x, y, `+${gain} score`, '--gain', { delay: 60 });
+                this.fx(x, y, `+${gain} score`, '--gain', {delay: 60});
             }
         },
         
@@ -765,7 +747,7 @@
             this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
-            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p));
+            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p) || this.canRally(p));
             if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }
             // The selection stays where it is, even on a piece that has acted.
         },
@@ -776,8 +758,9 @@
         },
         
         // The rest of the turn: the enemies', then the environment's (tiles, spawning),
-        // then housekeeping: every piece gets back action points, then its status effects
-        // count down (in that order, so an effect for a turn still counts at its end).
+        // then housekeeping: every piece gets back action points, rallying pieces HP, then
+        // its status effects count down (in that order, so an effect for a turn still counts
+        // at its end).
         endPlayerTurn: function() {
             this.enemyPhase();
             if (this.over) return;
@@ -789,6 +772,7 @@
             if (this.over) return;
             this.spawnGenerator.turnEnded();
             this.recoverAp();
+            this.rallyHeal();
             this.tickEffects();
             this.noticeEnemies();
             this.evaluateObjectives();

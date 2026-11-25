@@ -58,13 +58,13 @@ test('a game\'s rules are saved with it, whatever its map now says', async ({pag
     await startGame(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game;
-        g.rules.healAmount = '9 * coreLevel';
+        g.rules.placeCost = '9 * coreLevel';
         const data = JSON.parse(JSON.stringify(g.exportToObj()));
         g.reset();
-        const before = g.rules.healAmount;
+        const before = g.rules.placeCost;
         g.importFromObj(data);
-        return [before, g.rules.healAmount];
-    })).toEqual(['4 * coreLevel', '9 * coreLevel']);
+        return [before, g.rules.placeCost];
+    })).toEqual(['4 + ceil(levels / 2)', '9 * coreLevel']);
 });
 
 test('pieces\' status effects are saved with them; ones that make no sense are dropped', async ({page}) => {

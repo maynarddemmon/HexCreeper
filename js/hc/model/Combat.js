@@ -152,6 +152,38 @@
             }
         },
         
+        // ---- Rally ----
+        // A piece of yours that's hurt can rally, for the rallyCost rule's action points
+        // (at least MIN_COST): it's rallying (see Effects.js) for the rallyTurns rule's
+        // turns (at least 1), and gets back the rallyAmount rule's HP at the end of each
+        // (housekeeping, before the countdown), up to its max. Not again until that's over.
+        rallyCost: function(p) {return Math.max(MIN_COST, this.apRule('rallyCost', p));},
+        canRally: function(p) {
+            return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, pkg.EFFECT_RALLYING) && this.canAfford(p, this.rallyCost(p));
+        },
+        playerRally: function(p) {
+            const done = this.canRally(p);
+            if (done) {
+                this.spend(p, this.rallyCost(p));
+                this.addEffect(p, pkg.EFFECT_RALLYING, Math.max(1, this.statRule('rallyTurns', p)));
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        /*  Housekeeping: every rallying piece gets back its rallyAmount in HP, up to its max. */
+        rallyHeal: function() {
+            for (const p of this.pieces.values()) {
+                if (this.effectOn(p, pkg.EFFECT_RALLYING)) {
+                    const n = Math.min(p.maxHp - p.hp, Math.max(0, this.statRule('rallyAmount', p)));
+                    if (n > 0) {
+                        p.hp += n;
+                        this.fx(p.x, p.y, `+${n} HP`, '--heal', {});
+                    }
+                }
+            }
+        },
+        
         /*  Enemies coming into your sight for the first time (piece.noticed): each gets its
             initiative's points, and if any did, your pieces get theirs, once a turn
             (Game.initiativeTurn). */

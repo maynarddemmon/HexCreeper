@@ -95,6 +95,38 @@ test('a piece\'s status effects show as icons above it, where its bars are below
     expect(await whiteAbove(2, 0)).toBe(0);
 });
 
+test('a muted status effect shows in the character sheet, but has no icon; a hidden one shows in neither', async ({page}) => {
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), V = hc.view,
+            effects = hc.effects.byId;
+        effects.set('cursed', {id:'cursed', name:'Cursed', description:'', icon:'battery-low', muted:true, hidden:false});
+        effects.set('marked', {id:'marked', name:'Marked', description:'', icon:'battery-low', muted:false, hidden:true});
+        V.cam.size = 80;
+        hc.app.centerOn(false);
+        g.addEffect(c, 'cursed', 5);
+        g.addEffect(c, 'marked', 5);
+        g.selectedId = c.id;
+    });
+    // Drawn once, and time for an icon drawn there to load, then look where they would go.
+    await page.evaluate(() => hc.view.render(performance.now()));
+    await page.waitForTimeout(300);
+    const white = await page.evaluate(() => {
+        const V = hc.view, s = V.cam.size, [sx, sy] = V.cellCenter(0, 0),
+            size = Math.max(8, s * 0.2),
+            top = sy - s * (0.37 + hc.cfg.CORE_BORDER) - size;
+        V.stopPan();
+        V.render(performance.now());
+        const d = V.canvas.getContext('2d').getImageData(Math.round((sx - s / 2) * V.dpr), Math.round(top * V.dpr), Math.round(size * 2 * V.dpr), Math.round(size * V.dpr)).data;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) n++;
+        return n;
+    });
+    expect(white).toBe(0);
+    await page.keyboard.press('i');
+    await expect(page.getByText('Cursed (5 more turns)', {exact:true})).toBeVisible();
+    await expect(page.getByText(/Marked/)).toHaveCount(0);
+});
+
 test('I opens the selected piece\'s character sheet', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game;

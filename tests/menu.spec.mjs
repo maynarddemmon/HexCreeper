@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Character', 'Go to', 'Explore', 'Snake', 'Tree'];
+const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Rally', 'Character', 'Go to', 'Explore', 'Snake', 'Tree'];
 
 /*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. Pools are
     2 action points, all of it back each turn, so a can jump. */
@@ -29,7 +29,7 @@ test('clicking the selected piece again opens its menu beside it, with what it c
     await expect(items(page)).toHaveText(ITEMS);
     const disabled = await items(page).evaluateAll(els => els.map(e => e.classList.contains('disabled')));
     // A piece can go next to a; a can swap with the core, jump and be detached; it has a
-    // parent, so it can't attach; nothing is hurt, so no heal. It always has a character
+    // parent, so it can't attach; it isn't hurt, so it can't rally. It always has a character
     // sheet, and can always go to a cell, explore or get into formation.
     expect(disabled).toEqual([false, false, false, true, false, true, false, false, false, false, false]);
     // Beside the piece.
@@ -41,7 +41,7 @@ test('clicking the selected piece again opens its menu beside it, with what it c
 
 test('the actions are no longer in the footer', async ({page}) => {
     await setUp(page);
-    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5']) {
+    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Rally']) {
         await expect(button(page, name)).toHaveCount(0);
     }
 });
@@ -78,19 +78,25 @@ test('picking Swap closes the menu and asks for the piece to swap with', async (
     expect(await page.evaluate(() => [hc.app.game.pieceAt(0, 0).id !== hc.app.game.playerCoreId, hc.app.game.getPlayerCore().x])).toEqual([true, 1]);
 });
 
-test('Heal in the menu (or H) heals starting from the selected piece', async ({page}) => {
+test('Rally in the menu (or R) rallies the selected piece, if it\'s hurt', async ({page}) => {
     await setUp(page);
+    const rallying = () => page.evaluate(() => [...hc.app.game.pieces.values()].map(p => !!hc.app.game.effectOn(p, 'rallying')));
     await page.evaluate(() => {
         const g = hc.app.game;
-        g.rules.healAmount = '1'; // 1 HP, so it shows where healing starts
+        g.rules.rallyCost = '0.5';
+        g.pieceAt(1, 0).maxHp = 3;
         g.pieceAt(1, 0).hp = 1;
-        g.getPlayerCore().hp = 1;
     });
     await openMenu(page);
-    await menuItem(page, 'Heal 1 · 5').click();
-    expect(await page.evaluate(() => [hc.app.game.pieceAt(1, 0).hp, hc.app.game.getPlayerCore().hp, hc.app.game.score])).toEqual([2, 1, 95]);
-    await page.keyboard.press('h');
-    expect(await page.evaluate(() => hc.app.game.score)).toBe(90);
+    await menuItem(page, 'Rally').click();
+    expect(await rallying()).toEqual([false, true]);
+    expect(await page.evaluate(() => hc.app.game.pieceAt(1, 0).ap)).toBe(150);
+    // The core isn't hurt: R does nothing.
+    await page.evaluate(() => {
+        hc.app.game.selectedId = hc.app.game.playerCoreId;
+    });
+    await page.keyboard.press('r');
+    expect(await rallying()).toEqual([false, true]);
 });
 
 test('Place in the menu (or P) offers only the empty cells next to the selected piece, and links the new piece to it', async ({page}) => {
