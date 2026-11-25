@@ -14,8 +14,8 @@ test('a group stands for its trees of enemies, groups in it included', async ({p
     });
     expect(r).toEqual([
         ['goblin'],
-        ['goblin(goblin,goblin)'],
-        ['goblin(goblin(goblin,goblin),goblin(goblin,goblin),goblin(goblin,goblin))'],
+        ['goblin_reaver(goblin,goblin)'],
+        ['goblin_reaver(goblin_reaver(goblin,goblin),goblin_reaver(goblin,goblin),goblin_reaver(goblin,goblin))'],
         null
     ]);
 });
@@ -69,7 +69,7 @@ test('a group spawns at the first spot it fits at, as one band, and keeps its id
             nowhere:g.spawnGenerator.spawnGroup('goblin_pack', [[20, 0]])
         };
     });
-    expect(r).toEqual({count:10, at:[-20, 0], leaderKids:3, rank:3, ids:['goblin'], bands:1, saved:['goblin', true], nextBand:true, nowhere:null});
+    expect(r).toEqual({count:10, at:[-20, 0], leaderKids:3, rank:3, ids:['goblin_reaver', 'goblin'], bands:1, saved:['goblin_reaver', true], nextBand:true, nowhere:null});
 });
 
 test('hovering over a named enemy you can see says what it is', async ({page}) => {

@@ -84,7 +84,7 @@ test('going into a cavern or tunnel for the first time may spawn a band, by the 
     expect(await moveCore(page, ...found.tunnel)).toEqual([]);
     const spawned = await moveCore(page, ...found.cavern);
     expect(spawned.length).toBe(3);
-    expect(new Set(spawned.map(([id, band]) => id + band)).size).toBe(1); // goblins, one band
+    expect(new Set(spawned.map(([, band]) => band)).size).toBe(1); // a trio, one band
     const r = await page.evaluate(found => {
         const g = hc.app.game, s = g.spawnGenerator, sight = g.cellsInSight(),
             region = g.tileGenerator.regionAt(...found),
