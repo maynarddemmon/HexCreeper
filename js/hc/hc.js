@@ -53,7 +53,9 @@
             colorError:'var(--dmg)'
         },
         
-        // Tile Types (the terrain; heals, harms and loot are fixtures: see Fixtures.js)
+        // Tile Types (the terrain: a cell with none is plain floor; heals, harms and loot
+        // are fixtures: see Fixtures.js)
+        TILE_TYPE_FLOOR:'floor',
         TILE_TYPE_HOLE:'hole',
         TILE_TYPE_SOLID:'solid',
         

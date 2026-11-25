@@ -9,7 +9,7 @@
         
         {
             cfg:{PIECE_R, CORE_BORDER, ANIM, SHADOW},
-            TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
+            TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
             PIECE_TYPES
         } = pkg,
         
@@ -166,11 +166,20 @@
             }
         },
         
-        // Whether (x, y) holds a tile of the same kind and subtype as t, if t is a solid or
-        // a hole: tiles like that run together.
+        // Whether (x, y) holds a tile of the same kind and subtype as t, if t is a solid, a
+        // hole or a floor: tiles like that run together.
         sameTerrain = (t, x, y) => {
-            const n = (t.kind === TILE_TYPE_SOLID || t.kind === TILE_TYPE_HOLE) && game.tiles.get(game.key(x, y));
+            const n = (t.kind === TILE_TYPE_SOLID || t.kind === TILE_TYPE_HOLE || t.kind === TILE_TYPE_FLOOR) && game.tiles.get(game.key(x, y));
             return !!n && n.kind === t.kind && n.subtype === t.subtype;
+        },
+        
+        // A floor tile: its hex (and half a pixel more, so there's no seam) in its subtype's
+        // colour, so floors of a kind run together (with no grid lines between them).
+        drawFloor = t => {
+            ctx.beginPath();
+            addCellPath(t.x, t.y, -0.5);
+            ctx.fillStyle = dataColor(pkg.floors.get(t.subtype)?.fillColor, '--bg');
+            ctx.fill();
         },
         
         drawTile = t => {
@@ -559,11 +568,12 @@
         const {visitedQuads:visited, quads} = game.tileGenerator;
         if (visited) fillCells(known.filter(c => visited.has(quads.key(c.x, c.y))), '--visited');
         
-        // Solid and hole tiles
+        // Tiles: floors first (shadows fall on them), then solids and holes
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
+        for (const t of tilesShown) if (t.kind === TILE_TYPE_FLOOR) drawFloor(t);
         if (SHADOW.on) drawSolidShadows(tilesShown, sight ? known : null);
         fillSeeThroughSolids(tilesShown);
-        for (const t of tilesShown) drawTile(t);
+        for (const t of tilesShown) if (t.kind !== TILE_TYPE_FLOOR) drawTile(t);
         if (SHADOW.on) drawHoleShadows(tilesShown);
         
         // Heals, harms and loot (fixtures), over their tiles

@@ -107,6 +107,7 @@ myt.I18N.setDictionary({
 "status-solid":"$0 ($1) · HP $2/$3 · DR $4",
 "status-opacity":" · $0% opaque",
 "status-tile":"$0 · $1",
+"status-floor":"$0 (a step onto it costs ×$1)",
 "status-odds":"$0 · you: $1% to hit, $2 damage · it: $3%, $4",
 
 // Dialogs

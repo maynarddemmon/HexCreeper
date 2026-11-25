@@ -36,7 +36,7 @@
     
     Action points: a piece acts (moves, attacks, swaps, detaches, attaches...) by spending
     them, the actionCost rule's an action (a jump the jumpCost rule's, each at least
-    MIN_COST), so only with that many. They're kept in hundredths (AP_UNIT a point), as
+    MIN_COST; a step onto dear going more: see moveCost), so only with that many. They're kept in hundredths (AP_UNIT a point), as
     whole numbers, so they add up exactly. At the end of each turn, after the enemies',
     every piece gets back the apRecovery rule's points, up to its pool, the apPool rule's
     (but at least a point, and an action, so everything can act). A new piece starts with
@@ -117,6 +117,17 @@
         /*  What an action costs piece p, and a jump: at least MIN_COST. */
         actionCost: function(p) {return Math.max(MIN_COST, this.apRule('actionCost', p));},
         jumpCost: function(p) {return Math.max(MIN_COST, this.apRule('jumpCost', p));},
+        
+        /*  What piece p spends on move m (from legalMoves or resolveStep): an action for an
+            attack; for a step, an action times the dearest moveCost of the cells the
+            pieces it moves land on (Game.moveCostAt: a group goes at its slowest), but
+            never more than its pool, so dear going is slow but never a wall. */
+        moveCost: function(p, m) {
+            const action = this.actionCost(p);
+            if (m.attack || !m.moves?.length) return action;
+            const mult = Math.max(...m.moves.map(([, x, y]) => this.moveCostAt(x, y)));
+            return Math.max(MIN_COST, Math.min(this.apMax(p), Math.round(action * mult)));
+        },
         
         /*  Whether piece p has the points for an action costing cost (an action's if not
             given), and the game's on. */

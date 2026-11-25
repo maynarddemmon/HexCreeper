@@ -305,19 +305,22 @@
                 const route = navRoute(p);
                 if (!route) {
                     stop = nav.kind === 'goto' ? 'nav-no-route' : 'nav-explored';
-                } else if (!game.canMove(p)) {
-                    endTurn();
                 } else {
+                    // The step on, if it can make it, points or not (dear going costs more:
+                    // see Combat.moveCost). Without the points, the turn ends, to wait for them.
                     const [x, y] = route[0],
-                        move = game.findMove(p, x, y, 'follow');
-                    if (move && !move.attack && game.playerAct(p, x, y, 'follow')) {
+                        move = game.findMove(p, x, y, 'follow', false);
+                    if (!game.canAfford(p, move && !move.attack ? game.moveCost(p, move) : undefined)) {
+                        endTurn();
+                    } else if (move && !move.attack && game.playerAct(p, x, y, 'follow')) {
                         did = 'step';
                     } else {
                         const action = game.planUntangle(p, navField(p), nav.visited)?.[0],
                             q = action && game.pieces.get(action.id);
                         if (!action) {
                             stop = 'nav-blocked';
-                        } else if (!game.canAfford(q, action.kind === 'jump' ? game.jumpCost(q) : game.actionCost(q)) ||
+                        } else if (!game.canAfford(q, action.kind === 'jump' ? game.jumpCost(q) : action.kind === 'swap' ? game.actionCost(q) :
+                            game.moveCost(q, game.findMove(q, action.x, action.y, action.kind, false) ?? {})) ||
                             (action.kind === 'swap' && !game.canMove(game.pieces.get(action.other)))) {
                             // Its action is in a turn to come.
                             endTurn();
@@ -586,7 +589,7 @@
                     } else if (V.hover) {
                         // A named enemy you can see under the pointer: what it is. A solid: what
                         // it is and how tough. A hole, or a heal, harm or loot (a fixture) you
-                        // know of: what it is.
+                        // know of: what it is. A floor: what it is, and its cost.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
                             enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
                             sel = game.getSelected(),
@@ -609,6 +612,13 @@
                                 if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));
                             } else if (other) {
                                 status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
+                            }
+                            // A floor: what it is and what a step onto it costs (after any
+                            // fixture on it).
+                            const floor = tile?.kind === pkg.TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : null;
+                            if (floor) {
+                                const what = i18n('status-floor', floor.name, floor.moveCost);
+                                status = status ? status + ' · ' + what : floor.description ? i18n('status-tile', what, floor.description) : what;
                             }
                         }
                     }

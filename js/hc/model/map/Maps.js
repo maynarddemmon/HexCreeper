@@ -59,7 +59,7 @@
         /*  Calls back with init.json5's contents, {defaultMap, maps:[...], materials,
             solids, holes, fixtures, enemies, enemyGroups, ...}, or null if it couldn't be
             loaded. It's loaded once, and its materials and solid subtypes go to pkg.solids,
-            its hole subtypes to pkg.holes, its fixtures to pkg.fixtures (see Fixtures.js),
+            its hole and floor subtypes to pkg.holes and pkg.floors, its fixtures to pkg.fixtures (see Fixtures.js),
             its characters to pkg.characters (see Combat.js), and its enemies and groups to
             pkg.enemies and pkg.enemyGroups (see Enemies.js). */
         loadIndex: callback => {
@@ -72,6 +72,7 @@
                         pkg.settings.setDefaultRules(data.rules);
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
+                        pkg.floors.define(data.floors);
                         pkg.defineShadow(data.shadow);
                         pkg.fixtures.define(data.fixtures);
                         pkg.characters.define(data.characters);

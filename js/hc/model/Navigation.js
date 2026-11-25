@@ -11,7 +11,8 @@
         RADIUS = 120,    // the farthest a route goes, in steps (unseen ones counting as UNSEEN_COST)
         FIELD_SLACK = 12, // goalField counts goals up to this much further than the nearest
         PLAN_STATES = 400, // how many positions planUntangle looks at before giving up
-        LEAD_WEIGHT = 3;  // how much a step nearer for the lead counts against an action, untangling
+        LEAD_WEIGHT = 3,  // how much a step nearer for the lead counts against an action, untangling
+        TENTHS = 10;      // routes and fields count in tenths of a step, so dear going (floors' moveCost) can count fractions
     
     pkg.Navigation = new JS.Module('Navigation', {
         // Whether you've seen the cell with key k (always, without fog of war).
@@ -43,7 +44,7 @@
                             for (let at = k; at !== start; at = from.get(at)) route.unshift(cell(at));
                             return route;
                         }
-                        if (d < RADIUS) {
+                        if (d < RADIUS * TENTHS) {
                             for (const [dx, dy] of pkg.hex.dirs) {
                                 const nx = x + dx,
                                     ny = y + dy,
@@ -63,29 +64,30 @@
             return null;
         },
         
-        /*  What a step onto each cell costs piece p going somewhere by itself, as
+        /*  What a step onto each cell costs piece p going somewhere by itself, in tenths, as
             costOf(x, y, nk), nk its key from keysNear(p.x, p.y), worked out once for each
-            cell: 1 for a cell you've seen that's open, with no harm tile you know of and no
-            piece on it (swarmCost if one of p's swarm is: its whole tree, which makes way
-            for it in Follow); UNSEEN_COST for one you haven't seen, if unseen is true; 0
-            for one it can't go on. @private */
+            cell: its moveCost (see Game.moveCostAt) for a cell you've seen that's open, with
+            no harm you know of and no piece on it (swarmCost times that if one of p's swarm
+            is: its whole tree, which makes way for it in Follow); UNSEEN_COST for one you
+            haven't seen, if unseen is true; 0 for one it can't go on. @private */
         _stepCosts: function(p, unseen, swarmCost) {
             const topOf = q => {
                     while (this.parent(q)) q = this.parent(q);
                     return q;
                 },
                 top = topOf(p),
-                pieceCost = k => {
-                    const id = this.board.get(k);
-                    return id === undefined ? 1 : topOf(this.pieces.get(id)) === top ? swarmCost : 0;
+                pieceCost = (k, x, y) => {
+                    const id = this.board.get(k),
+                        step = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y)));
+                    return id === undefined ? step : topOf(this.pieces.get(id)) === top ? swarmCost * step : 0;
                 },
                 costs = new Map();
             return (x, y, nk) => {
                 let v = costs.get(nk);
                 if (v === undefined) {
                     const k = this.key(x, y);
-                    v = this.hasSeen(k) ? (this.isOpen(x, y) && !this.isHarm(x, y) ? pieceCost(k) : 0) :
-                        unseen && Math.abs(x) <= cfg.WORLD_LIMIT && Math.abs(y) <= cfg.WORLD_LIMIT ? UNSEEN_COST : 0;
+                    v = this.hasSeen(k) ? (this.isOpen(x, y) && !this.isHarm(x, y) ? pieceCost(k, x, y) : 0) :
+                        unseen && Math.abs(x) <= cfg.WORLD_LIMIT && Math.abs(y) <= cfg.WORLD_LIMIT ? UNSEEN_COST * TENTHS : 0;
                     costs.set(nk, v);
                 }
                 return v;
@@ -113,7 +115,7 @@
             accepts, by the costs routes count (with its swarm out of the way, since that
             moves), as far(x, y): Infinity for one it can't get there from, or too far off.
             Works out from p to the goals within reach (those up to FIELD_SLACK further
-            than the nearest), then back from them. */
+            than the nearest), then back from them. (Counted in tenths, given in steps.) */
         goalField: function(p, isGoal, unseen) {
             const {key} = pkg.hex.keysNear(p.x, p.y),
                 costOf = this._stepCosts(p, unseen, 1),
@@ -128,7 +130,7 @@
                                 for (const [dx, dy] of pkg.hex.dirs) {
                                     const nx = x + dx, ny = y + dy, nk = key(nx, ny),
                                         // out: the step onto the cell; back: onto this one
-                                        step = back ? (reached.has(nk) || (nx === p.x && ny === p.y) ? costOf(x, y, key(x, y)) || UNSEEN_COST : 0) : costOf(nx, ny, nk),
+                                        step = back ? (reached.has(nk) || (nx === p.x && ny === p.y) ? costOf(x, y, key(x, y)) || UNSEEN_COST * TENTHS : 0) : costOf(nx, ny, nk),
                                         next = d + step;
                                     if (step && !(cost.get(nk) <= next)) {
                                         cost.set(nk, next);
@@ -146,13 +148,13 @@
                     nearest = Math.min(nearest, d);
                     goals.push([x, y]);
                 }
-                return d < RADIUS;
+                return d < RADIUS * TENTHS;
             };
-            const reached = walk([[p.x, p.y]], () => nearest + FIELD_SLACK);
+            const reached = walk([[p.x, p.y]], () => nearest + FIELD_SLACK * TENTHS);
             back = true;
             onCell = () => true;
             const far = goals.length ? walk(goals, () => Infinity) : new Map();
-            return (x, y) => far.get(key(x, y)) ?? Infinity;
+            return (x, y) => (far.get(key(x, y)) ?? Infinity) / TENTHS;
         },
         
         /*  When piece p can't step on its way (far, as goalField gives it), a plan to get
@@ -229,11 +231,13 @@
                     next = (id, kind, moves, x, y, other) => {
                         const pos = new Map(base.pos);
                         for (const [gid, mx, my] of moves) pos.set(gid, [mx, my]);
-                        const k = keyOf(pos);
-                        if (!seen.has(k)) {
+                        const k = keyOf(pos),
+                            // A step costs more onto dear going (see Combat.moveCost).
+                            spent = kind === 'jump' ? jumpCosts.get(id) : kind === 'swap' ? costs.get(id) :
+                                this.moveCost(this.pieces.get(id), {moves});
+                        if (!seen.has(k) && base.ap.get(id) >= spent) {
                             seen.add(k);
-                            const spent = kind === 'jump' ? jumpCosts.get(id) : costs.get(id),
-                                ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
+                            const ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
                                 child = {pos, ap, cost:base.cost + spent / pkg.AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
                             if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
                             child.score = score(child);

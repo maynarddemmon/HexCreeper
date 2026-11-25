@@ -13,6 +13,11 @@
     A hole subtype is a kind of hole tile: optionally a fillColor, drawn in place of the
     usual hole colour.
     
+    A floor subtype is a kind of floor tile: open floor that's harder (or easier) going,
+    like mud, ice or loose stone. It doesn't block sight or movement, but stepping onto it
+    costs its moveCost (default 1) times an action (see Combat.moveCost); fillColor is the
+    colour it's drawn in (else the usual floor). A cell with no tile is plain floor.
+    
     Either may have a shadowLength: how long its shadow is, in hexes (how tall a solid is,
     or how deep a hole), else cfg.SHADOW's length. The light the shadows come from is
     init.json5's "shadow" (see defineShadow). */
@@ -55,6 +60,11 @@
         },
         getMaterial: function(id) {return materials.get(id);}
     }))('solid', parseSolid);
+    
+    // {id:{name, description, fillColor, moveCost}}
+    pkg.floors = new Subtypes('floor', f => isText(f.fillColor) && (f.moveCost === undefined || (isNum(f.moveCost) && f.moveCost >= 0.1))
+        ? {fillColor:f.fillColor || null, moveCost:f.moveCost ?? 1}
+        : null);
     
     // {id:{name, description, fillColor, shadowLength}}
     pkg.holes = new Subtypes('hole', h => isText(h.fillColor) && isLength(h.shadowLength)

@@ -26,6 +26,7 @@ With one of your pieces selected, point at an enemy to see the odds: your piece'
 Enemies arrive in waves of linked squads, and waves grow with your level. A squad's pieces act with their own action points, as yours do, and it plans its turn: it will carry a piece into reach, strike, and pull back out of reach. Kill a squad's leader to destroy the whole squad.
 
 <span style="font-size:16px;">TILES</span>
+- Some floor is harder going: loose stone, mud or ice cost more action points to step onto (pointing at one says how much), though never more than a piece's whole pool.
 - A green heart heals, a red blood drop does damage, and a gold coin is loot: score. They act when one of your pieces moves onto them (or is placed on one), and the number in the corner, if it shows, is what each gives. Spare healing flows along links (up first, then down), and any left over becomes score. Enemies walk around harm.
 - There are kinds of each: point at one to see what it is. Some only show when you're close, or when you step on them; some affect every piece around them (pointing at one outlines where); some last only a few turns once found (the turns left show top right), and some hold more than one go (what's left shows bottom left).
 - The trail of gold dots is the path your core has taken; it's darker where you've gone that way more than once.

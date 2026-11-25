@@ -82,8 +82,10 @@
                                     if (!this.game.canAfford(pc, this.game.jumpCost(pc)) || !this.game.jumpPiece(pc, ...a.jump)) break;
                                     this.game.spend(pc, this.game.jumpCost(pc));
                                 } else {
-                                    if (!this.game.canAfford(pc) || !this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
-                                    if (this.game.pieces.has(pc.id)) this.game.spend(pc);
+                                    const m = pc && this.game.findMove(pc, pc.x + a.dx, pc.y + a.dy, a.mode),
+                                        cost = m && this.game.moveCost(pc, m);
+                                    if (!m || !this.game.canAfford(pc, cost) || !this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
+                                    if (this.game.pieces.has(pc.id)) this.game.spend(pc, cost);
                                 }
                                 this.game.endAction();
                             }
@@ -114,7 +116,7 @@
                 bestKey = [cur, hexDist(root, t) * 1000 + euclid2(root, t)];
             for (const mode of this.game.canAfford(root) ? ['fixed', 'follow', 'free'] : []) {
                 for (const m of this.game.legalMoves(root, mode)) {
-                    if (!m.attack && this.game.canStep(root, m.dx, m.dy, true, mode)) {
+                    if (!m.attack && this.game.canStep(root, m.dx, m.dy, true, mode) && this.game.canAfford(root, this.game.moveCost(root, m))) {
                         const moved = new Map(m.moves.map(([id, x, y]) => [id, [x, y]])),
                             k = [
                                 Math.min(...members.map(g => {
@@ -159,7 +161,10 @@
                     if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0], this.game.jumpCost(jump[0]));
                 }
             }
-            if (best && this.game.act(root, best.x, best.y, best.mode)) this.game.spend(root);
+            if (best) {
+                const cost = this.game.moveCost(root, best);
+                if (this.game.act(root, best.x, best.y, best.mode)) this.game.spend(root, cost);
+            }
         },
         
         // Plan a squad's turn. Returns the actions to carry out in order: {id, dx, dy, mode}
@@ -294,7 +299,8 @@
                             for (const mode of PLAN_MODES) {
                                 const r = this.game.resolveStep(view, id, dx, dy, mode),
                                     sig = r ? (r.attack ? 'a' + r.hits.map(t => t.id).sort() : 'm' + r.moves.map(m => m.join(',')).sort().join(';')) : null;
-                                if (r && !seen.has(sig)) {
+                                // (a step onto dear going costs more: see Combat.moveCost)
+                                if (r && !seen.has(sig) && can(st, id, r.attack ? costs.get(id) : this.game.moveCost(pc, r))) {
                                     seen.add(sig);
                                     const action = {id, dx, dy, mode};
                                     if (r.attack) {
@@ -325,7 +331,7 @@
                                         for (const [gid, x, y] of r.moves) pos.set(gid, [x, y]);
                                         out.push({
                                             pos,
-                                            ap:spent(st, id),
+                                            ap:spent(st, id, this.game.moveCost(pc, r)),
                                             dmg:st.dmg,
                                             dead:st.dead,
                                             gain:st.gain,

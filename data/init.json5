@@ -2,7 +2,7 @@
 	// The map played when there's no saved game.
 	"defaultMap":"endless",
 	
-	// Any entry in the tables below (materials, solids, holes, fixtures, characters,
+	// Any entry in the tables below (materials, solids, holes, floors, fixtures, characters,
 	// enemies; not enemy groups) may extend another in the same table:
 	// "extends":"<id>" starts it as that one, with its own properties over it. Objects (like
 	// "stats") merge a property at a time; anything else (text, numbers, arrays like
@@ -111,6 +111,18 @@
 		"pit":     {"name":"Pit",      "description":"A deep pit. Nothing can cross it, but you can see over it.", "fillColor":"#333"},
 		"chasm":   {"name":"Chasm",    "description":"A crack in the ground too wide to jump.", "fillColor":"#282828"},
 		"sinkhole":{"name":"Sinkhole", "description":"The ground has fallen away here.",        "fillColor":"#383838"}
+	},
+	
+	// Kinds of floor tile: open floor that's harder going. Nothing is blocked (sight,
+	// movement), but a step onto one costs "moveCost" (default 1, at least 0.1) times an
+	// action, and a group steps at the cost of the dearest cell any of it lands on, never
+	// more than a piece's whole pool. Jumps don't pay it. "fillColor" (any CSS colour, or a
+	// --variable from index.html) is what it's drawn in; without it it's the usual floor. A
+	// cell with no tile is plain floor (cost 1).
+	"floors":{
+		"loose_stone":{"name":"Loose stone", "description":"Rocks that shift underfoot.",        "moveCost":1.5, "fillColor":"#4e4b47"},
+		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":2,   "fillColor":"#4a3f33"},
+		"ice":        {"name":"Ice",         "description":"Slick ice: slow, careful steps.",    "moveCost":1.5, "fillColor":"#4c5860"}
 	},
 	
 	// Fixtures: what sits on the ground of a cell (over its open floor) and does something

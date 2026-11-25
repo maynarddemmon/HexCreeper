@@ -9,7 +9,7 @@
         cfg:{
             WORLD_LIMIT, VISION, ANIM
         },
-        TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_TYPES,
+        TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_TYPES,
         hex:{keysNear, lineCellInto},
         hexDist, PIECE_TYPES
     } = pkg,
@@ -69,7 +69,7 @@
             this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
             this.spawnGenerator = pkg.SpawnGenerator.make(spawns.type, this, spawns.attrs); // and its enemies
             this.enemyAI = pkg.EnemyAI.make(ai.type, this, ai.attrs);                       // which it plays
-            this.tiles = new Map();          // "x,y" -> {x, y, kind:"solid" | "hole", subtype, ...}: the terrain, open floor where there's none (see makeTile)
+            this.tiles = new Map();          // "x,y" -> {x, y, kind:"solid" | "hole" | "floor", subtype, ...}: the terrain, plain floor where there's none (see makeTile)
             this.fixtures = new Map();       // "x,y" -> {x, y, type:"heal" | "harm" | "loot", subtype, ...}: what's on open floor (see Fixtures.js)
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
             this.initiativeTurn = null;      // the turn your pieces last got initiative (see noticeEnemies)
@@ -404,17 +404,26 @@
         // Legal actions for a piece: [{x, y, dx, dy, attack, hits}]
         // The piece and its whole group step together. If any group member would
         // step onto an opposing piece, the action is an attack instead: every such
-        // member hits its target and nobody moves.
-        legalMoves: function(piece, mode = this.modeFor(piece)) {
+        // member hits its target and nobody moves. For your pieces, only those it has the
+        // action points for (see moveCost), unless afford is false.
+        legalMoves: function(piece, mode = this.modeFor(piece), afford = true) {
             if (!piece || this.over) return [];
-            if (piece.owner === 'player' && !this.canMove(piece)) return [];
+            const mine = piece.owner === 'player' && afford;
+            if (mine && !this.canMove(piece)) return [];
             const view = this.boardView(),
                 out = [];
             for (const [dx, dy] of PIECE_TYPES[piece.type].steps(piece)) {
                 const r = this.resolveStep(view, piece.id, dx, dy, mode);
-                if (r) out.push({x:piece.x + dx, y:piece.y + dy, dx, dy, mode, ...r});
+                if (r && !(mine && !this.canAfford(piece, this.moveCost(piece, r)))) out.push({x:piece.x + dx, y:piece.y + dy, dx, dy, mode, ...r});
             }
             return out;
+        },
+        
+        /*  What stepping onto (x, y) costs, as a multiple of an action: its floor's moveCost
+            (see Solids.js), or 1. */
+        moveCostAt: function(x, y) {
+            const t = this.tiles.get(this.key(x, y));
+            return t?.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost ?? 1 : 1;
         },
         
         // Could `piece` step by (dx, dy) right now, in mode? Same rules as a normal move;
@@ -424,8 +433,8 @@
             return !!r && !r.attack;
         },
         
-        findMove: function(piece, x, y, mode = this.modeFor(piece)) {
-            return this.legalMoves(piece, mode).find(m => m.x === x && m.y === y) || null;
+        findMove: function(piece, x, y, mode = this.modeFor(piece), afford = true) {
+            return this.legalMoves(piece, mode, afford).find(m => m.x === x && m.y === y) || null;
         },
         
         // Combo rule: killing n enemies in one move scores n x (their total value),
@@ -686,9 +695,11 @@
         // Combat.js). Only the piece you choose spends them; pieces it carries keep theirs.
         // Your piece acts (moves or attacks): in its movement mode, or the one given.
         playerAct: function(piece, x, y, mode = this.modeFor(piece)) {
-            if (piece?.owner !== 'player' || !this.canMove(piece)) return false;
+            const m = piece?.owner === 'player' ? this.findMove(piece, x, y, mode) : null;
+            if (!m) return false;
+            const cost = this.moveCost(piece, m);
             if (!this.act(piece, x, y, mode)) return false;
-            this.spend(piece);
+            this.spend(piece, cost);
             this.afterPlayerAction();
             return true;
         },
@@ -787,15 +798,26 @@
         
         // How many actions it takes to reach a player piece from every cell within `radius`,
         // keeping off active harm tiles (other pieces are ignored since they move). A step
-        // is an action, and a jump (see jumpOffsets), with jumps, costs twice the points:
-        // it counts 2, so it's no quicker than walking, but it can cross holes.
+        // is an action times the moveCost of the cell it steps onto (dear going counts more:
+        // see moveCostAt), and a jump (see jumpOffsets), with jumps, costs twice the points:
+        // it counts 2, so it's no quicker than walking, but it can cross holes. Worked out
+        // in tenths, so it can go by whole numbers, and given in actions.
         distanceField: function(sources, radius = 30, jumps = true) {
             // Each cell's numeric key (see keysNear) is used while searching, and what's on
             // it looked up only once, so the search makes as little as it can.
             const {key:numKey} = keysNear(sources[0]?.x ?? 0, sources[0]?.y ?? 0),
                 OPEN = 1,
                 SOLID = 2,
-                dist = new Map(),     // numeric key -> distance
+                TENTHS = 10,
+                far = radius * TENTHS,
+                dist = new Map(),     // numeric key -> distance, in tenths
+                costs = new Map(),    // numeric key -> a step onto it, in tenths
+                costAt = (x, y) => {
+                    const nk = numKey(x, y);
+                    let v = costs.get(nk);
+                    if (v === undefined) costs.set(nk, v = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y))));
+                    return v;
+                },
                 kinds = new Map(),    // numeric key -> OPEN (open and not harm you know of), SOLID, or 0
                 kindAt = (x, y) => {
                     const nk = numKey(x, y);
@@ -809,7 +831,7 @@
                 buckets = [], // the cells reached, by distance: [x, y, x, y, ...]
                 reach = (x, y, d) => {
                     const nk = numKey(x, y);
-                    if (d <= radius && !(dist.get(nk) <= d) && kindAt(x, y) === OPEN) {
+                    if (d <= far && !(dist.get(nk) <= d) && kindAt(x, y) === OPEN) {
                         dist.set(nk, d);
                         (buckets[d] ??= []).push(x, y);
                     }
@@ -828,14 +850,16 @@
                     const x = cells[i],
                         y = cells[i + 1];
                     // Reached more cheaply since it was put here: skip it.
-                    if (dist.get(numKey(x, y)) === d && d < radius) {
-                        for (let s = 0; s < steps.length; s += 2) reach(x + steps[s], y + steps[s + 1], d + 1);
+                    // (Out from your pieces: a piece at the next cell would step onto this one.)
+                    if (dist.get(numKey(x, y)) === d && d < far) {
+                        const step = costAt(x, y);
+                        for (let s = 0; s < steps.length; s += 2) reach(x + steps[s], y + steps[s + 1], d + step);
                         // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is
                         // as quick. A jump can't pass over solids only (see canJumpOver).
                         for (let j = 0; j < jumpSteps.length; j += 6) {
                             const ka = kindAt(x + jumpSteps[j + 2], y + jumpSteps[j + 3]),
                                 kb = kindAt(x + jumpSteps[j + 4], y + jumpSteps[j + 5]);
-                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumpSteps[j], y + jumpSteps[j + 1], d + 2);
+                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumpSteps[j], y + jumpSteps[j + 1], d + 2 * TENTHS);
                         }
                     }
                 }
@@ -846,7 +870,7 @@
                 const cells = buckets[d] ?? [];
                 for (let i = 0; i < cells.length; i += 2) {
                     const k = this.key(cells[i], cells[i + 1]);
-                    if (!retval.has(k)) retval.set(k, d);
+                    if (!retval.has(k)) retval.set(k, d / TENTHS);
                 }
             }
             return retval;

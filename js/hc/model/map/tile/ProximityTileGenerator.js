@@ -120,7 +120,7 @@
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = game.key(x, y);
-                        if (game.tiles.has(kk) || game.fixtures.has(kk) || game.pieceAt(x, y)) continue;
+                        if (!game.isOpen(x, y) || game.fixtures.has(kk) || game.pieceAt(x, y)) continue;
                         game.fixtures.set(kk, game.makeFixture(x, y, this.attrs[made + 'Type'], rollRng, made));
                         return;
                     }
