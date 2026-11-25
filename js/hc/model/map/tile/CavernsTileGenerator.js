@@ -33,7 +33,7 @@
         attrs:{num, choice, table, pick},
         TileGenerator:{optionsOf},
         hex, hexDist,
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_TYPES, fixtureOptions
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
     } = pkg,
         
         {sqrt, sin, cos, atan2, hypot, ceil, floor, max, PI} = Math,
@@ -141,6 +141,13 @@
                 num('stalagmiteFrequency', 30, 0, 100),
                 num('stalactiteFrequency', 20, 0, 100),
                 num('holeFrequency', 15, 0, 100),      // clumps of 1 to 3 holes
+                // Patches of floor (floorTable) per 1000 cells, anywhere open (in caverns or
+                // tunnels), each a round patch floorSizeMin to floorSizeMax cells across the
+                // middle (radius 0 is one cell, 1 seven...), under stalagmites, stalactites
+                // and holes.
+                num('floorFrequency', 8, 0, 100),
+                num('floorSizeMin', 0, 0, 3),
+                num('floorSizeMax', 2, 0, 3),
                 // ...and anywhere open.
                 num('healFrequency', 4, 0, 100),
                 num('harmFrequency', 4, 0, 100),
@@ -149,6 +156,8 @@
                 // Which kinds, by weight (data/init.json5; heals, harms and loot are fixtures:
                 // see Fixtures.js).
                 table('holeTable', {pit:6, chasm:3, sinkhole:1}, optionsOf(pkg.holes)),
+                table('floorTable', {loose_stone:2, mud:1}, optionsOf(pkg.floors)),
+                choice('baseFloor', 'cave_floor', optionsOf(pkg.floors)), // what a cell with no tile is (see Game.baseFloor)
                 table('healTable', {heal:1}, fixtureOptions(FIXTURE_HEAL)),
                 table('harmTable', {harm:1}, fixtureOptions(FIXTURE_HARM)),
                 table('lootTable', {loot:1}, fixtureOptions(FIXTURE_LOOT)),
@@ -190,6 +199,7 @@
             this.siteReach = max(2, ceil((max(radius, DEAD_END_REACH) + JUNCTION_JITTER * this.spacing + 2 * BLOCK_RADIUS) / (0.866 * this.spacing)));
             this.blocks = pkg.makeChunks(BLOCK_RADIUS);
             this.madeBlocks = new Set(); // keys of the blocks whose cells have been made
+            this.floorPatches = new Map(); // "x,y" -> the patch of floor the seed starts there, or null (see floorPatchAt)
             
             // What's worked out from the seed, kept since it's asked for again and again.
             this.bases = new Map();       // site key -> {i, j, key, junction, wx, wy, radius, wobble} (see siteBase)
@@ -877,8 +887,51 @@
             return retval;
         },
         
-        // What cell (x, y) gets, as [kind, subtype]: a tile (a solid or hole) or a fixture
-        // (its type: heal, harm or loot), or null for neither.
+        // The patch of floor the seed starts at cell (x, y), {subtype, radius}, or null.
+        // Worked out once each.
+        floorPatchAt: function(x, y) {
+            const k = x + ',' + y;
+            let retval = this.floorPatches.get(k);
+            if (retval === undefined) {
+                const a = this.attrs,
+                    rng = this.game.rngFor('cave-floor', k),
+                    subtype = rng() * 1000 < a.floorFrequency ? pick(a.floorTable, rng) : undefined,
+                    min = Math.min(a.floorSizeMin, a.floorSizeMax);
+                retval = subtype === undefined ? null : {subtype, radius:min + floor(rng() * (Math.max(a.floorSizeMin, a.floorSizeMax) - min + 1))};
+                this.floorPatches.set(k, retval);
+            }
+            return retval;
+        },
+        
+        // The floor tile cell (x, y) is in a patch of (the nearest patch's), or undefined.
+        floorOf: function(x, y) {
+            let best, bestD = Infinity;
+            for (const c of hex.disk(x, y, Math.max(this.attrs.floorSizeMin, this.attrs.floorSizeMax))) {
+                const patch = this.floorPatchAt(c.x, c.y),
+                    d = hexDist(c, {x, y});
+                if (patch && d <= patch.radius && d < bestD) {
+                    best = patch.subtype;
+                    bestD = d;
+                }
+            }
+            return best;
+        },
+        
+        // A heal, harm or loot (fixture) the seed puts on open cell (x, y), as [type,
+        // subtype], or null.
+        fixtureOf: function(x, y) {
+            const a = this.attrs,
+                rng = this.game.rngFor('cave-item', x + ',' + y),
+                roll = rng() * 1000,
+                type = roll < a.healFrequency ? FIXTURE_HEAL :
+                    roll < a.healFrequency + a.harmFrequency ? FIXTURE_HARM :
+                    roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? FIXTURE_LOOT : null,
+                subtype = type ? pick(a[type + 'Table'], rng) : undefined;
+            return subtype === undefined || (x === 0 && y === 0) ? null : [type, subtype];
+        },
+        
+        // What tile cell (x, y) gets, as [kind, subtype]: a solid, a hole or a floor (from a
+        // patch), or null for the base floor.
         tileOf: function(x, y, near) {
             const a = this.attrs,
                 c = this.cellOf(x, y, near);
@@ -904,21 +957,17 @@
                         }
                     }
                 }
-                if (!retval && (x !== 0 || y !== 0)) {
-                    const rng = this.game.rngFor('cave-item', x + ',' + y),
-                        roll = rng() * 1000,
-                        kind = roll < a.healFrequency ? FIXTURE_HEAL :
-                            roll < a.healFrequency + a.harmFrequency ? FIXTURE_HARM :
-                            roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? FIXTURE_LOOT : null,
-                        subtype = kind ? pick(a[kind + 'Table'], rng) : undefined;
-                    if (subtype !== undefined) retval = [kind, subtype];
+                if (!retval) {
+                    const floorType = this.floorOf(x, y);
+                    if (floorType !== undefined) retval = [TILE_TYPE_FLOOR, floorType];
                 }
             }
             return retval;
         },
         
-        // Makes block (bi, bj)'s cells, once: their tiles and fixtures (tileOf). Cells with a
-        // tile, a fixture or a piece already are left as they are.
+        // Makes block (bi, bj)'s cells, once: their tiles (tileOf), and fixtures (fixtureOf)
+        // on the open ones. Cells with a tile, a fixture or a piece already are left as they
+        // are.
         makeBlock: function(bi, bj) {
             const bk = bi + ',' + bj;
             if (!this.madeBlocks.has(bk)) {
@@ -930,10 +979,10 @@
                     const k = game.key(x, y);
                     if (!game.tiles.has(k) && !game.fixtures.has(k) && !game.pieceAt(x, y)) {
                         const [kind, subtype] = this.tileOf(x, y, near) ?? [];
-                        if (FIXTURE_TYPES.includes(kind)) {
-                            game.fixtures.set(k, game.makeFixture(x, y, subtype, game.rngFor('rolls', k), kind));
-                        } else if (kind) {
-                            game.tiles.set(k, game.makeTile(x, y, kind, subtype));
+                        if (kind) game.tiles.set(k, game.makeTile(x, y, kind, subtype));
+                        if (game.isOpen(x, y)) {
+                            const [type, fixture] = this.fixtureOf(x, y) ?? [];
+                            if (type) game.fixtures.set(k, game.makeFixture(x, y, fixture, game.rngFor('rolls', k), type));
                         }
                     }
                 }

@@ -26,7 +26,7 @@ for (const [kind, max, other] of [['solid', 5, 'hole'], ['hole', 3, 'solid']]) {
         await startGame(page);
         const r = await page.evaluate(([kind, max, other]) => {
             const g = hc.app.game, G = hc.hex, Q = g.tileGenerator.quads, sizes = new Set();
-            hc.app.game.tileGenerator.attrs[other + 'Max'] = 0;
+            hc.app.game.tileGenerator.attrs[other + 'Max'] = hc.app.game.tileGenerator.attrs.floorMax = 0;
             let ok = true;
             hc.app.game.tileGenerator.attrs.wallChance = 0;
             for (let i = 0; i < 40; i++) {
@@ -63,7 +63,7 @@ const wallsOnly = page => page.evaluate(() => {
         quads = [[0, 0], ...Q.neighbours(0, 0)],
         touching = (side, other) => Q.cells(...side.split(',').map(Number))
             .filter(c => G.dirs.some(([dx, dy]) => Q.key(c.x + dx, c.y + dy) === other));
-    T.solidMax = T.holeMax = 0;
+    T.solidMax = T.holeMax = T.floorMax = 0;
     T.wallChance = 100;
     T.wallHoleChance = 0;
     for (const p of [...g.pieces.values()]) g.removePiece(p); // walls skip cells pieces are on

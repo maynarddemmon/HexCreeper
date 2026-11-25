@@ -4,6 +4,7 @@
 	},
 	"tileGenerator":{
 		"type":"proximity",
+		"baseFloor":"dirt_floor",
 		"quadRadius":2,
 		"wallChance":90,
 		"wallHoleChance":0,

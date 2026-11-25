@@ -1,6 +1,8 @@
 {
 	"tileGenerator":{
 		"type":"caverns",
+		"baseFloor":"frozen_floor",
+		"floorTable":{"ice":3, "loose_stone":1},
 		
 		"maxSize":10000,
 		"growth":0,

@@ -8,7 +8,8 @@ test('with no save, the default map from init.json5 is played', async ({page}) =
     expect(await page.evaluate(() => {
         const {id, name, rules, tileGenerator, spawnGenerator} = hc.app.game.gameMap;
         return [id, name, rules, tileGenerator, spawnGenerator, hc.app.game.tileGenerator.type];
-    })).toEqual(['endless', 'Endless Play', {}, {type:'proximity', attrs:{}}, {type:'proximity', attrs:{}}, 'proximity']);
+    })).toEqual(['endless', 'Endless Play', {}, {type:'proximity', attrs:{baseFloor:'stone_floor', floorMax:3, floorType:'loose_stone'}},
+        {type:'proximity', attrs:{}}, 'proximity']);
 });
 
 test('the Maps dialog lists every map in init.json5 and marks the one being played', async ({page}) => {

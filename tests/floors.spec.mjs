@@ -15,7 +15,9 @@ const putFloors = (page, subtype, cells) => page.evaluate(([subtype, cells]) => 
 test('floor kinds come from init.json5, with a moveCost; bad ones are refused', async ({page}) => {
     const errors = [];
     page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
-    expect(await page.evaluate(() => hc.floors.list().map(f => [f.id, f.moveCost]))).toEqual([['loose_stone', 1.5], ['mud', 2], ['ice', 1.5]]);
+    expect(await page.evaluate(() => hc.floors.list().map(f => [f.id, f.moveCost]))).toEqual([
+        ['stone_floor', 1], ['cave_floor', 1], ['dirt_floor', 1], ['frozen_floor', 1], ['loose_stone', 1.5], ['mud', 2], ['ice', 1.5]
+    ]);
     expect(await page.evaluate(() => {
         hc.floors.define({ok:{name:'Ok'}, free:{name:'Free', moveCost:0}, odd:{name:'Odd', moveCost:'lots'}});
         const out = hc.floors.list().map(f => [f.id, f.moveCost]);
@@ -106,4 +108,53 @@ test('pointing at a floor says what it is and what a step onto it costs', async 
     });
     await page.mouse.move(...await cellOnPage(page, 2, 0));
     await expect(page.getByText('Mud (a step onto it costs ×2) · Thick mud that sucks at your feet.')).toBeVisible();
+});
+
+test('a cell with no tile is the map\'s base floor, and costs what it does', async ({page}) => {
+    expect(await page.evaluate(() => {
+        const g = hc.app.game, out = [g.baseFloor().id, g.moveCostAt(5, 5)];
+        g.tileGenerator.attrs.baseFloor = 'mud';
+        out.push(g.baseFloor().id, g.moveCostAt(5, 5));
+        return out;
+    })).toEqual(['stone_floor', 1, 'mud', 2]);
+});
+
+test('the proximity generator puts a clump of floor in each quadrant, which solids and holes may land on', async ({page}) => {
+    expect(await page.evaluate(() => {
+        const g = hc.app.game, T = g.tileGenerator.attrs, out = [];
+        Object.assign(T, {wallChance:0, floorMin:6, floorMax:6, floorType:'ice', solidMin:0, solidMax:0, holeMin:0, holeMax:0});
+        const make = () => {
+            g.tiles.clear();
+            g.fixtures.clear();
+            g.tileGenerator.borders.clear();
+            g.tileGenerator.terrainQuads.delete('0,0');
+            g.tileGenerator.generateTerrain(0, 0);
+            return [...g.tiles.values()];
+        };
+        const floors = make();
+        out.push(floors.length, floors.every(t => t.kind === 'floor' && t.subtype === 'ice'));
+        // Solids over all of it: on the floors too.
+        T.solidMin = T.solidMax = 1000;
+        out.push(make().filter(t => t.kind === 'floor').length);
+        return out;
+    })).toEqual([6, true, 0]);
+});
+
+test('the caverns generator puts patches of floor on open cells, from its floorTable, under heals and the like', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game;
+        g.gameMap = {...g.gameMap, tileGenerator:{type:'caverns', attrs:{floorFrequency:40, floorTable:{mud:1}, healFrequency:60}}};
+        g.seed = 3;
+        g.reset();
+        for (const b of hc.hex.disk(0, 0, 3)) g.tileGenerator.makeBlock(b.x, b.y);
+        const floors = [...g.tiles.values()].filter(t => t.kind === 'floor');
+        return {
+            base:g.baseFloor().id,
+            some:floors.length > 20,
+            kinds:[...new Set(floors.map(t => t.subtype))],
+            onFloors:[...g.fixtures.values()].some(f => g.tiles.get(g.key(f.x, f.y))?.kind === 'floor'),
+            fixturesOpen:[...g.fixtures.values()].every(f => g.isOpen(f.x, f.y))
+        };
+    });
+    expect(r).toEqual({base:'cave_floor', some:true, kinds:['mud'], onFloors:true, fixturesOpen:true});
 });

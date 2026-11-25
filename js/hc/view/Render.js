@@ -462,7 +462,7 @@
         // Fills each cell on its own. (One path holding many closed cells is far slower to
         // fill: hundreds of ms for a screenful.)
         fillCells = (cells, color) => {
-            ctx.fillStyle = css(color);
+            ctx.fillStyle = dataColor(color);
             for (const c of cells) {
                 ctx.beginPath();
                 addCellPath(c.x, c.y, 0);
@@ -555,13 +555,15 @@
             motionsOf.get(m.id).push(m);
         }
         
-        // Background: fog everywhere, then plain floor on known cells.
-        ctx.fillStyle = css('--bg');
+        // Background: fog everywhere, then the base floor (the map's, or plain) on known
+        // cells.
+        const floorColor = game.baseFloor()?.fillColor || '--bg';
+        ctx.fillStyle = dataColor(sight ? '--bg' : floorColor);
         ctx.fillRect(0, 0, W, H);
         if (sight) {
             ctx.fillStyle = css('--fog');
             ctx.fillRect(0, 0, W, H);
-            fillCells(known, '--bg');
+            fillCells(known, floorColor);
         }
         
         // Visited quadrants, with a tile generator that has them

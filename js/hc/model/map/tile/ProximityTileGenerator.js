@@ -10,7 +10,7 @@
     const {
         attrs:{num, choice},
         TileGenerator:{optionsOf},
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
     } = pkg;
     
     const ProximityTileGenerator = pkg.ProximityTileGenerator = new JS.Class('ProximityTileGenerator', pkg.TileGenerator, {
@@ -18,6 +18,7 @@
         extend: {
             ATTRS:[
                 num('quadRadius', 5, 1, 6),        // quadrants' radius; the start cell (0,0) is the centre of quadrant (0,0)
+                choice('baseFloor', 'stone_floor', optionsOf(pkg.floors)), // what a cell with no tile is (see Game.baseFloor)
                 
                 // Heals and harms per quadrant, of these kinds of fixture (data/init.json5;
                 // see Fixtures.js).
@@ -37,6 +38,9 @@
                 num('solidMax', 5, 0, 20),
                 num('holeMin', 0, 0, 20),          // hole tiles per quadrant, in one connected clump (may replace solid tiles)
                 num('holeMax', 3, 0, 20),
+                num('floorMin', 0, 0, 20),         // floor tiles per quadrant (floorType), in one connected clump, under the others (which may replace them)
+                num('floorMax', 0, 0, 20),
+                choice('floorType', 'mud', optionsOf(pkg.floors)),
                 choice('wallSolid', 'stone_wall', optionsOf(pkg.solids)), // the solid and hole subtypes walls and clumps are made of
                 choice('clumpSolid', 'boulder', optionsOf(pkg.solids)),
                 choice('wallHole', 'chasm', optionsOf(pkg.holes)),
@@ -129,9 +133,11 @@
             for (let i = 0; i < this.attrs.harmPerQuad; i++) place(FIXTURE_HARM);
         },
         
-        // A quadrant's solid and hole tiles, once: the walls on its side of its borders,
-        // then a clump of solidMin to solidMax solid tiles, then a clump of holeMin to
-        // holeMax holes, which may land on (replace) solid tiles.
+        // A quadrant's terrain, once: the walls on its side of its borders, then a clump of
+        // floorMin to floorMax floor tiles, then a clump of solidMin to solidMax solid
+        // tiles, then a clump of holeMin to holeMax holes; each may land on (replace) the
+        // ones before it but walls. (The floors have their own generator, so the rest come
+        // out as they would without them.)
         generateTerrain: function(qx, qy) {
             const k = qx + ',' + qy;
             if (this.terrainQuads.has(k)) return;
@@ -145,8 +151,9 @@
                 const bk = ProximityTileGenerator.borderKey(k, i + ',' + j), wall = this.borderWall(bk);
                 if (wall && bk.startsWith(k + '|')) this.placeWall(cells, i, j, wall);
             }
-            this.placeClump(cells, TILE_TYPE_SOLID, this.attrs.solidMin, this.attrs.solidMax, [], rng);
-            this.placeClump(cells, TILE_TYPE_HOLE, this.attrs.holeMin, this.attrs.holeMax, [TILE_TYPE_SOLID], rng);
+            this.placeClump(cells, TILE_TYPE_FLOOR, this.attrs.floorMin, this.attrs.floorMax, [], this.game.rngFor('floor', k));
+            this.placeClump(cells, TILE_TYPE_SOLID, this.attrs.solidMin, this.attrs.solidMax, [TILE_TYPE_FLOOR], rng);
+            this.placeClump(cells, TILE_TYPE_HOLE, this.attrs.holeMin, this.attrs.holeMax, [TILE_TYPE_FLOOR, TILE_TYPE_SOLID], rng);
         },
         
         // A border as the seed makes it, on its own: a wall {door, hole, start} or null. The
@@ -234,7 +241,8 @@
             let options = cells.filter(c => free(c.x, c.y));
             for (let i = 0; i < count && options.length; i++) {
                 const {x, y} = options[Math.floor(rng() * options.length)];
-                game.tiles.set(game.key(x, y), game.makeTile(x, y, kind, kind === TILE_TYPE_HOLE ? this.attrs.clumpHole : this.attrs.clumpSolid));
+                game.tiles.set(game.key(x, y), game.makeTile(x, y, kind,
+                    kind === TILE_TYPE_HOLE ? this.attrs.clumpHole : kind === TILE_TYPE_FLOOR ? this.attrs.floorType : this.attrs.clumpSolid));
                 edge.delete(game.key(x, y));
                 for (const [dx, dy] of pkg.hex.dirs) {
                     const nx = x + dx,

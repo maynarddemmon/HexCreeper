@@ -1,5 +1,5 @@
 {
-	"tileGenerator":{"type":"caverns"},
+	"tileGenerator":{"type":"caverns", "baseFloor":"cave_floor"},
 	"spawnGenerator":{"type":"caverns"},
 	"enemyAI":{"type":"squad"}
 }

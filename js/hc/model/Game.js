@@ -419,11 +419,15 @@
             return out;
         },
         
+        /*  The kind of floor a cell with no tile is: the map's tile generator's baseFloor
+            (see Solids.js), or undefined if it has none (or it isn't known). */
+        baseFloor: function() {return pkg.floors.get(this.tileGenerator?.attrs.baseFloor);},
+        
         /*  What stepping onto (x, y) costs, as a multiple of an action: its floor's moveCost
-            (see Solids.js), or 1. */
+            (see Solids.js; the base floor's where there's no tile), or 1. */
         moveCostAt: function(x, y) {
             const t = this.tiles.get(this.key(x, y));
-            return t?.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost ?? 1 : 1;
+            return (t ? t.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost : 1 : this.baseFloor()?.moveCost) ?? 1;
         },
         
         // Could `piece` step by (dx, dy) right now, in mode? Same rules as a normal move;

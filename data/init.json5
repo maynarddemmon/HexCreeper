@@ -118,8 +118,15 @@
 	// action, and a group steps at the cost of the dearest cell any of it lands on, never
 	// more than a piece's whole pool. Jumps don't pay it. "fillColor" (any CSS colour, or a
 	// --variable from index.html) is what it's drawn in; without it it's the usual floor. A
-	// cell with no tile is plain floor (cost 1).
+	// cell with no tile is its map's base floor (its tile generator's "baseFloor"), drawn
+	// under everything.
 	"floors":{
+		// Base floors
+		"stone_floor": {"name":"Stone floor",  "description":"Plain stone.",                   "fillColor":"--bg"},
+		"cave_floor":  {"name":"Cave floor",   "description":"The rock floor of the caves.",   "fillColor":"#46423e"},
+		"dirt_floor":  {"name":"Dirt floor",   "description":"Packed earth.",                  "fillColor":"#48413a"},
+		"frozen_floor":{"name":"Frozen floor", "description":"Rock under a crust of frost.",   "fillColor":"#454c52"},
+		// Harder going
 		"loose_stone":{"name":"Loose stone", "description":"Rocks that shift underfoot.",        "moveCost":1.5, "fillColor":"#4e4b47"},
 		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":2,   "fillColor":"#4a3f33"},
 		"ice":        {"name":"Ice",         "description":"Slick ice: slow, careful steps.",    "moveCost":1.5, "fillColor":"#4c5860"}

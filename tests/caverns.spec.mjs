@@ -17,7 +17,7 @@ const inCaverns = (page, attrs = {}, seed = 7) => page.evaluate(([attrs, seed]) 
         },
         cell: (x, y) => {
             const t = g.tiles.get(g.key(x, y));
-            return !t ? 'open' : t.subtype === T.attrs.rockSolid ? 'rock' : t.subtype;
+            return !t || t.kind === 'floor' ? 'open' : t.subtype === T.attrs.rockSolid ? 'rock' : t.subtype;
         }
     };
 }, [attrs, seed]);
@@ -33,7 +33,7 @@ test('the start is open, and its cavern has tunnels to the neighbouring caverns 
         for (const [x, y] of todo) {
             for (const [dx, dy] of hc.hex.dirs) {
                 const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-                if (!seen.has(k) && Math.abs(x + dx) < 70 && Math.abs(y + dy) < 70 && !t) {
+                if (!seen.has(k) && Math.abs(x + dx) < 70 && Math.abs(y + dy) < 70 && (!t || t.kind === 'floor')) {
                     seen.add(k);
                     todo.push([x + dx, y + dy]);
                 }
@@ -63,7 +63,7 @@ const reachesSites = r => {
     for (const [x, y] of todo) {
         for (const [dx, dy] of hc.hex.dirs) {
             const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-            if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && !t) {
+            if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || t.kind === 'floor')) {
                 seen.add(k);
                 todo.push([x + dx, y + dy]);
             }
@@ -377,7 +377,7 @@ test('stalagmites, stalactites and holes are only on cavern floor off the tunnel
     const r = await page.evaluate(() => {
         const g = hc.app.game, T = g.tileGenerator;
         window.caves.make(4);
-        const placed = [...g.tiles.values()].filter(t => t.subtype !== 'cave_rock'),
+        const placed = [...g.tiles.values()].filter(t => t.subtype !== 'cave_rock' && t.kind !== 'floor'),
             offFloor = placed.filter(t => {
                 const near = T.near(...T.blocks.of(t.x, t.y));
                 return !T.isCavernFloor(t.x, t.y, near);
@@ -457,7 +457,7 @@ test('with a maxSize, the network is grown from the seed to that many open cells
             for (const [x, y] of todo) {
                 for (const [dx, dy] of hc.hex.dirs) {
                     const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-                    if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && !t) {
+                    if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || t.kind === 'floor')) {
                         seen.add(k);
                         todo.push([x + dx, y + dy]);
                     }
