@@ -158,3 +158,16 @@ test('the caverns generator puts patches of floor on open cells, from its floorT
     });
     expect(r).toEqual({base:'cave_floor', some:true, kinds:['mud'], onFloors:true, fixturesOpen:true});
 });
+
+test('pointing at plain ground says what the map\'s base floor is, with no cost when it\'s 1', async ({page}) => {
+    await putFixture(page, 2, 0, 'loot', {pool:5});
+    await page.evaluate(() => {
+        hc.app.centerOn(false);
+        hc.view.draw();
+    });
+    await page.mouse.move(...await cellOnPage(page, 0, -2));
+    await expect(page.getByText('Stone floor · Plain stone.', {exact:true})).toBeVisible();
+    // After a fixture on it
+    await page.mouse.move(...await cellOnPage(page, 2, 0));
+    await expect(page.getByText('Loot · Score for the taking. · Stone floor', {exact:true})).toBeVisible();
+});

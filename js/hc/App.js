@@ -589,7 +589,7 @@
                     } else if (V.hover) {
                         // A named enemy you can see under the pointer: what it is. A solid: what
                         // it is and how tough. A hole, or a heal, harm or loot (a fixture) you
-                        // know of: what it is. A floor: what it is, and its cost.
+                        // know of: what it is. Its floor: what it is, and its cost.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
                             enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
                             sel = game.getSelected(),
@@ -613,11 +613,12 @@
                             } else if (other) {
                                 status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
                             }
-                            // A floor: what it is and what a step onto it costs (after any
-                            // fixture on it).
-                            const floor = tile?.kind === pkg.TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : null;
+                            // A floor (a floor tile, or the map's base floor where there's no
+                            // tile): what it is and, if it isn't 1, what a step onto it costs
+                            // (after any fixture on it).
+                            const floor = tile?.kind === pkg.TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : !tile ? game.baseFloor() : null;
                             if (floor) {
-                                const what = i18n('status-floor', floor.name, floor.moveCost);
+                                const what = floor.moveCost === 1 ? floor.name : i18n('status-floor', floor.name, floor.moveCost);
                                 status = status ? status + ' · ' + what : floor.description ? i18n('status-tile', what, floor.description) : what;
                             }
                         }
