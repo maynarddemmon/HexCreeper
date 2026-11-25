@@ -8,7 +8,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, OWNERS, ANIM},
+            cfg:{PIECE_R, CORE_BORDER, ANIM},
             TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
             PIECE_TYPES
         } = pkg,
@@ -351,25 +351,25 @@
         },
         
         // Your core is bigger, so its bars sit lower, clear of its selection ring. Under
-        // the HP bar, a thinner one for the piece's action points, out of its pool, with
-        // a tick at each whole point.
+        // the HP bar (red), a thinner one for the piece's action points (white), out of its
+        // pool, with a tick at each whole point.
         drawBars = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
                 x = cx - w / 2,
                 y = cy + s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0)),
-                bar = (by, bh, frac) => {
+                bar = (by, bh, frac, color) => {
                     ctx.fillStyle = css('--grid');
                     ctx.fillRect(x, by, w, bh);
-                    ctx.fillStyle = css(OWNERS[p.owner].fill);
+                    ctx.fillStyle = css(color);
                     ctx.fillRect(x, by, w * Math.min(1, Math.max(0, frac)), bh);
                 };
-            if (p.maxHp > 1) bar(y, h, p.hp / p.maxHp);
+            if (p.maxHp > 1) bar(y, h, p.hp / p.maxHp, '--hp-bar');
             const pool = game.apMax(p);
             if (pool > 0) {
                 const ay = y + h + 1,
                     ah = Math.max(2, h * 0.5);
-                bar(ay, ah, p.ap / pool);
+                bar(ay, ah, p.ap / pool, '--ap-bar');
                 ctx.fillStyle = css('--bg');
                 for (let k = pkg.AP_UNIT; k < pool; k += pkg.AP_UNIT) ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);
             }
