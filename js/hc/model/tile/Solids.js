@@ -11,7 +11,11 @@
     place of the usual solid colours.
     
     A hole subtype is a kind of hole tile: optionally a fillColor, drawn in place of the
-    usual hole colour. */
+    usual hole colour.
+    
+    Either may have a shadowLength: how long its shadow is, in hexes (how tall a solid is,
+    or how deep a hole), else cfg.SHADOW's length. The light the shadows come from is
+    init.json5's "shadow" (see defineShadow). */
 (pkg => {
     'use strict';
     
@@ -24,15 +28,18 @@
             : null
         ),
         
-        // {id:{name, composition, hp, coverage, description, fillColor, borderColor}}
+        // A shadowLength, if given, must be a number of hexes, not below 0.
+        isLength = v => v === undefined || (isNum(v) && v >= 0),
+        
+        // {id:{name, composition, hp, coverage, description, fillColor, borderColor, shadowLength}}
         parseSolid = s => {
             const material = materials.get(s.composition);
             let own = null;
-            if (material && Number.isInteger(s.hp) && s.hp >= 1 && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor)) {
+            if (material && Number.isInteger(s.hp) && s.hp >= 1 && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor) && isLength(s.shadowLength)) {
                 const coverage = s.coverage ?? 100;
                 own = {
                     composition:s.composition, hp:s.hp, coverage,
-                    fillColor:s.fillColor || null, borderColor:s.borderColor || null,
+                    fillColor:s.fillColor || null, borderColor:s.borderColor || null, shadowLength:s.shadowLength ?? null,
                     material, dr:material.hardness, opacity:material.opacity * coverage / 100
                 };
             }
@@ -49,6 +56,23 @@
         getMaterial: function(id) {return materials.get(id);}
     }))('solid', parseSolid);
     
-    // {id:{name, description, fillColor}}
-    pkg.holes = new Subtypes('hole', h => isText(h.fillColor) ? {fillColor:h.fillColor || null} : null);
+    // {id:{name, description, fillColor, shadowLength}}
+    pkg.holes = new Subtypes('hole', h => isText(h.fillColor) && isLength(h.shadowLength)
+        ? {fillColor:h.fillColor || null, shadowLength:h.shadowLength ?? null}
+        : null);
+    
+    /*  Sets the light shadows come from (cfg.SHADOW: angle, color, blur, length) from
+        init.json5's "shadow", {id:value}: those given that are usable, with a warning for
+        any that aren't. */
+    pkg.defineShadow = data => {
+        const shadow = pkg.cfg.SHADOW,
+            ok = {angle:isNum, color:v => typeof v === 'string' && v !== '', blur:v => isNum(v) && v >= 0, length:v => isNum(v) && v >= 0};
+        for (const [id, value] of Object.entries(data ?? {})) {
+            if (ok[id]?.(value)) {
+                shadow[id] = value;
+            } else {
+                console.warn('init.json5 shadow', id, 'cannot be', value);
+            }
+        }
+    };
 })(hc);

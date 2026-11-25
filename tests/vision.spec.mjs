@@ -60,10 +60,13 @@ test.describe('fog of war', () => {
     test('a squad you can see but that\'s off the board has a red arrow at the edge, pointing at its leader', async ({page}) => {
         // The canvas's colour where the arrow for cell (x, y) goes: at the edge of the
         // board, towards it from the middle (see Render.js).
+        // (Drawn first, and with no pan going on, so the arrow is where it's looked for.)
         const arrowColour = (x, y) => page.evaluate(([x, y]) => {
-            const V = hc.view, [sx, sy] = V.cellCenter(x, y), pad = 22,
+            const V = hc.view;
+            V.stopPan();
+            V.render(performance.now());
+            const [sx, sy] = V.cellCenter(x, y), pad = 22,
                 ax = Math.min(V.W - pad, Math.max(pad, sx)), ay = Math.min(V.H - pad, Math.max(pad, sy));
-            hc.view.render(performance.now());
             return [...V.canvas.getContext('2d').getImageData(Math.round(ax * V.dpr), Math.round(ay * V.dpr), 1, 1).data].join();
         }, [x, y]);
         const RED = '255,51,51,255';

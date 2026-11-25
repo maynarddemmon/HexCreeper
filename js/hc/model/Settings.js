@@ -40,7 +40,8 @@
             pref(GROUP_DISPLAY, onto(cfg.ANIM, 'on', bool, 'animate')),
             pref(GROUP_DISPLAY, onto(cfg.ANIM, 'speed', num, 'animSpeed', 25, 200)),
             pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45)),
-            pref(GROUP_DISPLAY, onto(cfg, 'COMBAT_LOG', bool, 'combatLog'))
+            pref(GROUP_DISPLAY, onto(cfg, 'COMBAT_LOG', bool, 'combatLog')),
+            pref(GROUP_DISPLAY, onto(cfg.SHADOW, 'on', bool, 'shadows'))
         ],
         
         GROUPS = [GROUP_DISPLAY].map(id => ({

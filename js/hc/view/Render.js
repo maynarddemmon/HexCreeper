@@ -8,7 +8,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, ANIM},
+            cfg:{PIECE_R, CORE_BORDER, ANIM, SHADOW},
             TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
             PIECE_TYPES
         } = pkg,
@@ -54,6 +54,115 @@
                 ctx.fillStyle = dataColor(solid?.fillColor, '--solid');
                 ctx.fill();
                 ctx.globalAlpha = 1;
+            }
+        },
+        
+        // ---- Shadows (cfg.SHADOW, from data/init.json5) ----
+        // One light, so every shadow falls the same way: away from it, at SHADOW.angle. A
+        // solid's shadow is its hex moved that way by its length, on the floor below it,
+        // as dark as its coverage; a hole's is the shadow of its rim on the side the light
+        // comes from, falling into it. Each is drawn as one shape for all the tiles with
+        // the same shadow (so overlaps don't darken), and blurred by hand: filled three
+        // times, a little smaller, as is and a little bigger (a hole's a little shorter, as
+        // is and a little longer), each a third as dark, so its edge fades over blur px.
+        // (The canvas's own blur, filter or shadowBlur, costs a lot every frame, by area.)
+        
+        // Where shadows fall, as a unit vector on the screen
+        shadowDir = () => {
+            const a = SHADOW.angle * Math.PI / 180;
+            return [Math.cos(a), Math.sin(a)];
+        },
+        
+        // A solid or hole subtype's shadow's length, in px
+        shadowLengthOf = def => (def?.shadowLength ?? SHADOW.length) * cam.size,
+        
+        // The blur's passes: [inset in px, how dark of the shadow's colour]
+        blurPasses = () => SHADOW.blur > 0 ? [[SHADOW.blur / 2, 1 / 3], [0, 1 / 3], [-SHADOW.blur / 2, 1 / 3]] : [[0, 1]],
+        
+        /*  The shadows of the solids among tiles, on the floor (only where it's known:
+            known, a list of cells, or all of it if null). */
+        drawSolidShadows = (tiles, known) => {
+            const groups = new Map(); // "length,darkness" -> {len, alpha, tiles}
+            for (const t of tiles) {
+                if (t.kind === TILE_TYPE_SOLID) {
+                    const solid = pkg.solids.get(t.subtype),
+                        len = shadowLengthOf(solid),
+                        alpha = (solid?.coverage ?? 100) / 100,
+                        key = len + ',' + alpha;
+                    if (len > 0 && alpha > 0) {
+                        if (!groups.has(key)) groups.set(key, {len, alpha, tiles:[]});
+                        groups.get(key).tiles.push(t);
+                    }
+                }
+            }
+            if (groups.size) {
+                const [ux, uy] = shadowDir();
+                ctx.save();
+                if (known) {
+                    ctx.beginPath();
+                    for (const c of known) addCellPath(c.x, c.y, -0.5);
+                    ctx.clip();
+                }
+                ctx.fillStyle = SHADOW.color;
+                for (const {len, alpha, tiles:group} of groups.values()) {
+                    ctx.save();
+                    ctx.translate(ux * len, uy * len);
+                    for (const [inset, dark] of blurPasses()) {
+                        ctx.globalAlpha = dark * alpha;
+                        ctx.beginPath();
+                        for (const t of group) addCellPath(t.x, t.y, inset);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+        },
+        
+        /*  The shadows in the holes among tiles: from each edge of a hole that faces the
+            light and isn't against another hole, a band its length long falls into it
+            (only inside the holes). */
+        drawHoleShadows = tiles => {
+            const holes = tiles.filter(t => t.kind === TILE_TYPE_HOLE),
+                [ux, uy] = shadowDir(),
+                rims = []; // [ax, ay, bx, by, length in px]
+            for (const t of holes) {
+                const len = shadowLengthOf(pkg.holes.get(t.subtype));
+                if (len > 0) {
+                    const [cx, cy] = cellCenter(t.x, t.y),
+                        pts = pkg.hex.corners(t.x, t.y).map(([wx, wy]) => worldToScreen(wx, wy));
+                    for (const [dx, dy, a, b] of pkg.hex.edges) {
+                        const [ax, ay] = pts[a], [bx, by] = pts[b];
+                        // Facing the light: its outward side is towards where the light comes from.
+                        if (game.tiles.get(game.key(t.x + dx, t.y + dy))?.kind !== TILE_TYPE_HOLE &&
+                            ((ax + bx) / 2 - cx) * ux + ((ay + by) / 2 - cy) * uy < 0) {
+                            rims.push([ax, ay, bx, by, len]);
+                        }
+                    }
+                }
+            }
+            if (rims.length) {
+                ctx.save();
+                ctx.beginPath();
+                for (const t of holes) addCellPath(t.x, t.y, -0.5);
+                ctx.clip();
+                ctx.fillStyle = SHADOW.color;
+                for (const [inset, dark] of blurPasses()) {
+                    ctx.globalAlpha = dark;
+                    ctx.beginPath();
+                    for (const [ax, ay, bx, by, len] of rims) {
+                        // Each band the same way round, so where they overlap they fill as one.
+                        const l = Math.max(0, len - inset), ox = ux * l, oy = uy * l,
+                            [px, py, qx, qy] = (bx - ax) * oy - (by - ay) * ox >= 0 ? [ax, ay, bx, by] : [bx, by, ax, ay];
+                        ctx.moveTo(px, py);
+                        ctx.lineTo(qx, qy);
+                        ctx.lineTo(qx + ox, qy + oy);
+                        ctx.lineTo(px + ox, py + oy);
+                        ctx.closePath();
+                    }
+                    ctx.fill();
+                }
+                ctx.restore();
             }
         },
         
@@ -451,8 +560,10 @@
         
         // Heal, harm, solid and hole tiles
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
+        if (SHADOW.on) drawSolidShadows(tilesShown, sight ? known : null);
         fillSeeThroughSolids(tilesShown);
         for (const t of tilesShown) drawTile(t);
+        if (SHADOW.on) drawHoleShadows(tilesShown);
         
         // The area of the heal, harm or loot tile under the pointer, if it reaches past it.
         const hoverTile = V.hover && game.tileAt(V.hover.x, V.hover.y);

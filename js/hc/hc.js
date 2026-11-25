@@ -88,6 +88,19 @@
             // Whether the combat log shows (a preference; K toggles it).
             COMBAT_LOG:true,
             
+            // Shadows of solids and holes (see Render.js), from one light: angle (degrees
+            // clockwise from pointing right, so 90 is straight down), color, blur (px) and
+            // length (in hexes, unless a solid or hole subtype says: its shadowLength).
+            // data/init.json5's "shadow" goes over these. on: whether they're drawn (a
+            // preference).
+            SHADOW:{
+                on:true,
+                angle:90,
+                color:'#0003',
+                blur:2,
+                length:0.5
+            },
+            
             // Animation: a piece's step takes MOVE_MS and a jump JUMP_MS, during which it grows
             // by up to JUMP_GROW (as if rising towards you) and back. An attack's bump takes
             // BUMP_MS. on: whether pieces' moves are animated at all; speed: how fast, in %

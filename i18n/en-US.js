@@ -152,6 +152,7 @@ myt.I18N.setDictionary({
 "settings-note":"Changes apply at once, and are kept for every map.",
 "settings-group-display":"Display",
 "setting-combatLog":"Show the combat log",
+"setting-shadows":"Shadows",
 "setting-animate":"Animate pieces",
 "setting-animSpeed":"Animation speed (%)",
 "setting-followMargin":"Follow margin (% of the board)",

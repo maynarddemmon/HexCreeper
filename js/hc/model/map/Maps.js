@@ -72,6 +72,7 @@
                         pkg.settings.setDefaultRules(data.rules);
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
+                        pkg.defineShadow(data.shadow);
                         pkg.heals.define(data.heals);
                         pkg.harms.define(data.harms);
                         pkg.loots.define(data.loots);

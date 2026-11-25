@@ -38,7 +38,7 @@ JS.Packages(file => {
     
     // Tile
     file(TILE_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
-    file(TILE_ROOT + 'Solids.js').provides('hc.solids','hc.holes').requires('hc.Subtypes');
+    file(TILE_ROOT + 'Solids.js').provides('hc.solids','hc.holes','hc.defineShadow').requires('hc.Subtypes','hc.cfg');
     file(TILE_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
     
     // Map
