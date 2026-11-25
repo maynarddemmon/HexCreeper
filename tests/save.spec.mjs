@@ -67,6 +67,23 @@ test('a game\'s rules are saved with it, whatever its map now says', async ({pag
     })).toEqual(['4 * coreLevel', '9 * coreLevel']);
 });
 
+test('pieces\' status effects are saved with them; ones that make no sense are dropped', async ({page}) => {
+    await startGame(page);
+    expect(await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.addEffect(c, 'exhausted', 2);
+        const data = JSON.parse(JSON.stringify(g.exportToObj())),
+            core = data.pieces.find(p => p.id === c.id);
+        core.effects.push({id:'stunned', countdown:0}, {countdown:3}, 'dazed');
+        g.importFromObj(data);
+        const out = [g.getPlayerCore().effects];
+        delete core.effects;    // from before effects
+        g.importFromObj(data);
+        out.push(g.getPlayerCore().effects);
+        return out;
+    })).toEqual([[{id:'exhausted', countdown:2}], []]);
+});
+
 test('without a save, a reload starts a new game', async ({page}) => {
     await startGame(page);
     await playABit(page);

@@ -22,7 +22,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures],
+        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures, pkg.Effects],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
@@ -205,6 +205,8 @@
                 }
                 // From before action points: a full pool
                 if (!Number.isInteger(piece.ap) || piece.ap < 0) piece.ap = this.apMax(piece);
+                // Its status effects (from before them, none)
+                piece.effects = this.loadedEffects(piece);
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -774,7 +776,8 @@
         },
         
         // The rest of the turn: the enemies', then the environment's (tiles, spawning),
-        // then housekeeping: every piece gets back action points.
+        // then housekeeping: every piece gets back action points, then its status effects
+        // count down (in that order, so an effect for a turn still counts at its end).
         endPlayerTurn: function() {
             this.enemyPhase();
             if (this.over) return;
@@ -786,6 +789,7 @@
             if (this.over) return;
             this.spawnGenerator.turnEnded();
             this.recoverAp();
+            this.tickEffects();
             this.noticeEnemies();
             this.evaluateObjectives();
         },
@@ -809,10 +813,11 @@
         // How many actions it takes to reach a player piece from every cell within `radius`,
         // keeping off active harm tiles (other pieces are ignored since they move). A step
         // is an action times the moveCost of the cell it steps onto (dear going counts more:
-        // see moveCostAt), and a jump (see jumpOffsets), with jumps, costs twice the points:
-        // it counts 2, so it's no quicker than walking, but it can cross holes. Worked out
-        // in tenths, so it can go by whole numbers, and given in actions.
-        distanceField: function(sources, radius = 30, jumps = true) {
+        // see moveCostAt), and a jump (see jumpOffsets) counts 2 (an action, and the
+        // points its exhaustion costs: about as much again), so it's no quicker than
+        // walking, but it can cross holes. Worked out in tenths, so it can go by whole
+        // numbers, and given in actions.
+        distanceField: function(sources, radius = 30) {
             // Each cell's numeric key (see keysNear) is used while searching, and what's on
             // it looked up only once, so the search makes as little as it can.
             const {key:numKey} = keysNear(sources[0]?.x ?? 0, sources[0]?.y ?? 0),
@@ -849,7 +854,7 @@
                 // The steps, as [dx, dy, ...], and the jumps, as [dx, dy, ox1, oy1, ox2, oy2,
                 // ...] (the second cell jumped over the same as the first for a straight jump).
                 steps = pkg.hex.dirs.flat(),
-                jumpSteps = !jumps ? [] : this.jumpOffsets().flatMap(({dx, dy, over}) => [dx, dy, ...over[0], ...(over[1] ?? over[0])]);
+                jumpSteps = this.jumpOffsets().flatMap(({dx, dy, over}) => [dx, dy, ...over[0], ...(over[1] ?? over[0])]);
             for (const p of sources) {
                 dist.set(numKey(p.x, p.y), 0);
                 (buckets[0] ??= []).push(p.x, p.y);

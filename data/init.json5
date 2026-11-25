@@ -250,8 +250,17 @@
 		"apPool":"1 + con / 10",          // the most a piece can have
 		"apRecovery":"0.5 + agl / 40",    // what it gets back at the end of each turn
 		"apInitiative":"(wis + agl) / 40", // what it gets when an enemy first comes into your sight
-		"actionCost":"1",                 // what an action costs (a step, an attack, a swap, a detach or attach)
-		"jumpCost":"2"                    // and a jump
+		"actionCost":"1",                 // what an action costs (a step, an attack, a jump, a swap, a detach or attach)
+		"jumpExhaustion":"2"              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
+	},
+	
+	// Status effects a piece can have for a while ("name" and "description", to show). What
+	// each does is the game's, by its id (see js/hc/model/Effects.js).
+	"effects":{
+		"exhausted":{
+			"name":"Exhausted",
+			"description":"Gets no action points back at the end of the turn."
+		}
 	},
 	
 	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "stats" (str, agl,

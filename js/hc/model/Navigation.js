@@ -160,8 +160,9 @@
         /*  When piece p can't step on its way (far, as goalField gives it), a plan to get
             it nearer, untangling its swarm (its whole tree): each piece of it with the
             action points (see Combat.js; when none has, they're got back as at the end of a
-            turn) may step in Free mode, or swap with a piece next to it, or jump, and p may
-            step in Follow mode too. The plan is the fewest action points spent to get p
+            turn, but not by an exhausted piece) may step in Free mode, or swap with a piece
+            next to it, or jump (which exhausts it, so it counts the points it won't get
+            back as spent: see Effects.js), and p may step in Follow mode too. The plan is the fewest action points spent to get p
             nearer, keeping links slack on the way, found by a search out from where the
             swarm is (best first, giving up after PLAN_STATES positions), and keeping off
             positions in avoid (a Set of keys, as plan's position keys). Returns
@@ -173,11 +174,13 @@
             for (const q of this.piecesOf(p.owner)) if (topOf(q) === topOf(p)) tree.push(q.id);
             const inTree = new Set(tree),
                 range = this.rules.linkRange,
-                // what an action costs each piece, and a jump (see Combat.js)
+                // what an action costs each piece (see Combat.js), and the turns a jump
+                // exhausts it for (see Effects.js)
                 costs = new Map(tree.map(id => [id, this.actionCost(this.pieces.get(id))])),
-                jumpCosts = new Map(tree.map(id => [id, this.jumpCost(this.pieces.get(id))])),
+                exhaustion = new Map(tree.map(id => [id, Math.max(0, this.statRule('jumpExhaustion', this.pieces.get(id)))])),
                 links = tree.filter(id => inTree.has(this.pieces.get(id).parentId)).map(id => [id, this.pieces.get(id).parentId]),
-                // A position: where each piece of the swarm is, and its action points.
+                // A position: where each piece of the swarm is, its action points, and the
+                // turns each is exhausted for.
                 keyOf = pos => tree.map(id => pos.get(id).join(',')).join(';'),
                 tension = pos => links.reduce((t, [a, b]) => {
                     const [ax, ay] = pos.get(a), [bx, by] = pos.get(b);
@@ -203,6 +206,7 @@
                 start = {
                     pos:new Map(tree.map(id => [id, [this.pieces.get(id).x, this.pieces.get(id).y]])),
                     ap:new Map(tree.map(id => [id, this.pieces.get(id).ap])),
+                    tired:new Map(tree.map(id => [id, this.effectOn(this.pieces.get(id), pkg.EFFECT_EXHAUSTED)?.countdown ?? 0])),
                     cost:0,
                     plan:[]
                 },
@@ -222,10 +226,15 @@
                 const can = (s, id, cost=costs.get(id)) => s.ap.get(id) >= cost;
                 let base = st;
                 if (!tree.some(id => can(st, id))) {
-                    base = {...st, ap:new Map(tree.map(id => {
-                        const q = this.pieces.get(id);
-                        return [id, Math.max(st.ap.get(id), Math.min(this.apMax(q), st.ap.get(id) + this.apRecovery(q)))];
-                    }))};
+                    base = {
+                        ...st,
+                        ap:new Map(tree.map(id => {
+                            const q = this.pieces.get(id),
+                                back = st.tired.get(id) ? 0 : this.apRecovery(q);
+                            return [id, Math.max(st.ap.get(id), Math.min(this.apMax(q), st.ap.get(id) + back))];
+                        })),
+                        tired:new Map(tree.map(id => [id, Math.max(0, st.tired.get(id) - 1)]))
+                    };
                 }
                 const view = viewOf(base.pos),
                     next = (id, kind, moves, x, y, other) => {
@@ -233,12 +242,16 @@
                         for (const [gid, mx, my] of moves) pos.set(gid, [mx, my]);
                         const k = keyOf(pos),
                             // A step costs more onto dear going (see Combat.moveCost).
-                            spent = kind === 'jump' ? jumpCosts.get(id) : kind === 'swap' ? costs.get(id) :
-                                this.moveCost(this.pieces.get(id), {moves});
+                            spent = kind === 'jump' || kind === 'swap' ? costs.get(id) :
+                                this.moveCost(this.pieces.get(id), {moves}),
+                            // a jump's exhaustion: the points it won't get back
+                            tiring = kind === 'jump' ? exhaustion.get(id) : 0;
                         if (!seen.has(k) && base.ap.get(id) >= spent) {
                             seen.add(k);
                             const ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
-                                child = {pos, ap, cost:base.cost + spent / pkg.AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
+                                tired = tiring ? new Map(base.tired).set(id, base.tired.get(id) + tiring) : base.tired,
+                                lost = tiring * this.apRecovery(this.pieces.get(id)),
+                                child = {pos, ap, tired, cost:base.cost + (spent + lost) / pkg.AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
                             if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
                             child.score = score(child);
                             open.push(child);
@@ -258,7 +271,7 @@
                                 next(id, 'swap', [[id, ...base.pos.get(other)], [other, x, y]], ...base.pos.get(other), other);
                             }
                         }
-                        for (const c of can(base, id, jumpCosts.get(id)) ? this.jumpCells(view, id) : []) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
+                        for (const c of this.jumpCells(view, id)) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
                     }
                 }
             }

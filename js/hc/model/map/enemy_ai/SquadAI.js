@@ -33,7 +33,7 @@
                 num('patience', 2, 1, 20),         // turns without a hit before a nearby squad stops minding exposure
                 num('poise', 1, 0, 10, 0.1),       // bonus for a piece ending exactly 2 steps away (can strike next turn, can't be hit)
                 num('approach', 0.5, 0, 10, 0.1),  // penalty per step of distance for pieces further away
-                num('jump', 0.5, 0, 10, 0.1),      // cost of a jump: the piece sits out next turn, which is worth a step of approach
+                num('jump', 0.5, 0, 10, 0.1),      // cost of a jump: the piece is exhausted (no points back next turn), worth a step of approach
                 num('jumpClose', 1, 0, 10)         // pieces this close (steps) to a player piece don't jump when planning
             ]
         },
@@ -44,12 +44,7 @@
             let players = this.game.piecesOf('player');
             // (Without enemies there's nothing to plan, so no distances to work out.)
             if (players.length && this.game.piecesOf('enemy').length) {
-                let walkField = null;
-                // A squad none of whose pieces can ever have a jump's points goes by the
-                // field without jumps (made only if it's needed).
                 const field = this.game.distanceField(players),
-                    canJump = squad => squad.some(g => this.game.apMax(g) >= this.game.jumpCost(g)),
-                    fieldFor = squad => canJump(squad) ? field : (walkField ??= this.game.distanceField(players, 30, false)),
                     fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
                     front = squad => Math.min(...squad.map(fd)),
                     roots = this.game.piecesOf('enemy').filter(e => !this.game.parent(e)),
@@ -73,7 +68,7 @@
                                 caution = Math.max(0, 1 - idle / Math.max(1, this.attrs.patience)),
                                 hpBefore = this.game.piecesOf('player').reduce((a, q) => a + q.hp, 0),
                                 nBefore = this.game.piecesOf('player').length;
-                            let plan = this.planSquad(squad, budget, fieldFor(squad), caution),
+                            let plan = this.planSquad(squad, budget, field, caution),
                                 next = 0,
                                 fresh = true,
                                 ok = true;
@@ -87,7 +82,7 @@
                                     ok = !fresh && this.game.pieces.has(root.id);
                                     if (ok) {
                                         const rest = this.game.group(root);
-                                        plan = this.planSquad(rest, budgetOf(rest), fieldFor(rest), caution);
+                                        plan = this.planSquad(rest, budgetOf(rest), field, caution);
                                         next = 0;
                                         fresh = true;
                                     }
@@ -101,7 +96,7 @@
                             const hit = this.game.piecesOf('player').length < nBefore || this.game.piecesOf('player').reduce((a, q) => a + q.hp, 0) < hpBefore;
                             if (this.game.pieces.has(root.id)) root.idle = hit ? 0 : idle + 1;
                         } else {
-                            this.marchSquad(root, fieldFor(squad));
+                            this.marchSquad(root, field);
                         }
                     }
                 }
@@ -122,8 +117,8 @@
                     this.game.spend(other);
                 }
             } else if (a.jump) {
-                done = this.game.canAfford(pc, this.game.jumpCost(pc)) && this.game.jumpPiece(pc, ...a.jump);
-                if (done) this.game.spend(pc, this.game.jumpCost(pc));
+                done = this.game.canAfford(pc) && this.game.jumpPiece(pc, ...a.jump);
+                if (done) this.game.spend(pc);
             } else if (m) {
                 const cost = this.game.moveCost(pc, m);
                 done = this.game.canAfford(pc, cost) && this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode);
@@ -179,7 +174,7 @@
                 let jump = null,
                     jumpKey = [cur, sumOf(members.map(fd))];
                 for (const g of members) {
-                    if (this.game.canAfford(g, this.game.jumpCost(g))) {
+                    if (this.game.canAfford(g)) {
                         for (const c of this.game.jumpCells(view, g.id, true)) {
                             const k = after(g, c.x, c.y);
                             if (k[0] < jumpKey[0] || (k[0] === jumpKey[0] && k[1] < jumpKey[1])) {
@@ -191,7 +186,7 @@
                 }
                 if (jump) {
                     best = null;
-                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0], this.game.jumpCost(jump[0]));
+                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0]);
                 }
             }
             if (best) {
@@ -264,7 +259,6 @@
                 },
                 // whether piece id has the points for an action costing cost in state st
                 costs = new Map(squad.map(p => [p.id, this.game.actionCost(p)])),
-                jumpCosts = new Map(squad.map(p => [p.id, this.game.jumpCost(p)])),
                 can = (st, id, cost=costs.get(id)) => st.ap.get(id) >= cost,
                 // st's action points once piece id (and other, for a swap) spends cost
                 spent = (st, id, cost=costs.get(id), other) => {
@@ -416,20 +410,20 @@
                                 }
                             }
                         }
-                        // Jumping: only it moves, two cells, for its jump cost in points, which
-                        // costs jump. After the steps, so a step wins a tie. Only over gaps
-                        // (holes, harm): in open ground a jump gets it no nearer than
-                        // walking, for twice the points. Not within jumpClose of a player
+                        // Jumping: only it moves, two cells, for an action, but it's exhausted
+                        // (see Effects.js), which costs jump. After the steps, so a step wins a
+                        // tie. Only over gaps (holes, harm), where walking would take the long
+                        // way round. Not within jumpClose of a player
                         // piece, where the points are better spent striking and pulling
                         // back: it's for getting to the player, over holes, say.
                         const [x0, y0] = st.pos.get(id),
                             near = players.some(p => there(st, p.id) > 1e-9 && hexDist(p, {x:x0, y:y0}) <= A.jumpClose);
-                        for (const {x, y} of near || !can(st, id, jumpCosts.get(id)) ? [] : this.game.jumpCells(view, id, true)) {
+                        for (const {x, y} of near ? [] : this.game.jumpCells(view, id, true)) {
                             const pos = new Map(st.pos);
                             pos.set(id, [x, y]);
                             out.push({
                                 pos,
-                                ap:spent(st, id, jumpCosts.get(id)),
+                                ap:spent(st, id),
                                 hp:st.hp,
                                 gain:st.gain - A.jump,
                                 actions:[...st.actions, {id, jump:[x, y]}]

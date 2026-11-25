@@ -160,7 +160,7 @@ test('clicking a cell the selected piece can jump to jumps it there', async ({pa
     await page.evaluate(() => {
         const g = hc.app.game;
         g.rules.apPool = '2';
-        g.getPlayerCore().ap = 200;    // a jump's 2 action points
+        g.getPlayerCore().ap = 200;
         g.selectedId = g.playerCoreId;
         hc.app.centerOn(false);
     });

@@ -83,6 +83,10 @@
         // A damage range, [min, max], as "1–6", or "3" if there's only the one
         formatRange = ([min, max]) => min === max ? String(min) : min + '–' + max,
         
+        // Piece p's status effects (see Effects.js), as "Exhausted (2 more turns)", or ''
+        formatEffects = p => (p.effects ?? []).map(e => i18n(e.countdown === 1 ? 'effect-turn' : 'effect-turns',
+            pkg.effects.get(e.id)?.name ?? e.id, e.countdown)).join(', '),
+        
         // ---- The combat log ----
         LOG_LINES = 8,
         LOG_WIDTH = 360,
@@ -115,7 +119,7 @@
         },
         
         /*  The character sheet for your piece p: a dialog with its level, XP, HP, action
-            points, stats, and what they make it in combat. */
+            points, status effects, stats, and what they make it in combat. */
         openSheet = p => {
             const row = (label, value) => `<tr><td style="padding-right:16px;opacity:0.7;">${label}</td><td>${value}</td></tr>`,
                 head = key => `<tr><td colspan="2" style="padding-top:8px;font-weight:bold;">${i18n(key)}</td></tr>`,
@@ -124,6 +128,7 @@
                     row(i18n('sheet-hp'), p.hp + '/' + p.maxHp),
                     row(i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(p.ap), formatAp(game.apMax(p)),
                         formatAp(game.apRecovery(p)), formatAp(game.apRule('apInitiative', p)))),
+                    row(i18n('sheet-effects'), formatEffects(p) || i18n('sheet-effects-none')),
                     head('sheet-stats'),
                     ...pkg.STATS.map(s => row(i18n('stat-' + s), p.stats[s])),
                     head('sheet-combat'),
@@ -321,7 +326,7 @@
                             q = action && game.pieces.get(action.id);
                         if (!action) {
                             stop = 'nav-blocked';
-                        } else if (!game.canAfford(q, action.kind === 'jump' ? game.jumpCost(q) : action.kind === 'swap' ? game.actionCost(q) :
+                        } else if (!game.canAfford(q, action.kind === 'jump' || action.kind === 'swap' ? game.actionCost(q) :
                             game.moveCost(q, game.findMove(q, action.x, action.y, action.kind, false) ?? {})) ||
                             (action.kind === 'swap' && !game.canMove(game.pieces.get(action.other)))) {
                             // Its action is in a turn to come.
@@ -591,7 +596,8 @@
                     } else if (navNote) {
                         status = navNote;
                     } else if (V.hover) {
-                        // A named enemy you can see under the pointer: what it is. A solid: what
+                        // A named enemy you can see under the pointer: what it is, and its status
+                        // effects. A solid: what
                         // it is and how tough. A hole, or a heal, harm or loot (a fixture) you
                         // know of: what it is. Its floor: what it is, and its cost.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
@@ -606,6 +612,7 @@
                             // With one of your pieces selected, then how it and the enemy
                             // would do against each other.
                             status = enemy.description ? i18n('status-tile', enemy.name, enemy.description) : enemy.name;
+                            if (at.effects?.length) status = i18n('status-tile', status, formatEffects(at));
                             if (sel?.owner === 'player') {
                                 status = i18n('status-odds', status, game.hitChance(sel, at), formatRange(game.damageAgainst(sel, at)),
                                     game.hitChance(at, sel), formatRange(game.damageAgainst(at, sel)));

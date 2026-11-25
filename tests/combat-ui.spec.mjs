@@ -54,24 +54,25 @@ test('K shows and hides the combat log, and it stays that way', async ({page}) =
 test('pointing at an enemy with your piece selected shows how each would do against the other', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game;
-        g.addPiece('core', 'enemy', 2, 0);
+        g.addEffect(g.addPiece('core', 'enemy', 2, 0), 'exhausted', 2);
         g.selectedId = g.playerCoreId;
         hc.app.centerOn(false);
     });
     await page.mouse.move(...await cellOnPage(page, 2, 0));
-    // What it is, then the odds (sure combat: see clearBoard).
-    await expect(page.getByText(/^Creeper · Something .* · you: 100% to hit, 1 damage · it: 100%, 1$/)).toBeVisible();
+    // What it is, its status effects, then the odds (sure combat: see clearBoard).
+    await expect(page.getByText(/^Creeper · Something .* · Exhausted \(2 more turns\) · you: 100% to hit, 1 damage · it: 100%, 1$/)).toBeVisible();
 });
 
 test('I opens the selected piece\'s character sheet', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game;
         g.selectedId = g.playerCoreId;
+        g.addEffect(g.getPlayerCore(), 'exhausted', 1);
         hc.view.draw();
     });
     await page.keyboard.press('i');
     await expect(page.getByText('Your core · Level 1')).toBeVisible();
-    for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1 of 1 · +1 a turn · +0 initiative']) {
+    for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1 of 1 · +1 a turn · +0 initiative', 'Exhausted (1 more turn)']) {
         await expect(page.getByText(text, {exact:true})).toBeVisible();
     }
 });

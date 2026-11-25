@@ -35,10 +35,10 @@
     the same once the piece is gone.
     
     Action points: a piece acts (moves, attacks, swaps, detaches, attaches...) by spending
-    them, the actionCost rule's an action (a jump the jumpCost rule's, each at least
-    MIN_COST; a step onto dear going more: see moveCost), so only with that many. They're kept in hundredths (AP_UNIT a point), as
+    them, the actionCost rule's an action (at least MIN_COST; a jump too, but it exhausts
+    the piece; a step onto dear going more: see moveCost), so only with that many. They're kept in hundredths (AP_UNIT a point), as
     whole numbers, so they add up exactly. At the end of each turn, after the enemies',
-    every piece gets back the apRecovery rule's points, up to its pool, the apPool rule's
+    every piece but an exhausted one (see Effects.js) gets back the apRecovery rule's points, up to its pool, the apPool rule's
     (but at least a point, and an action, so everything can act). A new piece starts with
     none (but your core starts a game with an action's). When an enemy first comes into your sight it gets the apInitiative
     rule's points, how quick it is to notice you and act, and your pieces theirs too (once a
@@ -90,7 +90,7 @@
     pkg.Combat = new JS.Module('Combat', {
         /*  Gives piece p the profile its owner's table has for id (yours: a character's,
             "adventurer" if none; an enemy's: its enemyId's, "creeper" if none), at full
-            HP. */
+            HP, with no status effects. */
         giveProfile: function(p, id) {
             const enemy = p.owner === 'enemy',
                 profile = (enemy ? pkg.enemies : pkg.characters).get(id ?? (enemy ? DEFAULT_ENEMTY : DEFAULT_CHARACTER_CLASS)) ?? FALLBACK;
@@ -105,6 +105,7 @@
             p.maxHp = this.maxHpOf(p);
             p.hp = p.maxHp;
             p.ap = 0;
+            p.effects = [];
         },
         
         // ---- Action points ----
@@ -119,9 +120,8 @@
         apMax: function(p) {return Math.max(AP_UNIT, this.actionCost(p), this.apRule('apPool', p));},
         apRecovery: function(p) {return this.apRule('apRecovery', p);},
         
-        /*  What an action costs piece p, and a jump: at least MIN_COST. */
+        /*  What an action costs piece p (a jump too): at least MIN_COST. */
         actionCost: function(p) {return Math.max(MIN_COST, this.apRule('actionCost', p));},
-        jumpCost: function(p) {return Math.max(MIN_COST, this.apRule('jumpCost', p));},
         
         /*  What piece p spends on move m (from legalMoves or resolveStep): an action for an
             attack; for a step, an action times the dearest moveCost of the cells the
@@ -144,9 +144,12 @@
         /*  Piece p gets ap more action points, up to its pool (but never loses any). */
         giveAp: function(p, ap) {p.ap = Math.max(p.ap, Math.min(this.apMax(p), p.ap + ap));},
         
-        /*  The end of a turn: every piece gets back its recovery, up to its pool. */
+        /*  The end of a turn: every piece but an exhausted one gets back its recovery, up
+            to its pool. */
         recoverAp: function() {
-            for (const p of this.pieces.values()) this.giveAp(p, this.apRecovery(p));
+            for (const p of this.pieces.values()) {
+                if (!this.effectOn(p, pkg.EFFECT_EXHAUSTED)) this.giveAp(p, this.apRecovery(p));
+            }
         },
         
         /*  Enemies coming into your sight for the first time (piece.noticed): each gets its

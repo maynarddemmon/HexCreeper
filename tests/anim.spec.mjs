@@ -14,7 +14,7 @@ test('moves are recorded to animate: a group step together, a jump as a jump', a
         g.playerWait();
         g.motions = [];
         g.playerAct(c, 0, 1);
-        g.rules.apPool = g.rules.apRecovery = '2'; // for a jump's 2 points
+        g.rules.apPool = g.rules.apRecovery = '2';
         // Together: within a few ms (each reads the clock).
         const step = g.motions.map(m => [m.from, m.to, m.jump, Math.abs(m.t0 - g.motions[0].t0) < 5]);
         g.playerWait();

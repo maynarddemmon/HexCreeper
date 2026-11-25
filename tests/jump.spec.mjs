@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage} from './helpers.mjs';
 
-/*  Pools of 2 action points, all of it back each turn, so a piece can jump (2 points). */
+/*  Pools of 2 action points, all of it back each turn (unless exhausted). */
 const twoPoints = page => page.evaluate(() => {
     const g = hc.app.game;
     g.rules.apPool = g.rules.apRecovery = '2';
@@ -77,20 +77,41 @@ test('a jump that would leave a link out of range is not allowed', async ({page}
     expect(r).toEqual([false, true, true]);
 });
 
-test('a jump moves only the piece, and costs it 2 action points', async ({page}) => {
+test('a jump moves only the piece, costs it an action, and exhausts it', async ({page}) => {
     await setUp(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), a = g.pieces.get(window.ids.a), out = {};
         out.jumped = g.playerJump(core, -2, 1);
         out.at = [[core.x, core.y], [a.x, a.y]];
         out.ap = [core.ap, a.ap];
+        out.effects = [core.effects, a.effects];
+        // With the point left it can still step or jump.
         out.now = [g.canMove(core), g.canJump(core)];
-        // With 1 point it can step, but not jump.
-        core.ap = 100;
-        out.one = [g.canMove(core), g.canJump(core), g.playerJump(core, 0, 1)];
         return out;
     });
-    expect(r).toEqual({jumped:true, at:[[-2, 1], [1, 0]], ap:[0, 200], now:[false, false], one:[true, false, false]});
+    expect(r).toEqual({jumped:true, at:[[-2, 1], [1, 0]], ap:[100, 200], effects:[[{id:'exhausted', countdown:1}], []], now:[true, true]});
+});
+
+test('an exhausted piece gets no points back at the end of the turn; each jump adds a turn of it', async ({page}) => {
+    await setUp(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, core = g.getPlayerCore(), a = g.pieces.get(window.ids.a), out = [];
+        // Two jumps (there and back): all its points, and two turns exhausted.
+        out.push([g.playerJump(core, -2, 1), g.playerJump(core, 0, 0)]);
+        const turn = () => {
+            out.push([core.ap, core.effects.map(e => e.countdown), a.ap]);
+            core.ap = a.ap = 0;
+            g.playerWait();
+        };
+        turn();
+        turn();
+        turn();
+        out.push([core.ap, core.effects.length, a.ap]);
+        return out;
+    });
+    // The ends of its turn: none back, none back, then its 2 again; the other piece's
+    // every turn.
+    expect(r).toEqual([[true, true], [0, [2], 200], [0, [1], 200], [0, [], 200], [200, 0, 200]]);
 });
 
 test('no jumping in follow mode', async ({page}) => {
@@ -117,7 +138,7 @@ test('J, then a highlighted cell, jumps the selected piece there', async ({page}
     })).toEqual([0, 2, false]);
 });
 
-test('enemies jump: a planned jump is carried out, for 2 points, and then the piece can\'t act', async ({page}) => {
+test('enemies jump: a planned jump is carried out, for an action, and exhausts the piece', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await twoPoints(page);
@@ -129,19 +150,24 @@ test('enemies jump: a planned jump is carried out, for 2 points, and then the pi
         g.enemyAI.planSquad = () => [{id:lead.id, jump:[0, -6]}];
         g.enemyAI.marchSquad = () => {};
         g.enemyPhase();
-        const out = {at:[lead.x, lead.y], ap:lead.ap};
+        const out = {at:[lead.x, lead.y], ap:lead.ap, effects:lead.effects.map(e => ({...e}))};
         // Without points, the planner has nothing for it to do, and it doesn't march.
         g.enemyAI.planSquad = planSquad;
+        lead.ap = 0;
         const field = g.distanceField(g.piecesOf('player'));
         out.planned = g.enemyAI.planSquad([lead], 1, field).length;
         delete g.enemyAI.marchSquad;
         g.enemyAI.marchSquad(lead, field);
         out.marched = lead.x !== 0 || lead.y !== -6;
+        // Exhausted: nothing back at the end of this turn, its points at the next.
         g.recoverAp();
-        out.later = g.canAfford(lead);
+        g.tickEffects();
+        out.later = [g.canAfford(lead), lead.effects.length];
+        g.recoverAp();
+        out.after = g.canAfford(lead);
         return out;
     });
-    expect(r).toEqual({at:[0, -6], ap:0, planned:0, marched:false, later:true});
+    expect(r).toEqual({at:[0, -6], ap:100, effects:[{id:'exhausted', countdown:1}], planned:0, marched:false, later:[false, 0], after:true});
 });
 
 // A line of holes across the board at y = -2, from x = -w to w.

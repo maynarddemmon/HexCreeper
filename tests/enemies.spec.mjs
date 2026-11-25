@@ -107,8 +107,8 @@ test('a plan gone stale is made again: once a strike kills a piece, the next one
         // Two creepers next to that piece (2 HP), but not the core: each hit does 1 or 2
         // as they plan it (so the second strike is worth making), but does 2.
         hc.enemies.byId.set('creeper', {...hc.enemies.get('creeper'), damage:[1, 2], hp:3});
-        const a = g.addPiece('core', 'enemy', c.x, c.y - 2),
-            b = g.addPiece('core', 'enemy', c.x + 1, c.y - 2, a.id);
+        const a = g.addPiece('core', 'enemy', c.x, c.y - 2);
+        g.addPiece('core', 'enemy', c.x + 1, c.y - 2, a.id);
         g.recomputeRanks();
         g.rollDamage = () => 2;
         g.playerWait();

@@ -26,25 +26,25 @@ test('an enemy whose profile has no xp (here, the fallback) is worth the xpValue
     })).toEqual([7, 5]);
 });
 
-test('what actions and jumps cost are rules; a pool holds at least an action', async ({page}) => {
+test('what an action costs (a jump too) is a rule, and how long a jump exhausts a piece; a pool holds at least an action', async ({page}) => {
     await clearBoard(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.score = 0;
         g.rules.apRecovery = '0';   // (so the turn ending when it's spent gives nothing back)
         g.rules.actionCost = '0.5';
-        g.rules.jumpCost = '1';
+        g.rules.jumpExhaustion = '1 + con / 10';
         c.ap = 100;
         out.push(g.playerAct(c, 1, 0), g.playerAct(c, 2, 0), c.ap);
         c.ap = 100;
-        out.push(g.canJump(c), g.playerJump(c, 4, 0), c.ap);
+        out.push(g.canJump(c), g.playerJump(c, 4, 0), c.ap, g.effectOn(c, 'exhausted').countdown);
         g.rules.actionCost = '3';
         g.rules.apPool = '1';
         out.push(g.apMax(c));
         g.rules.actionCost = '0';
         out.push(g.actionCost(c));
         return out;
-    })).toEqual([true, true, 0, true, true, 0, 300, 10]);
+    })).toEqual([true, true, 0, true, true, 50, 2, 300, 10]);
 });
 
 test('the damage roll is a rule', async ({page}) => {

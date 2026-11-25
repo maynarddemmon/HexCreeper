@@ -78,6 +78,7 @@
                         }
                         pkg.defineShadow(data.shadow);
                         pkg.fixtures.define(data.fixtures);
+                        pkg.effects.define(data.effects);
                         pkg.characters.define(data.characters);
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
                     }

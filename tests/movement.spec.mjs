@@ -86,7 +86,7 @@ test('Go to and Explore may jump in follow mode, as a last resort; you may not',
         const g = hc.app.game, core = g.getPlayerCore();
         g.moveMode = 'follow';
         g.rules.apPool = '2';
-        core.ap = 200;    // a jump's 2 action points
+        core.ap = 200;
         return [g.jumpTargets(core).length, g.jumpTargets(core, true).length > 0];
     });
     expect(r).toEqual([0, true]);

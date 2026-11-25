@@ -379,23 +379,25 @@
         canJumpOver: function(x, y, over) {return over.some(([ox, oy]) => !this.isSolid(x + ox, y + oy));},
         
         /*  Jumps piece p to (x, y), if it can (jumpCells; an enemy won't land on harm). It
-            lands on the tiles there. (What it costs is the caller's to spend.) */
+            lands on the tiles there, and is exhausted for the jumpExhaustion rule's turns
+            more (see Effects.js). (Its action is the caller's to spend.) */
         jumpPiece: function(p, x, y) {
             let done = false;
             if (this.jumpCells(this.boardView(p.owner !== 'player'), p.id).some(c => c.x === x && c.y === y)) {
                 this.applyMoves(p, [[p.id, x, y]], true);
+                this.addEffect(p, pkg.EFFECT_EXHAUSTED, this.statRule('jumpExhaustion', p));
                 this.fx(x, y, 'jump', '--place-ink', {});
                 done = true;
             }
             return done;
         },
         
-        // A piece of yours can jump, for its jumpCost in action points (see Combat.js), except in
+        // A piece of yours can jump, for an action (see Combat.js), except in
         // follow mode (unless anyMode, for Go to and Explore, which jump as a last resort).
         // Enemies can jump too (see planSquad).
         jumpTargets: function(p, anyMode=false) {
             let out = [];
-            if (p?.owner === 'player' && this.canAfford(p, this.jumpCost(p)) && (anyMode || this.modeFor(p) !== 'follow')) {
+            if (p?.owner === 'player' && this.canAfford(p) && (anyMode || this.modeFor(p) !== 'follow')) {
                 out = this.jumpCells(this.boardView(), p.id);
             }
             return out;
@@ -404,7 +406,7 @@
         playerJump: function(p, x, y, anyMode=false) {
             let done = false;
             if (this.jumpTargets(p, anyMode).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
-                this.spend(p, this.jumpCost(p));
+                this.spend(p);
                 this.afterPlayerAction();
                 done = true;
             }
