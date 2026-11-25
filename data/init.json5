@@ -174,11 +174,45 @@
 		}
 	},
 	
+	// The rules of combat and action points (see js/hc/model/Combat.js), as formulas: numbers,
+	// + - * / % ^, parentheses, and min max floor ceil round sqrt log abs. They're the
+	// defaults for every map (a map's own "rules" can change them, for it). Most are of a
+	// piece's "level" and stats (str agl con dex int wis wil cha), and are rounded down.
+	"rules":{
+		// HP and levels
+		"maxHp":"10 + con / 2 + (level - 1) * (2 + con / 5)", // unless its profile fixes its hp
+		"xpToLevel":"20 * level",                          // the xp to go up from this level
+		"xpValue":"5 * level",                             // what killing an enemy is worth, unless its profile says
+		
+		// An attack: a d100 roll hits if it's no more than hitChance (in %, of the attacker's
+		// accuracy and the target's defence, kept from hitMin to hitMax).
+		"meleeAccuracy":"str + level",
+		"defence":"agl + level",
+		"hitChance":"50 + 3 * (accuracy - defence)",
+		"hitMin":5,
+		"hitMax":95,
+		// Then the damage: damageRoll, of the weapon's range ("min" and "max", each with
+		// damageBonus, never below 0) and two rolls ("roll" and "roll2", each from 0 up to 1),
+		// less the target's armor after penetration (the weapon's, plus penetrationBonus if
+		// more than 0). E.g. "min + floor((roll + roll2) * (max - min + 1) / 2)" for two dice.
+		"damageRoll":"min + floor(roll * (max - min + 1))",
+		"damageBonus":"(str - 10) / 2",
+		"penetrationBonus":"(str - 10) / 4",
+		
+		// Action points, in points (not rounded: kept in hundredths). A pool is at least a
+		// point, and an action; an action or a jump costs at least 0.1.
+		"apPool":"1 + con / 10",          // the most a piece can have
+		"apRecovery":"0.5 + agl / 40",    // what it gets back at the end of each turn
+		"apInitiative":"(wis + agl) / 40", // what it gets when an enemy first comes into your sight
+		"actionCost":"1",                 // what an action costs (a step, an attack, a swap, a detach or attach)
+		"jumpCost":"2"                    // and a jump
+	},
+	
 	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "stats" (str, agl,
 	// con, dex, int, wis, wil, cha: 10 if not given), "level" (1), "damage" ([min, max], its
 	// weapon's, before its str bonus), "penetration" (how much damage reduction its weapon
 	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
-	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: 5 x its level).
+	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: else the xpValue rule's).
 	
 	// Your pieces: all adventurers for now.
 	"characters":{

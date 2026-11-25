@@ -58,13 +58,13 @@ test('a game\'s rules are saved with it, whatever its map now says', async ({pag
     await startGame(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game;
-        g.rules.healActPer = 9;
+        g.rules.healAmount = '9 * coreLevel';
         const data = JSON.parse(JSON.stringify(g.exportToObj()));
         g.reset();
-        const before = g.rules.healActPer;
+        const before = g.rules.healAmount;
         g.importFromObj(data);
-        return [before, g.rules.healActPer];
-    })).toEqual([4, 9]);
+        return [before, g.rules.healAmount];
+    })).toEqual(['4 * coreLevel', '9 * coreLevel']);
 });
 
 test('without a save, a reload starts a new game', async ({page}) => {

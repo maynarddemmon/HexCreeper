@@ -69,6 +69,7 @@
                 loadJSON5(DATA_BASE_DIR + 'init.json5', data => {
                     if (data && Array.isArray(data.maps)) {
                         index = data;
+                        pkg.settings.setDefaultRules(data.rules);
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
                         pkg.heals.define(data.heals);

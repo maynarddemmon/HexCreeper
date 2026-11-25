@@ -316,7 +316,7 @@
                             q = action && game.pieces.get(action.id);
                         if (!action) {
                             stop = 'nav-blocked';
-                        } else if (!game.canAfford(q, action.kind === 'jump' ? pkg.JUMP_COST : pkg.ACTION_COST) ||
+                        } else if (!game.canAfford(q, action.kind === 'jump' ? game.jumpCost(q) : game.actionCost(q)) ||
                             (action.kind === 'swap' && !game.canMove(game.pieces.get(action.other)))) {
                             // Its action is in a turn to come.
                             endTurn();

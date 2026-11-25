@@ -22,6 +22,10 @@
         
         PREFS_KEY = 'hc.prefs',
         
+        // The cost rules' variables: your core's level, your highest, and your pieces'
+        // levels together (see Game.costRule).
+        COST_VARS = pkg.COST_VARS = ['coreLevel', 'maxLevel', 'levels'],
+        
         GROUP_DISPLAY = 'display',
         
         // An attr (see Attrs.js) that edits obj[prop], with obj[prop] as its default.
@@ -51,25 +55,31 @@
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (rank isn't used for now: see Combat.js)
-            // Combat (see Combat.js): formulas of a piece's level and stats (pkg.STAT_VARS),
-            // rounded down, but the hit chance, of accuracy and defence.
-            expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS), // unless its profile fixes it
+            // Combat and action points (see Combat.js). Their defaults are in init.json5's
+            // "rules", to tune them there; these are only for if it hasn't them. Formulas of
+            // a piece's level and stats (pkg.STAT_VARS), rounded down, but the hit chance,
+            // of accuracy and defence, the damage roll, and action points (not rounded).
+            expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS),
             expr('meleeAccuracy', 'str + level', pkg.STAT_VARS),
             expr('defence', 'agl + level', pkg.STAT_VARS),
-            expr('hitChance', '50 + 3 * (accuracy - defence)', ['accuracy', 'defence']), // in %, kept from hitMin to hitMax
+            expr('hitChance', '50 + 3 * (accuracy - defence)', ['accuracy', 'defence']),
             num('hitMin', 5, 0, 100),
             num('hitMax', 95, 0, 100),
-            expr('damageBonus', '(str - 10) / 2', pkg.STAT_VARS),     // added to the weapon's damage (never below 0)
-            expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS), // added to the weapon's penetration (if more than 0)
-            expr('xpToLevel', '20 * level', pkg.STAT_VARS),            // the xp to go up from this level
-            // Action points (see Combat.js): formulas of a piece's level and stats, in points.
-            expr('apPool', '1 + con / 10', pkg.STAT_VARS),             // the most a piece can have
-            expr('apRecovery', '0.5 + agl / 40', pkg.STAT_VARS),       // what it gets back each turn
-            expr('apInitiative', '(wis + agl) / 40', pkg.STAT_VARS),   // what it gets when it first meets the other side
-            num('placeBase', 4, 0, 100),      // the cost to place a piece = this + 1 per placePerPieces of your pieces' levels (rounded up)
-            num('placePerPieces', 2, 1, 100),
-            num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's level
-            num('healActPer', 4, 1, 20),      // and heals this x your core's level
+            expr('damageRoll', 'min + floor(roll * (max - min + 1))', pkg.DAMAGE_VARS),
+            expr('damageBonus', '(str - 10) / 2', pkg.STAT_VARS),
+            expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS),
+            expr('xpToLevel', '20 * level', pkg.STAT_VARS),
+            expr('xpValue', '5 * level', pkg.STAT_VARS),
+            expr('apPool', '1 + con / 10', pkg.STAT_VARS),
+            expr('apRecovery', '0.5 + agl / 40', pkg.STAT_VARS),
+            expr('apInitiative', '(wis + agl) / 40', pkg.STAT_VARS),
+            expr('actionCost', '1', pkg.STAT_VARS),
+            expr('jumpCost', '2', pkg.STAT_VARS),
+            // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
+            // (Not in init.json5: a map can set them, as any rule.)
+            expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece
+            expr('healCost', '5 * coreLevel', COST_VARS),           // the Heal action's cost
+            expr('healAmount', '4 * coreLevel', COST_VARS),         // and what it heals (at least 1)
             num('healScore', 1, 0, 20),       // each unused heal point becomes this much score
             num('corePathLength', 250, 0, 100000) // how many of the core's latest steps the golden path keeps (0: none)
         ],
@@ -110,6 +120,9 @@
     // The preferences in effect from the start.
     for (const def of PREFERENCES) def.obj[def.prop] = prefs[def.id] ?? def.defaultValue;
     
+    // The rules' defaults: init.json5's (see setDefaultRules), else the ones above.
+    let defaultRules = resolve(RULES, undefined, '');
+    
     pkg.settings = {
         // The preferences, by group, for Settings.
         getGroups: () => GROUPS,
@@ -145,8 +158,14 @@
             used skipped with a warning saying where (e.g. "Map warrens"). */
         cleanRules: (rules, where) => resolve(RULES, rules, where + ' rules', true),
         
+        /*  Sets the rules' defaults from init.json5's "rules" (those it has, made usable as
+            cleanRules does), over the ones here. */
+        setDefaultRules: rules => {
+            defaultRules = {...resolve(RULES, undefined, ''), ...resolve(RULES, rules, 'init.json5 rules', true)};
+        },
+        
         /*  Every rule, {id:value}: those given, made usable as cleanRules does, and the
-            rest at their defaults. */
-        resolveRules: (rules, where) => resolve(RULES, rules, where + ' rules')
+            rest at their defaults (see setDefaultRules). */
+        resolveRules: (rules, where) => ({...defaultRules, ...resolve(RULES, rules, where + ' rules', true)})
     };
 })(hc);

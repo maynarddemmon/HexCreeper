@@ -390,12 +390,12 @@
             return done;
         },
         
-        // A piece of yours can jump, for JUMP_COST action points (see Combat.js), except in
+        // A piece of yours can jump, for its jumpCost in action points (see Combat.js), except in
         // follow mode (unless anyMode, for Go to and Explore, which jump as a last resort).
         // Enemies can jump too (see planSquad).
         jumpTargets: function(p, anyMode=false) {
             let out = [];
-            if (p?.owner === 'player' && this.canAfford(p, pkg.JUMP_COST) && (anyMode || this.modeFor(p) !== 'follow')) {
+            if (p?.owner === 'player' && this.canAfford(p, this.jumpCost(p)) && (anyMode || this.modeFor(p) !== 'follow')) {
                 out = this.jumpCells(this.boardView(), p.id);
             }
             return out;
@@ -404,7 +404,7 @@
         playerJump: function(p, x, y, anyMode=false) {
             let done = false;
             if (this.jumpTargets(p, anyMode).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
-                this.spend(p, pkg.JUMP_COST);
+                this.spend(p, this.jumpCost(p));
                 this.afterPlayerAction();
                 done = true;
             }

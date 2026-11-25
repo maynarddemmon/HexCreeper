@@ -77,7 +77,7 @@
             this.playerCoreId = core.id;
             this.recomputeRanks();
             core.hp = core.maxHp;
-            core.ap = pkg.AP_UNIT;           // so it can act on the first turn
+            core.ap = this.actionCost(core); // so it can act on the first turn
             this.selectedId = core.id;
             this.corePath = [[0, 0]];       // the cells the core has been on, in order (the golden path: see extendCorePath)
             this.tileGenerator.start();
@@ -365,7 +365,7 @@
             return c ? c.level : 0;
         },
         // Placing costs more the more levels your pieces have between them.
-        placeCost: function() {return this.rules.placeBase + Math.ceil(this.totalLevels() / Math.max(1, this.rules.placePerPieces));},
+        placeCost: function() {return Math.max(0, this.costRule('placeCost'));},
         
         // Has this piece the action points to act (see Combat.js)?
         canMove: function(p) {return this.canAfford(p);},
@@ -498,8 +498,7 @@
             roll less its DR (after penetration). Returns whether that broke it, leaving
             open floor. */
         damageSolid: function(tile, attacker) {
-            const [min, max] = this.damageRange(attacker),
-                dmg = min + Math.floor(this.combatRoll() * (max - min + 1)) - this.armorAgainst(attacker, pkg.solids.get(tile.subtype)?.dr ?? Infinity);
+            const dmg = this.rollDamage(attacker) - this.armorAgainst(attacker, pkg.solids.get(tile.subtype)?.dr ?? Infinity);
             let broken = false;
             if (dmg > 0) {
                 tile.hp -= dmg;
@@ -565,8 +564,15 @@
         canAffordPlace: function() { return this.score >= this.placeCost(); },
         
         // ---- Heal action ----
-        healCost: function() {return this.rules.healCostPer * this.coreLevel();},
-        healAmount: function() {return this.rules.healActPer * this.coreLevel();},
+        healCost: function() {return Math.max(0, this.costRule('healCost'));},
+        healAmount: function() {return Math.max(1, this.costRule('healAmount'));},
+        
+        /*  A cost rule's formula (placeCost, healCost, healAmount: see Settings.js), of your
+            core's level, your highest and your pieces' levels together, rounded down. */
+        costRule: function(rule) {
+            return Math.floor(pkg.attrs.evaluate(this.rules[rule], pkg.COST_VARS,
+                {coreLevel:this.coreLevel(), maxLevel:this.maxLevel(), levels:this.totalLevels()})) || 0;
+        },
         anyDamaged: function() {return this.piecesOf('player').some(p => p.hp < p.maxHp);},
         canAffordHeal: function() {return this.score >= this.healCost();},
         

@@ -5,7 +5,7 @@
 (pkg => {
     'use strict';
     
-    const {cfg, ACTION_COST, JUMP_COST} = pkg,
+    const {cfg} = pkg,
         UNSEEN_COST = 3, // a step onto a cell you haven't seen counts as this many, so known ways come first
         SWARM_COST = 2,  // and onto one of the piece's swarm, which makes way (Follow), this many
         RADIUS = 120,    // the farthest a route goes, in steps (unseen ones counting as UNSEEN_COST)
@@ -171,6 +171,9 @@
             for (const q of this.piecesOf(p.owner)) if (topOf(q) === topOf(p)) tree.push(q.id);
             const inTree = new Set(tree),
                 range = this.rules.linkRange,
+                // what an action costs each piece, and a jump (see Combat.js)
+                costs = new Map(tree.map(id => [id, this.actionCost(this.pieces.get(id))])),
+                jumpCosts = new Map(tree.map(id => [id, this.jumpCost(this.pieces.get(id))])),
                 links = tree.filter(id => inTree.has(this.pieces.get(id).parentId)).map(id => [id, this.pieces.get(id).parentId]),
                 // A position: where each piece of the swarm is, and its action points.
                 keyOf = pos => tree.map(id => pos.get(id).join(',')).join(';'),
@@ -214,7 +217,7 @@
                 open.pop();
                 if (far(...st.pos.get(p.id)) < goal) return st.plan;
                 // A new turn, when nothing more can act in this one
-                const can = (s, id, cost=ACTION_COST) => s.ap.get(id) >= cost;
+                const can = (s, id, cost=costs.get(id)) => s.ap.get(id) >= cost;
                 let base = st;
                 if (!tree.some(id => can(st, id))) {
                     base = {...st, ap:new Map(tree.map(id => {
@@ -229,10 +232,10 @@
                         const k = keyOf(pos);
                         if (!seen.has(k)) {
                             seen.add(k);
-                            const spent = kind === 'jump' ? JUMP_COST : ACTION_COST,
+                            const spent = kind === 'jump' ? jumpCosts.get(id) : costs.get(id),
                                 ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
-                                child = {pos, ap, cost:base.cost + spent / ACTION_COST, plan:[...base.plan, {id, kind, x, y, other}]};
-                            if (other !== undefined) ap.set(other, ap.get(other) - ACTION_COST);
+                                child = {pos, ap, cost:base.cost + spent / pkg.AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
+                            if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
                             child.score = score(child);
                             open.push(child);
                         }
@@ -251,7 +254,7 @@
                                 next(id, 'swap', [[id, ...base.pos.get(other)], [other, x, y]], ...base.pos.get(other), other);
                             }
                         }
-                        for (const c of can(base, id, JUMP_COST) ? this.jumpCells(view, id) : []) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
+                        for (const c of can(base, id, jumpCosts.get(id)) ? this.jumpCells(view, id) : []) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
                     }
                 }
             }

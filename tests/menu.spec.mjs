@@ -82,7 +82,7 @@ test('Heal in the menu (or H) heals starting from the selected piece', async ({p
     await setUp(page);
     await page.evaluate(() => {
         const g = hc.app.game;
-        g.rules.healActPer = 1; // 1 HP, so it shows where healing starts
+        g.rules.healAmount = '1'; // 1 HP, so it shows where healing starts
         g.pieceAt(1, 0).hp = 1;
         g.getPlayerCore().hp = 1;
     });

@@ -10,7 +10,7 @@
     
     const {
         attrs:{num},
-        hexDist, euclid2, PIECE_TYPES, ACTION_COST, JUMP_COST
+        hexDist, euclid2, PIECE_TYPES
     } = pkg,
         
         // The movement modes squads plan with near the player (see expand, in planSquad).
@@ -45,7 +45,7 @@
                 // A squad none of whose pieces can ever have a jump's points goes by the
                 // field without jumps (made only if it's needed).
                 const field = this.game.distanceField(players),
-                    canJump = squad => squad.some(g => this.game.apMax(g) >= JUMP_COST),
+                    canJump = squad => squad.some(g => this.game.apMax(g) >= this.game.jumpCost(g)),
                     fieldFor = squad => canJump(squad) ? field : (walkField ??= this.game.distanceField(players, 30, false)),
                     fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
                     front = squad => Math.min(...squad.map(fd)),
@@ -60,7 +60,7 @@
                         this.game.track = root.id;
                         const squad = this.game.group(root),
                             // the most actions the squad has the points for
-                            budget = squad.reduce((n, g) => n + Math.floor(g.ap / ACTION_COST), 0);
+                            budget = squad.reduce((n, g) => n + Math.floor(g.ap / this.game.actionCost(g)), 0);
                         if (!budget) continue;
                         if (front(squad) <= this.attrs.planRange) {
                             // Patience: the longer a nearby squad goes without landing a hit, the
@@ -79,8 +79,8 @@
                                     this.game.spend(pc);
                                     this.game.spend(other);
                                 } else if (a.jump) {
-                                    if (!this.game.canAfford(pc, JUMP_COST) || !this.game.jumpPiece(pc, ...a.jump)) break;
-                                    this.game.spend(pc, JUMP_COST);
+                                    if (!this.game.canAfford(pc, this.game.jumpCost(pc)) || !this.game.jumpPiece(pc, ...a.jump)) break;
+                                    this.game.spend(pc, this.game.jumpCost(pc));
                                 } else {
                                     if (!this.game.canAfford(pc) || !this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
                                     if (this.game.pieces.has(pc.id)) this.game.spend(pc);
@@ -144,7 +144,7 @@
                 let jump = null,
                     jumpKey = [cur, sumOf(members.map(fd))];
                 for (const g of members) {
-                    if (this.game.canAfford(g, JUMP_COST)) {
+                    if (this.game.canAfford(g, this.game.jumpCost(g))) {
                         for (const c of this.game.jumpCells(view, g.id, true)) {
                             const k = after(g, c.x, c.y);
                             if (k[0] < jumpKey[0] || (k[0] === jumpKey[0] && k[1] < jumpKey[1])) {
@@ -156,7 +156,7 @@
                 }
                 if (jump) {
                     best = null;
-                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0], JUMP_COST);
+                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0], this.game.jumpCost(jump[0]));
                 }
             }
             if (best && this.game.act(root, best.x, best.y, best.mode)) this.game.spend(root);
@@ -211,12 +211,14 @@
                     return m;
                 },
                 // whether piece id has the points for an action costing cost in state st
-                can = (st, id, cost=ACTION_COST) => st.ap.get(id) >= cost,
+                costs = new Map(squad.map(p => [p.id, this.game.actionCost(p)])),
+                jumpCosts = new Map(squad.map(p => [p.id, this.game.jumpCost(p)])),
+                can = (st, id, cost=costs.get(id)) => st.ap.get(id) >= cost,
                 // st's action points once piece id (and other, for a swap) spends cost
-                spent = (st, id, cost=ACTION_COST, other) => {
+                spent = (st, id, cost=costs.get(id), other) => {
                     const ap = new Map(st.ap);
                     ap.set(id, ap.get(id) - cost);
-                    if (other !== undefined) ap.set(other, ap.get(other) - ACTION_COST);
+                    if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
                     return ap;
                 },
                 livePlayerAt = (st, x, y) => {
@@ -279,7 +281,7 @@
                                 pos.set(other, st.pos.get(id));
                                 out.push({
                                     pos,
-                                    ap:spent(st, id, ACTION_COST, other),
+                                    ap:spent(st, id, costs.get(id), other),
                                     dmg:st.dmg,
                                     dead:st.dead,
                                     gain:st.gain,
@@ -333,7 +335,7 @@
                                 }
                             }
                         }
-                        // Jumping: only it moves, two cells, for JUMP_COST points, which
+                        // Jumping: only it moves, two cells, for its jump cost in points, which
                         // costs jump. After the steps, so a step wins a tie. Only over gaps
                         // (holes, harm): in open ground a jump gets it no nearer than
                         // walking, for twice the points. Not within jumpClose of a player
@@ -341,12 +343,12 @@
                         // back: it's for getting to the player, over holes, say.
                         const [x0, y0] = st.pos.get(id),
                             near = players.some(p => !st.dead.has(p.id) && hexDist(p, {x:x0, y:y0}) <= A.jumpClose);
-                        for (const {x, y} of near || !can(st, id, JUMP_COST) ? [] : this.game.jumpCells(view, id, true)) {
+                        for (const {x, y} of near || !can(st, id, jumpCosts.get(id)) ? [] : this.game.jumpCells(view, id, true)) {
                             const pos = new Map(st.pos);
                             pos.set(id, [x, y]);
                             out.push({
                                 pos,
-                                ap:spent(st, id, JUMP_COST),
+                                ap:spent(st, id, jumpCosts.get(id)),
                                 dmg:st.dmg,
                                 dead:st.dead,
                                 gain:st.gain - A.jump,
