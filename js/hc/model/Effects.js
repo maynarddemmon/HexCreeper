@@ -1,6 +1,7 @@
 /*  Status effects: what a piece is going through for a while (a module included in
     Game). Their kinds, from data/init.json5's "effects" (see Subtypes.js): a name and a
-    description, to show. What each does is the game's, by its id:
+    description, to show, and an icon, drawn above a piece that has it (one of img/icons',
+    by name: see Render.js). What each does is the game's, by its id:
         exhausted   gets no action points back at the end of the turn (see Combat.js). A
                     jump exhausts a piece for the jumpExhaustion rule's turns.
 
@@ -16,7 +17,7 @@
         isEffect = e => typeof e?.id === 'string' && Number.isInteger(e.countdown) && e.countdown > 0;
 
     pkg.EFFECT_EXHAUSTED = 'exhausted';
-    pkg.effects = new Subtypes('effect', () => ({}));
+    pkg.effects = new Subtypes('effect', e => ({icon:typeof e.icon === 'string' ? e.icon : ''}));
 
     pkg.Effects = new JS.Module('Effects', {
         /*  Piece p's effect id ({id, countdown}), or undefined if it hasn't it. */

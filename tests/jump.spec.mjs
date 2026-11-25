@@ -1,10 +1,12 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage} from './helpers.mjs';
 
-/*  Pools of 2 action points, all of it back each turn (unless exhausted). */
+/*  Pools of 2 action points, all of it back each turn (unless exhausted), and a jump
+    exhausting a piece for a turn. */
 const twoPoints = page => page.evaluate(() => {
     const g = hc.app.game;
     g.rules.apPool = g.rules.apRecovery = '2';
+    g.rules.jumpExhaustion = '1';
 });
 
 /*  Every jump made, as [id, x, y], on window.jumps. */

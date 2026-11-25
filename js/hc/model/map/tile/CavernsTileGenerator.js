@@ -156,7 +156,7 @@
                 // Which kinds, by weight (data/init.json5; heals, harms and loot are fixtures:
                 // see Fixtures.js).
                 table('holeTable', {pit:6, chasm:3, sinkhole:1}, optionsOf(pkg.holes)),
-                table('floorTable', {loose_stone:2, mud:1}, optionsOf(pkg.floors)),
+                table('floorTable', {loose_stone:2, mud:1, pool:1}, optionsOf(pkg.floors)),
                 choice('baseFloor', 'cave_floor', optionsOf(pkg.floors)), // what a cell with no tile is (see Game.baseFloor)
                 table('healTable', {heal:1}, fixtureOptions(FIXTURE_HEAL)),
                 table('harmTable', {harm:1}, fixtureOptions(FIXTURE_HARM)),

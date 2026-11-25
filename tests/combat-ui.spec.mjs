@@ -63,6 +63,38 @@ test('pointing at an enemy with your piece selected shows how each would do agai
     await expect(page.getByText(/^Creeper · Something .* · Exhausted \(2 more turns\) · you: 100% to hit, 1 damage · it: 100%, 1$/)).toBeVisible();
 });
 
+test('a piece\'s status effects show as icons above it, where its bars are below', async ({page}) => {
+    // How many white pixels (the icon's strokes: --effect-icon) are in the square where the
+    // first icon goes above the piece at (x, y) (see Render.js: drawEffects).
+    // (Drawn first, and with no pan going on, so the piece is where it's looked for.)
+    const whiteAbove = (x, y) => page.evaluate(([x, y]) => {
+        const V = hc.view, g = hc.app.game, s = V.cam.size,
+            p = g.pieceAt(x, y),
+            [sx, sy] = V.cellCenter(x, y),
+            size = Math.max(8, s * 0.2),
+            top = sy - s * (0.37 + (p.id === g.playerCoreId ? hc.cfg.CORE_BORDER : 0)) - size,
+            left = sx - s / 2;
+        V.stopPan();
+        V.render(performance.now());
+        const d = V.canvas.getContext('2d').getImageData(Math.round(left * V.dpr), Math.round(top * V.dpr), Math.round(size * V.dpr), Math.round(size * V.dpr)).data;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) n++;
+        return n;
+    }, [x, y]);
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        hc.view.cam.size = 80;
+        hc.app.centerOn(false);
+        g.addEffect(g.getPlayerCore(), 'exhausted', 1);
+        g.addPiece('core', 'enemy', 2, 0);
+        g.addEffect(g.addPiece('core', 'enemy', -2, 0), 'exhausted', 1);
+    });
+    // (Once its icon has loaded.)
+    await expect.poll(() => whiteAbove(0, 0)).toBeGreaterThan(5);
+    expect(await whiteAbove(-2, 0)).toBeGreaterThan(5);
+    expect(await whiteAbove(2, 0)).toBe(0);
+});
+
 test('I opens the selected piece\'s character sheet', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game;

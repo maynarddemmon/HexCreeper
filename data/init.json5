@@ -129,8 +129,10 @@
 		"frozen_floor":{"name":"Frozen floor", "description":"Rock under a crust of frost.",   "fillColor":"#454c52"},
 		// Harder going
 		"loose_stone":{"name":"Loose stone", "description":"Rocks that shift underfoot.",        "moveCost":1.5, "fillColor":"#4e4b47"},
-		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":2,   "fillColor":"#4a3f33"},
-		"ice":        {"name":"Ice",         "description":"Slick ice: slow, careful steps.",    "moveCost":1.5, "fillColor":"#4c5860"}
+		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":1.75,"fillColor":"#4a3f33"},
+		"ice":        {"name":"Ice",         "description":"Slick ice: slow, careful steps.",    "moveCost":1.5, "fillColor":"#4c5860"},
+		// Water
+		"pool":       {"name":"Pool",        "description":"A pool of water.",                   "moveCost":2.0, "fillColor":"#039"}
 	},
 	
 	// Fixtures: what sits on the ground of a cell (over its open floor) and does something
@@ -254,12 +256,14 @@
 		"jumpExhaustion":"2"              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
 	},
 	
-	// Status effects a piece can have for a while ("name" and "description", to show). What
-	// each does is the game's, by its id (see js/hc/model/Effects.js).
+	// Status effects a piece can have for a while ("name" and "description", to show, and
+	// "icon", drawn above a piece that has it: one of img/icons', by name). What each does
+	// is the game's, by its id (see js/hc/model/Effects.js).
 	"effects":{
 		"exhausted":{
 			"name":"Exhausted",
-			"description":"Gets no action points back at the end of the turn."
+			"description":"Gets no action points back at the end of the turn.",
+			"icon":"battery-low"
 		}
 	},
 	

@@ -32,6 +32,60 @@
         // A colour from data (any CSS colour, or a --variable), or the fallback --variable.
         dataColor = (c, fallback) => c ? (c.startsWith('--') ? css(c) : c) : css(fallback),
         
+        // Status effect icons (see drawEffects): an effect kind's icon, one of img/icons'
+        // (Lucide's, drawn on a 24 by 24 grid), by name, as a Path2D to stroke, once it's
+        // loaded (undefined until then, null if it can't be).
+        ICON_DIR = './img/icons/',
+        iconPaths = new Map(),
+        iconPath = name => {
+            if (!iconPaths.has(name)) {
+                iconPaths.set(name, undefined);
+                fetch(ICON_DIR + name + '.svg').then(r => r.ok ? r.text() : Promise.reject(new Error(r.status))).then(text => {
+                    iconPaths.set(name, svgPath(text));
+                    draw();
+                }, err => {
+                    iconPaths.set(name, null);
+                    console.error('Bad icon', name, err);
+                });
+            }
+            return iconPaths.get(name);
+        },
+        
+        // An SVG icon's shapes (path, circle, ellipse, line, rect, polyline, polygon) as one
+        // Path2D.
+        svgPath = text => {
+            const path = new Path2D(),
+                svg = new DOMParser().parseFromString(text, 'image/svg+xml').documentElement,
+                n = (el, a) => Number(el.getAttribute(a) ?? 0);
+            for (const el of svg.children) {
+                const tag = el.tagName;
+                if (tag === 'path') {
+                    path.addPath(new Path2D(el.getAttribute('d')));
+                } else if (tag === 'circle' || tag === 'ellipse') {
+                    const rx = n(el, tag === 'circle' ? 'r' : 'rx'),
+                        ry = n(el, tag === 'circle' ? 'r' : 'ry');
+                    path.moveTo(n(el, 'cx') + rx, n(el, 'cy'));
+                    path.ellipse(n(el, 'cx'), n(el, 'cy'), rx, ry, 0, 0, Math.PI * 2);
+                } else if (tag === 'line') {
+                    path.moveTo(n(el, 'x1'), n(el, 'y1'));
+                    path.lineTo(n(el, 'x2'), n(el, 'y2'));
+                } else if (tag === 'rect') {
+                    path.roundRect(n(el, 'x'), n(el, 'y'), n(el, 'width'), n(el, 'height'), n(el, 'rx'));
+                } else if (tag === 'polyline' || tag === 'polygon') {
+                    const pts = (el.getAttribute('points') ?? '').trim().split(/[\s,]+/).map(Number);
+                    for (let i = 0; i + 1 < pts.length; i += 2) {
+                        if (i) {
+                            path.lineTo(pts[i], pts[i + 1]);
+                        } else {
+                            path.moveTo(pts[i], pts[i + 1]);
+                        }
+                    }
+                    if (tag === 'polygon') path.closePath();
+                }
+            }
+            return path;
+        },
+        
         // How strongly a solid of the subtype is filled: by its opacity (Solids.js).
         solidFillAlpha = solid => Math.max(SOLID_MIN_FILL, (solid?.opacity ?? 100) / 100),
         
@@ -470,14 +524,18 @@
             }
         },
         
-        // Your core is bigger, so its bars sit lower, clear of its selection ring. Under
-        // the HP bar (red), a thinner one for the piece's action points (white), out of its
-        // pool, with a tick at each whole point.
+        // How far from the middle of piece p's cell its bars start (below it) and its status
+        // effect icons end (above it). Your core is bigger, so they sit further out, clear
+        // of its selection ring.
+        barGap = (p, s) => s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0)),
+        
+        // Under the HP bar (red), a thinner one for the piece's action points (white), out
+        // of its pool, with a tick at each whole point.
         drawBars = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
                 x = cx - w / 2,
-                y = cy + s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0)),
+                y = cy + barGap(p, s),
                 bar = (by, bh, frac, color) => {
                     ctx.fillStyle = css('--grid');
                     ctx.fillRect(x, by, w, bh);
@@ -492,6 +550,30 @@
                 bar(ay, ah, p.ap / pool, '--ap-bar');
                 ctx.fillStyle = css('--bg');
                 for (let k = pkg.AP_UNIT; k < pool; k += pkg.AP_UNIT) ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);
+            }
+        },
+        
+        // Above the piece, as far out as its bars are below it: an icon for each of its
+        // status effects (see Effects.js; one whose icon hasn't loaded yet is skipped),
+        // left to right from the left side of its hex (half a cell from its middle).
+        drawEffects = (p, cx, cy, s) => {
+            const size = Math.max(8, s * 0.2),
+                y = cy - barGap(p, s) - size;
+            let x = cx - s / 2;
+            for (const e of p.effects ?? []) {
+                const name = pkg.effects.get(e.id)?.icon,
+                    path = name ? iconPath(name) : null;
+                if (path) {
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.scale(size / 24, size / 24);
+                    ctx.strokeStyle = css('--effect-icon');
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = ctx.lineJoin = 'round';
+                    ctx.stroke(path);
+                    ctx.restore();
+                    x += size + 1;
+                }
             }
         };
     
@@ -808,7 +890,10 @@
                 ctx.beginPath(); ctx.arc(sx, sy, s * (PIECE_R + (p.id === game.playerCoreId ? CORE_BORDER : 0)), 0, Math.PI * 2); ctx.fill();
                 ctx.globalAlpha = 1;
             }
-            if (s >= 22) drawBars(p, sx, sy, s);
+            if (s >= 22) {
+                drawBars(p, sx, sy, s);
+                drawEffects(p, sx, sy, s);
+            }
         }
         
         // Floating text + death bursts
