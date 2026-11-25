@@ -6,13 +6,17 @@
     
     const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
-        // The functions an expr attr's formula can call
-        FUNCTIONS = {min:Math.min, max:Math.max, floor:Math.floor, ceil:Math.ceil, round:Math.round, sqrt:Math.sqrt, log:Math.log, abs:Math.abs},
+        // The functions an expr attr's formula can call: JavaScript's Math functions (max,
+        // floor, pow, sign, hypot...), all but random, since a formula gives the same for
+        // the same values.
+        FUNCTIONS = Object.fromEntries(Object.getOwnPropertyNames(Math)
+            .filter(name => typeof Math[name] === 'function' && name !== 'random').map(name => [name, Math[name]])),
         
         /*  An expr attr's formula, text, made into a function of its variables, f({name:n}),
             or an Error saying what's wrong with it. names: the variables it may use. Numbers,
             + - * / % and ^ (power), with the usual precedence, unary minus, parentheses and
-            FUNCTIONS. Made once for each text (formulas). */
+            FUNCTIONS, by name, with "Math." in front or not (max(a, b) or Math.max(a, b)).
+            Made once for each text (formulas). */
         formulas = new Map(),
         compile = (text, names) => {
             const key = names.join() + '|' + text;
@@ -49,10 +53,17 @@
                             const f = power();
                             return v => -f(v);
                         }
-                        if (/^[A-Za-z_]/.test(t)) {
+                        // A name: a variable or a function (after "Math.", a function).
+                        let name = /^[A-Za-z_]/.test(t) ? t : null;
+                        if (t === 'Math' && peek() === '.') {
+                            i++;
+                            name = tokens[i++];
+                            if (!Object.hasOwn(FUNCTIONS, name ?? '') || peek() !== '(') throw new Error('no function Math.' + (name ?? ''));
+                        }
+                        if (name) {
                             if (peek() === '(') {
-                                const fn = FUNCTIONS[t];
-                                if (!fn) throw new Error('no function ' + t);
+                                const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : null;
+                                if (!fn) throw new Error('no function ' + name);
                                 i++;
                                 const args = [sum()];
                                 while (peek() === ',') {
@@ -62,8 +73,8 @@
                                 take(')');
                                 return v => fn(...args.map(a => a(v)));
                             }
-                            if (!names.includes(t)) throw new Error('no variable ' + t);
-                            return v => v[t];
+                            if (!names.includes(name)) throw new Error('no variable ' + name);
+                            return v => v[name];
                         }
                         throw new Error('unexpected ' + t);
                     },

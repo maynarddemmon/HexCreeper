@@ -79,7 +79,8 @@
             expr('jumpExhaustion', '2', pkg.STAT_VARS),
             expr('rallyCost', '0.5', pkg.STAT_VARS),
             expr('rallyTurns', '3', pkg.STAT_VARS),
-            expr('rallyAmount', 'con / 5', pkg.STAT_VARS),
+            expr('rallyAmount', '(con / 10) * level', pkg.STAT_VARS),
+            expr('rallyRefresh', 'Math.max(10, 150 - level)', pkg.STAT_VARS),
             // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
             // (Not in init.json5: a map can set them, as any rule.)
             expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece

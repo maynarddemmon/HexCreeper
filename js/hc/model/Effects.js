@@ -7,9 +7,10 @@
     each does is the game's, by its id:
         exhausted   gets no action points back at the end of the turn (see Combat.js). A
                     jump exhausts a piece for the jumpExhaustion rule's turns.
-        rallying    gets back the rallyAmount rule's HP at the end of each turn, and can't
-                    rally again (hidden; see Combat.js). Rallying gives a piece it for the
-                    rallyTurns rule's turns.
+        rallying    gets back the rallyAmount rule's HP at the end of each turn (hidden;
+                    see Combat.js). Rallying gives a piece it for the rallyTurns rule's turns.
+        rallied     can't rally (muted). Rallying gives a piece it for the rallyRefresh
+                    rule's turns.
     
     A piece's effects are plain data, saved with it: piece.effects, [{id, countdown}].
     countdown is how many more turns it lasts: at the end of each turn (housekeeping, after
@@ -24,6 +25,7 @@
     
     pkg.EFFECT_EXHAUSTED = 'exhausted';
     pkg.EFFECT_RALLYING = 'rallying';
+    pkg.EFFECT_RALLIED = 'rallied';
     pkg.effects = new Subtypes('effect', e => ({icon:typeof e.icon === 'string' ? e.icon : '', muted:e.muted === true, hidden:e.hidden === true}));
     
     pkg.Effects = new JS.Module('Effects', {

@@ -11,16 +11,18 @@ test('an expr attr is a formula of its variables, checked when it\'s given', asy
             names = ['rank', 'size'],
             def = expr('e', '1', names);
         return {
-            values:['rank * 2 + size / 10', '-2 ^ 2', '2 ^ 3 ^ 2', 'max(rank, 3) - floor(size / 7)', '(rank + 1) % 3']
+            values:['rank * 2 + size / 10', '-2 ^ 2', '2 ^ 3 ^ 2', 'max(rank, 3) - floor(size / 7)', '(rank + 1) % 3',
+                // Math functions, with Math. or without
+                'Math.max(10, 150 - size)', 'Math.min(rank, 2) + pow(2, 3)', 'sign(-size) * Math.hypot(3, rank)']
                 .map(f => evaluate(f, names, {rank:4, size:30})),
-            ok:['rank +', 'rank * pieces', 'sqr(rank)', '3 3', 'rank)'].map(f => normalize(def, f)),
-            problems:['rank * pieces', 'sqr(rank)'].map(f => formulaProblem(f, names))
+            ok:['rank +', 'rank * pieces', 'sqr(rank)', '3 3', 'rank)', 'Math.random()', 'random()', 'Math.PI', 'Math.max', 'Math(rank)'].map(f => normalize(def, f)),
+            problems:['rank * pieces', 'sqr(rank)', 'Math.random()', 'Math.sqr(rank)'].map(f => formulaProblem(f, names))
         };
     });
     expect(r).toEqual({
-        values:[11, -4, 512, 0, 2],
-        ok:[undefined, undefined, undefined, undefined, undefined],
-        problems:['no variable pieces', 'no function sqr']
+        values:[11, -4, 512, 0, 2, 120, 10, -5],
+        ok:[undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined],
+        problems:['no variable pieces', 'no function sqr', 'no function Math.random', 'no function Math.sqr']
     });
 });
 

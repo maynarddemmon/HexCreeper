@@ -31,7 +31,7 @@ myt.I18N.setDictionary({
 "lbl-ap":"AP",
 "tip-end-turn":"End your turn and let the enemies act. (Space)",
 "tip-place":"Place a piece next to this one, linked to it: choose the empty cell. Costs $0 score. (P)",
-"tip-rally":"Costs $0 action points: this piece gets back $1 HP at the end of this turn and each turn after, for $2 turns, and can't rally again until then. Only when it's hurt. (R)",
+"tip-rally":"Costs $0 action points: this piece gets back $1 HP at the end of this turn and each turn after, for $2 turns. It can't rally again for $3 turns. Only when it's hurt. (R)",
 "tip-mode":"How a piece's linked pieces move with it. Fixed: they all move with it, keeping their shape. Follow: it leads and the whole swarm it's linked to follows in its footsteps; only it attacks. Shift-click to move just the piece: the others stay put, unless the move would take one out of link range, which drags it along. (M)",
 "tip-detach":"Break the selected piece's link to its parent, however far apart they are. Costs it an action point. (B)",
 "tip-swap":"Swap the selected piece with one of your pieces next to it. Their links stay with them. Costs each of them an action point. You can also Alt-click (Option-click) the piece to swap with: holding Alt shows them. (V)",

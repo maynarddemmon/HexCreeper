@@ -210,7 +210,7 @@
                     tip:() => {
                         const p = sel();
                         return p ? i18n('tip-rally', formatAp(game.rallyCost(p)), Math.max(0, game.statRule('rallyAmount', p)),
-                            Math.max(1, game.statRule('rallyTurns', p))) : '';
+                            Math.max(1, game.statRule('rallyTurns', p)), game.rallyRefresh(p)) : '';
                     },
                     enabled:() => game.canRally(sel()),
                     run:() => {

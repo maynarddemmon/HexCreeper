@@ -5,13 +5,14 @@ test.beforeEach(async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     // Pools of 2 action points, all of it back each turn; a rally costs half a point, lasts
-    // 3 turns and gives back 2 HP a turn.
+    // 3 turns and gives back 2 HP a turn, and a piece can rally again once it's over.
     await page.evaluate(() => {
         const g = hc.app.game;
         g.rules.apPool = g.rules.apRecovery = '2';
         g.rules.rallyCost = '0.5';
         g.rules.rallyTurns = '3';
         g.rules.rallyAmount = '2';
+        g.rules.rallyRefresh = '0';
         g.getPlayerCore().ap = 200;
     });
 });
@@ -58,6 +59,26 @@ test('rallying stops at max HP, takes at least a turn, and needs the points', as
         return out;
     });
     expect(r).toEqual([[1], 10, 0, false]);
+});
+
+test('after rallying, a piece can\'t rally again for the rallyRefresh rule\'s turns, counting from then', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.rallyRefresh = 'Math.max(5, 7 - level)';
+        g.rules.rallyAmount = '1';
+        c.maxHp = 100;
+        c.hp = 10;
+        c.level = 1;
+        g.playerRally(c);
+        // Rallying for 3 turns, then it rallied 6 turns ago: it can rally again.
+        for (let i = 0; i < 6; i++) {
+            out.push(g.canRally(c));
+            g.playerWait();
+        }
+        out.push(g.canRally(c), c.effects.length);
+        return out;
+    });
+    expect(r).toEqual([false, false, false, false, false, false, true, 0]);
 });
 
 test('a piece that could still rally keeps the turn from ending by itself', async ({page}) => {
