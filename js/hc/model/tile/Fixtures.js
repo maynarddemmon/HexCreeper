@@ -1,7 +1,16 @@
-/*  Heal, harm and loot tiles: their subtypes, from data/init.json5 (see Subtypes.js), and
-    how a game makes, reveals and uses them (a module included in Game).
+/*  Fixtures: what sits on the ground of a cell and does something when one of your pieces
+    enters it (heals, harms and loot for now). Their kinds, from data/init.json5's
+    "fixtures" (see Subtypes.js), and how a game makes, reveals and uses them (a module
+    included in Game).
     
-    Every subtype has a name, a description, and (each optional but pool):
+    A cell has a tile (its terrain: open floor, or a solid or a hole: see Game.tiles) and
+    at most one fixture over it (Game.fixtures, "x,y" -> fixture), only on a cell you can
+    stand on. A fixture is plain data, saved with the game: {x, y, type, subtype, pool,
+    magnitude, uses, revealedAt, shown} (see makeFixture).
+    
+    Every kind has a name, a description, a type ("heal", "harm" or "loot": what it does,
+    which the rest of the game goes by, e.g. pieces keep off harm) and (each optional but
+    pool):
     - revealMode: when the tile shows: "instant" (the default: once its cell is in sight),
       "hidden" (once one of your pieces enters it) or {"proximity":n} (once one of your
       pieces comes within n cells). Once shown it stays shown.
@@ -21,19 +30,21 @@
       never with an infinite pool), "once" (after it's used once), {"count":n} (after n
       uses) or {"countdown":n} (n turns after it's revealed).
     
-    Heal tiles heal your pieces (what the piece doesn't need flows along its links, and
-    what nobody needs becomes score); harm tiles damage any piece; loot tiles give you
-    score. Only your pieces set them off, by entering their cell: a step, being carried,
-    a jump, a swap or being placed there. */
+    Heals heal your pieces (what the piece doesn't need flows along its links, and what
+    nobody needs becomes score); harms damage any piece; loot gives you score. Only your
+    pieces set them off, by entering their cell: a step, being carried, a jump, a swap or
+    being placed there. */
 (pkg => {
     'use strict';
     
-    const {
-        Subtypes,
-        TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT,
-        hexDist
-    } = pkg,
+    const {Subtypes, hexDist} = pkg,
         {isInt} = Subtypes,
+        
+        // The types of fixture
+        FIXTURE_HEAL = pkg.FIXTURE_HEAL = 'heal',
+        FIXTURE_HARM = pkg.FIXTURE_HARM = 'harm',
+        FIXTURE_LOOT = pkg.FIXTURE_LOOT = 'loot',
+        FIXTURE_TYPES = pkg.FIXTURE_TYPES = [FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT],
         
         SHAPES = ['flat', 'ring', 'fade'],
         
@@ -89,13 +100,14 @@
             return duration;
         },
         
-        // A subtype's own properties: pool and magnitude are {min, max}, or null for an
-        // infinite pool or a magnitude of the whole pool (which needs a pool that isn't
+        // A kind's own properties: its type; pool and magnitude are {min, max}, or null for
+        // an infinite pool or a magnitude of the whole pool (which needs a pool that isn't
         // infinite).
-        parseEffect = e => {
+        parseFixture = e => {
             const infinite = e.pool === 'infinite',
                 wholePool = e.magnitude === undefined || e.magnitude === 'pool',
                 own = {
+                    type:e.type,
                     reveal:parseShow(e.revealMode),
                     pool:infinite ? null : parseRange(e.pool),
                     magnitude:wholePool ? null : parseRange(e.magnitude),
@@ -104,79 +116,81 @@
                     area:parseArea(e.area),
                     duration:parseDuration(e.duration)
                 },
-                ok = own.reveal && (infinite || own.pool) && (wholePool ? !infinite : own.magnitude) && own.showMagnitude &&
+                ok = FIXTURE_TYPES.includes(own.type) && own.reveal && (infinite || own.pool) && (wholePool ? !infinite : own.magnitude) && own.showMagnitude &&
                     typeof own.showPool === 'boolean' && own.area && own.duration;
             return ok ? own : null;
         },
         
-        // A tile of a subtype that isn't known: shown at once, 1 of whatever it does, then gone.
-        FALLBACK = parseEffect({pool:1});
+        // A fixture of a kind that isn't known: shown at once, 1 of whatever it does, then gone.
+        FALLBACK = parseFixture({type:FIXTURE_LOOT, pool:1});
     
-    pkg.heals = new Subtypes(TILE_TYPE_HEAL, parseEffect);
-    pkg.harms = new Subtypes(TILE_TYPE_HARM, parseEffect);
-    pkg.loots = new Subtypes(TILE_TYPE_LOOT, parseEffect);
+    pkg.fixtures = new Subtypes('fixture', parseFixture);
     
-    // The subtypes of each kind of tile here.
-    const TYPES = {[TILE_TYPE_HEAL]:pkg.heals, [TILE_TYPE_HARM]:pkg.harms, [TILE_TYPE_LOOT]:pkg.loots};
+    /*  The kinds of fixture of a type, as {value, label} options (for a map component's
+        attrs: see ProximityTileGenerator.js and CavernsTileGenerator.js). */
+    pkg.fixtureOptions = type => () => pkg.fixtures.list().filter(f => f.type === type).map(f => ({value:f.id, label:f.name}));
     
-    pkg.EffectTiles = new JS.Module('EffectTiles', {
-        // Whether the tile is a heal, harm or loot tile.
-        isEffectTile: function(t) {return !!TYPES[t?.kind];},
+    pkg.Fixtures = new JS.Module('Fixtures', {
+        // A fixture's kind (with FALLBACK's properties, and its own type, if that isn't
+        // known).
+        fixtureType: function(f) {return pkg.fixtures.get(f.subtype) ?? {name:f.type, description:'', ...FALLBACK, type:f.type};},
         
-        // Its subtype (with FALLBACK's properties if that isn't known).
-        tileType: function(t) {return TYPES[t.kind].get(t.subtype) ?? {name:t.kind, description:'', ...FALLBACK};},
-        
-        // Whether the player knows the tile is there: any tile but an effect tile not yet
-        // revealed.
-        isRevealed: function(t) {return !this.isEffectTile(t) || t.revealedAt != null;},
-        
-        /*  A new tile of the subtype, with its pool and magnitude rolled (by rng), not yet
-            revealed: {x, y, kind, subtype, pool, magnitude, uses, revealedAt, shown}. pool:
-            what's left, or null if infinite; magnitude: what it gives, or null for all
-            that's left; revealedAt: the turn it was revealed, or null; shown: whether its
-            magnitude shows. */
-        makeEffectTile: function(x, y, kind, subtype, rng) {
-            const type = TYPES[kind].get(subtype) ?? FALLBACK,
-                roll = r => r ? r.min + Math.floor(rng() * (r.max - r.min + 1)) : null;
-            return {x, y, kind, subtype, pool:roll(type.pool), magnitude:roll(type.magnitude), uses:0, revealedAt:null, shown:false};
+        // The fixture at (x, y) you know of (revealed), optionally of a given type, or null.
+        fixtureAt: function(x, y, type) {
+            const f = this.fixtures.get(this.key(x, y));
+            return f && f.revealedAt != null && (!type || f.type === type) ? f : null;
         },
         
-        /*  Reveals the tiles your pieces now find (revealMode), and shows the magnitudes
+        // A harm you know of. (Harms only hurt what you set them off on, so the enemies,
+        // who keep off them, needn't know of hidden ones.)
+        isHarm: function(x, y) {return !!this.fixtureAt(x, y, FIXTURE_HARM);},
+        
+        /*  A new fixture of kind subtype (its type that kind's, or type if the kind isn't
+            known), with its pool and magnitude rolled (by rng), not yet revealed: {x, y,
+            type, subtype, pool, magnitude, uses, revealedAt, shown}. pool: what's left, or
+            null if infinite; magnitude: what it gives, or null for all that's left;
+            revealedAt: the turn it was revealed, or null; shown: whether its magnitude
+            shows. */
+        makeFixture: function(x, y, subtype, rng=Math.random, type=FIXTURE_LOOT) {
+            const kind = pkg.fixtures.get(subtype) ?? {...FALLBACK, type},
+                roll = r => r ? r.min + Math.floor(rng() * (r.max - r.min + 1)) : null;
+            return {x, y, type:kind.type, subtype, pool:roll(kind.pool), magnitude:roll(kind.magnitude), uses:0, revealedAt:null, shown:false};
+        },
+        
+        /*  Reveals the fixtures your pieces now find (revealMode), and shows the magnitudes
             they now see (showMagnitude). After your pieces move. */
-        revealTiles: function() {
+        revealFixtures: function() {
             const sight = this.cellsInSight(),
                 players = this.piecesOf('player'),
-                finds = (t, {mode, range}) => mode === 'instant'
-                    ? !sight || sight.has(this.key(t.x, t.y))
-                    : mode === 'proximity' && players.some(p => hexDist(p, t) <= range);
-            for (const t of this.tiles.values()) {
-                if (this.isEffectTile(t)) {
-                    const type = this.tileType(t);
-                    if (t.revealedAt == null && finds(t, type.reveal)) t.revealedAt = this.turn;
-                    if (t.revealedAt != null && !t.shown && finds(t, type.showMagnitude)) t.shown = true;
-                }
+                finds = (f, {mode, range}) => mode === 'instant'
+                    ? !sight || sight.has(this.key(f.x, f.y))
+                    : mode === 'proximity' && players.some(p => hexDist(p, f) <= range);
+            for (const f of this.fixtures.values()) {
+                const kind = this.fixtureType(f);
+                if (f.revealedAt == null && finds(f, kind.reveal)) f.revealedAt = this.turn;
+                if (f.revealedAt != null && !f.shown && finds(f, kind.showMagnitude)) f.shown = true;
             }
         },
         
-        /*  Your pieces that just moved set off the tiles they're on: harm first, then heal,
-            then loot. */
-        landOnTiles: function(pieces) {
-            for (const kind of [TILE_TYPE_HARM, TILE_TYPE_HEAL, TILE_TYPE_LOOT]) {
+        /*  Your pieces that just moved set off the fixtures they're on: harms first, then
+            heals, then loot. */
+        landOnFixtures: function(pieces) {
+            for (const type of [FIXTURE_HARM, FIXTURE_HEAL, FIXTURE_LOOT]) {
                 for (const g of pieces) {
-                    const t = g.owner === 'player' && this.pieces.has(g.id) ? this.tiles.get(this.key(g.x, g.y)) : null;
-                    if (t?.kind === kind && !this.over) this.useTile(t);
+                    const f = g.owner === 'player' && this.pieces.has(g.id) ? this.fixtures.get(this.key(g.x, g.y)) : null;
+                    if (f?.type === type && !this.over) this.useFixture(f);
                 }
             }
         },
         
-        /*  One of your pieces has entered tile t: it's revealed (with its magnitude), and
+        /*  One of your pieces has entered fixture t: it's revealed (with its magnitude), and
             gives each piece in its area, nearest first, its magnitude (less with fade), as
             long as its pool lasts. Then it's gone if its pool is empty or it's used up. */
-        useTile: function(t) {
-            const type = this.tileType(t),
+        useFixture: function(t) {
+            const type = this.fixtureType(t),
                 {radius, shape} = type.area,
                 inArea = p => shape === 'ring' ? hexDist(p, t) === radius : hexDist(p, t) <= radius,
-                affects = p => (t.kind === TILE_TYPE_HARM || p.owner === 'player') && inArea(p),
+                affects = p => (t.type === FIXTURE_HARM || p.owner === 'player') && inArea(p),
                 hit = [...this.pieces.values()].filter(affects).sort((a, b) => hexDist(a, t) - hexDist(b, t) || a.id - b.id),
                 {mode, n} = type.duration;
             t.revealedAt ??= this.turn;
@@ -188,23 +202,23 @@
                         amount = Math.min(Math.round(full * share), t.pool ?? Infinity);
                     if (amount > 0) {
                         if (t.pool != null) t.pool -= amount;
-                        this.tileEffect(t, p, amount);
+                        this.fixtureEffect(t, p, amount);
                     }
                 }
             }
             t.uses++;
             if (t.pool === 0 || mode === 'once' || (mode === 'count' && t.uses >= n)) {
-                this.tiles.delete(this.key(t.x, t.y));
-                if (t.kind === TILE_TYPE_HARM) this.fx(t.x, t.y, '', '--harm', {vanish:true});
-                if (t.kind === TILE_TYPE_LOOT) this.lootOpened++;
+                this.fixtures.delete(this.key(t.x, t.y));
+                if (t.type === FIXTURE_HARM) this.fx(t.x, t.y, '', '--harm', {vanish:true});
+                if (t.type === FIXTURE_LOOT) this.lootOpened++;
             }
         },
         
-        // What tile t does to piece p, amount times.
-        tileEffect: function(t, p, amount) {
-            if (t.kind === TILE_TYPE_HEAL) {
+        // What fixture t does to piece p, amount times.
+        fixtureEffect: function(t, p, amount) {
+            if (t.type === FIXTURE_HEAL) {
                 this.applyHeal(p, amount, true);
-            } else if (t.kind === TILE_TYPE_HARM) {
+            } else if (t.type === FIXTURE_HARM) {
                 this.logCombat({kind:'harm', d:this.whoOf(p), dmg:amount});
                 this.damage(p, amount, null);
             } else {
@@ -215,23 +229,23 @@
             }
         },
         
-        /*  At the end of a turn: tiles whose countdown (from when they were revealed) has
+        /*  At the end of a turn: fixtures whose countdown (from when they were revealed) has
             run out are gone. */
-        tickTiles: function() {
-            for (const t of [...this.tiles.values()]) {
-                if (this.isEffectTile(t) && t.revealedAt != null) {
-                    const {mode, n} = this.tileType(t).duration;
+        tickFixtures: function() {
+            for (const t of [...this.fixtures.values()]) {
+                if (t.revealedAt != null) {
+                    const {mode, n} = this.fixtureType(t).duration;
                     if (mode === 'countdown' && this.turn - t.revealedAt >= n) {
-                        this.tiles.delete(this.key(t.x, t.y));
-                        this.fx(t.x, t.y, '', '--' + t.kind, {vanish:true});
+                        this.fixtures.delete(this.key(t.x, t.y));
+                        this.fx(t.x, t.y, '', '--' + t.type, {vanish:true});
                     }
                 }
             }
         },
         
-        /*  Turns left before a countdown tile is gone, or null. */
+        /*  Turns left before a countdown fixture is gone, or null. */
         turnsLeft: function(t) {
-            const {mode, n} = this.tileType(t).duration;
+            const {mode, n} = this.fixtureType(t).duration;
             return mode === 'countdown' && t.revealedAt != null ? Math.max(0, n - (this.turn - t.revealedAt)) : null;
         }
     });

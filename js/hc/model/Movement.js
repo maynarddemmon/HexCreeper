@@ -303,7 +303,7 @@
             this.board.set(this.key(b.x, b.y), b.id);
             const core = [a, b].find(p => p.id === this.playerCoreId);
             if (core) this.extendCorePath(core.x, core.y);
-            this.landOnTiles([a, b]);
+            this.landOnFixtures([a, b]);
             if (a.owner === 'player') this.piecesMoved();
         },
         
@@ -476,7 +476,7 @@
                 this.extendCorePath(core.x, core.y);
             }
             if (piece.owner === 'player') {
-                this.landOnTiles(moved);
+                this.landOnFixtures(moved);
                 this.piecesMoved();
             }
             return moved;

@@ -36,12 +36,15 @@ for (const kind of ['harm', 'solid', 'hole']) {
     test(`enemies path around a wall of ${kind} tiles`, async ({page}) => {
         const r = await page.evaluate(kind => {
             const g = hc.app.game;
-            for (let x = -4; x <= 4; x++) g.tiles.set(g.key(x, -2), {...g.makeTile(x, -2, kind), revealedAt:g.turn});
+            // (A harm is a fixture; solids and holes are tiles.)
+            const layer = kind === 'harm' ? g.fixtures : g.tiles,
+                make = x => kind === 'harm' ? g.makeFixture(x, -2, 'harm') : g.makeTile(x, -2, kind);
+            for (let x = -4; x <= 4; x++) layer.set(g.key(x, -2), {...make(x), revealedAt:g.turn});
             const e = g.addPiece('core', 'enemy', 1, -6);
             let stepped = false, hit = false;
             for (let i = 0; i < 20 && !hit; i++) {
                 g.playerWait();
-                if (g.pieces.has(e.id) && g.tiles.get(g.key(e.x, e.y))?.kind === kind) stepped = true;
+                if (g.pieces.has(e.id) && (layer.get(g.key(e.x, e.y))?.type ?? layer.get(g.key(e.x, e.y))?.kind) === kind) stepped = true;
                 hit = g.over || g.getPlayerCore().hp < g.getPlayerCore().maxHp;
             }
             return {stepped, hit};

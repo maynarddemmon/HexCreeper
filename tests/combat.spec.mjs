@@ -59,7 +59,7 @@ test('after a kill the attacker advances, unless that would land on harm', async
         g.playerWait();
         const tx = c.x + d[0], ty = c.y + d[1];
         g.addPiece('core', 'enemy', tx, ty);
-        g.tiles.set(g.key(tx, ty), {...g.makeTile(tx, ty, 'harm', 'harm'), revealedAt:g.turn});
+        g.fixtures.set(g.key(tx, ty), {...g.makeFixture(tx, ty, 'harm'), revealedAt:g.turn});
         const hp = c.hp;
         g.playerAct(c, tx, ty);
         return {advanced, stayed:c.x === d[0] && c.y === d[1], hp:c.hp === hp};

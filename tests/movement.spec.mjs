@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, button, putTile} from './helpers.mjs';
+import {startGame, clearBoard, button, putFixture} from './helpers.mjs';
 
 /*  The core at (0, 0), a at (1, 0) linked to it, and b at (2, 0) linked to a, on an empty
     board, in a new turn. Puts their ids on window.ids. */
@@ -74,8 +74,8 @@ test('a trail is as long as the link range; a jump starts it afresh', async ({pa
 test('a step that can\'t be done in follow is tried in fixed (then free)', async ({page}) => {
     await setUp(page);
     // With links of 1, a can only follow to the core's old cell, but it won't go onto
-    // the harm tile there; in fixed it does.
-    await putTile(page, 0, 0, 'harm', 'harm');
+    // the harm there; in fixed it does.
+    await putFixture(page, 0, 0, 'harm');
     await page.evaluate(() => {hc.app.game.rules.linkRange = 1;});
     expect(await step(page, -1, 0, 'follow')).toEqual({core:[-1, 0], a:[0, 0], b:[1, 0]});
 });
@@ -145,9 +145,9 @@ test('in follow a piece leads and its parent, grandparent and their other branch
     expect(await step(page, 1, -1, 'follow', 'b')).toEqual({core:[0, 0], a:[2, 0], b:[3, -1]});
 });
 
-test('in follow, followers treat harm tiles you know of as walls; the lead may step on one', async ({page}) => {
+test('in follow, followers treat harms you know of as walls; the lead may step on one', async ({page}) => {
     await setUp(page);
-    const harm = (x, y) => putTile(page, x, y, 'harm', 'harm');
+    const harm = (x, y) => putFixture(page, x, y, 'harm');
     await harm(0, 0);                     // where a would go, the core's old cell
     expect(await step(page, 1, -1, 'follow')).toEqual({core:[1, -1], a:[1, 0], b:[2, 0]});
     await harm(2, -1);

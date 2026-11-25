@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, cellOnPage, putTile} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, putFixture} from './helpers.mjs';
 
 test.beforeEach(async ({page}) => {
     await startGame(page);
@@ -30,7 +30,7 @@ test('attacks, kills, xp and harm go into the combat log, which shows its last l
     await expect(page.getByText('Creeper is destroyed.')).toBeVisible();
     await expect(page.getByText('Your core gains 4 XP.')).toBeVisible();
     
-    await putTile(page, 0, 1, 'harm', null, {magnitude:1});
+    await putFixture(page, 0, 1, 'harm', {magnitude:1});
     await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 0, 1));
     expect(await page.evaluate(() => hc.app.game.combatLog.at(-1).kind)).toBe('harm');
 });

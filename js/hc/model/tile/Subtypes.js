@@ -2,7 +2,7 @@
     heal, harm and loot tiles), or the materials solids are made of. Every entry has a
     name and optionally a description; parse(entry, id) makes the rest of it usable, or
     gives null if it isn't, and the entry is left out with a console error ("Bad <kind>
-    <id>"). Solids.js and EffectTiles.js make the sets (and Combat.js and Enemies.js, for
+    <id>"). Solids.js and Fixtures.js make the sets (and Combat.js and Enemies.js, for
     characters, enemies and enemy groups).
     
     An entry may extend another of the same set: "extends":"<id>" makes it that entry,

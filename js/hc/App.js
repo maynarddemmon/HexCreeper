@@ -585,14 +585,15 @@
                         status = navNote;
                     } else if (V.hover) {
                         // A named enemy you can see under the pointer: what it is. A solid: what
-                        // it is and how tough. A hole, or a heal, harm or loot tile you know of:
-                        // what it is.
+                        // it is and how tough. A hole, or a heal, harm or loot (a fixture) you
+                        // know of: what it is.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
                             enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
                             sel = game.getSelected(),
                             tile = game.tileAt(V.hover.x, V.hover.y),
                             solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
-                            other = tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : game.isEffectTile(tile) ? game.tileType(tile) : null,
+                            fixture = game.fixtureAt(V.hover.x, V.hover.y),
+                            other = fixture ? game.fixtureType(fixture) : tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
                         if (enemy && (!game.cellsInSight() || game.cellsInSight().has(game.key(V.hover.x, V.hover.y)))) {
                             // With one of your pieces selected, then how it and the enemy

@@ -33,7 +33,7 @@
         attrs:{num, choice, table, pick},
         TileGenerator:{optionsOf},
         hex, hexDist,
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_TYPES, fixtureOptions
     } = pkg,
         
         {sqrt, sin, cos, atan2, hypot, ceil, floor, max, PI} = Math,
@@ -146,11 +146,12 @@
                 num('harmFrequency', 4, 0, 100),
                 num('lootFrequency', 2, 0, 100),
                 
-                // Which subtypes, by weight (data/init.json5; see EffectTiles.js).
+                // Which kinds, by weight (data/init.json5; heals, harms and loot are fixtures:
+                // see Fixtures.js).
                 table('holeTable', {pit:6, chasm:3, sinkhole:1}, optionsOf(pkg.holes)),
-                table('healTable', {heal:1}, optionsOf(pkg.heals)),
-                table('harmTable', {harm:1}, optionsOf(pkg.harms)),
-                table('lootTable', {loot:1}, optionsOf(pkg.loots)),
+                table('healTable', {heal:1}, fixtureOptions(FIXTURE_HEAL)),
+                table('harmTable', {harm:1}, fixtureOptions(FIXTURE_HARM)),
+                table('lootTable', {loot:1}, fixtureOptions(FIXTURE_LOOT)),
                 choice('rockSolid', 'cave_rock', optionsOf(pkg.solids)),
                 choice('stalagmiteSolid', 'stalagmite', optionsOf(pkg.solids)),
                 choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids)),
@@ -876,7 +877,8 @@
             return retval;
         },
         
-        // The tile cell (x, y) gets, as [kind, subtype], or null for none.
+        // What cell (x, y) gets, as [kind, subtype]: a tile (a solid or hole) or a fixture
+        // (its type: heal, harm or loot), or null for neither.
         tileOf: function(x, y, near) {
             const a = this.attrs,
                 c = this.cellOf(x, y, near);
@@ -905,9 +907,9 @@
                 if (!retval && (x !== 0 || y !== 0)) {
                     const rng = this.game.rngFor('cave-item', x + ',' + y),
                         roll = rng() * 1000,
-                        kind = roll < a.healFrequency ? TILE_TYPE_HEAL :
-                            roll < a.healFrequency + a.harmFrequency ? TILE_TYPE_HARM :
-                            roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? TILE_TYPE_LOOT : null,
+                        kind = roll < a.healFrequency ? FIXTURE_HEAL :
+                            roll < a.healFrequency + a.harmFrequency ? FIXTURE_HARM :
+                            roll < a.healFrequency + a.harmFrequency + a.lootFrequency ? FIXTURE_LOOT : null,
                         subtype = kind ? pick(a[kind + 'Table'], rng) : undefined;
                     if (subtype !== undefined) retval = [kind, subtype];
                 }
@@ -915,8 +917,8 @@
             return retval;
         },
         
-        // Makes block (bi, bj)'s cells, once. Cells with a tile or a piece already are left
-        // as they are.
+        // Makes block (bi, bj)'s cells, once: their tiles and fixtures (tileOf). Cells with a
+        // tile, a fixture or a piece already are left as they are.
         makeBlock: function(bi, bj) {
             const bk = bi + ',' + bj;
             if (!this.madeBlocks.has(bk)) {
@@ -926,9 +928,13 @@
                     near = this.near(bi, bj);
                 for (const {x, y} of this.blocks.cells(bi, bj)) {
                     const k = game.key(x, y);
-                    if (!game.tiles.has(k) && !game.pieceAt(x, y)) {
-                        const tile = this.tileOf(x, y, near);
-                        if (tile) game.tiles.set(k, game.makeTile(x, y, ...tile, game.rngFor('rolls', k)));
+                    if (!game.tiles.has(k) && !game.fixtures.has(k) && !game.pieceAt(x, y)) {
+                        const [kind, subtype] = this.tileOf(x, y, near) ?? [];
+                        if (FIXTURE_TYPES.includes(kind)) {
+                            game.fixtures.set(k, game.makeFixture(x, y, subtype, game.rngFor('rolls', k), kind));
+                        } else if (kind) {
+                            game.tiles.set(k, game.makeTile(x, y, kind, subtype));
+                        }
                     }
                 }
             }

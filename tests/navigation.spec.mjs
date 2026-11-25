@@ -16,13 +16,13 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('a route keeps off solids and harm tiles you know of, and may go through cells you haven\'t seen', async ({page}) => {
+test('a route keeps off solids and harms you know of, and may go through cells you haven\'t seen', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), put = (x, y, kind, subtype) => g.tiles.set(g.key(x, y), g.makeTile(x, y, kind, subtype));
-        // A wall across the way east, with a gap at (2, -2) on a harm tile and one at (2, 2).
+        // A wall across the way east, with a gap at (2, -2) on a harm and one at (2, 2).
         for (let y = -2; y <= 2; y++) put(2, y, 'solid', 'boulder');
-        put(2, -2, 'harm', 'harm');
-        g.tiles.get(g.key(2, -2)).revealedAt = 1; // known
+        g.tiles.delete(g.key(2, -2));
+        g.fixtures.set(g.key(2, -2), {...g.makeFixture(2, -2, 'harm'), revealedAt:1}); // known
         g.tiles.delete(g.key(2, 2));
         hc.cfg.VISION.fog = false;
         const around = g.routeTo(core, 4, 0),
@@ -164,7 +164,7 @@ test('going stops when an enemy comes into view, or one of your pieces is hurt',
     await page.evaluate(() => {
         const g = hc.app.game;
         for (const e of g.piecesOf('enemy')) g.removePiece(e);
-        g.tiles.set(g.key(2, 0), g.makeTile(2, 0, 'harm', 'trap'));
+        g.fixtures.set(g.key(2, 0), g.makeFixture(2, 0, 'trap'));
         g.getPlayerCore().hp = g.getPlayerCore().maxHp = 10;
         hc.view.draw();
     });

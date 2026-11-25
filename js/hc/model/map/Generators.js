@@ -17,7 +17,7 @@
             KIND:'tile generator', // what they are, for error messages
             types:{}, // name -> TileGenerator subclass (see register)
             
-            /*  A set of subtypes (solids, holes, heals...), as the options of a choice or
+            /*  A set of subtypes (solids, holes, fixtures...), as the options of a choice or
                 table attr. They're known once init.json5 has loaded. */
             optionsOf: subtypes => () => subtypes.list().map(s => ({value:s.id, label:s.name}))
         },

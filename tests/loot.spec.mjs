@@ -1,51 +1,51 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, putTile, setComponentAttrs} from './helpers.mjs';
+import {startGame, clearBoard, putFixture, setComponentAttrs} from './helpers.mjs';
 
-// The tiles made when the game is restarted with these tile generator attrs (and a fixed seed).
-const tilesWith = async (page, attrs) => {
+// The fixtures made when the game is restarted with these tile generator attrs (and a fixed seed).
+const fixturesWith = async (page, attrs) => {
     await setComponentAttrs(page, {tile:{healPerQuad:3, harmPerQuad:2, ...attrs}});
     return page.evaluate(() => {
         const g = hc.app.game;
         g.seed = 99;
         g.reset();
-        return [...g.tiles.values()].filter(t => ['heal', 'harm', 'loot'].includes(t.kind)).map(t => ({...t}));
+        return [...g.fixtures.values()].map(f => ({...f}));
     });
 };
 
-// Puts a loot tile you know of, holding value, at (x, y).
-const putLoot = (page, x, y, value) => putTile(page, x, y, 'loot', 'loot', {pool:value});
+// Puts loot you know of, holding value, at (x, y).
+const putLoot = (page, x, y, value) => putFixture(page, x, y, 'loot', {pool:value});
 
-test('lootChance turns heal tiles into loot tiles of the lootType subtype, their pools rolled from the seed', async ({page}) => {
+test('lootChance turns heals into loot of the lootType kind, their pools rolled from the seed', async ({page}) => {
     await startGame(page);
     await page.evaluate(() => {
-        hc.loots.define({test:{name:'Test loot', pool:{min:7, max:9}}});
+        hc.maps.loadIndex(data => hc.fixtures.define({...data.fixtures, test:{type:'loot', name:'Test loot', pool:{min:7, max:9}}}));
     });
     await setComponentAttrs(page, {tile:{lootType:'test'}});
-    const none = await tilesWith(page, {lootChance:0}),
-        all = await tilesWith(page, {lootChance:100});
-    expect(none.some(t => t.kind === 'loot')).toBe(false);
-    expect(all.some(t => t.kind === 'heal')).toBe(false);
-    const loot = all.filter(t => t.kind === 'loot');
-    expect(loot.length).toBe(none.filter(t => t.kind === 'heal').length);
+    const none = await fixturesWith(page, {lootChance:0}),
+        all = await fixturesWith(page, {lootChance:100});
+    expect(none.some(t => t.type === 'loot')).toBe(false);
+    expect(all.some(t => t.type === 'heal')).toBe(false);
+    const loot = all.filter(t => t.type === 'loot');
+    expect(loot.length).toBe(none.filter(t => t.type === 'heal').length);
     expect(loot.every(t => t.subtype === 'test' && t.pool >= 7 && t.pool <= 9)).toBe(true);
     expect(new Set(loot.map(t => t.pool)).size).toBeGreaterThan(1);
-    // Loot doesn't move the other tiles: the same cells, heal or loot, and the same harm tiles.
-    const cells = list => list.map(t => t.x + ',' + t.y + (t.kind === 'harm' ? 'h' : '')).sort();
+    // Loot doesn't move the others: the same cells, heal or loot, and the same harms.
+    const cells = list => list.map(t => t.x + ',' + t.y + (t.type === 'harm' ? 'h' : '')).sort();
     expect(cells(all)).toEqual(cells(none));
     
-    const some = await tilesWith(page, {lootChance:50}),
-        again = await tilesWith(page, {lootChance:50});
+    const some = await fixturesWith(page, {lootChance:50}),
+        again = await fixturesWith(page, {lootChance:50});
     expect(again).toEqual(some); // from the seed
 });
 
-test('a player piece landing on loot takes it: its score is earned and the tile is gone', async ({page}) => {
+test('a player piece landing on loot takes it: its score is earned and the loot is gone', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await putLoot(page, 1, 0, 25);
     const r = await page.evaluate(() => {
         const g = hc.app.game, before = [g.score, g.scoreEarned];
         g.playerAct(g.getPlayerCore(), 1, 0);
-        return [before, [g.score, g.scoreEarned], g.tiles.has('1,0')];
+        return [before, [g.score, g.scoreEarned], g.fixtures.has('1,0')];
     });
     expect(r[1]).toEqual([r[0][0] + 25, r[0][1] + 25]);
     expect(r[2]).toBe(false);
@@ -59,7 +59,7 @@ test('placing a piece on loot takes it too', async ({page}) => {
         const g = hc.app.game;
         g.score = 100;
         g.playerPlace(1, 0, g.getPlayerCore());
-        return [g.score, g.tiles.has('1,0')];
+        return [g.score, g.fixtures.has('1,0')];
     });
     expect(r).toEqual([100 - 5 + 12, false]);
 });
@@ -71,26 +71,26 @@ test('enemies leave loot where it is', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 5, 0), score = g.score;
         g.moveGroup(e, 1, 0);
-        g.landOnTiles([e]);
-        return [e.x, g.tiles.get('6,0')?.kind, g.score === score];
+        g.landOnFixtures([e]);
+        return [e.x, g.fixtures.get('6,0')?.type, g.score === score];
     });
     expect(r).toEqual([6, 'loot', true]);
 });
 
-test('loot tiles are saved as they are', async ({page}) => {
+test('loot is saved as it is', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    const tile = await putLoot(page, 2, 0, 17);
+    const loot = await putLoot(page, 2, 0, 17);
     const kept = await page.evaluate(() => {
         const copy = new hc.Game();
         copy.importFromObj(JSON.parse(JSON.stringify(hc.app.game.exportToObj())));
-        return copy.tiles.get('2,0');
+        return copy.fixtures.get('2,0');
     });
-    expect(kept).toEqual(tile);
+    expect(kept).toEqual(loot);
     expect(kept.pool).toBe(17);
 });
 
-test('opening loot tiles counts toward goals, and the count is saved', async ({page}) => {
+test('opening loot counts toward goals, and the count is saved', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await putLoot(page, 1, 0, 5);
@@ -108,4 +108,22 @@ test('opening loot tiles counts toward goals, and the count is saved', async ({p
         return [after1, [g.lootOpened, g.objectives[0].progress, g.outcome], copy.lootOpened, [g.lootTaken, copy.lootTaken]];
     });
     expect(r).toEqual([[1, '1/2', null], [2, '2/2', 'won'], 2, [10, 10]]);
+});
+
+test('a save from before fixtures, with heals, harms and loot among its tiles, loads them as fixtures', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await putLoot(page, 2, 0, 17);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj()));
+        g.tiles.set('3,0', g.makeTile(3, 0, 'solid', 'boulder'));
+        // As saves were: {kind:'loot', ...} in tiles, and no fixtures.
+        data.tiles = [...data.fixtures.map(({type, ...f}) => ({...f, kind:type})), g.makeTile(3, 0, 'solid', 'boulder')];
+        delete data.fixtures;
+        g.importFromObj(data);
+        return [g.fixtures.get('2,0'), [...g.tiles.keys()]];
+    });
+    expect(r[0]).toMatchObject({x:2, y:0, type:'loot', subtype:'loot', pool:17});
+    expect(r[0].kind).toBeUndefined();
+    expect(r[1]).toEqual(['3,0']);
 });

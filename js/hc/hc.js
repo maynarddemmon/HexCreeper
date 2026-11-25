@@ -53,12 +53,9 @@
             colorError:'var(--dmg)'
         },
         
-        // Tile Types
-        TILE_TYPE_HEAL:'heal',
-        TILE_TYPE_HARM:'harm',
+        // Tile Types (the terrain; heals, harms and loot are fixtures: see Fixtures.js)
         TILE_TYPE_HOLE:'hole',
         TILE_TYPE_SOLID:'solid',
-        TILE_TYPE_LOOT:'loot',
         
         cfg:{
             // Where help.txt is loaded from.

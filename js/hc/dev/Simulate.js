@@ -49,10 +49,11 @@
             game.rules = {...game.rules, ...pkg.settings.cleanRules(opts.rules, 'Simulation')};
             // An empty arena: no tiles, nothing spawning, nothing new revealed.
             game.tiles.clear();
+            game.fixtures.clear();
             for (const e of game.piecesOf('enemy')) game.removePiece(e);
             const tiles = game.tileGenerator, spawns = game.spawnGenerator;
             tiles.piecesMoved = spawns.piecesMoved = spawns.turnEnded = () => {};
-            game.revealTiles = () => {};
+            game.revealFixtures = () => {};
             // The combat log, tallied rather than kept
             const tally = {dealt:0, taken:0, hits:0, misses:0, theirHits:0, theirMisses:0};
             game.logCombat = e => {

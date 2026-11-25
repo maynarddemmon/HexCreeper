@@ -33,7 +33,7 @@ test('the start is open, and its cavern has tunnels to the neighbouring caverns 
         for (const [x, y] of todo) {
             for (const [dx, dy] of hc.hex.dirs) {
                 const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-                if (!seen.has(k) && Math.abs(x + dx) < 70 && Math.abs(y + dy) < 70 && (!t || g.isEffectTile(t))) {
+                if (!seen.has(k) && Math.abs(x + dx) < 70 && Math.abs(y + dy) < 70 && !t) {
                     seen.add(k);
                     todo.push([x + dx, y + dy]);
                 }
@@ -63,7 +63,7 @@ const reachesSites = r => {
     for (const [x, y] of todo) {
         for (const [dx, dy] of hc.hex.dirs) {
             const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-            if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || g.isEffectTile(t))) {
+            if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && !t) {
                 seen.add(k);
                 todo.push([x + dx, y + dy]);
             }
@@ -255,9 +255,10 @@ test('a cell comes out the same whatever order the blocks are made in', async ({
         return page.evaluate(order => {
             const g = hc.app.game, blocks = hc.hex.disk(0, 0, 4);
             g.tiles.clear();
+            g.fixtures.clear();
             g.tileGenerator.madeBlocks.clear();
             for (const b of order === 'out' ? blocks : blocks.reverse()) g.tileGenerator.makeBlock(b.x, b.y);
-            return [...g.tiles.values()].map(t => JSON.stringify([t.x, t.y, t.kind, t.subtype, t.pool])).sort();
+            return [...g.tiles.values(), ...g.fixtures.values()].map(t => JSON.stringify([t.x, t.y, t.kind ?? t.type, t.subtype, t.pool])).sort();
         }, order);
     };
     expect(await made('out')).toEqual(await made('in'));
@@ -390,18 +391,18 @@ test('stalagmites, stalactites and holes are only on cavern floor off the tunnel
     expect(r).toEqual({kinds:['sinkhole', 'stalactite', 'stalagmite'], offFloor:0, some:true});
 });
 
-test('heal, harm and loot tiles come at about their frequencies, from their tables', async ({page}) => {
+test('heals, harms and loot come at about their frequencies, from their tables', async ({page}) => {
     await startGame(page);
     await inCaverns(page, {stalagmiteFrequency:0, stalactiteFrequency:0, holeFrequency:0, healFrequency:50, harmFrequency:30, lootFrequency:0, harmTable:{trap:1, mine:0}});
     const r = await page.evaluate(() => {
         const g = hc.app.game;
         window.caves.make(6);
-        const tiles = [...g.tiles.values()], open = hc.hex.disk(0, 0, 6).flatMap(b => g.tileGenerator.blocks.cells(b.x, b.y))
+        const fixtures = [...g.fixtures.values()], open = hc.hex.disk(0, 0, 6).flatMap(b => g.tileGenerator.blocks.cells(b.x, b.y))
             .filter(c => g.tiles.get(g.key(c.x, c.y))?.subtype !== 'cave_rock').length,
-            count = kind => tiles.filter(t => t.kind === kind).length;
+            count = type => fixtures.filter(f => f.type === type).length;
         return {
             heal:count('heal') / open, harm:count('harm') / open, loot:count('loot'),
-            harmTypes:[...new Set(tiles.filter(t => t.kind === 'harm').map(t => t.subtype))]
+            harmTypes:[...new Set(fixtures.filter(f => f.type === 'harm').map(f => f.subtype))]
         };
     });
     expect(r.heal).toBeGreaterThan(0.03);
@@ -456,7 +457,7 @@ test('with a maxSize, the network is grown from the seed to that many open cells
             for (const [x, y] of todo) {
                 for (const [dx, dy] of hc.hex.dirs) {
                     const k = (x + dx) + ',' + (y + dy), t = g.tiles.get(k);
-                    if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && (!t || g.isEffectTile(t))) {
+                    if (!seen.has(k) && T.madeBlocks.has(T.blocks.key(x + dx, y + dy)) && !t) {
                         seen.add(k);
                         todo.push([x + dx, y + dy]);
                     }

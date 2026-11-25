@@ -10,7 +10,7 @@
     const {
         attrs:{num, choice},
         TileGenerator:{optionsOf},
-        TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_LOOT
+        TILE_TYPE_SOLID, TILE_TYPE_HOLE, FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, fixtureOptions
     } = pkg;
     
     const ProximityTileGenerator = pkg.ProximityTileGenerator = new JS.Class('ProximityTileGenerator', pkg.TileGenerator, {
@@ -19,14 +19,14 @@
             ATTRS:[
                 num('quadRadius', 5, 1, 6),        // quadrants' radius; the start cell (0,0) is the centre of quadrant (0,0)
                 
-                // Heal, harm and loot tiles per quadrant, of these subtypes (data/init.json5;
-                // see EffectTiles.js).
+                // Heals and harms per quadrant, of these kinds of fixture (data/init.json5;
+                // see Fixtures.js).
                 num('healPerQuad', 1, 0, 20),
                 num('harmPerQuad', 1, 0, 40),
-                num('lootChance', 10, 0, 100),     // % chance a heal tile is a loot tile instead
-                choice('healType', 'heal', optionsOf(pkg.heals)),
-                choice('harmType', 'harm', optionsOf(pkg.harms)),
-                choice('lootType', 'loot', optionsOf(pkg.loots)),
+                num('lootChance', 10, 0, 100),     // % chance a heal is loot instead
+                choice('healType', 'heal', fixtureOptions(FIXTURE_HEAL)),
+                choice('harmType', 'harm', fixtureOptions(FIXTURE_HARM)),
+                choice('lootType', 'loot', fixtureOptions(FIXTURE_LOOT)),
                 
                 // Border walls, and the clumps of solid and hole tiles in each quadrant.
                 num('wallChance', 50, 0, 100),     // % chance a border between quadrants is a wall
@@ -100,33 +100,33 @@
             }
         },
         
-        // A quadrant's heal and harm tiles, once, on random free cells, of the subtypes in
-        // its attrs (healType, harmType, lootType).
+        // A quadrant's heals and harms (fixtures), once, on random free cells (open floor
+        // with nothing on it), of the kinds in its attrs (healType, harmType, lootType).
         generateTiles: function(qx, qy) {
             const game = this.game,
                 k = qx + ',' + qy;
             if (this.tiledQuads.has(k)) return;
             this.tiledQuads.add(k);
-            // A loot tile replaces a heal tile at lootChance. (Loot and the tiles' pools and
+            // Loot replaces a heal at lootChance. (Loot and the fixtures' pools and
             // magnitudes have their own generators, so the cells come out as they would
             // without them.)
             const cells = this.quads.cells(qx, qy),
                 rng = game.rngFor('tiles', k),
                 lootRng = game.rngFor('loot', k),
                 rollRng = game.rngFor('rolls', k),
-                place = kind => {
-                    const loot = kind === TILE_TYPE_HEAL && lootRng() * 100 < this.attrs.lootChance,
-                        made = loot ? TILE_TYPE_LOOT : kind;
+                place = type => {
+                    const loot = type === FIXTURE_HEAL && lootRng() * 100 < this.attrs.lootChance,
+                        made = loot ? FIXTURE_LOOT : type;
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = game.key(x, y);
-                        if (game.tiles.has(kk) || game.pieceAt(x, y)) continue;
-                        game.tiles.set(kk, game.makeTile(x, y, made, this.attrs[made + 'Type'], rollRng));
+                        if (game.tiles.has(kk) || game.fixtures.has(kk) || game.pieceAt(x, y)) continue;
+                        game.fixtures.set(kk, game.makeFixture(x, y, this.attrs[made + 'Type'], rollRng, made));
                         return;
                     }
                 };
-            for (let i = 0; i < this.attrs.healPerQuad; i++) place(TILE_TYPE_HEAL);
-            for (let i = 0; i < this.attrs.harmPerQuad; i++) place(TILE_TYPE_HARM);
+            for (let i = 0; i < this.attrs.healPerQuad; i++) place(FIXTURE_HEAL);
+            for (let i = 0; i < this.attrs.harmPerQuad; i++) place(FIXTURE_HARM);
         },
         
         // A quadrant's solid and hole tiles, once: the walls on its side of its borders,
@@ -212,7 +212,7 @@
                 door = new Set(inner.slice(start, start + width)),
                 kind = wall.hole ? TILE_TYPE_HOLE : TILE_TYPE_SOLID;
             for (const c of border) {
-                if (!door.has(c) && !game.tiles.has(game.key(c.x, c.y)) && !game.pieceAt(c.x, c.y)) {
+                if (!door.has(c) && !game.tiles.has(game.key(c.x, c.y)) && !game.fixtures.has(game.key(c.x, c.y)) && !game.pieceAt(c.x, c.y)) {
                     game.tiles.set(game.key(c.x, c.y), game.makeTile(c.x, c.y, kind, wall.hole ? this.attrs.wallHole : this.attrs.wallSolid));
                 }
             }
@@ -227,7 +227,7 @@
                 inQuad = new Set(cells.map(c => game.key(c.x, c.y))),
                 free = (x, y) => {
                     const k = game.key(x, y), t = game.tiles.get(k);
-                    return inQuad.has(k) && (!t || replaces.includes(t.kind)) && !game.pieceAt(x, y);
+                    return inQuad.has(k) && (!t || replaces.includes(t.kind)) && !game.fixtures.has(k) && !game.pieceAt(x, y);
                 },
                 count = min + Math.floor(rng() * (max - min + 1));
             const edge = new Map(); // free cells touching the clump, by key

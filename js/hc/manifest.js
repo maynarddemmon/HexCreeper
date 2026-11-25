@@ -39,11 +39,11 @@ JS.Packages(file => {
     // Tile
     file(TILE_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
     file(TILE_ROOT + 'Solids.js').provides('hc.solids','hc.holes','hc.defineShadow').requires('hc.Subtypes','hc.cfg');
-    file(TILE_ROOT + 'EffectTiles.js').provides('hc.EffectTiles','hc.heals','hc.harms','hc.loots').requires('hc.Subtypes','hc.hexDist');
+    file(TILE_ROOT + 'Fixtures.js').provides('hc.Fixtures','hc.fixtures','hc.fixtureOptions','hc.FIXTURE_TYPES','hc.FIXTURE_HEAL','hc.FIXTURE_HARM','hc.FIXTURE_LOOT').requires('hc.Subtypes','hc.hexDist');
     
     // Map
     file(MAP_ROOT + 'MapComponent.js').provides('hc.MapComponent').requires('hc.attrs');
-    file(MAP_ROOT + 'Maps.js').provides('hc.maps').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.EffectTiles','hc.defineEnemies','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
+    file(MAP_ROOT + 'Maps.js').provides('hc.maps').requires('hc.cfg','JSON5','hc.goals','hc.solids','hc.Fixtures','hc.defineEnemies','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.SquadAI');
     file(MAP_ROOT + 'Generators.js').provides('hc.TileGenerator','hc.SpawnGenerator').requires('hc.MapComponent','hc.enemyTrees','hc.hex','hc.hexDist');
     
     // Map Spawn Generators
@@ -51,8 +51,8 @@ JS.Packages(file => {
     file(MAP_SPAWN_ROOT + 'CavernsSpawnGenerator.js').provides('hc.CavernsSpawnGenerator').requires('hc.SpawnGenerator','hc.hexDist','hc.attrs','hc.enemies');
     
     // Map Tile Generators
-    file(MAP_TILE_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
-    file(MAP_TILE_ROOT + 'CavernsTileGenerator.js').provides('hc.CavernsTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.EffectTiles');
+    file(MAP_TILE_ROOT + 'ProximityTileGenerator.js').provides('hc.ProximityTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.Fixtures');
+    file(MAP_TILE_ROOT + 'CavernsTileGenerator.js').provides('hc.CavernsTileGenerator').requires('hc.TileGenerator','hc.makeChunks','hc.solids','hc.Fixtures');
     
     // Map EnemyAI Generators
     file(MAP_ENEMY_AI_ROOT + 'EnemyAI.js').provides('hc.EnemyAI').requires('hc.MapComponent');
@@ -60,7 +60,7 @@ JS.Packages(file => {
     
     file(MODEL_ROOT + 'Combat.js').provides('hc.Combat','hc.characters','hc.enemies','hc.STATS','hc.STAT_VARS','hc.AP_UNIT','hc.DAMAGE_VARS').requires('hc.Subtypes','hc.attrs');
     file(MODEL_ROOT + 'Enemies.js').provides('hc.enemyGroups','hc.defineEnemies','hc.enemyTrees').requires('hc.Subtypes','hc.enemies');
-    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Combat','hc.Goals','hc.solids','hc.EffectTiles','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');
+    file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Combat','hc.Goals','hc.solids','hc.Fixtures','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings','hc.COST_VARS').requires('hc.cfg','hc.attrs','hc.PLAYER_MOVE_MODES','hc.STAT_VARS','hc.DAMAGE_VARS');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     

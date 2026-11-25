@@ -9,7 +9,7 @@
         
         {
             cfg:{PIECE_R, CORE_BORDER, ANIM, SHADOW},
-            TILE_TYPE_HEAL, TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID, TILE_TYPE_LOOT,
+            TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
             PIECE_TYPES
         } = pkg,
         
@@ -282,15 +282,16 @@
                         ctx.globalAlpha = 1;
                     }
                 });
-                return;
             }
-            
-            // Heal, harm and loot tiles show once revealed (EffectTiles.js).
-            if (game.isRevealed(t)) {
+        },
+        
+        // A fixture (Fixtures.js): heal, harm or loot, once it's revealed. Over its tile.
+        drawFixture = t => {
+            if (t.revealedAt != null) {
                 const s = cam.size,
                     [cx, cy] = cellCenter(t.x, t.y),
-                    loot = t.kind === TILE_TYPE_LOOT,
-                    heal = t.kind === TILE_TYPE_HEAL,
+                    loot = t.type === FIXTURE_LOOT,
+                    heal = t.type === FIXTURE_HEAL,
                     ink = css(loot ? '--loot' : heal ? '--heal' : '--harm');
                 ctx.beginPath();
                 addCellPath(t.x, t.y, 1);
@@ -329,17 +330,17 @@
                     ctx.bezierCurveTo(cx - r, by - r * 0.85, cx - r * 0.3, by - r * 1.5, cx, tip);
                     ctx.fill();
                 }
-                if (s >= 22) drawTileLabels(t, cx, cy, s, ink);
+                if (s >= 22) drawFixtureLabels(t, cx, cy, s, ink);
             }
         },
         
-        /*  A heal, harm or loot tile's numbers, in its corners: its magnitude bottom right
+        /*  A fixture's numbers, in its corners: its magnitude bottom right
             (once shown; all that's left, for a magnitude of the whole pool), what's left in
             it bottom left (with showPool; ∞ for an infinite pool) and, for a countdown, the
             turns left top right. */
-        drawTileLabels = (t, cx, cy, s, ink) => {
+        drawFixtureLabels = (t, cx, cy, s, ink) => {
             const [lx, ly] = TILE_LABEL_OFFSET,
-                type = game.tileType(t),
+                type = game.fixtureType(t),
                 turnsLeft = game.turnsLeft(t),
                 label = (text, x, y, align, baseline, size) => {
                     ctx.font = `700 ${Math.round(s * size)}px ui-sans-serif, system-ui, sans-serif`;
@@ -558,17 +559,20 @@
         const {visitedQuads:visited, quads} = game.tileGenerator;
         if (visited) fillCells(known.filter(c => visited.has(quads.key(c.x, c.y))), '--visited');
         
-        // Heal, harm, solid and hole tiles
+        // Solid and hole tiles
         const tilesShown = [...game.tiles.values()].filter(t => inView(t.x, t.y) && isKnown(t.x, t.y));
         if (SHADOW.on) drawSolidShadows(tilesShown, sight ? known : null);
         fillSeeThroughSolids(tilesShown);
         for (const t of tilesShown) drawTile(t);
         if (SHADOW.on) drawHoleShadows(tilesShown);
         
-        // The area of the heal, harm or loot tile under the pointer, if it reaches past it.
-        const hoverTile = V.hover && game.tileAt(V.hover.x, V.hover.y);
-        if (hoverTile && game.isEffectTile(hoverTile) && game.tileType(hoverTile).area.radius > 0) {
-            strokeRegion(hoverTile, game.tileType(hoverTile).area.radius, '--' + hoverTile.kind);
+        // Heals, harms and loot (fixtures), over their tiles
+        for (const f of game.fixtures.values()) if (inView(f.x, f.y) && isKnown(f.x, f.y)) drawFixture(f);
+        
+        // The area of the heal, harm or loot under the pointer, if it reaches past it.
+        const hoverFixture = V.hover && game.fixtureAt(V.hover.x, V.hover.y);
+        if (hoverFixture && game.fixtureType(hoverFixture).area.radius > 0) {
+            strokeRegion(hoverFixture, game.fixtureType(hoverFixture).area.radius, '--' + hoverFixture.type);
         }
         
         // Grid lines: the same everywhere (quadrants show only as the visited tint), and
@@ -652,8 +656,8 @@
             }
             // Where the hovered move lands: harm cells go red, heal cells bright green, loot gold
             if (hoverMove) for (const [, x, y] of hoverMove.moves) {
-                const kind = game.isHarm(x, y) ? TILE_TYPE_HARM : game.tileAt(x, y, TILE_TYPE_HEAL) ? TILE_TYPE_HEAL : game.tileAt(x, y, TILE_TYPE_LOOT) ? TILE_TYPE_LOOT : null;
-                if (kind) fillCell(x, y, '--' + kind + '-hover');
+                const type = game.fixtureAt(x, y)?.type;
+                if (type) fillCell(x, y, '--' + type + '-hover');
             }
             // Show every enemy a group attack would hit
             if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');

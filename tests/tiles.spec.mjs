@@ -1,21 +1,21 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, putTile, setComponentAttrs} from './helpers.mjs';
+import {startGame, clearBoard, putFixture, setComponentAttrs} from './helpers.mjs';
 
-test('solids and holes go out to the vision radius; heal and harm tiles only 1 quadrant out', async ({page}) => {
+test('solids and holes go out to the vision radius; heals and harms only 1 quadrant out', async ({page}) => {
     await startGame(page);
     // Vision radius 12 and quadrant radius 3: terrain out to ceil(12 / 11) = 2 quadrants from
-    // the start, a hexagon of 19; heal and harm tiles in the start quadrant and its 6
-    // neighbours. No loot, or some heal tiles are loot.
+    // the start, a hexagon of 19; heals and harms (fixtures) in the start quadrant and its 6
+    // neighbours. No loot, or some heals are loot.
     await setComponentAttrs(page, {tile:{quadRadius:3, lootChance:0}});
     const r = await page.evaluate(() => {
         hc.app.game.reset();
-        const g = hc.app.game, n = 7, tiles = [...g.tiles.values()].filter(t => t.kind === 'heal' || t.kind === 'harm'),
+        const g = hc.app.game, n = 7, tiles = [...g.fixtures.values()],
             inReach = tiles.every(t => {
                 const [i, j] = hc.app.game.tileGenerator.quads.of(t.x, t.y);
                 return hc.hex.dist({x:i, y:j}, {x:0, y:0}) <= 1; // quadrants are laid out like cells
             });
-        return {terrainQuads:g.tileGenerator.terrainQuads.size, tiledQuads:g.tileGenerator.tiledQuads.size, heal:tiles.filter(t => t.kind === 'heal').length === n,
-            harm:tiles.filter(t => t.kind === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === g.tileGenerator.attrs[t.kind + 'Type'])};
+        return {terrainQuads:g.tileGenerator.terrainQuads.size, tiledQuads:g.tileGenerator.tiledQuads.size, heal:tiles.filter(t => t.type === 'heal').length === n,
+            harm:tiles.filter(t => t.type === 'harm').length === n, inReach, subtypes:tiles.every(t => t.subtype === g.tileGenerator.attrs[t.type + 'Type'])};
     });
     expect(r).toEqual({terrainQuads:19, tiledQuads:7, heal:true, harm:true, inReach:true, subtypes:true});
 });
@@ -71,6 +71,7 @@ const wallsOnly = page => page.evaluate(() => {
         // Makes the seven quadrants again, in the given order of quadrant indexes.
         regenerate: (order = [0, 1, 2, 3, 4, 5, 6]) => {
             g.tiles.clear();
+            g.fixtures.clear();
             g.tileGenerator.terrainQuads.clear();
             g.tileGenerator.borders.clear();
             for (const n of order) g.tileGenerator.generateTerrain(...quads[n]);
@@ -169,6 +170,7 @@ test('holes are placed after solid tiles and may replace them', async ({page}) =
         T.solidMin = T.solidMax = 1000; // every free cell of the quadrant
         T.holeMin = T.holeMax = 3;
         g.tiles.clear();
+        g.fixtures.clear();
         g.tileGenerator.borders.clear();
         g.tileGenerator.terrainQuads.delete('0,0');
         g.tileGenerator.generateTerrain(0, 0);
@@ -184,14 +186,14 @@ test.describe('rules', () => {
         await clearBoard(page);
     });
     
-    test('a harm tile hurts whoever moves onto it, then is gone', async ({page}) => {
+    test('a harm hurts whoever moves onto it, then is gone', async ({page}) => {
         const d = await page.evaluate(() => hc.hex.dirs[0]);
-        await putTile(page, d[0], d[1], 'harm', 'harm');
+        await putFixture(page, d[0], d[1], 'harm');
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[0];
             const hp = c.hp;
             g.playerAct(c, d[0], d[1]);
-            return {lost:hp - c.hp, gone:!g.tiles.has(g.key(d[0], d[1]))};
+            return {lost:hp - c.hp, gone:!g.fixtures.has(g.key(d[0], d[1]))};
         });
         expect(r).toEqual({lost:1, gone:true});
     });
@@ -218,9 +220,9 @@ test.describe('rules', () => {
         expect(r).toEqual({move:false, place:false, groupMove:false, coreStayed:true});
     });
     
-    test('harm tiles stay once every neighbouring quadrant is visited', async ({page}) => {
+    test('harms stay once every neighbouring quadrant is visited', async ({page}) => {
         const d = await page.evaluate(() => hc.hex.dirs[0]);
-        await putTile(page, d[0], d[1], 'harm', 'harm');
+        await putFixture(page, d[0], d[1], 'harm');
         const r = await page.evaluate(() => {
             const g = hc.app.game, d = hc.hex.dirs[0];
             for (const [i, j] of hc.app.game.tileGenerator.quads.neighbours(0, 0)) g.tileGenerator.visitedQuads.add(i + ',' + j);
@@ -253,14 +255,14 @@ test.describe('rules', () => {
         expect(r).toEqual({oneUp:true, upAndDown:true, leftover:3});
     });
     
-    test('eating two heal tiles in one move: each gives its own, with no combo', async ({page}) => {
+    test('eating two heals in one move: each gives its own, with no combo', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
             g.score = 100;
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
             const a = g.pieceAt(D[0][0], D[0][1]), m = D[2];
-            for (const p of [c, a]) g.tiles.set(g.key(p.x + m[0], p.y + m[1]), {...g.makeTile(p.x + m[0], p.y + m[1], 'heal', 'heal'), pool:1, revealedAt:0});
+            for (const p of [c, a]) g.fixtures.set(g.key(p.x + m[0], p.y + m[1]), {...g.makeFixture(p.x + m[0], p.y + m[1], 'heal'), pool:1, revealedAt:0});
             const s0 = g.score;
             g.playerAct(c, c.x + m[0], c.y + m[1]);
             return g.score - s0;   // both at full HP: 1 score each

@@ -9,7 +9,7 @@
         cfg:{
             WORLD_LIMIT, VISION, ANIM
         },
-        TILE_TYPE_HARM, TILE_TYPE_HOLE, TILE_TYPE_SOLID,
+        TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_TYPES,
         hex:{keysNear, lineCellInto},
         hexDist, PIECE_TYPES
     } = pkg,
@@ -22,7 +22,7 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.EffectTiles],
+        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
@@ -58,8 +58,8 @@
             this.combatLog = [];             // what happened in combat (see Combat.js; not saved)
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
-            this.lootOpened = 0;             // loot tiles emptied
-            this.lootTaken = 0;              // score taken from loot tiles
+            this.lootOpened = 0;             // loot fixtures emptied
+            this.lootTaken = 0;              // score taken from loot
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
@@ -69,7 +69,8 @@
             this.tileGenerator = pkg.TileGenerator.make(tiles.type, this, tiles.attrs);   // places the map's tiles
             this.spawnGenerator = pkg.SpawnGenerator.make(spawns.type, this, spawns.attrs); // and its enemies
             this.enemyAI = pkg.EnemyAI.make(ai.type, this, ai.attrs);                       // which it plays
-            this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
+            this.tiles = new Map();          // "x,y" -> {x, y, kind:"solid" | "hole", subtype, ...}: the terrain, open floor where there's none (see makeTile)
+            this.fixtures = new Map();       // "x,y" -> {x, y, type:"heal" | "harm" | "loot", subtype, ...}: what's on open floor (see Fixtures.js)
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
             this.initiativeTurn = null;      // the turn your pieces last got initiative (see noticeEnemies)
             this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
@@ -81,7 +82,7 @@
             this.selectedId = core.id;
             this.corePath = [[0, 0]];       // the cells the core has been on, in order (the golden path: see extendCorePath)
             this.tileGenerator.start();
-            this.revealTiles();
+            this.revealFixtures();
             this.spawnGenerator.start();
             this.noticeEnemies();
             this.evaluateObjectives();
@@ -117,6 +118,7 @@
                 objectives:this.objectives.map(s => ({...s})),
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
+                fixtures:[...this.fixtures.values()].map(f => ({...f})),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
                 spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
                 enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
@@ -141,7 +143,8 @@
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
-                !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
+                !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
+                !(o.fixtures === undefined || (isArr(o.fixtures) && o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))))
             ) throw new Error('Malformed game data');
             const rules = pkg.settings.resolveRules(o.rules, 'Saved game'),
                 objectives = o.gameMap?.objectives ?? [];
@@ -209,7 +212,18 @@
                 this.board.set(this.key(p.x, p.y), p.id);
             }
             this.nextBand = 1 + Math.max(0, ...[...this.pieces.values()].map(p => p.band ?? 0));
-            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
+            // From before fixtures, heals, harms and loot were tiles: they're made fixtures.
+            const fixtures = [...(o.fixtures ?? [])];
+            this.tiles = new Map();
+            for (const {...t} of o.tiles) {
+                if (FIXTURE_TYPES.includes(t.kind)) {
+                    const {kind:type, ...rest} = t;
+                    fixtures.push({...rest, type});
+                } else {
+                    this.tiles.set(this.key(t.x, t.y), t);
+                }
+            }
+            this.fixtures = new Map(fixtures.map(f => [this.key(f.x, f.y), {...f}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
             this.enemyAI = enemyAI;
@@ -522,36 +536,26 @@
         },
         
         // ---- Tiles ----
-        // Your pieces have moved (or one was placed): the tiles they now need, the ones
+        // Your pieces have moved (or one was placed): the tiles they now need, the fixtures
         // they now find, and any enemies that come of where they've gone.
         piecesMoved: function() {
             this.tileGenerator.piecesMoved();
-            this.revealTiles();
+            this.revealFixtures();
             this.spawnGenerator.piecesMoved();
         },
         
         /*  A tile of the given kind and subtype: a solid (see Solids.js) with its hit
-            points, a hole, or a heal, harm or loot tile, its pool and magnitude rolled by rng
-            (see EffectTiles.js). */
-        makeTile: function(x, y, kind, subtype, rng = Math.random) {
-            let tile = {x, y, kind, subtype};
-            if (kind === TILE_TYPE_SOLID) {
-                tile.hp = pkg.solids.get(subtype)?.hp ?? 1;
-            } else if (this.isEffectTile(tile)) {
-                tile = this.makeEffectTile(x, y, kind, subtype, rng);
-            }
+            points, or a hole. (Heals, harms and loot are fixtures: see makeFixture.) */
+        makeTile: function(x, y, kind, subtype) {
+            const tile = {x, y, kind, subtype};
+            if (kind === TILE_TYPE_SOLID) tile.hp = pkg.solids.get(subtype)?.hp ?? 1;
             return tile;
         },
         
-        // The tile at (x, y) you know of (see isRevealed), optionally of a given kind.
+        // The tile at (x, y), optionally of a given kind, or null.
         tileAt: function(x, y, kind) {
             const t = this.tiles.get(this.key(x, y));
-            return t && this.isRevealed(t) && (!kind || t.kind === kind) ? t : null;
-        },
-        // A harm tile you know of. (Harm tiles only hurt what you set them off on, so the
-        // enemies, who keep off them, needn't know of hidden ones.)
-        isHarm: function(x, y) {
-            return !!this.tileAt(x, y, TILE_TYPE_HARM);
+            return t && (!kind || t.kind === kind) ? t : null;
         },
         
         // ---- Placing linked pieces ----
@@ -618,7 +622,7 @@
             this.recomputeRanks();
             p.hp = p.maxHp;
             this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
-            this.landOnTiles([p]);
+            this.landOnFixtures([p]);
             this.piecesMoved();
             this.afterPlayerAction();
             return true;
@@ -757,7 +761,7 @@
             const core = this.getPlayerCore();
             if (core && !this.getSelected()) this.selectedId = core.id;
             this.turn++;
-            this.tickTiles();
+            this.tickFixtures();
             if (this.over) return;
             this.spawnGenerator.turnEnded();
             this.recoverAp();

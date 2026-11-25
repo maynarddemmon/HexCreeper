@@ -2,8 +2,8 @@
 	// The map played when there's no saved game.
 	"defaultMap":"endless",
 	
-	// Any entry in the tables below (materials, solids, holes, heals, harms, loots,
-	// characters, enemies; not enemy groups) may extend another in the same table:
+	// Any entry in the tables below (materials, solids, holes, fixtures, characters,
+	// enemies; not enemy groups) may extend another in the same table:
 	// "extends":"<id>" starts it as that one, with its own properties over it. Objects (like
 	// "stats") merge a property at a time; anything else (text, numbers, arrays like
 	// "damage") replaces the parent's. An entry may extend one that extends another, and so
@@ -113,8 +113,10 @@
 		"sinkhole":{"name":"Sinkhole", "description":"The ground has fallen away here.",        "fillColor":"#383838"}
 	},
 	
-	// Kinds of heal, harm and loot tile. Each has a name, a description, and how it works
-	// (see js/hc/model/tile/EffectTiles.js for the details):
+	// Fixtures: what sits on the ground of a cell (over its open floor) and does something
+	// when a piece of yours enters it. Each has a name, a description, a "type" ("heal":
+	// heals your pieces, "harm": hurts, "loot": score; the game goes by the type, e.g.
+	// pieces keep off harm) and how it works (see js/hc/model/tile/Fixtures.js):
 	//   revealMode: when it shows: "instant" (default: once its cell is in sight),
 	//     "hidden" (once a piece of yours enters it) or {"proximity":n} (once a piece of
 	//     yours is within n cells).
@@ -128,15 +130,18 @@
 	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
-	// Maps choose which kinds their tiles are (their tile generator's attrs; see
+	// Maps choose which kinds of each type they place (their tile generator's attrs; see
 	// js/hc/model/map/tile/ProximityTileGenerator.js and CavernsTileGenerator.js).
-	"heals":{
+	"fixtures":{
+		// Heals
 		"heal": {
+			"type":"heal",
 			"name":"Heal",
 			"description":"Heals the piece that takes it; what it doesn't need flows along its links.",
 			"pool":{"min":1, "max":4}
 		},
 		"spring":{
+			"type":"heal",
 			"name":"Healing spring", 
 			"description":"Heals 1 each time, for as long as it lasts.", 
 			"pool":"infinite", 
@@ -144,27 +149,31 @@
 			"duration":{"countdown":10}
 		},
 		"salve": {
+			"type":"heal",
 			"name":"Salve",
 			"description":"Heals every piece of yours next to it.",
 			"pool":6,
 			"magnitude":2,
 			"area":1,
 			"showPool":true
-		}
-	},
-	"harms":{
+		},
+		
+		// Harms
 		"harm":{
+			"type":"harm",
 			"name":"Harm",
 			"description":"Hurts whatever piece of yours steps on it.",
 			"pool":1
 		},
 		"trap":{
+			"type":"harm",
 			"name":"Hidden trap",
 			"description":"You only find it by stepping on it.",
 			"revealMode":"hidden",
 			"pool":2
 		},
 		"mine":{
+			"type":"harm",
 			"name":"Mine",
 			"description":"Blasts every piece around it, less further out.",
 			"revealMode":{"proximity":2},
@@ -172,15 +181,17 @@
 			"magnitude":2,
 			"area":{"radius":1, "shape":"fade"},
 			"duration":"once"
-		}
-	},
-	"loots":{
+		},
+		
+		// Loot
 		"loot":{
+			"type":"loot",
 			"name":"Loot",
 			"description":"Score for the taking.",
 			"pool":{"min":10, "max":30}
 		},
 		"cache":{
+			"type":"loot",
 			"name":"Cache",
 			"description":"Buried: you have to be close to find it, and closer to tell what's in it.",
 			"revealMode":{"proximity":2},
