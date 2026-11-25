@@ -53,6 +53,17 @@ The tests start their own static server and load the real `index.html`, then dri
 - saving: a saved game comes back intact on reload, a bad save is cleared and the maps are shown, and the last save can be loaded after losing;
 - the UI works: header buttons, help, click versus shift-click, keyboard moves and settings.
 
+### Combat simulator
+
+`npm run sim` plays fights between a hero and enemy groups with the real game code (rules, profiles, action points, squad AI) in headless Chromium, and prints win rate, turns, HP left, damage and hit rates for each challenge tier of a map, or each group you name:
+
+```
+npm run sim -- --level 2 --tiers 0,3,5,7 --fights 300
+npm run sim -- --groups goblin,goblin_pair --rule "hitChance=50 + 4 * (accuracy - defence)"
+```
+
+Options: `--map` (caverns), `--level` (1), `--tiers` or `--groups`, `--fights` (200), `--distance` (4), `--max-turns` (100), `--seed` (1), `--rule name=formula` (repeatable), `--json`. In the browser, open `index.html?dev` and call `hc.simulate({...}, rows => console.table(rows))`. A simple bot plays the hero (it attacks the weakest enemy next to it, else steps toward the nearest), so the numbers are on the hard side; see `js/hc/dev/Simulate.js`.
+
 `npm run setup-hooks` turns on a pre-commit hook that runs the linter and the startup tests. `npx playwright test --headed` shows the browser while they run, and `npx playwright test combat` runs a single file.
 
 ## Project layout
@@ -74,6 +85,7 @@ The tests start their own static server and load the real `index.html`, then dri
 | `docs/DESIGN.md` | The design notes: every rule, its numbers and the reasoning behind them |
 | `docs/PLAYTESTS.md` | The playtest log |
 | `tests/` | Playwright tests (`npm test`) and their static server |
+| `tools/sim.mjs`, `js/hc/dev/` | The combat simulator (`npm run sim`), loaded in the game only with `?dev` |
 
 ### Code conventions
 

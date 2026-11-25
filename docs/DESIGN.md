@@ -299,6 +299,7 @@ Rules and attrs are never shown to the player: they're tuned in code (combat and
 
 ## Balance notes
 - See [PLAYTESTS.md](PLAYTESTS.md) for play sessions.
+- **The combat simulator** (2026-11-24, `js/hc/dev/Simulate.js`, `npm run sim`; see the README): a hero (played by a simple bot) against groups from a map's challenge tiers, or named, in an open arena with the map's rules and enemy AI. First run (caverns, level 1, 100 fights a tier): tier 0 (goblins) 98% won with 77% HP left; tier 3 88%; tier 5 86%; tier 7 (trios coming in) 60%; tier 9 33%; tier 13 11%; tier 17 1%. Hit rates were about 45% both ways.
 - (Earlier, with both grids.) With the planning AI, a simulated bot that places pieces whenever it can and attacks with every piece that can, but never moves otherwise, lasted a median 11 turns on squares (1 of 10 runs reached the 400-turn cap) and 26 on hexes (none reached it).
 - With the old AI, where squads moved as one block, the same bot had 1–2 of 10 runs on squares and 3 of 8 on hexes holding out forever (the **turtling** problem: a stationary rank-4 swarm fed on squads that arrived piecemeal). Patience in the planning AI largely fixes this.
 - AI tuning sweep against a wall of pieces over 12 turns: caution 6 → squads brawl (ending exposed 11 of 12 turns); caution 10–15 → a safe strike on 3 turns and exposed on only 3; caution ≥ 9 without patience → squads never commit.

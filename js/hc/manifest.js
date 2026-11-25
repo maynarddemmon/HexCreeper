@@ -80,6 +80,9 @@ JS.Packages(file => {
         'hc.ConfirmDialog','hc.WideView'
     );
     
+    // Development only: not required by the App (see index.html's ?dev, and tools/sim.mjs).
+    file(HC_ROOT + 'dev/Simulate.js').provides('hc.simulate').requires('hc.Game','hc.maps','hc.settings','hc.SpawnGenerator','hc.attrs','hc.hexDist');
+    
     // Include Everything
     file(HC_ROOT + 'App.js').provides('hc.App').requires(
         'hc.GameView','hc.SettingsDialog','hc.MapsDialog','hc.MapBrief','hc.PieceMenu','hc.dialogUtil','hc.Btn','hc.LabeledValue','hc.PersistenceManager'

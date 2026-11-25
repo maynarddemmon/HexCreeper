@@ -33,7 +33,7 @@ export default [
     {
         // The test harness runs in Node as ES modules. Code passed to page.evaluate runs in
         // the game page, so "hc" stays available as a global there.
-        files: ['tests/**/*.mjs', 'playwright.config.mjs'],
+        files: ['tests/**/*.mjs', 'tools/**/*.mjs', 'playwright.config.mjs'],
         languageOptions: {
             sourceType: 'module',
             globals: {

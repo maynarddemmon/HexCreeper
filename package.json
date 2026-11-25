@@ -11,7 +11,8 @@
         "globals": "^17.14.0"
     },
     "scripts": {
-        "lint": "eslint js tests playwright.config.mjs",
+        "lint": "eslint js tests tools playwright.config.mjs",
+        "sim": "node tools/sim.mjs",
         "test": "playwright test",
         "lintest": "npm run lint && npm run test",
         "setup-hooks": "git config core.hooksPath hooks"

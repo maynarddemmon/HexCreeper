@@ -184,5 +184,9 @@ writeScript('lib/loader-browser.min');
 writeScript('js/hc/manifest');
 </script>
 </head><body><div id="appDiv"></div>
-<script>JS.require('hc.App', () => {new hc.App(document.getElementById('appDiv'));});</script>
+<script>
+JS.require('hc.App', () => {new hc.App(document.getElementById('appDiv'));});
+// Development tools (the combat simulator, hc.simulate), with ?dev in the URL
+if (/[?&]dev\b/.test(location.search)) JS.require('hc.simulate');
+</script>
 </body></html>
