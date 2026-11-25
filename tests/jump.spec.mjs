@@ -1,10 +1,29 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage} from './helpers.mjs';
 
-/*  The core at (0, 0) and a at (1, 0) linked to it, in a new turn. Ids on window.ids. */
+/*  Pools of 2 action points, all of it back each turn, so a piece can jump (2 points). */
+const twoPoints = page => page.evaluate(() => {
+    const g = hc.app.game;
+    g.rules.apPool = g.rules.apRecovery = '2';
+});
+
+/*  Every jump made, as [id, x, y], on window.jumps. */
+const recordJumps = page => page.evaluate(() => {
+    const g = hc.app.game, jumpPiece = g.jumpPiece;
+    window.jumps = [];
+    g.jumpPiece = function(p, x, y) {
+        const done = jumpPiece.call(this, p, x, y);
+        if (done) window.jumps.push([p.id, x, y]);
+        return done;
+    };
+});
+
+/*  The core at (0, 0) and a at (1, 0) linked to it, in a new turn, with 2 action points
+    each. Ids on window.ids. */
 const setUp = async page => {
     await startGame(page);
     await clearBoard(page);
+    await twoPoints(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
         g.score = 1000;
@@ -58,21 +77,20 @@ test('a jump that would leave a link out of range is not allowed', async ({page}
     expect(r).toEqual([false, true, true]);
 });
 
-test('a jump moves only the piece, uses a move, and it can\'t act this turn or the next; no recover', async ({page}) => {
+test('a jump moves only the piece, and costs it 2 action points', async ({page}) => {
     await setUp(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), a = g.pieces.get(window.ids.a), out = {};
         out.jumped = g.playerJump(core, -2, 1);
         out.at = [[core.x, core.y], [a.x, a.y]];
-        out.used = g.movesUsed;
-        out.now = [g.canMove(core), g.canRecover(core), g.canJump(core)];
-        g.playerWait();
-        out.next = [g.canMove(core), g.canRecover(core), g.legalMoves(core).length];
-        g.playerWait();
-        out.after = g.canMove(core);
+        out.ap = [core.ap, a.ap];
+        out.now = [g.canMove(core), g.canJump(core)];
+        // With 1 point it can step, but not jump.
+        core.ap = 100;
+        out.one = [g.canMove(core), g.canJump(core), g.playerJump(core, 0, 1)];
         return out;
     });
-    expect(r).toEqual({jumped:true, at:[[-2, 1], [1, 0]], used:1, now:[false, false, false], next:[false, false, 0], after:true});
+    expect(r).toEqual({jumped:true, at:[[-2, 1], [1, 0]], ap:[0, 200], now:[false, false], one:[true, false, false]});
 });
 
 test('no jumping in follow mode', async ({page}) => {
@@ -99,9 +117,10 @@ test('J, then a highlighted cell, jumps the selected piece there', async ({page}
     })).toEqual([0, 2, false]);
 });
 
-test('enemies jump: a planned jump is carried out, and the piece sits out its next turn', async ({page}) => {
+test('enemies jump: a planned jump is carried out, for 2 points, and then the piece can\'t act', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await twoPoints(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game,
             lead = g.addPiece('core', 'enemy', 0, -4),
@@ -110,20 +129,19 @@ test('enemies jump: a planned jump is carried out, and the piece sits out its ne
         g.enemyAI.planSquad = () => [{id:lead.id, jump:[0, -6]}];
         g.enemyAI.marchSquad = () => {};
         g.enemyPhase();
-        const out = {at:[lead.x, lead.y], tired:g.isTired(lead)};
-        // Its next turn: the planner has nothing for it to do, and it doesn't march.
-        g.turn++;
+        const out = {at:[lead.x, lead.y], ap:lead.ap};
+        // Without points, the planner has nothing for it to do, and it doesn't march.
         g.enemyAI.planSquad = planSquad;
         const field = g.distanceField(g.piecesOf('player'));
         out.planned = g.enemyAI.planSquad([lead], 1, field).length;
         delete g.enemyAI.marchSquad;
         g.enemyAI.marchSquad(lead, field);
         out.marched = lead.x !== 0 || lead.y !== -6;
-        g.turn++;
-        out.later = g.isTired(lead);
+        g.recoverAp();
+        out.later = g.canAfford(lead);
         return out;
     });
-    expect(r).toEqual({at:[0, -6], tired:true, planned:0, marched:false, later:false});
+    expect(r).toEqual({at:[0, -6], ap:0, planned:0, marched:false, later:true});
 });
 
 // A line of holes across the board at y = -2, from x = -w to w.
@@ -136,12 +154,14 @@ test('an enemy near you, kept from you by a long line of holes, jumps it rather 
     await startGame(page);
     await clearBoard(page);
     await holeLine(page, 8);
+    await twoPoints(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 0, -4);
         g.recomputeRanks();
         let turns = 0;
         while (e.y < -2 && turns < 4) {
             g.enemyPhase();
+            g.recoverAp();
             g.turn++;
             turns++;
         }
@@ -155,19 +175,23 @@ test('a far squad marches over a long line of holes, one piece after another', a
     await startGame(page);
     await clearBoard(page);
     await holeLine(page, 12);
+    await twoPoints(page);
+    await recordJumps(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game,
             lead = g.addPiece('core', 'enemy', 0, -12),
             kid = g.addPiece('core', 'enemy', 1, -12, lead.id);
         g.recomputeRanks();
-        let turns = 0, jumped = false;
+        // It marches all the way (rather than stopping to strike your core once one's over).
+        g.enemyAI.attrs.planRange = 0;
+        let turns = 0;
         while ((lead.y < -2 || kid.y < -2) && turns < 30) {
             g.enemyPhase();
-            jumped ||= g.isTired(lead) || g.isTired(kid);
+            g.recoverAp();
             g.turn++;
             turns++;
         }
-        return {over:lead.y > -2 && kid.y > -2, jumped, linked:kid.parentId === lead.id};
+        return {over:lead.y > -2 && kid.y > -2, jumped:window.jumps.length > 0, linked:kid.parentId === lead.id};
     });
     expect(r).toEqual({over:true, jumped:true, linked:true});
 });
@@ -175,8 +199,10 @@ test('a far squad marches over a long line of holes, one piece after another', a
 test('in open ground enemies walk rather than jump', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await twoPoints(page);
+    await recordJumps(page);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, out = [];
+        const g = hc.app.game;
         // A lone enemy and a squad, near (planning) and far (marching).
         g.addPiece('core', 'enemy', 0, -5);
         const far = g.addPiece('core', 'enemy', 4, -12);
@@ -184,10 +210,10 @@ test('in open ground enemies walk rather than jump', async ({page}) => {
         g.recomputeRanks();
         for (let t = 0; t < 8; t++) {
             g.enemyPhase();
-            out.push(g.piecesOf('enemy').some(e => g.isTired(e)));
+            g.recoverAp();
             g.turn++;
         }
-        return out.some(Boolean);
+        return window.jumps.length;
     });
-    expect(r).toBe(false);
+    expect(r).toBe(0);
 });

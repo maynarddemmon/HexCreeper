@@ -7,7 +7,7 @@
         gameView,
         
         scoreView,
-        movesView,
+        apView,
         turnView,
         endTurnBtn,
         modeBtn,
@@ -72,6 +72,9 @@
         
         /*  The key for a keydown: the code for numpad keys, the lowercase character for
             others, or the key's name (e.g. "Enter"). */
+        // Action points (kept in hundredths: see Combat.js) as points, e.g. "1.75"
+        formatAp = ap => String(ap / pkg.AP_UNIT),
+        
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
         
         /*  After the game has been replaced by a saved one. */
@@ -110,7 +113,7 @@
         
         /*  What the selected piece's menu offers, in its order: place (next to it), swap,
             jump and attach (which then ask for the cell, or the piece to swap with or attach to),
-            detach, heal (flowing from it), recover (it), and quicken (the swarm). */
+            detach, and heal (flowing from it). */
         menuItems = () => {
             const sel = () => game.getSelected(),
                 choose = mode => () => {
@@ -143,26 +146,6 @@
                         draw();
                     }
                 },
-                {
-                    id:'recover',
-                    label:() => i18n('btn-recover', sel() ? game.recoverCost(sel()) : 0),
-                    tip:() => i18n('tip-recover'),
-                    enabled:() => game.canRecover(sel()),
-                    run:() => {
-                        game.playerRecover(sel());
-                        draw();
-                    }
-                },
-                {
-                    id:'quicken',
-                    label:() => i18n('btn-quicken', game.quickenCost()),
-                    tip:() => i18n('tip-quicken', game.quickenCost()),
-                    enabled:() => game.canQuicken(),
-                    run:() => {
-                        game.playerQuicken();
-                        draw();
-                    }
-                },
                 {id:'goto', label:() => i18n('btn-goto'), tip:() => i18n('tip-goto'), enabled:() => !game.over && !!sel(), run:choose('gotoMode')},
                 {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')},
                 {id:'snake', label:() => i18n('btn-snake'), tip:() => i18n('tip-snake'), enabled:() => !game.over && !!sel(), run:() => startNav('snake')},
@@ -171,7 +154,7 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', r:'recover', u:'quicken', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', h:'heal', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -232,15 +215,15 @@
         },
         
         /*  The next step: plans the way from where the piece is now and takes a step along
-            it in Follow mode (which tries Fixed, then Free, if it can't follow), ending the
-            turn; then waits for that turn to play. If it can't, it untangles its swarm
-            (planUntangle), an action at a time, using the moves the turn has, until it can
-            step on, keeping off positions the swarm has been in on the way. Getting into a
-            formation, it takes the next action for it (formationAction), using the moves
-            the turn has, then ends the turn. */
+            it in Follow mode (which tries Fixed, then Free, if it can't follow), while it
+            has the action points; without them, it ends the turn and waits for that turn to
+            play. If it can't step, it untangles its swarm (planUntangle), an action at a
+            time, with the points the swarm has, until it can step on, keeping off positions
+            the swarm has been in on the way. Getting into a formation, it takes the next
+            action for it (formationAction), with the points the swarm has, then ends the
+            turn. */
         navStep = () => {
-            const p = game.pieces.get(nav.id),
-                turn = game.turn;
+            const p = game.pieces.get(nav.id);
             let stop = '', did = '';
             if (!p || game.over) {
                 stop = game.over ? 'nav-over' : 'nav-lost';
@@ -259,9 +242,11 @@
                 const route = navRoute(p);
                 if (!route) {
                     stop = nav.kind === 'goto' ? 'nav-no-route' : 'nav-explored';
+                } else if (!game.canMove(p)) {
+                    endTurn();
                 } else {
                     const [x, y] = route[0],
-                        move = game.canMove(p) && game.findMove(p, x, y, 'follow');
+                        move = game.findMove(p, x, y, 'follow');
                     if (move && !move.attack && game.playerAct(p, x, y, 'follow')) {
                         did = 'step';
                     } else {
@@ -269,7 +254,8 @@
                             q = action && game.pieces.get(action.id);
                         if (!action) {
                             stop = 'nav-blocked';
-                        } else if (!game.canMove(q)) {
+                        } else if (!game.canAfford(q, action.kind === 'jump' ? pkg.JUMP_COST : pkg.ACTION_COST) ||
+                            (action.kind === 'swap' && !game.canMove(game.pieces.get(action.other)))) {
                             // Its action is in a turn to come.
                             endTurn();
                         } else if (doPlanned(action)) {
@@ -285,8 +271,6 @@
                 if (did !== 'form') nav.visited.add(game.swarmKey(p));
                 if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
             }
-            // A step ends the turn (if it didn't end by itself, with nothing else to do).
-            if (!stop && did === 'step' && game.turn === turn) endTurn();
             stop ||= navStopReason();
             if (stop) {
                 stopNav(stop === 'nav-over' ? '' : stop);
@@ -413,7 +397,8 @@
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
                 if (sel) {
                     self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, sel.xp, game.statRule('xpToLevel', sel))
+                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, sel.xp, game.statRule('xpToLevel', sel),
+                            formatAp(sel.ap), formatAp(game.apMax(sel)))
                     );
                 } else {
                     self.selected.update(i18n('info-none'));
@@ -631,7 +616,7 @@
             new Spacer(ftrView);
             
             const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
-            movesView = new LabeledValue(ftrView, {label:i18n('lbl-moves'), ...statAttrs, paddingRight:padding});
+            apView = new LabeledValue(ftrView, {label:i18n('lbl-ap'), ...statAttrs, paddingRight:padding});
             
             endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
                 doActivated:endTurn
@@ -661,7 +646,9 @@
             scoreView.update(game.score + '/' + game.scoreEarned); // to spend/earned in all
             const gameOver = game.over;
             
-            movesView.update(game.movesLeft() + '/' + game.moveLimit());
+            // The selected piece's action points, and its pool
+            const selected = game.getSelected();
+            apView.update(selected ? formatAp(selected.ap) + '/' + formatAp(game.apMax(selected)) : '–');
             
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);

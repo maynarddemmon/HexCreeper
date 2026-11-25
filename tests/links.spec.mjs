@@ -24,21 +24,19 @@ const piece = (page, name) => page.evaluate(name => {
     return {x:p.x, y:p.y, parent:Object.keys(window.ids).find(n => window.ids[n] === p.parentId) ?? null, rank:p.rank};
 }, name);
 
-const turnState = page => page.evaluate(() => {
-    const g = hc.app.game;
-    return {movesUsed:g.movesUsed, limit:g.moveLimit()};
-});
+// A piece's action points
+const apOf = (page, name) => page.evaluate(name => hc.app.game.pieces.get(window.ids[name]).ap, name);
 
-test('detaching breaks a piece\'s link, keeps what\'s below it, uses its move, and can lower ranks', async ({page}) => {
+test('detaching breaks a piece\'s link, keeps what\'s below it, costs it an action point, and can lower ranks', async ({page}) => {
     await setUp(page);
     expect(await piece(page, 'core')).toMatchObject({rank:2});
-    expect(await turnState(page)).toEqual({movesUsed:0, limit:2});
+    expect(await apOf(page, 'a')).toBe(100);
     
     expect(await page.evaluate(() => hc.app.game.playerDetach(hc.app.game.pieces.get(window.ids.a)))).toBe(true);
     expect(await piece(page, 'a')).toMatchObject({parent:null, rank:1});
     expect(await piece(page, 'b')).toMatchObject({parent:'a'});
     expect(await piece(page, 'core')).toMatchObject({rank:1});      // only one child now
-    expect(await turnState(page)).toEqual({movesUsed:1, limit:1});  // and so one move a turn
+    expect(await apOf(page, 'a')).toBe(0);
     expect(await page.evaluate(() => hc.app.game.canMove(hc.app.game.pieces.get(window.ids.a)))).toBe(false);
 });
 
@@ -70,7 +68,7 @@ test('the core, pieces with no parent, pieces that have acted, and enemies can\'
     expect(r).toEqual([false, false, false, false]);
 });
 
-test('a piece with no parent attaches to an adjacent piece of yours, using its move and raising ranks', async ({page}) => {
+test('a piece with no parent attaches to an adjacent piece of yours, for an action point, raising ranks', async ({page}) => {
     await setUp(page);
     await page.evaluate(() => {
         const g = hc.app.game;
@@ -86,7 +84,7 @@ test('a piece with no parent attaches to an adjacent piece of yours, using its m
     expect(r).toEqual([['core'], true]); // b is adjacent, but linked below a
     expect(await piece(page, 'a')).toMatchObject({parent:'core'});
     expect(await piece(page, 'core')).toMatchObject({rank:2});
-    expect(await turnState(page)).toEqual({movesUsed:1, limit:2});
+    expect(await apOf(page, 'a')).toBe(0);
 });
 
 test('no attaching to a piece linked below, a piece that isn\'t adjacent, or for a piece with a parent', async ({page}) => {

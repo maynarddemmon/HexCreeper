@@ -50,7 +50,6 @@
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (rank isn't used for now: see Combat.js)
-            num('movesPer', 1, 1, 10),        // pieces you may move per turn = this x the highest rank of any piece
             // Combat (see Combat.js): formulas of a piece's level and stats (pkg.STAT_VARS),
             // rounded down, but the hit chance, of accuracy and defence.
             expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS), // unless its profile fixes it
@@ -62,6 +61,10 @@
             expr('damageBonus', '(str - 10) / 2', pkg.STAT_VARS),     // added to the weapon's damage (never below 0)
             expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS), // added to the weapon's penetration (if more than 0)
             expr('xpToLevel', '20 * level', pkg.STAT_VARS),            // the xp to go up from this level
+            // Action points (see Combat.js): formulas of a piece's level and stats, in points.
+            expr('apPool', '1 + con / 10', pkg.STAT_VARS),             // the most a piece can have
+            expr('apRecovery', '0.5 + agl / 40', pkg.STAT_VARS),       // what it gets back each turn
+            expr('apInitiative', '(wis + agl) / 40', pkg.STAT_VARS),   // what it gets when it first meets the other side
             num('placeBase', 4, 0, 100),      // the cost to place a piece = this + 1 per placePerPieces of your pieces' levels (rounded up)
             num('placePerPieces', 2, 1, 100),
             num('healCostPer', 5, 0, 100),    // the Heal action costs this x your core's level

@@ -350,16 +350,29 @@
             }
         },
         
-        // Your core is bigger, so its bar sits lower, clear of its selection ring.
-        drawHpBar = (p, cx, cy, s) => {
+        // Your core is bigger, so its bars sit lower, clear of its selection ring. Under
+        // the HP bar, a thinner one for the piece's action points, out of its pool, with
+        // a tick at each whole point.
+        drawBars = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
                 x = cx - w / 2,
-                y = cy + s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0));
-            ctx.fillStyle = css('--grid');
-            ctx.fillRect(x, y, w, h);
-            ctx.fillStyle = css(OWNERS[p.owner].fill);
-            ctx.fillRect(x, y, w * Math.max(0, p.hp) / p.maxHp, h);
+                y = cy + s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0)),
+                bar = (by, bh, frac) => {
+                    ctx.fillStyle = css('--grid');
+                    ctx.fillRect(x, by, w, bh);
+                    ctx.fillStyle = css(OWNERS[p.owner].fill);
+                    ctx.fillRect(x, by, w * Math.min(1, Math.max(0, frac)), bh);
+                };
+            if (p.maxHp > 1) bar(y, h, p.hp / p.maxHp);
+            const pool = game.apMax(p);
+            if (pool > 0) {
+                const ay = y + h + 1,
+                    ah = Math.max(2, h * 0.5);
+                bar(ay, ah, p.ap / pool);
+                ctx.fillStyle = css('--bg');
+                for (let k = pkg.AP_UNIT; k < pool; k += pkg.AP_UNIT) ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);
+            }
         };
     
     /*  Draws a frame: floor and fog, quadrant tint, tiles, grid lines, highlights, the golden
@@ -657,8 +670,7 @@
                 hl: !V.placeMode && selGroupIds.has(p.id),
                 root: p.id === game.playerCoreId,
                 linkTarget: linkTargets.has(p.id),
-                moved: p.owner === 'player' && (game.acted.has(p.id) || game.fresh.has(p.id) || game.isTired(p)),
-                spent: p.owner === 'player' && !game.acted.has(p.id) && !game.fresh.has(p.id) && !game.isTired(p) && !game.canMove(p),
+                spent: p.owner === 'player' && !game.canMove(p),
             });
             ctx.restore();
             
@@ -668,7 +680,7 @@
                 ctx.beginPath(); ctx.arc(sx, sy, s * (PIECE_R + (p.id === game.playerCoreId ? CORE_BORDER : 0)), 0, Math.PI * 2); ctx.fill();
                 ctx.globalAlpha = 1;
             }
-            if (p.maxHp > 1 && s >= 22) drawHpBar(p, sx, sy, s);
+            if (s >= 22) drawBars(p, sx, sy, s);
         }
         
         // Floating text + death bursts

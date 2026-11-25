@@ -308,8 +308,9 @@
         },
         
         // ---- Swap ----
-        // Two of your pieces next to each other can swap cells. It uses a move, and both
-        // pieces are done for the turn. Enemies can swap too (see planSquad).
+        // Two of your pieces next to each other can swap cells. Each spends an action's
+        // points (see Combat.js), so both must have them. Enemies can swap too (see
+        // planSquad).
         swapTargets: function(p) {
             let out = [];
             if (!this.over && p?.owner === 'player' && this.canMove(p)) {
@@ -323,8 +324,8 @@
             let done = false;
             if (this.swapTargets(p).includes(q)) {
                 this.swapPieces(p, q);
-                this.useMove(p);
-                this.acted.add(q.id);
+                this.spend(p);
+                this.spend(q);
                 this.fx(p.x, p.y, 'swap', '--place-ink', {});
                 this.afterPlayerAction();
                 done = true;
@@ -378,25 +379,23 @@
         canJumpOver: function(x, y, over) {return over.some(([ox, oy]) => !this.isSolid(x + ox, y + oy));},
         
         /*  Jumps piece p to (x, y), if it can (jumpCells; an enemy won't land on harm). It
-            lands on the tiles there, and is tired: it can't act this turn or the next. */
+            lands on the tiles there. (What it costs is the caller's to spend.) */
         jumpPiece: function(p, x, y) {
             let done = false;
             if (this.jumpCells(this.boardView(p.owner !== 'player'), p.id).some(c => c.x === x && c.y === y)) {
                 this.applyMoves(p, [[p.id, x, y]], true);
-                p.tiredUntil = this.turn + 1;
                 this.fx(x, y, 'jump', '--place-ink', {});
                 done = true;
             }
             return done;
         },
         
-        // A piece of yours that can move this turn can jump, except in follow mode (unless
-        // anyMode, for Go to and Explore, which jump as a last resort). It uses a move, and
-        // the piece can't act again this turn or the next. Enemies can jump too (see
-        // planSquad).
+        // A piece of yours can jump, for JUMP_COST action points (see Combat.js), except in
+        // follow mode (unless anyMode, for Go to and Explore, which jump as a last resort).
+        // Enemies can jump too (see planSquad).
         jumpTargets: function(p, anyMode=false) {
             let out = [];
-            if (!this.over && p?.owner === 'player' && this.canMove(p) && (anyMode || this.modeFor(p) !== 'follow')) {
+            if (p?.owner === 'player' && this.canAfford(p, pkg.JUMP_COST) && (anyMode || this.modeFor(p) !== 'follow')) {
                 out = this.jumpCells(this.boardView(), p.id);
             }
             return out;
@@ -405,7 +404,7 @@
         playerJump: function(p, x, y, anyMode=false) {
             let done = false;
             if (this.jumpTargets(p, anyMode).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
-                this.useMove(p);
+                this.spend(p, pkg.JUMP_COST);
                 this.afterPlayerAction();
                 done = true;
             }

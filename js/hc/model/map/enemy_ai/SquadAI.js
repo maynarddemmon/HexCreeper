@@ -10,7 +10,7 @@
     
     const {
         attrs:{num},
-        hexDist, euclid2, PIECE_TYPES
+        hexDist, euclid2, PIECE_TYPES, ACTION_COST, JUMP_COST
     } = pkg,
         
         // The movement modes squads plan with near the player (see expand, in planSquad).
@@ -41,7 +41,12 @@
             let players = this.game.piecesOf('player');
             // (Without enemies there's nothing to plan, so no distances to work out.)
             if (players.length && this.game.piecesOf('enemy').length) {
+                let walkField = null;
+                // A squad none of whose pieces can ever have a jump's points goes by the
+                // field without jumps (made only if it's needed).
                 const field = this.game.distanceField(players),
+                    canJump = squad => squad.some(g => this.game.apMax(g) >= JUMP_COST),
+                    fieldFor = squad => canJump(squad) ? field : (walkField ??= this.game.distanceField(players, 30, false)),
                     fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
                     front = squad => Math.min(...squad.map(fd)),
                     roots = this.game.piecesOf('enemy').filter(e => !this.game.parent(e));
@@ -53,8 +58,10 @@
                         if (!players.length) return;
                         this.game.endAction();
                         this.game.track = root.id;
-                        const squad = this.game.group(root);
-                        const budget = this.game.rules.movesPer * Math.max(...squad.map(g => g.rank));
+                        const squad = this.game.group(root),
+                            // the most actions the squad has the points for
+                            budget = squad.reduce((n, g) => n + Math.floor(g.ap / ACTION_COST), 0);
+                        if (!budget) continue;
                         if (front(squad) <= this.attrs.planRange) {
                             // Patience: the longer a nearby squad goes without landing a hit, the
                             // less it cares about exposure, so it can't hang back forever.
@@ -62,24 +69,28 @@
                                 caution = Math.max(0, 1 - idle / Math.max(1, this.attrs.patience)),
                                 hpBefore = this.game.piecesOf('player').reduce((a, q) => a + q.hp, 0),
                                 nBefore = this.game.piecesOf('player').length;
-                            for (const a of this.planSquad(squad, budget, field, caution)) {
+                            for (const a of this.planSquad(squad, budget, fieldFor(squad), caution)) {
                                 if (this.game.over) return;
                                 const pc = this.game.pieces.get(a.id);
                                 if (a.swap) {
                                     const other = this.game.pieces.get(a.swap);
-                                    if (!pc || !other || !this.game.swapOk(this.game.boardView(), pc.id, other.id)) break;
+                                    if (!this.game.canAfford(pc) || !this.game.canAfford(other) || !this.game.swapOk(this.game.boardView(), pc.id, other.id)) break;
                                     this.game.swapPieces(pc, other);
+                                    this.game.spend(pc);
+                                    this.game.spend(other);
                                 } else if (a.jump) {
-                                    if (!pc || !this.game.jumpPiece(pc, ...a.jump)) break;
-                                } else if (!pc || !this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) {
-                                    break;
+                                    if (!this.game.canAfford(pc, JUMP_COST) || !this.game.jumpPiece(pc, ...a.jump)) break;
+                                    this.game.spend(pc, JUMP_COST);
+                                } else {
+                                    if (!this.game.canAfford(pc) || !this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode)) break;
+                                    if (this.game.pieces.has(pc.id)) this.game.spend(pc);
                                 }
                                 this.game.endAction();
                             }
                             const hit = this.game.piecesOf('player').length < nBefore || this.game.piecesOf('player').reduce((a, q) => a + q.hp, 0) < hpBefore;
                             if (this.game.pieces.has(root.id)) root.idle = hit ? 0 : idle + 1;
                         } else {
-                            this.marchSquad(root, field);
+                            this.marchSquad(root, fieldFor(squad));
                         }
                     }
                 }
@@ -91,7 +102,8 @@
         // it give (follow, then free) to get through tight places. If no step gets it closer
         // (a line of holes in the way, say), one of its pieces jumps instead, if that gets
         // the squad's nearest piece closer, or else its pieces closer in all: so the rest
-        // can follow the first over. A tired leader doesn't step, but the others may jump.
+        // can follow the first over. Only with the action points for it: a leader without
+        // them doesn't step, but the others may jump.
         marchSquad: function(root, field) {
             const players = this.game.piecesOf('player'),
                 fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
@@ -100,7 +112,7 @@
                 t = players.reduce((b, q) => hexDist(root, q) < hexDist(root, b) ? q : b);
             let best = null,
                 bestKey = [cur, hexDist(root, t) * 1000 + euclid2(root, t)];
-            for (const mode of this.game.isTired(root) ? [] : ['fixed', 'follow', 'free']) {
+            for (const mode of this.game.canAfford(root) ? ['fixed', 'follow', 'free'] : []) {
                 for (const m of this.game.legalMoves(root, mode)) {
                     if (!m.attack && this.game.canStep(root, m.dx, m.dy, true, mode)) {
                         const moved = new Map(m.moves.map(([id, x, y]) => [id, [x, y]])),
@@ -132,7 +144,7 @@
                 let jump = null,
                     jumpKey = [cur, sumOf(members.map(fd))];
                 for (const g of members) {
-                    if (!this.game.isTired(g)) {
+                    if (this.game.canAfford(g, JUMP_COST)) {
                         for (const c of this.game.jumpCells(view, g.id, true)) {
                             const k = after(g, c.x, c.y);
                             if (k[0] < jumpKey[0] || (k[0] === jumpKey[0] && k[1] < jumpKey[1])) {
@@ -144,15 +156,16 @@
                 }
                 if (jump) {
                     best = null;
-                    this.game.jumpPiece(jump[0], jump[1].x, jump[1].y);
+                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0], JUMP_COST);
                 }
             }
-            if (best) this.game.act(root, best.x, best.y, best.mode);
+            if (best && this.game.act(root, best.x, best.y, best.mode)) this.game.spend(root);
         },
         
         // Plan a squad's turn. Returns the actions to carry out in order: {id, dx, dy, mode}
-        // to step, {id, swap} to swap with another squad piece, or {id, jump:[x, y]}. Pieces
-        // tired from a jump last turn can't act.
+        // to step, {id, swap} to swap with another squad piece, or {id, jump:[x, y]}. Each
+        // spends the piece's action points (both pieces', for a swap: see Combat.js), so a
+        // piece acts only with the points for it, and may act more than once.
         planSquad: function(squad, budget, field, caution = 1) {
             const A = this.attrs,
                 ids = squad.map(p => p.id),
@@ -186,7 +199,7 @@
                 },
                 initial = {
                     pos:new Map(squad.map(p => [p.id, [p.x, p.y]])),
-                    acted:new Set(ids.filter(id => this.game.isTired(byId.get(id)))),
+                    ap:new Map(squad.map(p => [p.id, p.ap])),
                     dmg:new Map(),
                     dead:new Set(),
                     gain:0,
@@ -196,6 +209,15 @@
                     const m = new Map();
                     for (const [id, [x, y]] of st.pos) m.set(x + ',' + y, id);
                     return m;
+                },
+                // whether piece id has the points for an action costing cost in state st
+                can = (st, id, cost=ACTION_COST) => st.ap.get(id) >= cost,
+                // st's action points once piece id (and other, for a swap) spends cost
+                spent = (st, id, cost=ACTION_COST, other) => {
+                    const ap = new Map(st.ap);
+                    ap.set(id, ap.get(id) - cost);
+                    if (other !== undefined) ap.set(other, ap.get(other) - ACTION_COST);
+                    return ap;
                 },
                 livePlayerAt = (st, x, y) => {
                     const p = pAt.get(x + ',' + y);
@@ -220,7 +242,7 @@
                     return v;
                 },
                 
-                // Every action an unacted piece could take next, in fixed and free
+                // Every action a piece with the points could take next, in fixed and free
                 // (resolveStep, on the positions being tried; the same result in both is
                 // kept once). Follow is only for marching: near the player it would let one
                 // piece bring the whole squad in and still leave the leader's group attack,
@@ -246,18 +268,18 @@
                             target: (id, x, y) => livePlayerAt(st, x, y)
                         };
                     for (const id of ids) {
-                        if (st.acted.has(id)) continue;
+                        if (!can(st, id)) continue;
                         const pc = byId.get(id);
-                        // Swapping with a squad piece next to it that hasn't acted: both are
-                        // then done.
+                        // Swapping with a squad piece next to it that has the points: both
+                        // spend them.
                         for (const other of ids) {
-                            if (other > id && !st.acted.has(other) && this.game.swapOk(view, id, other)) {
+                            if (other > id && can(st, other) && this.game.swapOk(view, id, other)) {
                                 const pos = new Map(st.pos);
                                 pos.set(id, st.pos.get(other));
                                 pos.set(other, st.pos.get(id));
                                 out.push({
                                     pos,
-                                    acted:new Set(st.acted).add(id).add(other),
+                                    ap:spent(st, id, ACTION_COST, other),
                                     dmg:st.dmg,
                                     dead:st.dead,
                                     gain:st.gain,
@@ -277,7 +299,7 @@
                                         // Every hit does 1 damage; a piece at 0 HP takes what's below it.
                                         const n = {
                                             pos:st.pos,
-                                            acted:new Set(st.acted).add(id),
+                                            ap:spent(st, id),
                                             dmg:new Map(st.dmg),
                                             dead:new Set(st.dead),
                                             gain:st.gain,
@@ -301,7 +323,7 @@
                                         for (const [gid, x, y] of r.moves) pos.set(gid, [x, y]);
                                         out.push({
                                             pos,
-                                            acted:new Set(st.acted).add(id),
+                                            ap:spent(st, id),
                                             dmg:st.dmg,
                                             dead:st.dead,
                                             gain:st.gain,
@@ -311,21 +333,20 @@
                                 }
                             }
                         }
-                        // Jumping: only it moves, two cells, and it's then done, and tired next
-                        // turn, which costs jump. After the steps, so a step wins a tie.
-                        // Only over gaps (holes, harm): in open ground a jump gets it no
-                        // nearer than walking, and leaves it unable to strike next turn.
-                        // Not within jumpClose of a player piece, where sitting out the
-                        // next turn would spoil striking and pulling back: it's for getting
-                        // to the player, over holes, say.
+                        // Jumping: only it moves, two cells, for JUMP_COST points, which
+                        // costs jump. After the steps, so a step wins a tie. Only over gaps
+                        // (holes, harm): in open ground a jump gets it no nearer than
+                        // walking, for twice the points. Not within jumpClose of a player
+                        // piece, where the points are better spent striking and pulling
+                        // back: it's for getting to the player, over holes, say.
                         const [x0, y0] = st.pos.get(id),
                             near = players.some(p => !st.dead.has(p.id) && hexDist(p, {x:x0, y:y0}) <= A.jumpClose);
-                        for (const {x, y} of near ? [] : this.game.jumpCells(view, id, true)) {
+                        for (const {x, y} of near || !can(st, id, JUMP_COST) ? [] : this.game.jumpCells(view, id, true)) {
                             const pos = new Map(st.pos);
                             pos.set(id, [x, y]);
                             out.push({
                                 pos,
-                                acted:new Set(st.acted).add(id),
+                                ap:spent(st, id, JUMP_COST),
                                 dmg:st.dmg,
                                 dead:st.dead,
                                 gain:st.gain - A.jump,
@@ -337,14 +358,14 @@
                 },
                 
                 // While searching, a partial plan also gets credit for strikes it has
-                // set up but not yet made (unacted pieces next to a player piece, up to
-                // the actions left), so "carry into reach, strike, pull back" survives
+                // set up but not yet made (pieces with the points next to a player piece,
+                // up to the actions left), so "carry into reach, strike, pull back" survives
                 // the pruning even though its first step looks bad on its own.
                 potential = (st, left) => {
                     if (left <= 0) return 0;
                     let k = 0;
                     for (const id of ids) {
-                        if (st.acted.has(id)) continue;
+                        if (!can(st, id)) continue;
                         const [x, y] = st.pos.get(id);
                         if (pkg.hex.dirs.some(([dx, dy]) => livePlayerAt(st, x + dx, y + dy))) k++;
                     }

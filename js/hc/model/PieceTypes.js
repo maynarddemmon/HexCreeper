@@ -67,9 +67,10 @@
                         ctx.beginPath(); ctx.arc(cx, cy, r + size * RING_GAP + width / 2, 0, TWO_PI); ctx.stroke();
                     };
                 
-                // Moved this turn: inverted (light fill, coloured ring and rank symbol).
-                const inv = opts.moved && !opts.ghost;
-                ctx.globalAlpha = opts.ghost ? 0.3 : opts.spent ? 0.5 : 1;
+                // Without the action points to act (opts.spent): inverted (light fill,
+                // coloured ring and level symbol).
+                const inv = opts.spent && !opts.ghost;
+                ctx.globalAlpha = opts.ghost ? 0.3 : 1;
                 ctx.fillStyle = pkg.view.css(inv ? '--bg' : o.fill);
                 ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.fill();
                 

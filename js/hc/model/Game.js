@@ -70,21 +70,19 @@
             this.enemyAI = pkg.EnemyAI.make(ai.type, this, ai.attrs);                       // which it plays
             this.tiles = new Map();          // "x,y" -> {x, y, kind:"heal" | "harm" | "solid" | "hole" | "loot", subtype, ...} (see makeTile)
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
-            this.acted = new Set();          // ids of player pieces moved this turn (each can move once a turn)
-            this.fresh = new Set();          // ids of pieces placed this turn (can't move until next turn)
-            this.movesUsed = 0;              // moves made this turn (counts toward the move limit)
-            this.recoverUsed = false;        // whether Recover has been used this turn (once a turn)
-            this.quickenUsed = false;        // whether Quicken has been used this turn (once a turn: a move more)
+            this.initiativeTurn = null;      // the turn your pieces last got initiative (see noticeEnemies)
             this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             this.recomputeRanks();
             core.hp = core.maxHp;
+            core.ap = pkg.AP_UNIT;           // so it can act on the first turn
             this.selectedId = core.id;
             this.corePath = [[0, 0]];       // the cells the core has been on, in order (the golden path: see extendCorePath)
             this.tileGenerator.start();
             this.revealTiles();
             this.spawnGenerator.start();
+            this.noticeEnemies();
             this.evaluateObjectives();
         },
         
@@ -122,11 +120,7 @@
                 spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
                 enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
                 seenCells:[...this.seenCells],
-                acted:[...this.acted],
-                fresh:[...this.fresh],
-                movesUsed:this.movesUsed,
-                recoverUsed:this.recoverUsed,
-                quickenUsed:this.quickenUsed,
+                initiativeTurn:this.initiativeTurn,
                 moveMode:this.moveMode,
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
@@ -143,8 +137,8 @@
                 isArr = Array.isArray;
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
-                !Number.isInteger(o.movesUsed) || !pkg.isObj(o.rules) ||
-                ![o.pieces, o.tiles, o.seenCells, o.acted, o.fresh, o.corePath].every(isArr) ||
+                !pkg.isObj(o.rules) ||
+                ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string')
             ) throw new Error('Malformed game data');
@@ -204,6 +198,8 @@
                     this.giveProfile(piece, piece.enemyId);
                     piece.hp = Math.min(piece.maxHp, Math.max(1, p.hp | 0));
                 }
+                // From before action points: a full pool
+                if (!Number.isInteger(piece.ap) || piece.ap < 0) piece.ap = this.apMax(piece);
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -216,11 +212,7 @@
             this.spawnGenerator = spawnGenerator;
             this.enemyAI = enemyAI;
             this.seenCells = new Set(o.seenCells);
-            this.acted = new Set(o.acted);
-            this.fresh = new Set(o.fresh);
-            this.movesUsed = o.movesUsed;
-            this.recoverUsed = !!o.recoverUsed;
-            this.quickenUsed = !!o.quickenUsed;
+            this.initiativeTurn = Number.isInteger(o.initiativeTurn) ? o.initiativeTurn : null;
             this.moveMode = pkg.PLAYER_MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
@@ -370,18 +362,11 @@
             const c = this.getPlayerCore();
             return c ? c.level : 0;
         },
-        maxRank: function() {return Math.max(0, ...this.piecesOf('player').map(p => p.rank)); },
-        moveLimit: function() {return this.rules.movesPer * this.maxRank() + (this.quickenUsed ? 1 : 0);},
         // Placing costs more the more levels your pieces have between them.
         placeCost: function() {return this.rules.placeBase + Math.ceil(this.totalLevels() / Math.max(1, this.rules.placePerPieces));},
         
-        // Can this player piece still move this turn?
-        canMove: function(p) {
-            return !this.acted.has(p.id) && !this.fresh.has(p.id) && !this.isTired(p) && this.movesUsed < this.moveLimit();
-        },
-        
-        // Is the piece tired from a jump: one this turn, or last turn (see jumpPiece)?
-        isTired: function(p) {return (p?.tiredUntil ?? -1) >= this.turn;},
+        // Has this piece the action points to act (see Combat.js)?
+        canMove: function(p) {return this.canAfford(p);},
         
         // The piece plus everything linked below it.
         group: function(p) {
@@ -621,7 +606,6 @@
             this.score -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id);
             this.piecesPlaced++;
-            this.fresh.add(p.id); // a newly placed piece can't move until next turn
             this.recomputeRanks();
             p.hp = p.maxHp;
             this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
@@ -685,36 +669,23 @@
         },
         
         // ---- Turn flow ----
-        // Each turn you may make up to moveLimit() moves, each piece moving at most once
-        // (unless it's recovered), in any order. Only the piece you choose spends a move;
-        // pieces it carries keep theirs.
+        // Your pieces act in any order, each as often as its action points allow (see
+        // Combat.js). Only the piece you choose spends them; pieces it carries keep theirs.
         // Your piece acts (moves or attacks): in its movement mode, or the one given.
         playerAct: function(piece, x, y, mode = this.modeFor(piece)) {
-            if (this.over || !piece || piece.owner !== 'player' || !this.canMove(piece)) return false;
+            if (piece?.owner !== 'player' || !this.canMove(piece)) return false;
             if (!this.act(piece, x, y, mode)) return false;
-            if (this.pieces.has(piece.id)) this.useMove(piece);
+            this.spend(piece);
             this.afterPlayerAction();
             return true;
-        },
-        
-        movesLeft: function() {
-            const eligible = this.piecesOf('player').filter(p => !this.acted.has(p.id) && !this.fresh.has(p.id) && !this.isTired(p)).length;
-            return Math.max(0, Math.min(this.moveLimit() - this.movesUsed, eligible));
-        },
-        
-        // A piece has acted: it's done for the turn, and a move is used.
-        useMove: function(p) {
-            this.acted.add(p.id);
-            this.movesUsed++;
         },
         
         // ---- Detach and attach ----
         // A piece other than the core can be detached from its parent, however far apart
         // they are, or, with no parent, attached to an adjacent piece of yours (in any
-        // group, but not one linked below it, which would make a loop). Either is the
-        // piece's action for the turn, and uses a move. Ranks change to suit: a detached
-        // piece keeps its own, but what it was linked to may drop, and with it the swarm's
-        // rank (the highest of any piece) and the moves a turn. Only player pieces can do
+        // group, but not one linked below it, which would make a loop). Either is an
+        // action, for the piece's action points. Ranks change to suit: a detached piece
+        // keeps its own, but what it was linked to may drop. Only player pieces can do
         // either.
         canDetach: function(p) {
             return !this.over && p?.owner === 'player' && p.id !== this.playerCoreId && !!p.parentId && this.canMove(p);
@@ -747,62 +718,19 @@
             return done;
         },
         afterLinkChange: function(p, text) {
-            this.useMove(p);
+            this.spend(p);
             this.recomputeRanks();
             this.fx(p.x, p.y, text, '--place-ink', {});
             this.afterPlayerAction();
         },
         
-        // ---- Recover ----
-        // Once a turn, a piece that has moved, or was placed, this turn can be made ready to
-        // move again, for its level in score. It doesn't add a move: moving it again uses one
-        // of the turn's moves left, so it's only offered while there's one. A piece tired
-        // from a jump can't be recovered.
-        recoverCost: function(p) {return p.level;},
-        canRecover: function(p) {
-            return !this.over && !this.recoverUsed && p?.owner === 'player' && !this.isTired(p) &&
-                (this.acted.has(p.id) || this.fresh.has(p.id)) &&
-                this.movesUsed < this.moveLimit() && this.score >= this.recoverCost(p);
-        },
-        anyRecoverable: function() {return this.piecesOf('player').some(p => this.canRecover(p));},
-        
-        // ---- Quicken ----
-        // Once a turn, one more move this turn, for your highest level in score.
-        quickenCost: function() {return this.maxLevel();},
-        canQuicken: function() {return !this.over && !this.quickenUsed && this.score >= this.quickenCost();},
-        playerQuicken: function() {
-            let quickened = false;
-            if (this.canQuicken()) {
-                const cost = this.quickenCost(),
-                    core = this.getPlayerCore();
-                this.score -= cost;
-                this.quickenUsed = true;
-                if (core) this.fx(core.x, core.y, `-${cost} score`, '--place-ink', {});
-                quickened = true;
-            }
-            return quickened;
-        },
-        playerRecover: function(p) {
-            let recovered = false;
-            if (this.canRecover(p)) {
-                const cost = this.recoverCost(p);
-                this.score -= cost;
-                this.acted.delete(p.id);
-                this.fresh.delete(p.id);
-                this.recoverUsed = true;
-                this.selectedId = p.id;
-                this.fx(p.x, p.y, `-${cost} score`, '--place-ink', {});
-                recovered = true;
-            }
-            return recovered;
-        },
-        
         afterPlayerAction: function() {
+            this.noticeEnemies();
             this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p));
-            if (!canAct && !this.canAffordPlace() && !this.anyRecoverable() && !this.canQuicken()) { this.endPlayerTurn(); return; }
+            if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }
             // The selection stays where it is, even on a piece that has acted.
         },
         
@@ -811,20 +739,20 @@
             this.endPlayerTurn();
         },
         
+        // The rest of the turn: the enemies', then the environment's (tiles, spawning),
+        // then housekeeping: every piece gets back action points.
         endPlayerTurn: function() {
             this.enemyPhase();
             if (this.over) return;
-            this.acted.clear();
-            this.fresh.clear();
-            this.movesUsed = 0;
-            this.recoverUsed = false;
-            this.quickenUsed = false;
+            this.noticeEnemies();
             const core = this.getPlayerCore();
             if (core && !this.getSelected()) this.selectedId = core.id;
             this.turn++;
             this.tickTiles();
             if (this.over) return;
             this.spawnGenerator.turnEnded();
+            this.recoverAp();
+            this.noticeEnemies();
             this.evaluateObjectives();
         },
         
@@ -844,11 +772,11 @@
             }
         },
         
-        // How many turns it takes to reach a player piece from every cell within `radius`,
+        // How many actions it takes to reach a player piece from every cell within `radius`,
         // keeping off active harm tiles (other pieces are ignored since they move). A step
-        // takes a turn, and so does a jump (see jumpOffsets) but the piece then sits out the
-        // next: it counts 2, so it's no quicker than walking, but it can cross holes.
-        distanceField: function(sources, radius = 30) {
+        // is an action, and a jump (see jumpOffsets), with jumps, costs twice the points:
+        // it counts 2, so it's no quicker than walking, but it can cross holes.
+        distanceField: function(sources, radius = 30, jumps = true) {
             // Each cell's numeric key (see keysNear) is used while searching, and what's on
             // it looked up only once, so the search makes as little as it can.
             const {key:numKey} = keysNear(sources[0]?.x ?? 0, sources[0]?.y ?? 0),
@@ -876,7 +804,7 @@
                 // The steps, as [dx, dy, ...], and the jumps, as [dx, dy, ox1, oy1, ox2, oy2,
                 // ...] (the second cell jumped over the same as the first for a straight jump).
                 steps = pkg.hex.dirs.flat(),
-                jumps = this.jumpOffsets().flatMap(({dx, dy, over}) => [dx, dy, ...over[0], ...(over[1] ?? over[0])]);
+                jumpSteps = !jumps ? [] : this.jumpOffsets().flatMap(({dx, dy, over}) => [dx, dy, ...over[0], ...(over[1] ?? over[0])]);
             for (const p of sources) {
                 dist.set(numKey(p.x, p.y), 0);
                 (buckets[0] ??= []).push(p.x, p.y);
@@ -891,10 +819,10 @@
                         for (let s = 0; s < steps.length; s += 2) reach(x + steps[s], y + steps[s + 1], d + 1);
                         // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is
                         // as quick. A jump can't pass over solids only (see canJumpOver).
-                        for (let j = 0; j < jumps.length; j += 6) {
-                            const ka = kindAt(x + jumps[j + 2], y + jumps[j + 3]),
-                                kb = kindAt(x + jumps[j + 4], y + jumps[j + 5]);
-                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumps[j], y + jumps[j + 1], d + 2);
+                        for (let j = 0; j < jumpSteps.length; j += 6) {
+                            const ka = kindAt(x + jumpSteps[j + 2], y + jumpSteps[j + 3]),
+                                kb = kindAt(x + jumpSteps[j + 4], y + jumpSteps[j + 5]);
+                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumpSteps[j], y + jumpSteps[j + 1], d + 2);
                         }
                     }
                 }

@@ -218,8 +218,7 @@ test('killing enemies gives xp; enough goes up a level, with its HP', async ({pa
         // Goblins (5 xp each) next to the core, killed one at a time
         for (let i = 0; i < 4; i++) {
             g.addPiece('core', 'enemy', 1, 0, null, 'goblin');
-            g.acted.clear();
-            g.movesUsed = 0;
+            c.ap = 100;
             g.playerAct(c, 1, 0);
             out.push([c.xp, c.level]);
         }

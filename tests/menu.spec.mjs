@@ -1,14 +1,16 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Recover · 1', 'Quicken · 1', 'Go to', 'Explore', 'Snake', 'Tree'];
+const ITEMS = ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5', 'Go to', 'Explore', 'Snake', 'Tree'];
 
-/*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. */
+/*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. Pools are
+    2 action points, all of it back each turn, so a can jump. */
 const setUp = async page => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
+        g.rules.apPool = g.rules.apRecovery = '2';
         g.score = 1000;
         g.playerPlace(1, 0, core);
         g.playerWait();
@@ -27,9 +29,9 @@ test('clicking the selected piece again opens its menu beside it, with what it c
     await expect(items(page)).toHaveText(ITEMS);
     const disabled = await items(page).evaluateAll(els => els.map(e => e.classList.contains('disabled')));
     // A piece can go next to a; a can swap with the core, jump and be detached; it has a
-    // parent, so it can't attach; nothing is hurt, so no heal; it hasn't moved, so no recover.
-    // It can always go to a cell, explore or get into formation.
-    expect(disabled).toEqual([false, false, false, true, false, true, true, false, false, false, false, false]);
+    // parent, so it can't attach; nothing is hurt, so no heal. It can always go to a cell,
+    // explore or get into formation.
+    expect(disabled).toEqual([false, false, false, true, false, true, false, false, false, false]);
     // Beside the piece.
     const [px, py] = await cellOnPage(page, 1, 0),
         box = await page.getByRole('menu').filter({visible:true}).boundingBox();
@@ -39,7 +41,7 @@ test('clicking the selected piece again opens its menu beside it, with what it c
 
 test('the actions are no longer in the footer', async ({page}) => {
     await setUp(page);
-    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Recover', 'Heal 4 · 5', 'Quicken · 1']) {
+    for (const name of ['Place · 5', 'Swap', 'Jump', 'Attach', 'Detach', 'Heal 4 · 5']) {
         await expect(button(page, name)).toHaveCount(0);
     }
 });

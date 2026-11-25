@@ -5,14 +5,13 @@
 (pkg => {
     'use strict';
     
-    const {cfg} = pkg,
+    const {cfg, ACTION_COST, JUMP_COST} = pkg,
         UNSEEN_COST = 3, // a step onto a cell you haven't seen counts as this many, so known ways come first
         SWARM_COST = 2,  // and onto one of the piece's swarm, which makes way (Follow), this many
         RADIUS = 120,    // the farthest a route goes, in steps (unseen ones counting as UNSEEN_COST)
         FIELD_SLACK = 12, // goalField counts goals up to this much further than the nearest
         PLAN_STATES = 400, // how many positions planUntangle looks at before giving up
-        LEAD_WEIGHT = 3,  // how much a step nearer for the lead counts against an action, untangling
-        JUMP_COST = 3;    // and how many actions a jump counts as
+        LEAD_WEIGHT = 3;  // how much a step nearer for the lead counts against an action, untangling
     
     pkg.Navigation = new JS.Module('Navigation', {
         // Whether you've seen the cell with key k (always, without fog of war).
@@ -157,10 +156,10 @@
         },
         
         /*  When piece p can't step on its way (far, as goalField gives it), a plan to get
-            it nearer, untangling its swarm (its whole tree): each piece of it that can act
-            (once a turn, as many as the moves a turn allow) may step in Free mode, or swap
-            with a piece next to it, or jump, and p may step in Follow mode too. The plan is
-            the fewest actions (a jump counting JUMP_COST, as it tires the piece) to get p
+            it nearer, untangling its swarm (its whole tree): each piece of it with the
+            action points (see Combat.js; when none has, they're got back as at the end of a
+            turn) may step in Free mode, or swap with a piece next to it, or jump, and p may
+            step in Follow mode too. The plan is the fewest action points spent to get p
             nearer, keeping links slack on the way, found by a search out from where the
             swarm is (best first, giving up after PLAN_STATES positions), and keeping off
             positions in avoid (a Set of keys, as plan's position keys). Returns
@@ -172,10 +171,8 @@
             for (const q of this.piecesOf(p.owner)) if (topOf(q) === topOf(p)) tree.push(q.id);
             const inTree = new Set(tree),
                 range = this.rules.linkRange,
-                limit = this.moveLimit(),
                 links = tree.filter(id => inTree.has(this.pieces.get(id).parentId)).map(id => [id, this.pieces.get(id).parentId]),
-                // A position: where each piece of the swarm is, what's acted this turn,
-                // moves used and when each piece is tired until, in turns from now.
+                // A position: where each piece of the swarm is, and its action points.
                 keyOf = pos => tree.map(id => pos.get(id).join(',')).join(';'),
                 tension = pos => links.reduce((t, [a, b]) => {
                     const [ax, ay] = pos.get(a), [bx, by] = pos.get(b);
@@ -200,9 +197,7 @@
                 },
                 start = {
                     pos:new Map(tree.map(id => [id, [this.pieces.get(id).x, this.pieces.get(id).y]])),
-                    acted:new Set(tree.filter(id => !this.canMove(this.pieces.get(id)))),
-                    used:this.movesUsed,
-                    tired:new Map(tree.map(id => [id, (this.pieces.get(id).tiredUntil ?? -1) - this.turn])),
+                    ap:new Map(tree.map(id => [id, this.pieces.get(id).ap])),
                     cost:0,
                     plan:[]
                 },
@@ -219,10 +214,13 @@
                 open.pop();
                 if (far(...st.pos.get(p.id)) < goal) return st.plan;
                 // A new turn, when nothing more can act in this one
-                const can = id => !st.acted.has(id) && st.tired.get(id) < 0 && st.used < limit;
+                const can = (s, id, cost=ACTION_COST) => s.ap.get(id) >= cost;
                 let base = st;
-                if (!tree.some(can)) {
-                    base = {...st, acted:new Set(), used:0, tired:new Map([...st.tired].map(([id, t]) => [id, t - 1]))};
+                if (!tree.some(id => can(st, id))) {
+                    base = {...st, ap:new Map(tree.map(id => {
+                        const q = this.pieces.get(id);
+                        return [id, Math.max(st.ap.get(id), Math.min(this.apMax(q), st.ap.get(id) + this.apRecovery(q)))];
+                    }))};
                 }
                 const view = viewOf(base.pos),
                     next = (id, kind, moves, x, y, other) => {
@@ -231,17 +229,16 @@
                         const k = keyOf(pos);
                         if (!seen.has(k)) {
                             seen.add(k);
-                            const acted = new Set(base.acted).add(id),
-                                tired = kind === 'jump' ? new Map(base.tired).set(id, 1) : base.tired,
-                                child = {pos, acted, used:base.used + 1, tired, cost:base.cost + (kind === 'jump' ? JUMP_COST : 1),
-                                    plan:[...base.plan, {id, kind, x, y, other}]};
-                            if (other !== undefined) acted.add(other);
+                            const spent = kind === 'jump' ? JUMP_COST : ACTION_COST,
+                                ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
+                                child = {pos, ap, cost:base.cost + spent / ACTION_COST, plan:[...base.plan, {id, kind, x, y, other}]};
+                            if (other !== undefined) ap.set(other, ap.get(other) - ACTION_COST);
                             child.score = score(child);
                             open.push(child);
                         }
                     };
                 for (const id of tree) {
-                    if (base === st ? can(id) : base.tired.get(id) < 0) {
+                    if (can(base, id)) {
                         const [x, y] = base.pos.get(id);
                         for (const mode of id === p.id ? ['follow', 'free'] : ['free']) {
                             for (const [dx, dy] of pkg.hex.dirs) {
@@ -250,11 +247,11 @@
                             }
                         }
                         for (const other of tree) {
-                            if (other !== id && !base.acted.has(other) && base.tired.get(other) < 0 && this.swapOk(view, id, other)) {
+                            if (other !== id && can(base, other) && this.swapOk(view, id, other)) {
                                 next(id, 'swap', [[id, ...base.pos.get(other)], [other, x, y]], ...base.pos.get(other), other);
                             }
                         }
-                        for (const c of this.jumpCells(view, id)) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
+                        for (const c of can(base, id, JUMP_COST) ? this.jumpCells(view, id) : []) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
                     }
                 }
             }

@@ -20,7 +20,16 @@
     Rolls come from the game's seed, in turn, so a game plays the same again.
     
     Killing enemies gives the piece that did it their xp; at the xpToLevel rule's xp it
-    goes up a level, and its max HP with it (and its HP by as much). */
+    goes up a level, and its max HP with it (and its HP by as much).
+    
+    Action points: a piece acts (moves, attacks, swaps, detaches, attaches...) by spending
+    them, ACTION_COST an action (a jump JUMP_COST), so only with that many. They're kept
+    in hundredths (AP_UNIT a point), as whole numbers, so they add up exactly. At the end
+    of each turn, after the enemies', every piece gets back the apRecovery rule's points,
+    up to its pool, the apPool rule's (but at least a point, so everything can act). A new piece starts with none (but your core starts
+    a game with one). When an enemy first comes into your sight it gets the apInitiative
+    rule's points, how quick it is to notice you and act, and your pieces theirs too (once a
+    turn), up to their pools. The rules are of a piece's level and stats, not rounded. */
 (pkg => {
     'use strict';
     
@@ -49,7 +58,11 @@
         // What a profile is if init.json5 doesn't say (or has no such one)
         DEFAULT_ENEMTY = 'creeper',
         DEFAULT_CHARACTER_CLASS = 'adventurer',
-        FALLBACK = parseProfile({});
+        FALLBACK = parseProfile({}),
+        
+        AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
+        ACTION_COST = pkg.ACTION_COST = 100; // what an action costs
+    pkg.JUMP_COST = 200;                     // and a jump
     
     pkg.characters = new Subtypes('character', parseProfile);
     pkg.enemies = new Subtypes('enemy', parseProfile);
@@ -71,6 +84,49 @@
             p.xpValue = profile.xp;
             p.maxHp = this.maxHpOf(p);
             p.hp = p.maxHp;
+            p.ap = 0;
+        },
+        
+        // ---- Action points ----
+        // A rule's formula (of a piece's level and stats) for piece p, in hundredths of a
+        // point, rounded, and not below 0.
+        apRule: function(rule, p) {
+            return Math.max(0, Math.round(AP_UNIT * evaluate(this.rules[rule], STAT_VARS, {level:p.level, ...p.stats}))) || 0;
+        },
+        
+        /*  The most action points piece p can have (its pool: at least a point, so it can
+            act), and what it gets back a turn. */
+        apMax: function(p) {return Math.max(AP_UNIT, this.apRule('apPool', p));},
+        apRecovery: function(p) {return this.apRule('apRecovery', p);},
+        
+        /*  Whether piece p has the points for an action costing cost (and the game's on). */
+        canAfford: function(p, cost=ACTION_COST) {return !this.over && !!p && p.ap >= cost;},
+        
+        /*  Piece p spends cost action points. */
+        spend: function(p, cost=ACTION_COST) {p.ap = Math.max(0, p.ap - cost);},
+        
+        /*  Piece p gets ap more action points, up to its pool (but never loses any). */
+        giveAp: function(p, ap) {p.ap = Math.max(p.ap, Math.min(this.apMax(p), p.ap + ap));},
+        
+        /*  The end of a turn: every piece gets back its recovery, up to its pool. */
+        recoverAp: function() {
+            for (const p of this.pieces.values()) this.giveAp(p, this.apRecovery(p));
+        },
+        
+        /*  Enemies coming into your sight for the first time (piece.noticed): each gets its
+            initiative's points, and if any did, your pieces get theirs, once a turn
+            (Game.initiativeTurn). */
+        noticeEnemies: function() {
+            const sight = this.cellsInSight(),
+                seen = this.piecesOf('enemy').filter(e => !e.noticed && (!sight || sight.has(this.key(e.x, e.y))));
+            for (const e of seen) {
+                e.noticed = true;
+                this.giveAp(e, this.apRule('apInitiative', e));
+            }
+            if (seen.length && this.initiativeTurn !== this.turn) {
+                this.initiativeTurn = this.turn;
+                for (const p of this.piecesOf('player')) this.giveAp(p, this.apRule('apInitiative', p));
+            }
         },
         
         // A rule's formula (of a piece's level and stats) for piece p, rounded down.

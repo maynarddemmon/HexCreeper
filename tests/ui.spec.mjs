@@ -159,23 +159,26 @@ test('clicking a cell the selected piece can jump to jumps it there', async ({pa
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game;
+        g.rules.apPool = '2';
+        g.getPlayerCore().ap = 200;    // a jump's 2 action points
         g.selectedId = g.playerCoreId;
         hc.app.centerOn(false);
     });
     const core = () => page.evaluate(() => {
         const c = hc.app.game.getPlayerCore();
-        return [c.x, c.y, hc.app.game.canMove(c)];
+        return [c.x, c.y, c.ap];
     });
     // Not in Follow mode
     await page.evaluate(() => {hc.app.game.moveMode = 'follow';});
     await page.mouse.click(...await cellOnPage(page, 2, -1));
-    expect(await core()).toEqual([0, 0, true]);
+    expect(await core()).toEqual([0, 0, 200]);
     await page.evaluate(() => {hc.app.game.moveMode = 'fixed';});
     // Hovering shows it there, as a ghost, and a click jumps.
     await page.mouse.move(...await cellOnPage(page, 2, -1));
     expect(await page.evaluate(() => hc.view.jumpAt(hc.app.game.getPlayerCore(), hc.view.hover))).toEqual({x:2, y:-1});
     await page.mouse.click(...await cellOnPage(page, 2, -1));
-    expect(await core()).toEqual([2, -1, false]);
+    // (Spent, so the turn ended, and it got a point back.)
+    expect(await core()).toEqual([2, -1, 100]);
 });
 
 test('alt-click on a piece the selected one can swap with swaps them; a click selects it', async ({page}) => {

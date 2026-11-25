@@ -25,17 +25,17 @@ const at = page => page.evaluate(() => Object.fromEntries(Object.entries(window.
 
 const P = name => `hc.app.game.pieces.get(window.ids.${name})`;
 
-test('two adjacent pieces swap cells, keeping their links; it uses a move and both are done', async ({page}) => {
+test('two adjacent pieces swap cells, keeping their links; it costs each an action point', async ({page}) => {
     await setUp(page);
     expect(await page.evaluate(`hc.app.game.playerSwap(${P('core')}, ${P('a')})`)).toBe(true);
     expect(await at(page)).toEqual({core:[1, 0], a:[0, 0], b:[2, 0], c:[-1, 0]});
     expect(await page.evaluate(() => {
         const g = hc.app.game, p = name => g.pieces.get(window.ids[name]);
-        return [p('a').parentId === p('core').id, p('b').parentId === p('a').id, g.movesUsed, g.canMove(p('core')), g.canMove(p('a'))];
-    })).toEqual([true, true, 1, false, false]);
+        return [p('a').parentId === p('core').id, p('b').parentId === p('a').id, p('core').ap, p('a').ap, g.canMove(p('b'))];
+    })).toEqual([true, true, 0, 0, true]);
 });
 
-test('no swap that would leave a link out of range, with a piece not next to it, an enemy, or a piece that has acted', async ({page}) => {
+test('no swap that would leave a link out of range, with a piece not next to it, an enemy, or a piece without the points', async ({page}) => {
     await setUp(page);
     const r = await page.evaluate(`(() => {
         const g = hc.app.game, out = [];
@@ -45,7 +45,7 @@ test('no swap that would leave a link out of range, with a piece not next to it,
         out.push(g.swapTargets(${P('b')}).length);                           // only a is next to b
         g.addPiece('core', 'enemy', 2, -1);
         out.push(g.swapTargets(${P('b')}).some(t => t.owner === 'enemy'));
-        g.playerAct(${P('c')}, -2, 0);                                        // c has acted
+        g.playerAct(${P('c')}, -2, 0);                                        // c has spent its point
         out.push(g.swapTargets(${P('core')}).some(t => t.id === window.ids.c));
         return out;
     })()`);

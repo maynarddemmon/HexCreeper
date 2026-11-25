@@ -14,6 +14,7 @@ test('moves are recorded to animate: a group step together, a jump as a jump', a
         g.playerWait();
         g.motions = [];
         g.playerAct(c, 0, 1);
+        g.rules.apPool = g.rules.apRecovery = '2'; // for a jump's 2 points
         // Together: within a few ms (each reads the clock).
         const step = g.motions.map(m => [m.from, m.to, m.jump, Math.abs(m.t0 - g.motions[0].t0) < 5]);
         g.playerWait();
@@ -53,9 +54,7 @@ test('moving a piece again drops what of its move was still to play', async ({pa
         const g = hc.app.game, c = g.getPlayerCore();
         g.motions = [];
         g.playerAct(c, 1, 0);
-        g.recoverUsed = false;
-        g.acted.clear();
-        g.quickenUsed = true;
+        c.ap = 100;
         g.playerAct(c, 2, 0);
         return g.motions.filter(m => m.id === c.id).map(m => m.to);
     });

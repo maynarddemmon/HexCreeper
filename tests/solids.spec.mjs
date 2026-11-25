@@ -91,7 +91,7 @@ test('a piece whose damage beats a solid\'s DR breaks it, its damage less the DR
     const hit = () => page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), move = g.legalMoves(core).find(m => m.x === 1 && m.y === 0);
         g.playerAct(core, 1, 0);
-        g.acted.clear();
+        core.ap = 100;
         return [move?.attack, g.tiles.get('1,0')?.hp ?? null, core.x];
     });
     expect(await hit()).toEqual([true, 2, 0]);

@@ -6,20 +6,20 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
-test('rank needs two children; it sets moves, but not max HP (level does)', async ({page}) => {
+test('rank needs two children; it sets neither max HP (level does) nor action points', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.hex.dirs[0], hc.hex.dirs[3]];
         g.score = 100;
-        const before = {rank:c.rank, hp:c.hp, max:c.maxHp, moves:g.moveLimit(), cost:g.placeCost()};
+        const before = {rank:c.rank, hp:c.hp, max:c.maxHp, pool:g.apMax(c), cost:g.placeCost()};
         g.playerPlace(d0[0], d0[1], c);
         const oneChild = c.rank;
         g.playerPlace(d1[0], d1[1], c);
-        return {before, oneChild, after:{rank:c.rank, hp:c.hp, max:c.maxHp, moves:g.moveLimit(), cost:g.placeCost()}, score:g.score};
+        return {before, oneChild, after:{rank:c.rank, hp:c.hp, max:c.maxHp, pool:g.apMax(c), cost:g.placeCost()}, score:g.score};
     });
-    expect(r.before).toEqual({rank:1, hp:2, max:2, moves:1, cost:5});
+    expect(r.before).toEqual({rank:1, hp:2, max:2, pool:100, cost:5});
     expect(r.oneChild).toBe(1);
-    // Rank 2: 2 moves, but the same max HP. Place cost follows the 3 pieces' levels.
-    expect(r.after).toEqual({rank:2, hp:2, max:2, moves:2, cost:6});
+    // Rank 2, but the same max HP and pool. Place cost follows the 3 pieces' levels.
+    expect(r.after).toEqual({rank:2, hp:2, max:2, pool:100, cost:6});
     expect(r.score).toBe(90);
 });
 
@@ -39,21 +39,7 @@ test('placing costs 4, plus 1 for every 2 of your pieces (rounded up), whatever 
     expect(costs).toEqual([5, 5, 6, 6, 7, 7, 2, 7]);
 });
 
-test('moves per turn follow the highest rank of any piece, not the core', async ({page}) => {
-    const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-        g.score = 1000;
-        g.playerPlace(D[0][0], D[0][1], c);
-        const a = g.pieceAt(D[0][0], D[0][1]);
-        const free = g.placeCells().filter(q => hc.hexDist(q, a) === 1 && hc.hexDist(q, c) > 1);
-        g.playerPlace(free[0].x, free[0].y, a);
-        g.playerPlace(free[1].x, free[1].y, a);
-        return {core:c.rank, child:a.rank, moves:g.moveLimit(), cost:g.placeCost()};
-    });
-    expect(r).toEqual({core:1, child:2, moves:2, cost:6});
-});
-
-test('each piece moves at most once per turn; new pieces wait a turn', async ({page}) => {
+test('a piece acts while it has the action points (here, once a turn); new pieces start with none', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
         g.score = 100;
@@ -64,9 +50,9 @@ test('each piece moves at most once per turn; new pieces wait a turn', async ({p
         const t = g.turn, m = g.legalMoves(a).find(m => !m.attack);
         const first = g.playerAct(a, m.x, m.y);
         const again = g.legalMoves(a).length;
-        return {freshCanMove, first, again, turn:g.turn === t, left:g.movesLeft()};
+        return {freshCanMove, first, again, turn:g.turn === t, ap:a.ap, core:g.canMove(c)};
     });
-    expect(r).toEqual({freshCanMove:false, first:true, again:0, turn:true, left:1});
+    expect(r).toEqual({freshCanMove:false, first:true, again:0, turn:true, ap:0, core:true});
 });
 
 test('destroying a piece destroys everything linked below it and lowers ranks', async ({page}) => {
