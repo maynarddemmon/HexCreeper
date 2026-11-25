@@ -137,10 +137,11 @@
 		"pool":         {"name":"Pool",          "description":"A pool of water.",               "moveCost":2.0, "fillColor":"#039"}
 	},
 	
-	// Fixtures: what sits on the ground of a cell (over its open floor) and does something
+	// Fixtures: what sits on the ground of a cell (over its open floor), and may do something
 	// when a piece of yours enters it. Each has a name, a description, a "type" ("heal":
-	// heals your pieces, "harm": hurts, "loot": score; the game goes by the type, e.g.
-	// pieces keep off harm) and how it works (see js/hc/model/tile/Fixtures.js):
+	// heals your pieces, "harm": hurts, "loot": score, "feature": nothing, but it may be in
+	// the way; the game goes by the type, e.g. pieces keep off harm) and how it works (see
+	// js/hc/model/tile/Fixtures.js):
 	//   revealMode: when it shows: "instant" (default: once its cell is in sight),
 	//     "hidden" (once a piece of yours enters it) or {"proximity":n} (once a piece of
 	//     yours is within n cells).
@@ -154,6 +155,15 @@
 	//     that piece) or {"radius":n, "shape":"flat" | "ring" | "fade"}.
 	//   duration: when it's gone: "exhausted" (default: when its pool is empty), "once",
 	//     {"count":n} (after n uses) or {"countdown":n} (n turns after it's revealed).
+	//   state: {"name":value} (true, false or a number): what each one keeps, its formulas'
+	//     variables (with "hp", what it has left).
+	//   composition, hp, coverage, floor: as for solids (DR and opacity from the material;
+	//     with hp it can be broken, when it's in the way; floor is left under it when it's
+	//     gone); coverage may be a formula.
+	//   moveCost: what a step onto it costs, times the floor's (default 1), or a formula; 0
+	//     or less and it's in the way, as a solid is.
+	//   destroyInto: the fixture it leaves when it's gone (broken, used up or run out).
+	//   fillColor, borderColor: a feature's colours.
 	// Maps choose which kinds of each type they place (their tile generator's attrs; see
 	// js/hc/model/map/tile/ProximityTileGenerator.js and CavernsTileGenerator.js).
 	"fixtures":{
@@ -221,11 +231,45 @@
 			"revealMode":{"proximity":2},
 			"pool":{"min":30, "max":60},
 			"showMagnitude":{"proximity":1}
+		},
+		
+		// Features (none placed yet)
+		"barricade":{
+			"type":"feature",
+			"name":"Barricade",
+			"description":"Planks nailed across the way.",
+			"composition":"pinewood",
+			"hp":10,
+			"coverage":80,
+			"moveCost":0,
+			"destroyInto":"broken_barricade",
+			"fillColor":"#7a5a3a",
+			"borderColor":"#5a4028"
+		},
+		"broken_barricade":{
+			"type":"feature",
+			"name":"Broken barricade",
+			"description":"What's left of a barricade: slow going.",
+			"composition":"pinewood",
+			"hp":5,
+			"coverage":20,
+			"moveCost":1.5,
+			"destroyInto":"wood_scraps",
+			"fillColor":"#7a5a3a",
+			"borderColor":"#5a4028"
+		},
+		"wood_scraps":{
+			"type":"feature",
+			"name":"Wood Scraps",
+			"description":"Scraps of wood.",
+			"composition":"pinewood",
+			"fillColor":"#7536",
 		}
 	},
 	
 	// The rules of combat and action points (see js/hc/model/Combat.js), as formulas: numbers,
-	// + - * / % ^, parentheses, and min max floor ceil round sqrt log abs. They're the
+	// + - * / % ^, parentheses, Math functions (max(a, b) or Math.max(a, b)), comparisons
+	// (< <= > >= == !=), && || !, and c ? a : b. They're the
 	// defaults for every map (a map's own "rules" can change them, for it). Most are of a
 	// piece's "level" and stats (str agl con dex int wis wil cha), and are rounded down.
 	"rules":{

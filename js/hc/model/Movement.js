@@ -376,7 +376,7 @@
         
         /*  Whether a jump from (x, y) can pass over the cells at the offsets `over`: not
             over a solid, so one of them mustn't be solid. */
-        canJumpOver: function(x, y, over) {return over.some(([ox, oy]) => !this.isSolid(x + ox, y + oy));},
+        canJumpOver: function(x, y, over) {return over.some(([ox, oy]) => !this.blocksJumps(x + ox, y + oy));},
         
         /*  Jumps piece p to (x, y), if it can (jumpCells; an enemy won't land on harm). It
             lands on the tiles there, and is exhausted for the jumpExhaustion rule's turns
@@ -437,12 +437,15 @@
                 target: (id, x, y) => {
                     const g = this.pieces.get(id),
                         t = this.pieceAt(x, y),
-                        tile = this.tiles.get(this.key(x, y));
+                        tile = this.tiles.get(this.key(x, y)),
+                        f = this.fixtures.get(this.key(x, y));
                     let hit = null;
                     if (t && t.owner !== g.owner) {
                         hit = {attacker:g, target:t};
                     } else if (this.canBreak(g, tile)) {
                         hit = {attacker:g, target:tile, solid:true};
+                    } else if (this.canBreakFixture(g, f)) {
+                        hit = {attacker:g, target:f, fixture:true};
                     }
                     return hit;
                 }

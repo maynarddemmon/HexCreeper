@@ -13,16 +13,19 @@
             .filter(name => typeof Math[name] === 'function' && name !== 'random').map(name => [name, Math[name]])),
         
         /*  An expr attr's formula, text, made into a function of its variables, f({name:n}),
-            or an Error saying what's wrong with it. names: the variables it may use. Numbers,
-            + - * / % and ^ (power), with the usual precedence, unary minus, parentheses and
-            FUNCTIONS, by name, with "Math." in front or not (max(a, b) or Math.max(a, b)).
-            Made once for each text (formulas). */
+            or an Error saying what's wrong with it. names: the variables it may use (a
+            true or false one counts as 1 or 0). Numbers, + - * / % and ^ (power), with the
+            usual precedence, unary minus, parentheses and FUNCTIONS, by name, with "Math."
+            in front or not (max(a, b) or Math.max(a, b)); and, looser than those,
+            comparisons (< <= > >=, then == !=), && and ||, each 1 for true or 0 for false,
+            and c ? a : b (a if c isn't 0, else b), loosest of all. ! (not: 1 for 0, else 0)
+            is as tight as unary minus. Made once for each text (formulas). */
         formulas = new Map(),
         compile = (text, names) => {
             const key = names.join() + '|' + text;
             let retval = formulas.get(key);
             if (!retval) {
-                const tokens = text.match(/\d+(\.\d+)?|[A-Za-z_]\w*|\S/g) ?? [];
+                const tokens = text.match(/\d+(\.\d+)?|[A-Za-z_]\w*|<=|>=|==|!=|&&|\|\||\S/g) ?? [];
                 let i = 0;
                 const peek = () => tokens[i],
                     take = t => {
@@ -45,13 +48,17 @@
                             return () => n;
                         }
                         if (t === '(') {
-                            const f = sum();
+                            const f = ternary();
                             take(')');
                             return f;
                         }
                         if (t === '-') {
                             const f = power();
                             return v => -f(v);
+                        }
+                        if (t === '!') {
+                            const f = power();
+                            return v => f(v) ? 0 : 1;
                         }
                         // A name: a variable or a function (after "Math.", a function).
                         let name = /^[A-Za-z_]/.test(t) ? t : null;
@@ -65,16 +72,16 @@
                                 const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : null;
                                 if (!fn) throw new Error('no function ' + name);
                                 i++;
-                                const args = [sum()];
+                                const args = [ternary()];
                                 while (peek() === ',') {
                                     i++;
-                                    args.push(sum());
+                                    args.push(ternary());
                                 }
                                 take(')');
                                 return v => fn(...args.map(a => a(v)));
                             }
                             if (!names.includes(name)) throw new Error('no variable ' + name);
-                            return v => v[name];
+                            return v => Number(v[name]);
                         }
                         throw new Error('unexpected ' + t);
                     },
@@ -86,9 +93,26 @@
                         return v => a(v) ** b(v);
                     },
                     product = binary(power, {'*':(a, b) => a * b, '/':(a, b) => a / b, '%':(a, b) => a % b}),
-                    sum = binary(product, {'+':(a, b) => a + b, '-':(a, b) => a - b});
+                    sum = binary(product, {'+':(a, b) => a + b, '-':(a, b) => a - b}),
+                    truth = b => b ? 1 : 0,
+                    comparison = binary(sum, {'<':(a, b) => truth(a < b), '<=':(a, b) => truth(a <= b), '>':(a, b) => truth(a > b), '>=':(a, b) => truth(a >= b)}),
+                    equality = binary(comparison, {'==':(a, b) => truth(a === b), '!=':(a, b) => truth(a !== b)}),
+                    and = binary(equality, {'&&':(a, b) => truth(a && b)}),
+                    or = binary(and, {'||':(a, b) => truth(a || b)}),
+                    ternary = () => {
+                        const c = or();
+                        let f = c;
+                        if (peek() === '?') {
+                            i++;
+                            const a = ternary();
+                            take(':');
+                            const b = ternary();
+                            f = v => c(v) ? a(v) : b(v);
+                        }
+                        return f;
+                    };
                 try {
-                    const f = sum();
+                    const f = ternary();
                     if (i < tokens.length) throw new Error('unexpected ' + tokens[i]);
                     retval = f;
                 } catch (err) {

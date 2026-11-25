@@ -602,9 +602,9 @@
                         status = navNote;
                     } else if (V.hover) {
                         // A named enemy you can see under the pointer: what it is, and its status
-                        // effects. A solid: what
-                        // it is and how tough. A hole, or a heal, harm or loot (a fixture) you
-                        // know of: what it is. Its floor: what it is, and its cost.
+                        // effects. A solid, or a fixture you know of that can be broken: what
+                        // it is and how tough. A hole, or another fixture you know of: what it
+                        // is. Its floor: what it is, and its cost.
                         const at = game.pieceAt(V.hover.x, V.hover.y),
                             enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
                             sel = game.getSelected(),
@@ -626,6 +626,12 @@
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
                                 if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));
+                            } else if (fixture?.hp != null && other.material) {
+                                // A fixture that can be broken: as a solid, and how much it
+                                // blocks sight if it does.
+                                const opacity = game.fixtureOpacity(fixture);
+                                status = i18n('status-solid', other.name, other.material.name, fixture.hp, other.hp, other.material.hardness);
+                                if (opacity > 0 && opacity < 100) status += i18n('status-opacity', Math.round(opacity));
                             } else if (other) {
                                 status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
                             }
@@ -634,7 +640,9 @@
                             // (after any fixture on it).
                             const floor = tile?.kind === pkg.TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : !tile ? game.baseFloor() : null;
                             if (floor) {
-                                const what = floor.moveCost === 1 ? floor.name : i18n('status-floor', floor.name, floor.moveCost);
+                                // (Times a fixture's you know of, if it isn't in the way.)
+                                const cost = fixture && !game.fixtureBlocks(fixture.x, fixture.y) ? floor.moveCost * game.fixtureValue(fixture, 'moveCost') : floor.moveCost,
+                                    what = cost === 1 ? floor.name : i18n('status-floor', floor.name, Math.round(cost * 100) / 100);
                                 status = status ? status + ' · ' + what : floor.description ? i18n('status-tile', what, floor.description) : what;
                             }
                         }

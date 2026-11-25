@@ -118,7 +118,7 @@
                 objectives:this.objectives.map(s => ({...s})),
                 pieces:[...this.pieces.values()].map(p => ({...p})),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
-                fixtures:[...this.fixtures.values()].map(f => ({...f})),
+                fixtures:[...this.fixtures.values()].map(f => ({...f, ...f.state ? {state:{...f.state}} : {}})),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
                 spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
                 enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
@@ -225,7 +225,7 @@
                     this.tiles.set(this.key(t.x, t.y), t);
                 }
             }
-            this.fixtures = new Map(fixtures.map(f => [this.key(f.x, f.y), {...f}]));
+            this.fixtures = new Map(fixtures.map(f => [this.key(f.x, f.y), {...f, ...f.state ? {state:{...f.state}} : {}}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
             this.enemyAI = enemyAI;
@@ -242,16 +242,18 @@
         },
         
         key: function(x, y) { return x + ',' + y; },
-        // Can a piece ever be on (x, y)? Not past the edge of the world, or on a solid or
-        // hole tile.
+        // Can a piece be on (x, y) now? Not past the edge of the world, on a solid or hole
+        // tile, or where a fixture is in the way (see Fixtures.fixtureBlocks).
         isOpen: function(x, y) {
             if (Math.abs(x) > WORLD_LIMIT || Math.abs(y) > WORLD_LIMIT) return false;
             const kind = this.tiles.get(this.key(x, y))?.kind;
-            return kind !== TILE_TYPE_SOLID && kind !== TILE_TYPE_HOLE;
+            return kind !== TILE_TYPE_SOLID && kind !== TILE_TYPE_HOLE && !this.fixtureBlocks(x, y);
         },
         // Solid tiles block movement (and jumps over them); how much they block sight is
         // seeThrough's. Holes don't block sight.
         isSolid: function(x, y) { return this.tiles.get(this.key(x, y))?.kind === TILE_TYPE_SOLID; },
+        // Whether nothing can jump over (x, y): a solid, or a fixture in the way.
+        blocksJumps: function(x, y) {return this.isSolid(x, y) || this.fixtureBlocks(x, y);},
         
         // ---- Fog of war ----
         // Keys of the cells in sight of a player piece, or null when fog of war is off.
@@ -311,10 +313,13 @@
         },
         
         // The share of sight that gets through (x, y): 1, or for a solid, 1 less its
-        // opacity (Solids.js); none for a solid of an unknown subtype.
+        // opacity (Solids.js); none for a solid of an unknown subtype. A fixture there lets
+        // through 1 less its opacity of that (Fixtures.fixtureOpacity).
         seeThrough: function(x, y) {
-            const tile = this.tiles.get(this.key(x, y));
-            return tile?.kind === TILE_TYPE_SOLID ? 1 - (pkg.solids.get(tile.subtype)?.opacity ?? 100) / 100 : 1;
+            const tile = this.tiles.get(this.key(x, y)),
+                f = this.fixtures.get(this.key(x, y));
+            return (tile?.kind === TILE_TYPE_SOLID ? 1 - (pkg.solids.get(tile.subtype)?.opacity ?? 100) / 100 : 1) *
+                (f ? 1 - this.fixtureOpacity(f) / 100 : 1);
         },
         
         /*  A number for enemies spawned together, so they can be known as a band: each
@@ -426,10 +431,11 @@
         baseFloor: function() {return pkg.floors.get(this.tileGenerator?.attrs.baseFloor);},
         
         /*  What stepping onto (x, y) costs, as a multiple of an action: its floor's moveCost
-            (see Solids.js; the base floor's where there's no tile), or 1. */
+            (see Solids.js; the base floor's where there's no tile), or 1, times its
+            fixture's (see Fixtures.fixtureMoveCost). */
         moveCostAt: function(x, y) {
             const t = this.tiles.get(this.key(x, y));
-            return (t ? t.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost : 1 : this.baseFloor()?.moveCost) ?? 1;
+            return ((t ? t.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost : 1 : this.baseFloor()?.moveCost) ?? 1) * this.fixtureMoveCost(x, y);
         },
         
         // Could `piece` step by (dx, dy) right now, in mode? Same rules as a normal move;
@@ -454,6 +460,8 @@
                     if (this.pieces.has(h.attacker.id)) {
                         if (h.solid) {
                             if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
+                        } else if (h.fixture) {
+                            if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) broken++;
                         } else if (this.pieces.has(h.target.id)) {
                             const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
                             for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
@@ -470,7 +478,8 @@
                     this.earn(gain);
                     this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
                 }
-                // Advance into the space cleared, if a piece was destroyed or a solid broken.
+                // Advance into the space cleared, if a piece was destroyed or a solid or
+                // fixture broken.
                 if ((kills || broken) && piece.owner === 'player' && this.rules.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
                     this.moveGroup(piece, m.dx, m.dy, mode);
                 }
@@ -822,7 +831,7 @@
                     const nk = numKey(x, y);
                     let v = kinds.get(nk);
                     if (v === undefined) {
-                        v = this.isOpen(x, y) ? (this.isHarm(x, y) ? 0 : OPEN) : this.isSolid(x, y) ? SOLID : 0;
+                        v = this.isOpen(x, y) ? (this.isHarm(x, y) ? 0 : OPEN) : this.blocksJumps(x, y) ? SOLID : 0;
                         kinds.set(nk, v);
                     }
                     return v;

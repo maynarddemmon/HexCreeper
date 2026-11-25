@@ -78,6 +78,10 @@
                         }
                         pkg.defineShadow(data.shadow);
                         pkg.fixtures.define(data.fixtures);
+                        for (const f of pkg.fixtures.list()) {
+                            if (f.floor && !pkg.floors.get(f.floor)) console.warn('Fixture', f.id, 'leaves floor', f.floor, 'which there is none of');
+                            if (f.destroyInto && !pkg.fixtures.get(f.destroyInto)) console.warn('Fixture', f.id, 'leaves fixture', f.destroyInto, 'which there is none of');
+                        }
                         pkg.effects.define(data.effects);
                         pkg.characters.define(data.characters);
                         pkg.defineEnemies(data.enemies, data.enemyGroups);

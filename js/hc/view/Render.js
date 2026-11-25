@@ -348,9 +348,28 @@
             }
         },
         
-        // A fixture (Fixtures.js): heal, harm or loot, once it's revealed. Over its tile.
+        // A feature (a fixture that does nothing when entered: see Fixtures.js): a hexagon
+        // inside its cell, in its kind's colours (else a solid's), faint if it isn't in the
+        // way.
+        drawFeature = t => {
+            const kind = game.fixtureType(t);
+            ctx.globalAlpha = game.fixtureBlocks(t.x, t.y) ? 1 : 0.6;
+            ctx.beginPath();
+            addCellPath(t.x, t.y, cam.size * 0.15);
+            ctx.fillStyle = dataColor(kind.fillColor, '--solid');
+            ctx.fill();
+            ctx.lineWidth = Math.max(1, cam.size * 0.04);
+            ctx.strokeStyle = dataColor(kind.borderColor, '--solid-edge');
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        },
+        
+        // A fixture (Fixtures.js): heal, harm, loot or a feature, once it's revealed. Over
+        // its tile.
         drawFixture = t => {
-            if (t.revealedAt != null) {
+            if (t.revealedAt != null && t.type === pkg.FIXTURE_FEATURE) {
+                drawFeature(t);
+            } else if (t.revealedAt != null) {
                 const s = cam.size,
                     [cx, cy] = cellCenter(t.x, t.y),
                     loot = t.type === FIXTURE_LOOT,
@@ -662,7 +681,7 @@
         for (const t of tilesShown) if (t.kind !== TILE_TYPE_FLOOR) drawTile(t);
         if (SHADOW.on) drawHoleShadows(tilesShown);
         
-        // Heals, harms and loot (fixtures), over their tiles
+        // Heals, harms, loot and features (fixtures), over their tiles
         for (const f of game.fixtures.values()) if (inView(f.x, f.y) && isKnown(f.x, f.y)) drawFixture(f);
         
         // The area of the heal, harm or loot under the pointer, if it reaches past it.

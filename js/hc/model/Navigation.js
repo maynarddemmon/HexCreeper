@@ -199,7 +199,8 @@
                         trailOf: id => this.pieces.get(id).trail,
                         target: (id, x, y) => {
                             const o = this.pieceAt(x, y);
-                            return (o && !inTree.has(o.id) && o.owner !== p.owner) || this.canBreak(this.pieces.get(id), this.tiles.get(this.key(x, y))) ? {} : null;
+                            return (o && !inTree.has(o.id) && o.owner !== p.owner) || this.canBreak(this.pieces.get(id), this.tiles.get(this.key(x, y))) ||
+                                this.canBreakFixture(this.pieces.get(id), this.fixtures.get(this.key(x, y))) ? {} : null;
                         }
                     };
                 },
