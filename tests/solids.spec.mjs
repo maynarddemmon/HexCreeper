@@ -286,3 +286,28 @@ test('along an edge, the clearer of the two solids beside the line counts', asyn
     });
     expect(r).toEqual({oneSide:6, bothSides:0, iceBeside:3});
 });
+
+test('a broken solid leaves the floor its kind names, or the base floor', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.advance = false;
+        c.damage = [99, 99];
+        for (const [subtype, x] of [['boulder', 1], ['wooden_barricade', -1]]) {
+            g.tiles.set(g.key(x, 0), g.makeTile(x, 0, 'solid', subtype));
+            c.ap = 100;
+            g.playerAct(c, x, 0);
+            const t = g.tiles.get(g.key(x, 0));
+            out.push([hc.solids.get(subtype).floor, t ? [t.kind, t.subtype] : null, g.isOpen(x, 0)]);
+        }
+        return out;
+    });
+    expect(r).toEqual([['loose_stone', ['floor', 'loose_stone'], true], [null, null, true]]);
+});
+
+test('kinds of solid that extend another leave its floor too', async ({page}) => {
+    await startGame(page);
+    expect(await page.evaluate(() => ['ice_wall', 'ice_boulder', 'icicle', 'stalactite'].map(id => hc.solids.get(id).floor)))
+        .toEqual(['ice', 'ice', 'ice', 'loose_stone']);
+});

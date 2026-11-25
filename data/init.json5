@@ -65,24 +65,25 @@
 	// any CSS colour, or a --variable from index.html); without them it's the usual grey.
 	// "coverage" (0-100, default 100) is how much of the cell the material fills, e.g. bars
 	// or a net: its opacity is its material's times its coverage. A solid that can be seen
-	// through is drawn see-through too. "shadowLength" is how far its shadow reaches, in
+	// through is drawn see-through too. "floor" is the floor it leaves when it's broken
+	// (else the map's base floor). "shadowLength" is how far its shadow reaches, in
 	// hexes (else the shadow's length): how tall it is. Its shadow is as dark as its
 	// coverage.
 	// Maps choose which kinds walls, clumps and cave rock are made of (their tile
 	// generator's attrs; see js/hc/model/map/tile/ProximityTileGenerator.js and
 	// CavernsTileGenerator.js).
 	"solids":{
-		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30},
-		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12},
-		"wall_of_stone":   {"name":"Stone wall",       "composition":"basalt",    "hp":12},
-		"sandstone_wall":  {"name":"Sandstone wall",   "composition":"sandstone", "hp":20, "fillColor":"#b49870", "borderColor":"#c9ae86"},
+		"stone_wall":      {"name":"Granite wall",     "composition":"granite",   "hp":30, "floor":"loose_stone"},
+		"boulder":         {"name":"Boulder",          "composition":"basalt",    "hp":12, "floor":"loose_stone"},
+		"wall_of_stone":   {"name":"Stone wall",       "composition":"basalt",    "hp":12, "floor":"loose_stone"},
+		"sandstone_wall":  {"name":"Sandstone wall",   "composition":"sandstone", "hp":20, "fillColor":"#b49870", "borderColor":"#c9ae86", "floor":"loose_stone"},
 		"wooden_barricade":{"name":"Wooden barricade", "composition":"pinewood",  "hp":8,  "fillColor":"#7a5a3c", "borderColor":"#92704f"},
 		"wall_of_iron":    {"name":"Wall of iron",     "composition":"iron",      "hp":15, "fillColor":"#5c6168", "borderColor":"#7c838c"},
 		"wall_of fungus":  {"name":"Wall of fungus",   "composition":"fungus",    "hp":3,  "fillColor":"#6e5c7e", "borderColor":"#8a76a0"},
 		"wall_of_flesh":   {"name":"Wall of flesh",    "composition":"flesh",     "hp":6,  "fillColor":"#9c5058", "borderColor":"#b6666f"},
-		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447"},
+		"hedge":           {"name":"Hedge",            "composition":"vegetable", "hp":4,  "fillColor":"#3e6a3a", "borderColor":"#518447", "floor":"dirt_floor"},
 		"glass_wall":      {"name":"Glass wall",       "composition":"glass",     "hp":4,  "fillColor":"#9cc8d8", "borderColor":"#c4e4ee"},
-		"ice_wall":        {"name":"Ice wall",         "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8"},
+		"ice_wall":        {"name":"Ice wall",         "composition":"ice",       "hp":6,  "fillColor":"#cfe6f0", "borderColor":"#e8f4f8", "floor":"ice"},
 		"crystal_wall":    {"name":"Crystal wall",     "composition":"crystal",   "hp":20, "fillColor":"#c8b8e8", "borderColor":"#e0d4f6"},
 		"plastic_wall":    {"name":"Plastic wall",     "composition":"plastic",   "hp":6,  "fillColor":"#d8d0b0", "borderColor":"#ece6cc"},
 		"iron_bars":       {"name":"Iron bars",        "composition":"iron",      "hp":10, "coverage":20, "fillColor":"#5c6168", "borderColor":"#7c838c"},
@@ -90,10 +91,10 @@
 		// Caverns (see js/hc/model/map/tile/CavernsTileGenerator.js). A stalactite hangs from the
 		// ceiling, so you can see past it more than a stalagmite, and over a pile of rubble
 		// a little.
-		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c"},
-		"stalagmite":      {"name":"Stalagmite",       "composition":"calcite",   "hp":8,  "fillColor":"#9a8f7e", "borderColor":"#b3a894"},
+		"cave_rock":       {"name":"Cave rock",        "composition":"limestone", "hp":40, "fillColor":"#57504a", "borderColor":"#6b645c", "floor":"loose_stone"},
+		"stalagmite":      {"name":"Stalagmite",       "composition":"calcite",   "hp":8,  "fillColor":"#9a8f7e", "borderColor":"#b3a894", "floor":"loose_stone"},
 		"stalactite":      {"name":"Stalactite", "extends":"stalagmite", "hp":6, "coverage":40},
-		"rubble":          {"name":"Rubble",           "composition":"rubble",    "hp":6,  "coverage":70, "fillColor":"#7a6f63", "borderColor":"#8f8476"},
+		"rubble":          {"name":"Rubble",           "composition":"rubble",    "hp":6,  "coverage":70, "fillColor":"#7a6f63", "borderColor":"#8f8476", "floor":"loose_stone"},
 		"ice_boulder":     {"name":"Ice Boulder", "extends":"ice_wall"},
 		"icicle":          {"name":"Icicle",      "extends":"ice_boulder", "hp":3}
 	},

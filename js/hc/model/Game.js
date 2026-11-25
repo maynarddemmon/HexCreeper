@@ -523,7 +523,7 @@
         
         /*  An attack on a solid tile: it can't dodge, so it takes the attacker's damage
             roll less its DR (after penetration). Returns whether that broke it, leaving
-            open floor. */
+            the floor its kind names (Solids.js), or the base floor. */
         damageSolid: function(tile, attacker) {
             const dmg = this.rollDamage(attacker) - this.armorAgainst(attacker, pkg.solids.get(tile.subtype)?.dr ?? Infinity);
             let broken = false;
@@ -531,7 +531,13 @@
                 tile.hp -= dmg;
                 this.fx(tile.x, tile.y, `-${dmg}`, '--dmg', {bump:{from:attacker}});
                 if (tile.hp <= 0) {
-                    this.tiles.delete(this.key(tile.x, tile.y));
+                    // What's left: the floor its kind names (if there is one), else the base floor.
+                    const floor = pkg.solids.get(tile.subtype)?.floor;
+                    if (pkg.floors.get(floor)) {
+                        this.tiles.set(this.key(tile.x, tile.y), this.makeTile(tile.x, tile.y, TILE_TYPE_FLOOR, floor));
+                    } else {
+                        this.tiles.delete(this.key(tile.x, tile.y));
+                    }
                     this._sightKey = null; // it no longer blocks sight
                     this.fx(tile.x, tile.y, '', '--solid', {burst:true});
                     broken = true;

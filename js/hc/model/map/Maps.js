@@ -73,6 +73,9 @@
                         pkg.solids.define(data.materials, data.solids);
                         pkg.holes.define(data.holes);
                         pkg.floors.define(data.floors);
+                        for (const s of pkg.solids.list()) {
+                            if (s.floor && !pkg.floors.get(s.floor)) console.warn('Solid', s.id, 'leaves floor', s.floor, 'which there is none of');
+                        }
                         pkg.defineShadow(data.shadow);
                         pkg.fixtures.define(data.fixtures);
                         pkg.characters.define(data.characters);

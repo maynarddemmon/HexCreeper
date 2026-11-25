@@ -8,7 +8,8 @@
     coverage (0-100, default 100: how much of the cell the material fills, e.g. bars or a
     net; its opacity is the material's times this), and optionally the colours it's drawn
     in, fillColor and borderColor (any CSS colour, or a --variable from index.html), in
-    place of the usual solid colours.
+    place of the usual solid colours, and floor: the floor subtype it leaves when it's
+    broken (else the map's base floor; one that isn't known counts as none).
     
     A hole subtype is a kind of hole tile: optionally a fillColor, drawn in place of the
     usual hole colour.
@@ -36,15 +37,15 @@
         // A shadowLength, if given, must be a number of hexes, not below 0.
         isLength = v => v === undefined || (isNum(v) && v >= 0),
         
-        // {id:{name, composition, hp, coverage, description, fillColor, borderColor, shadowLength}}
+        // {id:{name, composition, hp, coverage, description, fillColor, borderColor, shadowLength, floor}}
         parseSolid = s => {
             const material = materials.get(s.composition);
             let own = null;
-            if (material && Number.isInteger(s.hp) && s.hp >= 1 && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor) && isLength(s.shadowLength)) {
+            if (material && Number.isInteger(s.hp) && s.hp >= 1 && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor) && isLength(s.shadowLength) && isText(s.floor)) {
                 const coverage = s.coverage ?? 100;
                 own = {
                     composition:s.composition, hp:s.hp, coverage,
-                    fillColor:s.fillColor || null, borderColor:s.borderColor || null, shadowLength:s.shadowLength ?? null,
+                    fillColor:s.fillColor || null, borderColor:s.borderColor || null, shadowLength:s.shadowLength ?? null, floor:s.floor || null,
                     material, dr:material.hardness, opacity:material.opacity * coverage / 100
                 };
             }
