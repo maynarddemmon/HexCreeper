@@ -16,7 +16,7 @@ Each piece acts (moves, attacks, swaps, jumps, attaches or detaches) by spending
 <span style="font-size:16px;">LEVELS AND RANK</span>
 Each piece has a level, stats and XP. Killing enemies gives the piece that does it XP, and enough XP raises its level, and its max HP with it. Place costs 4, plus 1 for every 2 levels your pieces have between them.
 A piece shows its level as a symbol: level 1 is a plain circle, 2 a line, 3 a triangle, 4 a cross, 5 a star, 6 three lines, 7 a seven-point star, 8 four lines, and from 9 a star with that many points.
-A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. (Rank has no effect yet.)
+A piece's rank is 1, or 1 + the lower of its two highest-ranked children, so a piece needs two children to rank up. A piece that earns XP gets more for its parent's rank, and passes some up to its parent (more for its own rank), which passes some of that on up.
 
 <span style="font-size:16px;">ATTACKING</span>
 Moving onto an enemy attacks it: a roll decides whether it hits (from the attacker's str and level against the target's agl and level), then how much damage it does, less the target's armor. When a group moves, every piece in it that would land on an enemy attacks it. Killing an enemy gives XP (and pieces destroyed below a killed piece count too). After a kill (or breaking what it attacked), the attacker advances into the empty cell if it can; to attack without moving, use Attack (F).

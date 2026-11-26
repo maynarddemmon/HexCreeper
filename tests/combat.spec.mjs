@@ -139,7 +139,8 @@ test('pieces get their profiles: you an adventurer\'s, an enemy its own, or a cr
             plain = g.addPiece('core', 'enemy', 5, 0);
         return [[c.level, c.hp, c.maxHp, c.stats.con, c.damage], [gob.hp, gob.stats.agl, gob.xpValue], [plain.hp, plain.xpValue]];
     });
-    expect(r).toEqual([[1, 15, 15, 10, [1, 6]], [5, 12, 5], [4, 4]]);
+    // xp in hundredths
+    expect(r).toEqual([[1, 15, 15, 10, [1, 6]], [5, 12, 500], [4, 400]]);
 });
 
 test('the hit chance comes from accuracy against defence, kept from hitMin to hitMax', async ({page}) => {
@@ -239,6 +240,54 @@ test('killing enemies gives xp; enough goes up a level, with its HP', async ({pa
         }
         return [out, c.hp, c.maxHp];
     });
-    // 20 xp for level 2: max HP 10 + 5 + 1 x (2 + 2) = 19, and HP up by the 4 more.
-    expect(r).toEqual([[[5, 1], [10, 1], [15, 1], [0, 2]], 14, 19]);
+    // 20 xp for level 2: max HP 10 + 5 + 1 x (2 + 2) = 19, and HP up by the 4 more. (xp in
+    // hundredths)
+    expect(r).toEqual([[[500, 1], [1000, 1], [1500, 1], [0, 2]], 14, 19]);
+});
+
+// A chain of your pieces: the core, a below it, b below a, each with the given rank; an
+// enemy next to b worth 20 xp (2000 hundredths), killed by b (on a cleared board). Their
+// xp, with no levelling up.
+const chainKill = (page, ranks, rules = {}) => page.evaluate(([ranks, rules]) => {
+    const g = hc.app.game, c = g.getPlayerCore();
+    Object.assign(g.rules, {xpToLevel:'1000'}, rules);
+    for (const p of g.piecesOf('player')) if (p !== c) g.removePiece(p);
+    const a = g.addPiece('core', 'player', 1, 0, c.id),
+        b = g.addPiece('core', 'player', 2, 0, a.id),
+        e = g.addPiece('core', 'enemy', 3, 0);
+    g.recomputeRanks = () => {};
+    [c.rank, a.rank, b.rank] = ranks;
+    e.xpValue = 2000;
+    b.ap = 100;
+    g.playerAttack(b, 3, 0);
+    return [c.xp, a.xp, b.xp, g.pieces.has(e.id)];
+}, [ranks, rules]);
+
+test('xp is shared up the links: a bonus for the parent\'s rank first, then a share of all that, of the passer\'s rank', async ({page}) => {
+    await clearBoard(page);
+    // b: 20 + 20 x 2/20 (a's rank 2) = 22. Passes 22 x 1/20 (its rank 1) = 1.1 to a, which
+    // gets 1.1 x 3/20 (the core's rank 3) = 0.165 more: 1.265 (rounded to 1.27), and
+    // passes 1.27 x 2/20 = 0.127 (0.13) to the core, which has no parent.
+    expect(await chainKill(page, [3, 2, 1])).toEqual([13, 127, 2200, false]);
+});
+
+test('xp sharing is two rules', async ({page}) => {
+    await clearBoard(page);
+    expect(await chainKill(page, [1, 1, 1], {childXPBonus:'0', parentXPShare:'xp / 2'})).toEqual([500, 1000, 2000, false]);
+});
+
+test('a kill is the last of your pieces to hurt the enemy\'s, however it dies', async ({page}) => {
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        for (const p of g.piecesOf('player')) if (p !== c) g.removePiece(p);
+        const e = g.addPiece('core', 'enemy', 1, 0);
+        e.hp = e.maxHp = 3;
+        c.ap = 100;
+        g.playerAttack(c, 1, 0);           // 1 damage: c's now
+        const hurt = [e.hp, e.lastHitBy === c.id];
+        g.damage(e, 5, null);              // dies of something else
+        return [hurt, g.pieces.has(e.id), c.xp];
+    });
+    expect(r).toEqual([[2, true], false, 400]);
 });

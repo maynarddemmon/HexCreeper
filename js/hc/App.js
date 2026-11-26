@@ -76,6 +76,7 @@
             others, or the key's name (e.g. "Enter"). */
         // Action points (kept in hundredths: see Combat.js) as points, e.g. "1.75"
         formatAp = ap => String(ap / pkg.AP_UNIT),
+        formatXp = xp => String(xp / pkg.XP_UNIT),
         
         // Shows or hides the combat log (the combatLog preference, so it's kept).
         toggleLog = () => {pkg.settings.set('combatLog', !pkg.cfg.COMBAT_LOG);},
@@ -112,7 +113,7 @@
                 case 'miss': text = i18n('log-miss', a, d, e.roll, e.chance); break;
                 case 'harm': text = i18n('log-harm', d, e.dmg); break;
                 case 'destroyed': text = e.linked ? i18n('log-destroyed-linked', d, e.linked) : i18n('log-destroyed', d); break;
-                case 'xp': text = i18n('log-xp', a, e.xp); break;
+                case 'xp': text = i18n('log-xp', a, formatXp(e.xp)); break;
                 case 'level': text = i18n('log-level', a, e.level); break;
                 default: text = e.kind;
             }
@@ -125,7 +126,7 @@
             const row = (label, value) => `<tr><td style="padding-right:16px;opacity:0.7;">${label}</td><td>${value}</td></tr>`,
                 head = key => `<tr><td colspan="2" style="padding-top:8px;font-weight:bold;">${i18n(key)}</td></tr>`,
                 rows = [
-                    row(i18n('sheet-xp'), p.xp + '/' + game.statRule('xpToLevel', p)),
+                    row(i18n('sheet-xp'), formatXp(p.xp) + '/' + formatXp(game.xpRule('xpToLevel', p))),
                     row(i18n('sheet-hp'), p.hp + '/' + p.maxHp),
                     row(i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(p.ap), formatAp(game.apMax(p)),
                         formatAp(game.apRecovery(p)), formatAp(game.apRule('apInitiative', p)))),
@@ -518,7 +519,7 @@
                 self.hpFill.setWidth(self.hpBar.width * hp / max);
                 if (sel) {
                     self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, sel.xp, game.statRule('xpToLevel', sel),
+                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, formatXp(sel.xp), formatXp(game.xpRule('xpToLevel', sel)),
                             formatAp(sel.ap), formatAp(game.apMax(sel)))
                     );
                 } else {

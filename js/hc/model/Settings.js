@@ -55,11 +55,12 @@
             num('visionRadius', 12, 1, 30),   // how far your pieces see (see hc.cfg.VISION)
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
-            num('rankBase', 1, 1, 10),        // the rank of a piece without two children (rank isn't used for now: see Combat.js)
+            num('rankBase', 1, 1, 10),        // the rank of a piece without two children (it sets how XP is shared: see Combat.awardXp)
             // Combat and action points (see Combat.js). Their defaults are in init.json5's
             // "rules", to tune them there; these are only for if it hasn't them. Formulas of
             // a piece's level and stats (pkg.STAT_VARS), rounded down, but the hit chance,
-            // of accuracy and defence, the damage roll, and action points (not rounded).
+            // of accuracy and defence, the damage roll, and action points and xp (kept in
+            // hundredths).
             expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS),
             expr('meleeAccuracy', 'str + level', pkg.STAT_VARS),
             expr('defence', 'agl + level', pkg.STAT_VARS),
@@ -71,6 +72,8 @@
             expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS),
             expr('xpToLevel', '20 * level', pkg.STAT_VARS),
             expr('xpValue', '5 * level', pkg.STAT_VARS),
+            expr('parentXPShare', 'xp * rank / 20', pkg.XP_VARS),   // passed up to a piece's parent, of what it got
+            expr('childXPBonus', 'xp * parentRank / 20', pkg.XP_VARS), // more for a piece with a parent
             expr('apPool', '1 + con / 10', pkg.STAT_VARS),
             expr('apRecovery', '0.5 + agl / 40', pkg.STAT_VARS),
             expr('apInitiative', '(wis + agl) / 40', pkg.STAT_VARS),

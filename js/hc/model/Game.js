@@ -443,8 +443,7 @@
         
         /*  Carries out piece's attack's hits ({attacker, target}, and solid or fixture
             for a tile or a fixture): strikes at pieces (and what's linked below them),
-            damages solids and fixtures. Your piece learns from the enemies it kills.
-            Returns {kills, broken}: pieces destroyed, solids and fixtures broken. */
+            damages solids and fixtures. Returns {kills, broken}: pieces destroyed, solids and fixtures broken. */
         applyHits: function(piece, hits) {
             let kills = 0, broken = 0;
             for (const h of hits) {
@@ -456,11 +455,6 @@
                     } else if (this.pieces.has(h.target.id)) {
                         const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
                         kills += lost.length;
-                        // Your piece learns from the enemies it killed (see Combat.js).
-                        if (h.attacker.owner === 'player' && this.pieces.has(h.attacker.id)) {
-                            const xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
-                            if (xp) this.gainXp(h.attacker, xp);
-                        }
                     }
                 }
             }
@@ -476,8 +470,12 @@
         },
         
         // Damage a piece; returns the list of pieces destroyed (empty if it survived).
-        // Destroying a piece also destroys everything linked below it.
-        damage: function(target, dmg, attacker) {
+        // Destroying a piece also destroys everything linked below it. by is the piece the
+        // damage is from (the attacker, or who set off a harm). An enemy remembers the last
+        // of your pieces to hurt it (lastHitBy), whose kill it is (with what was linked
+        // below it), however it dies: that piece earns their xp (see Combat.awardXp).
+        damage: function(target, dmg, attacker, by = attacker) {
+            if (by?.owner === 'player' && target.owner === 'enemy') target.lastHitBy = by.id;
             target.hp -= dmg;
             this.fx(target.x, target.y, `-${dmg}`, '--dmg', { flash: true, bump: attacker ? { from: attacker } : null });
             if (target.hp > 0) return [];
@@ -498,6 +496,9 @@
             this.fx(target.x, target.y, '', col, {burst:true, piece:{...target}});
             if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
+            const killer = this.pieces.get(target.lastHitBy),
+                xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
+            if (killer && xp && !this.over) this.awardXp(killer, xp);
             return lost;
         },
         

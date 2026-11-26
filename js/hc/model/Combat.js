@@ -23,14 +23,16 @@
     which can't go below 0: armor can soak a hit completely. No criticals or fumbles yet.
     Rolls come from the game's seed, in turn, so a game plays the same again.
     
-    Killing enemies gives the piece that did it their xp; at the xpToLevel rule's xp it
-    goes up a level, and its max HP with it (and its HP by as much).
+    Killing enemies gives the piece that did it their xp, and shares some up its links
+    (see awardXp); at the xpToLevel rule's xp a piece goes up a level, and its max HP
+    with it (and its HP by as much). XP is kept in hundredths (XP_UNIT a point), as whole
+    numbers, so small shares aren't lost.
     
     What happens is kept in the combat log (Game.combatLog, the last LOG_MAX entries, not
     saved), as plain data for the view to put into words: {turn, kind, ...}, kind one of
     'hit' (a, d, roll, chance, dmg), 'soak' and 'miss' (a, d, roll, chance), 'harm' (d,
     dmg: from a harm tile), 'destroyed' (d, linked: how many linked below it went too),
-    'xp' (a, xp) and 'level' (a, level).
+    'xp' (a, xp: in hundredths) and 'level' (a, level).
     a and d (attacker, defender) are who they were (see whoOf), so an entry still reads
     the same once the piece is gone.
     
@@ -49,6 +51,7 @@
     const {Subtypes, attrs:{evaluate}} = pkg,
         STATS = pkg.STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
         STAT_VARS = pkg.STAT_VARS = ['level', ...STATS],
+        XP_VARS = pkg.XP_VARS = ['xp', 'rank', 'parentRank', 'level'], // the parentXPShare and childXPBonus rules'
         DAMAGE_VARS = pkg.DAMAGE_VARS = ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
         isInt = v => Number.isInteger(v) && v >= 0,
         
@@ -82,6 +85,7 @@
         ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
         
         AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
+        XP_UNIT = pkg.XP_UNIT = 100,         // a point, in the hundredths xp is kept in
         MIN_COST = 10;                       // the least an action can cost (so there's an end to them)
     
     pkg.characters = new Subtypes('character', parseProfile);
@@ -101,7 +105,7 @@
             p.penetration = profile.penetration;
             p.armor = profile.armor;
             p.fixedHp = profile.hp;
-            p.xpValue = profile.xp ?? Math.max(0, this.statRule('xpValue', p));
+            p.xpValue = profile.xp != null ? profile.xp * XP_UNIT : this.xpRule('xpValue', p);
             p.maxHp = this.maxHpOf(p);
             p.hp = p.maxHp;
             p.ap = 0;
@@ -310,11 +314,44 @@
             return lost;
         },
         
-        /*  Piece p gains xp, going up a level (or more) at the xpToLevel rule's xp. */
+        // ---- Experience ----
+        // A rule's formula (of a piece's level and stats) for piece p, in hundredths of an
+        // xp point, rounded, and not below 0.
+        xpRule: function(rule, p) {
+            return Math.max(0, Math.round(XP_UNIT * evaluate(this.rules[rule], STAT_VARS, {level:p.level, ...p.stats}))) || 0;
+        },
+        
+        /*  The parentXPShare or childXPBonus rule's formula for xp (hundredths) that piece p
+            gets, whose parent is parent: in hundredths, rounded, not below 0. Its
+            variables: xp (in points), rank (p's), parentRank and level (p's). */
+        xpShareRule: function(rule, xp, p, parent) {
+            return Math.max(0, Math.round(XP_UNIT * evaluate(this.rules[rule], XP_VARS,
+                {xp:xp / XP_UNIT, rank:p.rank, parentRank:parent.rank, level:p.level}))) || 0;
+        },
+        
+        /*  Piece p earns xp (hundredths) for a kill, and its parents a share of it: a piece
+            with a parent gets the childXPBonus rule's more (of its parent's rank), then
+            passes the parentXPShare rule's of all it got (of its own rank) up to its parent,
+            which does the same with that, and so on up. */
+        awardXp: function(p, xp) {
+            let piece = p,
+                amount = xp;
+            while (piece && amount > 0) {
+                const parent = this.parent(piece);
+                if (parent) amount += this.xpShareRule('childXPBonus', amount, piece, parent);
+                this.gainXp(piece, amount);
+                amount = parent ? this.xpShareRule('parentXPShare', amount, piece, parent) : 0;
+                piece = parent;
+            }
+        },
+        
+        /*  Piece p gains xp (hundredths), going up a level (or more) at the xpToLevel
+            rule's xp. */
         gainXp: function(p, xp) {
             this.logCombat({kind:'xp', a:this.whoOf(p), xp});
+            this.fx(p.x, p.y, `+${xp / XP_UNIT} XP`, '--gain', {delay:160});
             p.xp += xp;
-            for (let need = this.statRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.statRule('xpToLevel', p)) {
+            for (let need = this.xpRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.xpRule('xpToLevel', p)) {
                 p.xp -= need;
                 p.level++;
                 const max = this.maxHpOf(p);

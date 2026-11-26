@@ -11,7 +11,8 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
     The help that opens on a first visit is skipped unless skipHelp is false. Requests to other origins (e.g. the Font Awesome CDN
     used by myt) are answered with an empty response so the tests never depend on the
-    network. */
+    network. The game starts on the endless map whatever init.json5's defaultMap is, so
+    the tests don't change with it. */
 export const startGame = async (page, {skipHelp=true} = {}) => {
     const problems = {pageErrors:[], warnings:[], errors:[]};
     page.on('pageerror', err => problems.pageErrors.push(err.message));
@@ -22,6 +23,10 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
     });
 
     await page.route(url => url.origin !== BASE_URL, route => route.fulfill({status:200, body:''}));
+    await page.route('**/data/init.json5', async route => {
+        const response = await route.fetch();
+        route.fulfill({response, body:(await response.text()).replace(/"defaultMap":\s*"[^"]*"/, '"defaultMap":"endless"')});
+    });
     if (skipHelp) await page.addInitScript(() => {localStorage.setItem('hc.helpSeen', 'true');});
 
     await page.goto('/index.html');

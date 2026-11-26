@@ -23,7 +23,7 @@ test('attacks, kills, xp and harm go into the combat log, which shows its last l
         [true, {kind:'miss', a:you, d:it, roll:expect.any(Number), chance:0}],
         [true, {kind:'hit', a:you, d:it, roll:expect.any(Number), chance:100, dmg:1}],
         [true, {kind:'destroyed', d:it, linked:0}],
-        [true, {kind:'xp', a:you, xp:4}]
+        [true, {kind:'xp', a:you, xp:400}]
     ]);
     await expect(page.getByText(/Your core hits Creeper for 1 \(\d+ vs 100%\)\./)).toBeVisible();
     await expect(page.getByText('Creeper is destroyed.')).toBeVisible();

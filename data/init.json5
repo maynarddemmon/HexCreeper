@@ -317,6 +317,9 @@
 		"maxHp":"10 + con / 2 + (level - 1) * (2 + con / 5)", // unless its profile fixes its hp
 		"xpToLevel":"20 * level",                          // the xp to go up from this level
 		"xpValue":"5 * level",                             // what killing an enemy is worth, unless its profile says
+		// XP sharing up a piece's links: of xp (what the piece got), rank (its), parentRank, level
+		"childXPBonus":"xp * parentRank / 20",             // more for a piece with a parent, first
+		"parentXPShare":"xp * rank / 20",                  // then passed up to its parent (which does the same)
 		
 		// An attack: a d100 roll hits if it's no more than hitChance (in %, of the attacker's
 		// accuracy and the target's defence, kept from hitMin to hitMax).

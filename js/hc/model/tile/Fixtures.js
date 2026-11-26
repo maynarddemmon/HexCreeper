@@ -487,17 +487,18 @@
             for (const type of [FIXTURE_HARM, FIXTURE_HEAL, FIXTURE_LOOT]) {
                 for (const g of pieces) {
                     const f = g.owner === 'player' && this.pieces.has(g.id) ? this.fixtures.get(this.key(g.x, g.y)) : null;
-                    if (f?.type === type && !this.over) this.useFixture(f);
+                    if (f?.type === type && !this.over) this.useFixture(f, g);
                 }
             }
         },
         
-        /*  One of your pieces has entered fixture t: it's revealed (with its magnitude), and
-            gives each piece in its area, nearest first, its magnitude (less with fade), as
-            long as its pool lasts (a heal gives only what's needed and keeps the rest).
-            Then it's gone if its pool is empty or it's used up; a heal nobody needed
-            isn't used at all. */
-        useFixture: function(t) {
+        /*  One of your pieces, by, has entered fixture t: it's revealed (with its
+            magnitude), and gives each piece in its area, nearest first, its magnitude (less
+            with fade), as long as its pool lasts (a heal gives only what's needed and keeps
+            the rest). Then it's gone if its pool is empty or it's used up; a heal nobody
+            needed isn't used at all. An enemy a harm hurts was hurt by by (see
+            Game.damage), so it's by's kill if it dies of it. */
+        useFixture: function(t, by) {
             const type = this.fixtureType(t),
                 {radius, shape} = type.area,
                 inArea = p => shape === 'ring' ? hexDist(p, t) === radius : hexDist(p, t) <= radius,
@@ -513,7 +514,7 @@
                         share = shape === 'fade' ? (radius + 1 - hexDist(p, t)) / (radius + 1) : 1,
                         amount = Math.min(Math.round(full * share), t.pool ?? Infinity);
                     if (amount > 0) {
-                        const n = this.fixtureEffect(t, p, amount);
+                        const n = this.fixtureEffect(t, p, amount, by);
                         if (t.pool != null) t.pool -= n;
                         used += n;
                     }
@@ -527,15 +528,15 @@
             }
         },
         
-        // What fixture t does to piece p, amount times. Returns how much of it was used
-        // (all of it but for a heal: what it healed).
-        fixtureEffect: function(t, p, amount) {
+        // What fixture t, set off by piece by, does to piece p, amount times. Returns how
+        // much of it was used (all of it but for a heal: what it healed).
+        fixtureEffect: function(t, p, amount, by) {
             let used = amount;
             if (t.type === FIXTURE_HEAL) {
                 used = this.applyHeal(p, amount);
             } else if (t.type === FIXTURE_HARM) {
                 this.logCombat({kind:'harm', d:this.whoOf(p), dmg:amount});
-                this.damage(p, amount, null);
+                this.damage(p, amount, null, by);
             } else {
                 this.gold += amount;
                 this.lootTaken += amount;

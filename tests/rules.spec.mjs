@@ -23,7 +23,7 @@ test('an enemy whose profile has no xp (here, the fallback) is worth the xpValue
         const g = hc.app.game;
         g.rules.xpValue = '7 * level';
         return [g.addPiece('core', 'enemy', 3, 0, null, 'unknown').xpValue, g.addPiece('core', 'enemy', 5, 0, null, 'goblin').xpValue];
-    })).toEqual([7, 5]);
+    })).toEqual([700, 500]); // in hundredths
 });
 
 test('what an action costs (a jump too) is a rule, and how long a jump exhausts a piece; a pool holds at least an action', async ({page}) => {
