@@ -25,14 +25,26 @@ test('a species has a range and a typical value for each stat: [3, 18] and 10 if
     expect(r.goblin[1]).toBeLessThanOrEqual(r.goblin[0][1]);
 });
 
-test('profiles have a species, whose typical stats they get unless they say; pieces have it too', async ({page}) => {
+test('a piece gets its species\' typical stats and base damage, but for what its profile says', async ({page}) => {
     const r = await withData(page, () => {
-        hc.species.define({elf:{name:'Elf', stats:{agl:[3, 14, 18]}}});
-        hc.characters.define({ranger:{name:'Ranger', species:'elf', stats:{dex:13}}});
-        const ranger = hc.characters.get('ranger');
-        return {species:ranger.species, stats:[ranger.stats.agl, ranger.stats.dex, ranger.stats.str]};
+        hc.species.define({
+            elf:{name:'Elf', stats:{agl:[3, 14, 18]}, damage:[1, 8]},
+            dwarf:{name:'Dwarf', stats:{con:[3, 13, 18]}}
+        });
+        hc.characters.define({
+            ranger:{name:'Ranger', species:'elf', stats:{dex:13}},
+            brute:{name:'Brute', species:'dwarf', damage:[2, 5]}
+        });
+        const g = hc.app.game, p = g.addPiece('core', 'player', 9, 9), out = {ranger:hc.characters.get('ranger').species};
+        g.giveProfile(p, 'ranger');
+        out.elf = [p.species, p.stats.agl, p.stats.dex, p.stats.str, p.damage];
+        g.giveProfile(p, 'brute');
+        out.dwarf = [p.species, p.stats.con, p.damage];
+        g.removePiece(p);
+        return out;
     });
-    expect(r).toEqual({species:'elf', stats:[14, 13, 10]});
+    // A dwarf's base damage isn't given: [1, 4].
+    expect(r).toEqual({ranger:['elf'], elf:['elf', 14, 13, 10, [1, 8]], dwarf:['dwarf', 13, [2, 5]]});
     await clearBoard(page);
     const pieces = await page.evaluate(() => {
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 2, 0);
@@ -40,7 +52,30 @@ test('profiles have a species, whose typical stats they get unless they say; pie
         g.giveProfile(e, 'goblin');
         return [g.getPlayerCore().species, e.species, hc.enemies.get('goblin_reaver').species];
     });
-    expect(pieces).toEqual(['human', 'goblin', 'goblin']);
+    expect(pieces).toEqual(['human', 'goblin', ['goblin']]);
+});
+
+test('a character can be any of a list of species: the first, unless it\'s given another of them', async ({page}) => {
+    const r = await withData(page, () => {
+        hc.species.define({
+            human:{name:'Human', playable:true},
+            elf:{name:'Elf', stats:{agl:[3, 14, 18]}, playable:true},
+            orc:{name:'Orc', stats:{int:[3, 6, 10]}}
+        });
+        hc.characters.define({
+            wanderer:{name:'Wanderer', species:['human', 'elf']},
+            sage:{name:'Sage', species:['human', 'orc'], stats:{int:12}}
+        });
+        const g = hc.app.game, p = g.addPiece('core', 'player', 9, 9), out = [];
+        for (const s of [undefined, 'elf', 'orc']) {
+            g.giveProfile(p, 'wanderer', s);
+            out.push([p.species, p.stats.agl]);
+        }
+        g.removePiece(p);
+        // The sage's int is over an orc's max, so it's left out.
+        return {out, playable:hc.species.list().filter(s => s.playable).map(s => s.id), wanderer:hc.characters.get('wanderer').species, sage:!!hc.characters.get('sage')};
+    });
+    expect(r).toEqual({out:[['human', 10], ['elf', 14], ['human', 10]], playable:['human', 'elf'], wanderer:['human', 'elf'], sage:false});
 });
 
 test('a sub-species extends a species, its own ranges and typical values over the other\'s', async ({page}) => {

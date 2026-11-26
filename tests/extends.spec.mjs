@@ -51,9 +51,10 @@ test('an entry extending one that isn\'t there, or in a loop, or a bad one, is l
 test('enemies extend: the goblin reaver is a goblin with its own stats over a goblin\'s', async ({page}) => {
     await startGame(page);
     expect(await page.evaluate(() => {
-        const r = hc.enemies.get('goblin_reaver');
-        return [r.name, r.stats, r.damage, r.hp, r.xp];
-    })).toEqual(['Goblin Reaver', {str:12, agl:12, con:12, dex:10, int:6, wis:8, wil:6, cha:6}, [2, 6], 8, 10]);
+        const r = hc.enemies.get('goblin_reaver'), g = hc.app.game, p = g.addPiece('core', 'enemy', 9, 9);
+        g.giveProfile(p, 'goblin_reaver');
+        return [r.name, r.species, r.stats, r.damage, r.hp, r.xp, p.stats];
+    })).toEqual(['Goblin Reaver', ['goblin'], {str:12, con:12}, [2, 6], 8, 10, {str:12, agl:12, con:12, dex:10, int:6, wis:8, wil:6, cha:6}]);
 });
 
 test('enemy groups don\'t extend', async ({page}) => {

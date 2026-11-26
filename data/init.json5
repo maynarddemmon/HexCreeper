@@ -382,10 +382,15 @@
 	// doesn't say): [min, typical, max], or [min, max] for a typical value half way
 	// (rounded); [3, 10, 18] if not given (a species going down to 0 should say so). An
 	// entry can extend another (a sub-species), a stat's whole entry replacing the other's.
+	// "damage": its base damage, [min, max] ([1, 4] if not given), a profile's if it
+	// doesn't say. "playable": whether you can choose it for a character (false if not
+	// given).
 	"species":{
 		"human":{
 			"name":"Human",
 			"description":"Adaptable, curious and stubborn.",
+			"damage":[1, 6],
+			"playable":true,
 			"stats":{
 				"str":[3, 10, 18], 
 				"agl":[3, 10, 18], 
@@ -400,6 +405,8 @@
 		"dwarf":{
 			"name":"Dwarf",
 			"description":"Stout, resilient and strong.",
+			"damage":[1, 6],
+			"playable":true,
 			"stats":{
 				"str":[3, 11, 18], 
 				"agl":[3, 9,  18], 
@@ -414,6 +421,8 @@
 		"elf":{
 			"name":"Elf",
 			"description":"Graceful, nimble and smart.",
+			"damage":[1, 6],
+			"playable":true,
 			"stats":{
 				"str":[3, 8,  18], 
 				"agl":[3, 11, 18], 
@@ -428,19 +437,23 @@
 		"goblin":{
 			"name":"Goblin",
 			"description":"Small, quick and spiteful, with green skin, big eyes and sharp teeth.",
-			"stats":{"str":[4, 8, 14], "agl":[6, 12, 18], "con":[4, 8, 14], "dex":[4, 10, 16], "int":[3, 6, 12], "wis":[3, 8, 14], "wil":[3, 6, 12], "cha":[3, 6, 12]}
+			"stats":{"str":[4, 8, 14], "agl":[6, 12, 18], "con":[4, 8, 14], "dex":[4, 10, 16], "int":[3, 6, 12], "wis":[3, 8, 14], "wil":[3, 6, 12], "cha":[3, 6, 12]},
+			"damage":[1, 4]
 		},
 		"creeper":{
 			"name":"Creeper",
 			"description":"Things that crawl out of the dark: nobody knows quite what.",
-			"stats":{"str":[3, 8, 18], "agl":[3, 8, 18], "con":[3, 8, 18]}
+			"stats":{"str":[3, 8, 18], "agl":[3, 8, 18], "con":[3, 8, 18]},
+			"damage":[1, 4]
 		}
 	},
 	
-	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "species" (its
-	// species' id: it must have one), "stats" (str, agl, con, dex, int, wis, wil, cha: its
-	// species' typical values if not given, and within its ranges), "level" (1), "damage" ([min, max], its
-	// weapon's, before its str bonus), "penetration" (how much damage reduction its weapon
+	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "species" (the id
+	// of the species it's for, or a list of them: for a character, the species it can be,
+	// a piece being the first unless it's chosen; it must have one), "stats" (str, agl,
+	// con, dex, int, wis, wil, cha, its own: its species' typical values for any not given,
+	// and within all its species' ranges), "level" (1), "damage" ([min, max], its
+	// weapon's, before its str bonus: its species' base damage if not given), "penetration" (how much damage reduction its weapon
 	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
 	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: else the xpValue rule's).
 	
@@ -448,9 +461,8 @@
 	"characters":{
 		"adventurer":{
 			"name":"Adventurer",
-			"species":"human",
 			"description":"Someone setting out to see what's down there.",
-			"damage":[1, 6]
+			"species":["human", "dwarf", "elf"]
 		}
 	},
 	
@@ -461,7 +473,6 @@
 			"name":"Creeper",
 			"description":"Something that crawls out of the dark.",
 			"species":"creeper",
-			"damage":[1, 4],
 			"hp":4,
 			"xp":4
 		},
@@ -469,7 +480,6 @@
 			"name":"Goblin",
 			"description":"A small humanoid with green skin, big eyes and sharp teeth.",
 			"species":"goblin",
-			"damage":[1, 4],
 			"hp":5,
 			"xp":5
 		},

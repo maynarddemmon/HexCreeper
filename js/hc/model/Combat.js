@@ -5,18 +5,24 @@
     A species (`species`) is what a creature is, a template for it: in "stats", for each
     stat, the range it can be in and its typical value, [min, typical, max], or [min,
     max] for a typical value half way (rounded); [3, 10, 18] if not given (a species
-    that goes down to 0 should say so). Entries can extend others (a sub-species: see
-    Subtypes.js), a stat's whole entry replacing the other's. Stats can't go outside the
-    range (spending stat points can't raise one above its max).
+    that goes down to 0 should say so). It has a base "damage", [min, max] ([1, 4] if
+    not given), and is "playable" (true or false: false if not given) if you can choose
+    it for a character. Entries can extend others (a sub-species: see Subtypes.js), a
+    stat's whole entry replacing the other's. Stats can't go outside the range (spending
+    stat points can't raise one above its max).
     
     A profile is what a piece is in a fight: yours from `characters` (the "adventurer"
-    for now: a class, of a species), an enemy's from `enemies` (its enemyId, or "creeper"
-    for one without). A profile has
-        species      its species' id (it must have one)
-        stats        str, agl, con, dex, int, wis, wil, cha (its species' typical values
-                     if not given; within its ranges)
+    for now: a class, which may become a background), an enemy's from `enemies` (its
+    enemyId, or "creeper" for one without). A profile has
+        species      the id of the species it's for, or a list of them (a character's:
+                     the species it can be; it must have at least one). A piece is the
+                     first, unless it's given another of them (see giveProfile)
+        stats        str, agl, con, dex, int, wis, wil, cha, its own: its species'
+                     typical values for any it doesn't give (and it must be within every
+                     one of its species' ranges)
         level        1 if not given
-        damage       [min, max], what its weapon does (before its str bonus)
+        damage       [min, max], what its weapon does (before its str bonus): its
+                     species' base damage if not given
         penetration  how much of a target's damage reduction its weapon goes through
         armor        its damage reduction: taken off each hit's damage
         hp           its max HP, if fixed (else the maxHp rule works it out)
@@ -77,12 +83,15 @@
             rolls roll and roll2: a whole number, not below 0. */
         rolled = (rules, min, max, roll, roll2) => Math.max(0, Math.floor(evaluate(rules.damageRoll, DAMAGE_VARS, {min, max, roll, roll2})) || 0),
         
+        isRange = v => Array.isArray(v) && v.length === 2 && v.every(isInt) && v[0] <= v[1],
+        
         /*  A species as init.json5 has it, made usable ({ranges:{stat:[min, max]},
-            typical:{stat:n}}), or null if it isn't. */
+            typical:{stat:n}, damage:[min, max], playable}), or null if it isn't. */
         parseSpecies = entry => {
             const ranges = {},
-                typical = {};
-            let ok = true;
+                typical = {},
+                damage = entry.damage ?? DEFAULT_DAMAGE;
+            let ok = isRange(damage) && (entry.playable === undefined || typeof entry.playable === 'boolean');
             for (const s of STATS) {
                 const v = entry.stats?.[s] ?? DEFAULT_STAT,
                     [min, mid, max] = Array.isArray(v) && v.length === 2 ? [v[0], Math.round((v[0] + v[1]) / 2), v[1]] : Array.isArray(v) ? v : [];
@@ -93,39 +102,46 @@
                     ok = false;
                 }
             }
-            return ok ? {ranges, typical} : null;
+            return ok ? {ranges, typical, damage:[...damage], playable:entry.playable === true} : null;
         },
         
         DEFAULT_STAT = [3, 10, 18],          // a species' stat it doesn't give: [min, typical, max]
+        DEFAULT_DAMAGE = [1, 4],             // a species' base damage, if it doesn't give one
         // A species for a profile with none (only the fallback profile below)
         FALLBACK_SPECIES = {id:'', name:'', description:'', ...parseSpecies({})},
         
-        /*  A profile as init.json5 has it, made usable, or null if it isn't (its species
-            must be in pkg.species). */
-        parseProfile = (entry, id, species = pkg.species.get(entry.species)) => {
-            const stats = {}, level = entry.level ?? 1, damage = entry.damage ?? [1, 4];
+        /*  The species a profile's "species" names (an id, or a list of them), or null if
+            it names none, or any that isn't there. */
+        speciesOf = v => {
+            const ids = typeof v === 'string' ? [v] : Array.isArray(v) && v.length && v.every(s => typeof s === 'string') ? v : [],
+                list = ids.map(s => pkg.species.get(s));
+            return list.length && list.every(Boolean) ? list : null;
+        },
+        
+        /*  A profile as init.json5 has it, made usable ({species:[ids], stats:{its own},
+            damage (or null: its species'), ...}), or null if it isn't (its species must
+            be in pkg.species). */
+        parseProfile = (entry, id, species = speciesOf(entry.species)) => {
+            const stats = entry.stats ?? {}, level = entry.level ?? 1, damage = entry.damage;
             if (!species) {
                 console.error('Profile', id, 'has no species', JSON.stringify(entry.species), 'that there is');
                 return null;
             }
-            for (const s of STATS) {
-                const v = entry.stats?.[s] ?? species.typical[s];
-                if (!isInt(v) || v < species.ranges[s][0] || v > species.ranges[s][1]) return null;
-                stats[s] = v;
-            }
-            if (!(Number.isInteger(level) && level >= 1) ||
-                !(Array.isArray(damage) && damage.length === 2 && damage.every(isInt) && damage[0] <= damage[1]) ||
+            if (!(stats && typeof stats === 'object' && !Array.isArray(stats)) ||
+                !Object.entries(stats).every(([s, v]) => STATS.includes(s) && isInt(v) && species.every(sp => v >= sp.ranges[s][0] && v <= sp.ranges[s][1])) ||
+                !(Number.isInteger(level) && level >= 1) ||
+                !(damage === undefined || isRange(damage)) ||
                 !isInt(entry.penetration ?? 0) || !isInt(entry.armor ?? 0) ||
                 !(entry.hp === undefined || (Number.isInteger(entry.hp) && entry.hp >= 1)) ||
                 !isInt(entry.xp ?? 0)) return null;
-            return {species:species.id, stats, level, damage:[...damage], penetration:entry.penetration ?? 0, armor:entry.armor ?? 0,
-                hp:entry.hp, xp:entry.xp};
+            return {species:species.map(sp => sp.id), stats:{...stats}, level, damage:damage ? [...damage] : null,
+                penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp};
         },
         
         // What a profile is if init.json5 doesn't say (or has no such one)
         DEFAULT_ENEMTY = 'creeper',
         DEFAULT_CHARACTER_CLASS = 'adventurer',
-        FALLBACK = parseProfile({}, '', FALLBACK_SPECIES),
+        FALLBACK = parseProfile({}, '', [FALLBACK_SPECIES]),
         
         LOG_MAX = 200,                       // combat log entries kept
         ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
@@ -141,17 +157,19 @@
     
     pkg.Combat = new JS.Module('Combat', {
         /*  Gives piece p the profile its owner's table has for id (yours: a character's,
-            "adventurer" if none; an enemy's: its enemyId's, "creeper" if none), at full
-            HP, with no status effects. */
-        giveProfile: function(p, id) {
+            "adventurer" if none; an enemy's: its enemyId's, "creeper" if none), as the
+            species speciesId if it's one of the profile's (else its first), at full HP,
+            with no status effects. */
+        giveProfile: function(p, id, speciesId) {
             const enemy = p.owner === 'enemy',
-                profile = (enemy ? pkg.enemies : pkg.characters).get(id ?? (enemy ? DEFAULT_ENEMTY : DEFAULT_CHARACTER_CLASS)) ?? FALLBACK;
-            p.species = profile.species;
-            p.stats = {...profile.stats};
+                profile = (enemy ? pkg.enemies : pkg.characters).get(id ?? (enemy ? DEFAULT_ENEMTY : DEFAULT_CHARACTER_CLASS)) ?? FALLBACK,
+                species = pkg.species.get(profile.species.includes(speciesId) ? speciesId : profile.species[0]) ?? FALLBACK_SPECIES;
+            p.species = species.id;
+            p.stats = {...species.typical, ...profile.stats};
             p.level = profile.level;
             p.xp = 0;
             p.statPoints = {available:0, spent:0};
-            p.damage = [...profile.damage];
+            p.damage = [...(profile.damage ?? species.damage)];
             p.penetration = profile.penetration;
             p.armor = profile.armor;
             p.fixedHp = profile.hp;
