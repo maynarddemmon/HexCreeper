@@ -13,6 +13,7 @@
         endTurnBtn,
         modeBtn,
         pieceMenu,
+        actionMenu = null, // the choice of what to do to a fixture (see Use), while it's open
         saveBtn,
         exportBtn,
         hiddenSaveFileImporter,
@@ -153,6 +154,8 @@
             V.swapMode = false;
             V.jumpMode = false;
             V.attackMode = false;
+            V.useMode = false;
+            V.useChoice = null;
             V.gotoMode = false;
             V.menuOpen = false;
             centerOn(false);
@@ -174,6 +177,8 @@
             V.swapMode = false;
             V.jumpMode = false;
             V.attackMode = false;
+            V.useMode = false;
+            V.useChoice = null;
             V.gotoMode = false;
             V.menuOpen = false;
             game.playerWait();
@@ -181,8 +186,8 @@
         },
         
         /*  What the selected piece's menu offers, in its order: place (next to it), swap,
-            jump, attach and attack (which then ask for the cell, or the piece to swap with or
-            attach to), detach, rally, its character sheet, and going places and into
+            jump, attach, attack and use (which then ask for the cell, or the piece to swap with
+            or attach to), detach, rally, its character sheet, and going places and into
             formations. */
         menuItems = () => {
             const sel = () => game.getSelected(),
@@ -203,6 +208,7 @@
                 {id:'jump', label:() => i18n('btn-jump'), tip:() => i18n('tip-jump'), enabled:() => game.canJump(sel()), run:choose('jumpMode')},
                 {id:'attach', label:() => i18n('btn-attach'), tip:() => i18n('tip-attach'), enabled:() => game.canAttach(sel()), run:choose('attachMode')},
                 {id:'attack', label:() => i18n('btn-attack'), tip:() => i18n('tip-attack'), enabled:() => game.canAttack(sel()), run:choose('attackMode')},
+                {id:'use', label:() => i18n('btn-use'), tip:() => i18n('tip-use'), enabled:() => game.canUse(sel()), run:choose('useMode')},
                 {id:'detach', label:() => i18n('btn-detach'), tip:() => i18n('tip-detach'), enabled:() => game.canDetach(sel()), run:() => {
                     if (game.playerDetach(sel())) gameView.afterTurn();
                     draw();
@@ -229,8 +235,27 @@
             ];
         },
         
+        /*  A menu of the actions piece p can do to the fixture at choice ({x, y}: see Use),
+            each doing it (see Fixtures.playerUse). */
+        makeActionMenu = (p, {x, y}) => {
+            const f = game.fixtureAt(x, y),
+                kind = game.fixtureType(f);
+            return new pkg.PieceMenu(gameView, {
+                items:game.fixtureActions(p, f).map(name => ({
+                    label:() => kind.actions[name].label,
+                    tip:() => i18n('tip-use-action', kind.actions[name].label, kind.name),
+                    enabled:() => game.canAfford(p) && game.fixtureActions(p, f).includes(name),
+                    run:() => {
+                        if (game.playerUse(p, x, y, name)) gameView.afterTurn();
+                        draw();
+                    }
+                })),
+                onPick:() => {V.useChoice = null;}
+            });
+        },
+        
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', u:'use', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -294,7 +319,8 @@
         /*  The next step: plans the way from where the piece is now and takes a step along
             it in Follow mode (which tries Fixed, then Free, if it can't follow), while it
             has the action points; without them, it ends the turn and waits for that turn to
-            play. If it can't step, it untangles its swarm (planUntangle), an action at a
+            play. A shut door next on the way, it opens (a step into it does), and steps
+            through it next. If it can't step, it untangles its swarm (planUntangle), an action at a
             time, with the points the swarm has, until it can step on, keeping off positions
             the swarm has been in on the way. Getting into a formation, it takes the next
             action for it (formationAction), with the points the swarm has, then ends the
@@ -324,9 +350,13 @@
                     // The step on, if it can make it, points or not (dear going costs more:
                     // see Combat.moveCost). Without the points, the turn ends, to wait for them.
                     const [x, y] = route[0],
-                        move = game.findMove(p, x, y, 'follow', false);
+                        move = game.findMove(p, x, y, 'follow', false),
+                        // A shut door on the way: the step opens it (see Fixtures.stepAction).
+                        opens = game.stepAction(p, x, y);
                     if (!game.canAfford(p, move && !move.attack ? game.moveCost(p, move) : undefined)) {
                         endTurn();
+                    } else if (opens && game.playerAct(p, x, y, 'follow')) {
+                        did = 'open';
                     } else if (move && !move.attack && game.playerAct(p, x, y, 'follow')) {
                         did = 'step';
                     } else {
@@ -349,13 +379,13 @@
             }
             if (did) {
                 gameView.afterTurn();
-                if (did !== 'form') nav.visited.add(game.swarmKey(p));
+                if (did !== 'form' && did !== 'open') nav.visited.add(game.swarmKey(p));
                 if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
             }
             stop ||= navStopReason();
-            // A step that leaves the piece without the points for another ends the turn
-            // with it (so the turn is one beat, below).
-            if (!stop && did === 'step' && game.turn === turn && !game.canMove(p)) endTurn();
+            // A step (or a door opened) that leaves the piece without the points for another
+            // ends the turn with it (so the turn is one beat, below).
+            if (!stop && (did === 'step' || did === 'open') && game.turn === turn && !game.canMove(p)) endTurn();
             if (stop) {
                 stopNav(stop === 'nav-over' ? '' : stop);
             } else {
@@ -421,6 +451,8 @@
             V.swapMode = false;
             V.jumpMode = false;
             V.attackMode = false;
+            V.useMode = false;
+            V.useChoice = null;
             V.gotoMode = false;
             V.menuOpen = false;
             draw();
@@ -600,6 +632,8 @@
                         status = i18n('status-jump');
                     } else if (V.attackMode) {
                         status = i18n('status-attack');
+                    } else if (V.useMode) {
+                        status = i18n('status-use');
                     } else if (V.gotoMode) {
                         status = i18n('status-goto');
                     } else if (nav) {
@@ -641,6 +675,10 @@
                             } else if (other) {
                                 status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
                             }
+                            // A fixture's state, in words (a door's "shut, barred": see
+                            // Fixtures.fixtureDescription).
+                            const words = fixture ? game.fixtureDescription(fixture) : [];
+                            if (words.length) status = i18n('status-tile', status, words.join(', '));
                             // A floor (a floor tile, or the map's base floor where there's no
                             // tile): what it is and, if it isn't 1, what a step onto it costs
                             // (after any fixture on it).
@@ -810,6 +848,22 @@
                 pieceMenu.refresh();
                 pieceMenu.placeNear(...V.cellCenter(sel.x, sel.y), V.cam.size);
             }
+            // What to do to a fixture, beside it, while that's being chosen (see Use): a menu
+            // made for each choice, of the actions the selected piece can do to it then.
+            if (V.useChoice && (!sel || gameOver)) V.useChoice = null;
+            if (actionMenu && actionMenu.choice !== V.useChoice) {
+                actionMenu.destroy();
+                actionMenu = null;
+            }
+            if (V.useChoice && !actionMenu) {
+                actionMenu = makeActionMenu(sel, V.useChoice);
+                actionMenu.choice = V.useChoice;
+            }
+            if (actionMenu) {
+                actionMenu.refresh();
+                actionMenu.placeNear(...V.cellCenter(V.useChoice.x, V.useChoice.y), V.cam.size);
+                actionMenu.setVisible(true);
+            }
             
             
             infoPanel.update();
@@ -867,6 +921,8 @@
             V.swapMode = false;
             V.jumpMode = false;
             V.attackMode = false;
+            V.useMode = false;
+            V.useChoice = null;
             V.gotoMode = false;
             V.menuOpen = false;
             game.reset();
@@ -1044,7 +1100,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.attackMode || V.gotoMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.attackMode || V.useMode || V.useChoice || V.gotoMode) return;
                 if (k === 'Enter') {
                     // Opens the selected piece's menu, its first item focused.
                     if (game.getSelected()) {

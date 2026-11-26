@@ -5,7 +5,8 @@
     the damage they can expect to deal (each strike's hit chance and damage odds, and the
     chances of a kill: see Combat.js) and how exposed the squad is when the turn ends.
     That lets them carry a piece into reach, strike with it, then pull it back out of
-    reach by moving an ancestor. A plan that goes stale as it's carried out (a strike kills
+    reach by moving an ancestor. Shut doors they can open (Fixtures.stepOpens: not barred
+    ones) are on their paths, and opening one is an action they plan. A plan that goes stale as it's carried out (a strike kills
     its target, so the next attack there would be a step) is made again from there. Far-away
     squads just march as a block. */
 (pkg => {
@@ -44,7 +45,8 @@
             let players = this.game.piecesOf('player');
             // (Without enemies there's nothing to plan, so no distances to work out.)
             if (players.length && this.game.piecesOf('enemy').length) {
-                const field = this.game.distanceField(players),
+                // (Through the doors they'd open: see Fixtures.stepOpens.)
+                const field = this.game.distanceField(players, 30, true),
                     fd = p => field.get(this.game.key(p.x, p.y)) ?? Infinity,
                     front = squad => Math.min(...squad.map(fd)),
                     roots = this.game.piecesOf('enemy').filter(e => !this.game.parent(e)),
@@ -75,7 +77,7 @@
                             while (ok && next < plan.length && !this.game.over) {
                                 const a = plan[next++],
                                     pc = this.game.pieces.get(a.id),
-                                    m = pc && !a.swap && !a.jump ? this.game.findMove(pc, pc.x + a.dx, pc.y + a.dy, a.mode) : null;
+                                    m = pc && !a.swap && !a.jump && !a.open ? this.game.findMove(pc, pc.x + a.dx, pc.y + a.dy, a.mode) : null;
                                 if (m && !m.attack !== !a.attack) {
                                     // Stale: plan the rest of the turn again, from here (unless
                                     // the plan was only just made, which would go round again).
@@ -119,6 +121,8 @@
             } else if (a.jump) {
                 done = this.game.canAfford(pc) && this.game.jumpPiece(pc, ...a.jump);
                 if (done) this.game.spend(pc);
+            } else if (a.open) {
+                done = !!pc && this.game.enemyStepAction(pc, pc.x + a.dx, pc.y + a.dy);
             } else if (m) {
                 const cost = this.game.moveCost(pc, m);
                 done = this.game.canAfford(pc, cost) && this.game.act(pc, pc.x + a.dx, pc.y + a.dy, a.mode);
@@ -130,7 +134,8 @@
         // Far from the player: step the squad one cell along the shortest path (see
         // distanceField), keeping its shape (fixed) if that gets it closer, or else letting
         // it give (follow, then free) to get through tight places. If no step gets it closer
-        // (a line of holes in the way, say), one of its pieces jumps instead, if that gets
+        // (a line of holes in the way, say), a piece next to a shut door on the way opens
+        // it, or else one of its pieces jumps, if that gets
         // the squad's nearest piece closer, or else its pieces closer in all: so the rest
         // can follow the first over. Only with the action points for it: a leader without
         // them doesn't step, but the others may jump.
@@ -163,7 +168,21 @@
                     }
                 }
             }
+            // No step gets it closer, but a door would, opened: a piece with the points next
+            // to it opens it (the step on is a later action's), and that's all.
+            let opened = false;
             if (!(best && bestKey[0] < cur) && cur !== Infinity) {
+                for (const g of members) {
+                    for (const [dx, dy] of pkg.hex.dirs) {
+                        const d = field.get(this.game.key(g.x + dx, g.y + dy));
+                        if (!opened && d !== undefined && d < fd(g) && this.game.fixtureBlocks(g.x + dx, g.y + dy) && this.game.enemyStepAction(g, g.x + dx, g.y + dy)) {
+                            opened = true;
+                            best = null;
+                        }
+                    }
+                }
+            }
+            if (!opened && !(best && bestKey[0] < cur) && cur !== Infinity) {
                 // [nearest, total] after a jump of piece g to (x, y)
                 const sumOf = vals => vals.reduce((a, v) => a + v, 0),
                     after = (g, x, y) => {
@@ -196,8 +215,9 @@
         },
         
         // Plan a squad's turn. Returns the actions to carry out in order: {id, dx, dy, mode}
-        // to step ({id, dx, dy, mode, attack:true} to attack), {id, swap} to swap with
-        // another squad piece, or {id, jump:[x, y]}. Each spends the piece's action points
+        // to step ({id, dx, dy, mode, attack:true} to attack), {id, dx, dy, open:true} to
+        // open the door there (see Fixtures.stepAction; the plan's steps after go through
+        // it), {id, swap} to swap with another squad piece, or {id, jump:[x, y]}. Each spends the piece's action points
         // (both pieces', for a swap: see Combat.js), so a piece acts only with the points
         // for it, and may act more than once.
         //
@@ -249,9 +269,12 @@
                     pos:new Map(squad.map(p => [p.id, [p.x, p.y]])),
                     ap:new Map(squad.map(p => [p.id, p.ap])),
                     hp:new Map(),
+                    opened:new Set(), // the keys of the doors the plan has opened
                     gain:0,
                     actions:[]
                 },
+                // Whether (x, y) is open, with the doors plan st has opened
+                isOpenIn = (st, x, y) => this.game.isOpen(x, y) || st.opened.has(x + ',' + y),
                 occupiedBySquad = st => {
                     const m = new Map();
                     for (const [id, [x, y]] of st.pos) m.set(x + ',' + y, id);
@@ -345,8 +368,8 @@
                                     other = sq === undefined ? this.game.pieceAt(x, y) : null;
                                 return sq ?? (other && !inSquad.has(other.id) ? other.id : undefined);
                             },
-                            open: (x, y) => this.game.isOpen(x, y) && !this.game.isHarm(x, y),
-                            passable: (x, y) => this.game.isOpen(x, y),
+                            open: (x, y) => isOpenIn(st, x, y) && !this.game.isHarm(x, y),
+                            passable: (x, y) => isOpenIn(st, x, y),
                             harm: (x, y) => this.game.isHarm(x, y),
                             target: (id, x, y) => livePlayerAt(st, x, y)
                         };
@@ -364,6 +387,7 @@
                                     pos,
                                     ap:spent(st, id, costs.get(id), other),
                                     hp:st.hp,
+                                    opened:st.opened,
                                     gain:st.gain,
                                     actions:[...st.actions, {id, swap:other}]
                                 });
@@ -385,6 +409,7 @@
                                             pos:st.pos,
                                             ap:spent(st, id),
                                             hp:new Map(st.hp),
+                                            opened:st.opened,
                                             gain:st.gain - killValue(st),
                                             actions:[...st.actions, {...action, attack:true}]
                                         };
@@ -403,11 +428,31 @@
                                             pos,
                                             ap:spent(st, id, this.game.moveCost(pc, r)),
                                             hp:st.hp,
+                                            opened:st.opened,
                                             gain:st.gain,
                                             actions:[...st.actions, action]
                                         });
                                     }
                                 }
+                            }
+                        }
+                        // Opening a door next to it (a step into it would: see
+                        // Fixtures.stepAction), for an action, if it's on the way (nearer the
+                        // player than the piece is), which counts as a step of approach.
+                        const [px, py] = st.pos.get(id);
+                        for (const [dx, dy] of pkg.hex.dirs) {
+                            const tx = px + dx,
+                                ty = py + dy,
+                                k = tx + ',' + ty;
+                            if (!st.opened.has(k) && can(st, id) && fdist(tx, ty) < fdist(px, py) && this.game.stepAction({owner:pc.owner, x:px, y:py}, tx, ty)) {
+                                out.push({
+                                    pos:st.pos,
+                                    ap:spent(st, id),
+                                    hp:st.hp,
+                                    opened:new Set(st.opened).add(k),
+                                    gain:st.gain + A.approach,
+                                    actions:[...st.actions, {id, dx, dy, open:true}]
+                                });
                             }
                         }
                         // Jumping: only it moves, two cells, for an action, but it's exhausted
@@ -425,6 +470,7 @@
                                 pos,
                                 ap:spent(st, id),
                                 hp:st.hp,
+                                opened:st.opened,
                                 gain:st.gain - A.jump,
                                 actions:[...st.actions, {id, jump:[x, y]}]
                             });

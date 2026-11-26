@@ -163,7 +163,15 @@
 	//   moveCost: what a step onto it costs, times the floor's (default 1), or a formula; 0
 	//     or less and it's in the way, as a solid is.
 	//   destroyInto: the fixture it leaves when it's gone (broken, used up or run out).
-	//   fillColor, borderColor: a feature's colours.
+	//   fillColor, borderColor: a feature's colours; shape: how it's drawn, "hex" (default)
+	//     or "door".
+	//   orientable: true if each one faces a way (front, sides, back: see Fixtures.js).
+	//   actions: {"name":{"from":["front", "back", "side"], "when":formula, "set":{"state
+	//     name":value or formula}, "onStep":true, "label":"..."}}: what a piece of yours
+	//     next to it can do to it (with Use, U), for an action; onStep: what a step into
+	//     it does, when it's in the way.
+	//   describe: [{"when":formula, "text":"..."}]: words for its state, shown when you
+	//     point at it (each whose when holds).
 	// Maps choose which kinds of each type they place (their tile generator's attrs; see
 	// js/hc/model/map/tile/ProximityTileGenerator.js and CavernsTileGenerator.js).
 	"fixtures":{
@@ -257,6 +265,38 @@
 			"destroyInto":"wood_scraps",
 			"fillColor":"#7a5a3a",
 			"borderColor":"#5a4028"
+		},
+		"wooden_door":{
+			"type":"feature",
+			"name":"Wooden door",
+			"description":"A heavy oak door. It can be barred from behind.",
+			"shape":"door",
+			"orientable":true,
+			"composition":"oakwood",
+			"hp":15,
+			"state":{"open":false, "barred":false},
+			"moveCost":"open ? 1 : 0",
+			"coverage":"open ? 0 : 100",
+			"destroyInto":"broken_door",
+			"actions":{
+				"open": {"when":"!open && !barred", "set":{"open":true}, "onStep":true},
+				"close":{"when":"open", "set":{"open":false}},
+				"bar":  {"from":["back"], "when":"!open && !barred", "set":{"barred":true}},
+				"unbar":{"from":["back"], "when":"barred", "set":{"barred":false}}
+			},
+			"describe":[{"when":"open", "text":"open"}, {"when":"!open", "text":"shut"}, {"when":"barred", "text":"barred"}],
+			"fillColor":"#753",
+			"borderColor":"#532"
+		},
+		"broken_door":{
+			"type":"feature",
+			"name":"Broken door",
+			"description":"Splintered oak: slow going.",
+			"composition":"oakwood",
+			"coverage":20,
+			"moveCost":1.5,
+			"fillColor":"#6b4a2b",
+			"borderColor":"#4a3220"
 		},
 		"wood_scraps":{
 			"type":"feature",

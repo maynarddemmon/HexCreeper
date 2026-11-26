@@ -1,7 +1,9 @@
 /*  Routes for your pieces to go somewhere by themselves, a step a turn (Go to and Explore:
     see App.js; a module included in Game). A route is planned only from what you know:
-    cells you haven't seen may be anything, and harm tiles you know of are kept off. It's
-    planned again before every step, as what you know changes. */
+    cells you haven't seen may be anything, and harm tiles you know of are kept off. A shut
+    door a step would open (Fixtures.stepOpens) is a way through, an action dearer: the
+    step into it opens it. It's planned again before every step, as what you know
+    changes. */
 (pkg => {
     'use strict';
     
@@ -68,8 +70,9 @@
             costOf(x, y, nk), nk its key from keysNear(p.x, p.y), worked out once for each
             cell: its moveCost (see Game.moveCostAt) for a cell you've seen that's open, with
             no harm you know of and no piece on it (swarmCost times that if one of p's swarm
-            is: its whole tree, which makes way for it in Follow); UNSEEN_COST for one you
-            haven't seen, if unseen is true; 0 for one it can't go on. @private */
+            is: its whole tree, which makes way for it in Follow), or a door a step would
+            open (a step more, for opening it); UNSEEN_COST for one you haven't seen, if
+            unseen is true; 0 for one it can't go on. @private */
         _stepCosts: function(p, unseen, swarmCost) {
             const topOf = q => {
                     while (this.parent(q)) q = this.parent(q);
@@ -86,7 +89,8 @@
                 let v = costs.get(nk);
                 if (v === undefined) {
                     const k = this.key(x, y);
-                    v = this.hasSeen(k) ? (this.isOpen(x, y) && !this.isHarm(x, y) ? pieceCost(k, x, y) : 0) :
+                    v = this.hasSeen(k) ? (this.isOpen(x, y) && !this.isHarm(x, y) ? pieceCost(k, x, y) :
+                        this.stepOpens(x, y) && !this.isHarm(x, y) ? pieceCost(k, x, y) + TENTHS : 0) :
                         unseen && Math.abs(x) <= cfg.WORLD_LIMIT && Math.abs(y) <= cfg.WORLD_LIMIT ? UNSEEN_COST * TENTHS : 0;
                     costs.set(nk, v);
                 }

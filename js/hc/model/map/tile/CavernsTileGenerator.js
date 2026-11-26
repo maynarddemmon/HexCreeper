@@ -18,6 +18,9 @@
     width (tunnelWidthMin to tunnelWidthMax) as it goes. Everything else is rock
     (rockSolid).
     
+    Doors (doorChance): where a tunnel leaves a cavern, a short straight wall across it with
+    a door in it (doorTable: see Fixtures.js), its back toward the cavern (see doorway).
+    
     Streams (streamChance, off by default): some sites are springs, and from each a stream
     wanders along tunnels from site to site, in any direction, branching now and then, a
     channel of streamFloor down the middle of each tunnel it takes. Where it runs through a
@@ -65,6 +68,8 @@
         // from where it ends (world units).
         DEAD_END_KINDS = () => ['simple', 'lasso', 'fork', 'knot'].map(value => ({value, label:value})),
         DEAD_END_REACH = 16,
+        DOOR_SETBACK = 6,        // how far past a cavern's edge a doorway is, in steps along the tunnel's path (MAX_STEP each)
+        DOOR_WALL_MAX = 8,       // the most cells of wall either side of a door
         
         // The points of a walk from (x, y), heading off at heading, for length (world
         // units), turning in two waves as tunnels do (more with tangle, 0 to 1): [[x, y]].
@@ -153,6 +158,10 @@
                 num('poolSizeMax', 40, 1, 100),
                 num('poolTerminusChance', 30, 0, 100), // % chance a pool is where the stream ends
                 
+                // Doors (see doorway): % of the places a tunnel leaves a cavern with one,
+                // of the kinds in doorTable, by weight.
+                num('doorChance', 15, 0, 100),
+                
                 // Tiles per 1000 open cells: in caverns, off the tunnels' paths...
                 num('stalagmiteFrequency', 30, 0, 100),
                 num('stalactiteFrequency', 20, 0, 100),
@@ -186,7 +195,8 @@
                 choice('stalactiteSolid', 'stalactite', optionsOf(pkg.solids)),
                 choice('rubbleSolid', 'rubble', optionsOf(pkg.solids)),
                 choice('streamFloor', 'stream', optionsOf(pkg.floors)),
-                choice('poolFloor', 'pool', optionsOf(pkg.floors))
+                choice('poolFloor', 'pool', optionsOf(pkg.floors)),
+                table('doorTable', {wooden_door:1}, fixtureOptions(FIXTURE_FEATURE))
             ],
             
             // The key of the tunnel between two sites ("i,j" keys), the same either way
@@ -234,6 +244,7 @@
             this.cavernLoops = new Map(); // site key -> its cavern loop, or null
             this.springs = new Map();     // site key -> the stream from it, or null (see spring)
             this.pools = new Map();       // site key -> its pool, or null (see poolOf)
+            this.doorways = new Map();    // tunnel key + '>' + site key -> its doorway there, or null (see doorway)
             
             // With a maxSize, the network grown so far (see grow).
             this.network = a.maxSize > 0 ? {
@@ -984,15 +995,135 @@
             return t.water;
         },
         
+        // ---- Doors ----
+        
+        /*  The doorway where tunnel tk leaves the cavern at site end (its key), if it has one,
+            or null: {door, facing, subtype, walls}. At doorChance (not where the cavern's a
+            junction, a join, or the tunnel has a stream), a little way (DOOR_SETBACK) past
+            the cavern's edge along the tunnel's path, a straight wall across it, along
+            whichever of the grid's three lines is most nearly across the path, out to the
+            tunnel's edges either side (walls: the keys of its cells), with a door (of
+            subtype, at cell key door) in the middle, on the path, its back toward the
+            cavern. None if that wouldn't shut the tunnel there, or could be gone round:
+            if any of it is by the start, or in or next to anything else open (a cavern, or
+            another tunnel, dead end or cavern loop), or the door wouldn't have open tunnel
+            both in front of it and behind it. Worked out once each. */
+        doorway: function(tk, end) {
+            const key = tk + '>' + end;
+            let retval = this.doorways.get(key);
+            if (retval === undefined) {
+                retval = null;
+                const a = this.attrs,
+                    rng = this.game.rngFor('cave-door', key),
+                    [i, j] = end.split(',').map(Number),
+                    other = tk.split('|').find(k => k !== end).split(',').map(Number),
+                    s = this.site(i, j);
+                if (a.doorChance > 0 && rng() * 100 < a.doorChance && !s.junction && !this.isJoined([i, j], other) &&
+                    !(a.streamChance > 0 && this.isWetTunnel(tk))) {
+                    const subtype = pick(a.doorTable, rng),
+                        t = this.tunnel(tk),
+                        cavern = this.cavern(i, j),
+                        cellKey = (x, y) => {
+                            const c = hex.cellAtWorld(x, y);
+                            return c.x + ',' + c.y;
+                        },
+                        path = tk.split('|')[0] === end ? t.path : [...t.path].reverse(),
+                        out = path.findIndex(q => !cavern.has(cellKey(q.x, q.y))),
+                        n = Math.min(path.length - 1, out + DOOR_SETBACK);
+                    if (subtype !== undefined && out > 0 && n > out) {
+                        const at = path[n],
+                            prev = path[n - 1],
+                            heading = atan2(at.y - prev.y, at.x - prev.x),
+                            door = hex.cellAtWorld(at.x, at.y),
+                            dirWorld = d => {
+                                const [x, y] = hex.center(...hex.dirs[d % 6]),
+                                    [x0, y0] = hex.center(0, 0);
+                                return [x - x0, y - y0];
+                            },
+                            // The line most nearly across the path.
+                            across = [0, 1, 2].reduce((best, d) => {
+                                const [x, y] = dirWorld(d),
+                                    cosine = Math.abs(cos(heading) * x + sin(heading) * y) / hypot(x, y);
+                                return cosine < best.cosine ? {d, cosine} : best;
+                            }, {d:0, cosine:Infinity}).d,
+                            walls = new Set(),
+                            beyond = [];
+                        for (const sign of [1, -1]) {
+                            let [x, y] = [door.x, door.y];
+                            for (let m = 0; m <= DOOR_WALL_MAX; m++) {
+                                const [dx, dy] = hex.dirs[sign > 0 ? across : across + 3];
+                                x += dx;
+                                y += dy;
+                                if (m < DOOR_WALL_MAX && t.cells.has(x + ',' + y)) {
+                                    walls.add(x + ',' + y);
+                                } else {
+                                    beyond.push(x + ',' + y);
+                                    m = DOOR_WALL_MAX;
+                                }
+                            }
+                        }
+                        // Facing either way along the wall (sides across and across + 3), the
+                        // one whose back is toward the cavern.
+                        const facings = [(across + 4) % 6, (across + 1) % 6],
+                            [dcx, dcy] = hex.center(door.x, door.y),
+                            backOf = f => {
+                                const [x1, y1] = dirWorld(f + 3),
+                                    [x2, y2] = dirWorld(f + 4);
+                                return (x1 + x2) * (s.wx - dcx) + (y1 + y2) * (s.wy - dcy);
+                            },
+                            facing = backOf(facings[0]) > backOf(facings[1]) ? facings[0] : facings[1],
+                            doorKey = door.x + ',' + door.y,
+                            // What else is open round it (anything that could get round it)
+                            near = this.around(...this.siteOf(door.x, door.y)),
+                            elsewhere = k => near.caverns.some(c => c.has(k)) || near.tunnels.some(u => u !== t && u.cells.has(k)),
+                            neighbourOpen = sides => sides.some(d => {
+                                const [dx, dy] = hex.dirs[(facing + d) % 6],
+                                    k = (door.x + dx) + ',' + (door.y + dy);
+                                return !walls.has(k) && (t.cells.has(k) || cavern.has(k));
+                            }),
+                            ok = t.cells.has(doorKey) && [doorKey, ...walls, ...beyond].every(k => {
+                                const [x, y] = k.split(',').map(Number);
+                                return !elsewhere(k) && hexDist({x, y}, {x:0, y:0}) > 1;
+                            }) && neighbourOpen([0, 1]) && neighbourOpen([3, 4]);
+                        if (ok) retval = {door:doorKey, facing, subtype, walls};
+                    }
+                }
+                this.doorways.set(key, retval);
+            }
+            return retval;
+        },
+        
         // The caverns and tunnels (dead ends' shapes and cavern loops too) that may reach block (bi,
-        // bj): {caverns, tunnels, streams, pools}, the keys of their cells (and the
-        // tunnels' spines), and of the cells of the streams and pools there. Sites more than
+        // bj): {caverns, tunnels, doorWalls, doors, streams, pools}, the keys of their
+        // cells (and the tunnels' spines), of the walls of the doorways there (see
+        // doorway), its doors (door cell key -> doorway), and of the cells of the streams
+        // and pools there. Sites more than
         // siteReach apart on the lattice are too far for theirs to.
         near: function(bi, bj) {
             const c = this.blocks.center(bi, bj),
                 centre = this.siteOf(c.x, c.y),
-                sites = hex.disk(...centre, this.siteReach).map(q => [q.x, q.y]),
+                {sites, tunnelKeys, caverns, tunnels} = this.around(...centre),
                 wet = this.streamsAround(...centre, this.siteReach),
+                wetSites = sites.filter(q => wet.sites.has(q.join())),
+                doorways = [...tunnelKeys].flatMap(tk => tk.split('|').map(end => this.doorway(tk, end))).filter(Boolean);
+            return {
+                caverns,
+                tunnels,
+                doorWalls:new Set(doorways.flatMap(d => [...d.walls])),
+                doors:new Map(doorways.map(d => [d.door, d])),
+                streams:[
+                    ...[...tunnelKeys].filter(tk => wet.edges.has(tk)).map(tk => this.waterOf(this.tunnel(tk))),
+                    ...wetSites.map(q => this.deadEndShape(...q)).filter(Boolean).map(t => this.waterOf(t))
+                ],
+                pools:wetSites.map(q => this.poolCells(...q))
+            };
+        },
+        
+        /*  What's within siteReach of site (i, j) on the lattice (see near): {sites ([i, j]),
+            tunnelKeys (of the tunnels between them), caverns (the keys of their cells),
+            tunnels (theirs, with dead ends' shapes and cavern loops)}. */
+        around: function(i, j) {
+            const sites = hex.disk(i, j, this.siteReach).map(q => [q.x, q.y]),
                 inRange = new Set(sites.map(q => q.join())),
                 tunnelKeys = new Set();
             for (const q of sites) {
@@ -1001,18 +1132,14 @@
                     if (inRange.has(n.join()) && this.hasTunnel(q, n)) tunnelKeys.add(pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()));
                 }
             }
-            const wetSites = sites.filter(q => wet.sites.has(q.join()));
             return {
+                sites,
+                tunnelKeys,
                 caverns:sites.map(q => this.cavern(...q)),
                 tunnels:[
                     ...[...tunnelKeys].map(tk => this.tunnel(tk)),
                     ...sites.flatMap(q => [this.deadEndShape(...q), this.cavernLoop(...q)]).filter(Boolean)
-                ],
-                streams:[
-                    ...[...tunnelKeys].filter(tk => wet.edges.has(tk)).map(tk => this.waterOf(this.tunnel(tk))),
-                    ...wetSites.map(q => this.deadEndShape(...q)).filter(Boolean).map(t => this.waterOf(t))
-                ],
-                pools:wetSites.map(q => this.poolCells(...q))
+                ]
             };
         },
         
@@ -1054,7 +1181,7 @@
         // ---- Making cells ----
         
         // What cell (x, y) is, given what's near it (see near): {open, cavern, clear,
-        // rubble, water}. Open cells are in a cavern or a tunnel; clear ones (the tunnels'
+        // rubble, water}. Open cells are in a cavern or a tunnel, but not a doorway's wall; clear ones (the tunnels'
         // spines, and the start cell and its neighbours) are kept free of stalagmites,
         // stalactites and holes; rubble is where a tunnel has collapsed, outside the
         // caverns; water is 'pool' or 'stream' where there's one (not by the start), or null.
@@ -1065,7 +1192,7 @@
                 start = hexDist({x, y}, {x:0, y:0}) <= 1,
                 water = !open || start ? null : near.pools.some(keys => keys.has(k)) ? 'pool' : near.streams.some(keys => keys.has(k)) ? 'stream' : null;
             return {
-                open,
+                open:open && !near.doorWalls.has(k),
                 cavern,
                 rubble:!cavern && !water && near.tunnels.some(t => t.plug?.has(k)),
                 clear:start || near.tunnels.some(t => t.spine.has(k)),
@@ -1200,7 +1327,11 @@
                     if (!game.tiles.has(k) && !game.fixtures.has(k) && !game.pieceAt(x, y)) {
                         const [kind, subtype] = this.tileOf(x, y, near) ?? [];
                         if (kind) game.tiles.set(k, game.makeTile(x, y, kind, subtype));
-                        if (game.isOpen(x, y)) {
+                        const door = near.doors.get(k);
+                        if (door) {
+                            // A doorway's door (see doorway)
+                            game.fixtures.set(k, {...game.makeFixture(x, y, door.subtype, game.rngFor('rolls', k), FIXTURE_FEATURE), facing:door.facing});
+                        } else if (game.isOpen(x, y)) {
                             const [type, fixture] = this.fixtureOf(x, y) ?? [];
                             if (type && (type !== FIXTURE_FEATURE || this.isCavernFloor(x, y, near))) {
                                 game.fixtures.set(k, game.makeFixture(x, y, fixture, game.rngFor('rolls', k), type));

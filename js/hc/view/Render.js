@@ -352,21 +352,75 @@
             }
         },
         
-        // A feature (a fixture that does nothing when entered: see Fixtures.js): a hexagon
-        // inside its cell, in its kind's colours (else a solid's), faint if it isn't in the
-        // way, with its HP bar once it's damaged.
+        // A feature (a fixture that does nothing when entered: see Fixtures.js), in its
+        // kind's colours (else a solid's), as its kind's shape says: a hexagon inside its
+        // cell, faint if it isn't in the way, or a door (drawDoor); with its HP bar once
+        // it's damaged.
         drawFeature = t => {
-            const kind = game.fixtureType(t);
-            ctx.globalAlpha = game.fixtureBlocks(t.x, t.y) ? 1 : 0.6;
-            ctx.beginPath();
-            addCellPath(t.x, t.y, cam.size * 0.15);
-            ctx.fillStyle = dataColor(kind.fillColor, '--solid');
-            ctx.fill();
-            ctx.lineWidth = Math.max(1, cam.size * 0.04);
-            ctx.strokeStyle = dataColor(kind.borderColor, '--solid-edge');
-            ctx.stroke();
-            ctx.globalAlpha = 1;
+            const kind = game.fixtureType(t),
+                fill = dataColor(kind.fillColor, '--solid'),
+                edge = dataColor(kind.borderColor, '--solid-edge');
+            if (kind.shape === 'door') {
+                drawDoor(t, fill, edge);
+            } else {
+                ctx.globalAlpha = game.fixtureBlocks(t.x, t.y) ? 1 : 0.6;
+                ctx.beginPath();
+                addCellPath(t.x, t.y, cam.size * 0.15);
+                ctx.fillStyle = fill;
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, cam.size * 0.04);
+                ctx.strokeStyle = edge;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
             if (t.hp != null) drawDamage(t, t.hp, kind.hp ?? t.hp);
+        },
+        
+        // A door (a feature of shape "door"): a thick bar across its cell along the wall
+        // it's in (from the middle of the edge toward one side to the other's: see
+        // Fixtures.js, orientable), shut; swung round from that first end into its back
+        // half, open (its state's open). Barred (its state's barred), a shorter bar behind
+        // it. Each bar in fill, with an edge.
+        drawDoor = (t, fill, edge) => {
+            const s = cam.size,
+                [cx, cy] = cellCenter(t.x, t.y),
+                // From its centre toward the centre of the cell round from it in direction i
+                toward = i => {
+                    const [dx, dy] = pkg.hex.dirs[(i + 6) % 6],
+                        [nx, ny] = cellCenter(t.x + dx, t.y + dy);
+                    return [nx - cx, ny - cy];
+                },
+                f = t.facing ?? 0,
+                [ax, ay] = toward(f + 2).map(v => v / 2),
+                [bx, by] = toward(f + 5).map(v => v / 2),
+                [k1, k2] = [toward(f + 3), toward(f + 4)],
+                back = [k1[0] + k2[0], k1[1] + k2[1]],
+                backLength = Math.hypot(...back) || 1,
+                [ux, uy] = [back[0] / backLength, back[1] / backLength],
+                width = Math.hypot(bx - ax, by - ay),
+                thick = Math.max(2, s * 0.12),
+                bar = (x1, y1, x2, y2, w) => {
+                    ctx.lineCap = 'butt';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = edge;
+                    ctx.lineWidth = w + Math.max(1, s * 0.02) * 2;
+                    ctx.stroke();
+                    ctx.strokeStyle = fill;
+                    ctx.lineWidth = w;
+                    ctx.stroke();
+                };
+            if (t.state?.open) {
+                bar(cx + ax, cy + ay, cx + ax + ux * width * 0.85, cy + ay + uy * width * 0.85, thick);
+            } else {
+                bar(cx + ax, cy + ay, cx + bx, cy + by, thick);
+                if (t.state?.barred) {
+                    const ox = ux * thick * 1.6,
+                        oy = uy * thick * 1.6;
+                    bar(cx + ax * 0.6 + ox, cy + ay * 0.6 + oy, cx + bx * 0.6 + ox, cy + by * 0.6 + oy, thick * 0.5);
+                }
+            }
         },
         
         // A fixture (Fixtures.js): heal, harm, loot or a feature, once it's revealed. Over
@@ -732,6 +786,10 @@
             fillCell(sel.x, sel.y, '--sel-bg');
             for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
             if (V.jumpAt(sel, V.hover)) ghost = [[sel.id, V.hover.x, V.hover.y]];
+        } else if (V.useMode && sel) {
+            // The cells with a fixture the selected piece can do something to.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const q of game.useTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
         } else if (V.attackMode && sel) {
             // The cells the selected piece can attack.
             fillCell(sel.x, sel.y, '--sel-bg');

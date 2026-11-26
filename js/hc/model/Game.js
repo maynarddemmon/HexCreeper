@@ -412,7 +412,8 @@
         
         /*  What stepping onto (x, y) costs, as a multiple of an action: its floor's moveCost
             (see Solids.js; the base floor's where there's no tile), or 1, times its
-            fixture's (see Fixtures.fixtureMoveCost). */
+            fixture's (see Fixtures.fixtureMoveCost: 1 for one in the way, so a door costs
+            what its floor does once it's open). */
         moveCostAt: function(x, y) {
             const t = this.tiles.get(this.key(x, y));
             return ((t ? t.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype)?.moveCost : 1 : this.baseFloor()?.moveCost) ?? 1) * this.fixtureMoveCost(x, y);
@@ -681,6 +682,10 @@
         // Combat.js). Only the piece you choose spends them; pieces it carries keep theirs.
         // Your piece acts (moves or attacks): in its movement mode, or the one given.
         playerAct: function(piece, x, y, mode = this.modeFor(piece)) {
+            // Into a fixture in the way that a step does something to (a door: see
+            // Fixtures.stepAction): that, if it can, and nothing else.
+            const step = piece?.owner === 'player' ? this.stepAction(piece, x, y) : undefined;
+            if (step !== undefined) return !!step && this.playerUse(piece, x, y, step.action);
             const m = piece?.owner === 'player' ? this.findMove(piece, x, y, mode) : null;
             if (!m) return false;
             const cost = this.moveCost(piece, m);
@@ -780,7 +785,7 @@
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p) ||
-                this.canRally(p) || this.canAttack(p));
+                this.canRally(p) || this.canAttack(p) || this.canUse(p));
             if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }
             // The selection stays where it is, even on a piece that has acted.
         },
@@ -832,9 +837,11 @@
         // is an action times the moveCost of the cell it steps onto (dear going counts more:
         // see moveCostAt), and a jump (see jumpOffsets) counts 2 (an action, and the
         // points its exhaustion costs: about as much again), so it's no quicker than
-        // walking, but it can cross holes. Worked out in tenths, so it can go by whole
-        // numbers, and given in actions.
-        distanceField: function(sources, radius = 30) {
+        // walking, but it can cross holes. With openDoors, a door a step would open (see
+        // Fixtures.stepOpens) counts as a cell it can go on, an action dearer (the step that
+        // opens it). Worked out in tenths, so it can go by whole numbers, and given in
+        // actions.
+        distanceField: function(sources, radius = 30, openDoors = false) {
             // Each cell's numeric key (see keysNear) is used while searching, and what's on
             // it looked up only once, so the search makes as little as it can.
             const {key:numKey} = keysNear(sources[0]?.x ?? 0, sources[0]?.y ?? 0),
@@ -847,7 +854,7 @@
                 costAt = (x, y) => {
                     const nk = numKey(x, y);
                     let v = costs.get(nk);
-                    if (v === undefined) costs.set(nk, v = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y))));
+                    if (v === undefined) costs.set(nk, v = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y))) + (openDoors && !this.isOpen(x, y) ? TENTHS : 0));
                     return v;
                 },
                 kinds = new Map(),    // numeric key -> OPEN (open and not harm you know of), SOLID, or 0
@@ -855,7 +862,7 @@
                     const nk = numKey(x, y);
                     let v = kinds.get(nk);
                     if (v === undefined) {
-                        v = this.isOpen(x, y) ? (this.isHarm(x, y) ? 0 : OPEN) : this.blocksJumps(x, y) ? SOLID : 0;
+                        v = this.isOpen(x, y) ? (this.isHarm(x, y) ? 0 : OPEN) : openDoors && this.stepOpens(x, y) ? OPEN : this.blocksJumps(x, y) ? SOLID : 0;
                         kinds.set(nk, v);
                     }
                     return v;

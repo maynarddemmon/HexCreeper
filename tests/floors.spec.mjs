@@ -164,7 +164,8 @@ test('the caverns generator puts patches of floor on open cells, from its floorT
             some:floors.length > 20,
             kinds:[...new Set(floors.map(t => t.subtype))],
             onFloors:[...g.fixtures.values()].some(f => g.tiles.get(g.key(f.x, f.y))?.kind === 'floor'),
-            fixturesOpen:[...g.fixtures.values()].every(f => g.isOpen(f.x, f.y))
+            // (On open floor: what's under it, since a fixture may be in the way itself.)
+            fixturesOpen:[...g.fixtures.values()].every(f => ['floor', undefined].includes(g.tiles.get(g.key(f.x, f.y))?.kind))
         };
     });
     expect(r).toEqual({base:'cave_floor', some:true, kinds:['mud'], onFloors:true, fixturesOpen:true});

@@ -49,6 +49,25 @@
     - destroyInto: the kind of fixture it leaves when it's gone (when it's broken, used up
       or its countdown runs out), revealed if it was.
     - fillColor, borderColor: a feature's colours (any CSS colour, or a --variable).
+    - shape: how a feature is drawn: "hex" (the default: a hexagon inside its cell) or
+      "door" (see Render.js).
+    - orientable: whether each one faces a way (default false): it then has a facing, 0 to
+      5 (an index into hex.dirs), which splits the six cells round it into its front
+      (facing and the next direction round), its sides (the next, and the one opposite:
+      the wall it's in, for a door) and its back (the two opposite its front).
+    - actions: {name:action}: what a piece of yours next to it can do to it (see
+      fixtureActions), each an action, for its action points:
+      - from: the sides it can be done from: ["front", "back", "side"] (the default: all;
+        for one that isn't orientable, it's any side);
+      - when: a formula of its state: it can be done only when this isn't 0 (default 1);
+      - set: {state name: value}, a number, true or false, or a formula of its state (as
+        it was): what doing it changes;
+      - onStep: true if a piece of yours stepping into it does this (and stays put),
+        rather than anything else a step would do;
+      - label: what it's called (default: its name, with a capital).
+      It can't be done if it would put the fixture in the way of a piece on it.
+    - describe: [{when, text}]: words for its state, shown when you point at it (a door's
+      "shut", "barred"): each text whose when (a formula of its state) isn't 0.
     
     Heals heal your pieces (what the piece doesn't need flows along its links, and what
     nobody needs becomes score); harms damage any piece; loot gives you score. Only your
@@ -130,6 +149,38 @@
         parseFormula = (v, def, names) => v === undefined ? def : Number.isFinite(v) ? v :
             typeof v === 'string' && !pkg.attrs.formulaProblem(v, names) ? v : undefined,
         
+        SIDES = ['front', 'back', 'side'],
+        
+        // {name:{from, when, set, onStep, label}}, as above, or null if any doesn't make
+        // sense (state: the kind's; names: its formulas' variables).
+        parseActions = (v, state, names) => {
+            let actions = v === undefined ? {} : null;
+            if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                actions = {};
+                for (const [name, a] of Object.entries(v)) {
+                    const from = a?.from ?? SIDES,
+                        when = parseFormula(a?.when, 1, names),
+                        set = a?.set ?? {},
+                        ok = Array.isArray(from) && from.every(s => SIDES.includes(s)) && when !== undefined &&
+                            set !== null && typeof set === 'object' && !Array.isArray(set) &&
+                            Object.entries(set).every(([k, s]) => Object.hasOwn(state, k) && (typeof s === 'boolean' || parseFormula(s, 0, names) !== undefined)) &&
+                            (a.onStep === undefined || typeof a.onStep === 'boolean') && isText(a.label);
+                    if (ok) {
+                        actions[name] = {from, when, set, onStep:a.onStep ?? false, label:a.label || name[0].toUpperCase() + name.slice(1)};
+                    } else {
+                        actions = null;
+                        break;
+                    }
+                }
+            }
+            return actions;
+        },
+        
+        // [{when, text}], as above, or null if any doesn't make sense.
+        parseDescribe = (v, names) => v === undefined ? [] : Array.isArray(v) &&
+            v.every(d => d !== null && typeof d === 'object' && typeof d.text === 'string' && d.text && parseFormula(d.when, 1, names) !== undefined) ?
+            v.map(d => ({when:parseFormula(d.when, 1, names), text:d.text})) : null,
+        
         // A kind's own properties: its type; pool and magnitude are {min, max}, or null for
         // an infinite pool or a magnitude of the whole pool (which needs a pool that isn't
         // infinite; a feature has neither); state, the formulas' variables (names), and
@@ -159,13 +210,18 @@
                     floor:e.floor || null,
                     destroyInto:e.destroyInto || null,
                     fillColor:e.fillColor || null,
-                    borderColor:e.borderColor || null
+                    borderColor:e.borderColor || null,
+                    shape:e.shape ?? 'hex',
+                    orientable:e.orientable ?? false,
+                    actions:state ? parseActions(e.actions, state, names) : null,
+                    describe:parseDescribe(e.describe, names)
                 },
                 ok = FIXTURE_TYPES.includes(own.type) && own.reveal && (feature || ((infinite || own.pool) && (wholePool ? !infinite : own.magnitude))) && own.showMagnitude &&
                     typeof own.showPool === 'boolean' && own.area && own.duration && state && material !== undefined &&
                     (own.hp === null || (Number.isInteger(own.hp) && own.hp >= 1)) && own.coverage !== undefined && own.moveCost !== undefined &&
                     (typeof own.coverage !== 'number' || isPercent(own.coverage)) &&
-                    [e.floor, e.destroyInto, e.fillColor, e.borderColor].every(isText);
+                    [e.floor, e.destroyInto, e.fillColor, e.borderColor].every(isText) &&
+                    ['hex', 'door'].includes(own.shape) && typeof own.orientable === 'boolean' && own.actions && own.describe;
             return ok ? own : null;
         },
         
@@ -196,7 +252,8 @@
         /*  A new fixture of kind subtype (its type that kind's, or type if the kind isn't
             known), with its pool and magnitude rolled (by rng), not yet revealed: {x, y,
             type, subtype, pool, magnitude, uses, revealedAt, shown}, and hp and state (a
-            copy of its kind's) if its kind has them. pool: what's left, or null if
+            copy of its kind's) if its kind has them, and a facing (by rng) if it's
+            orientable. pool: what's left, or null if
             infinite; magnitude: what it gives, or null for all that's left; revealedAt:
             the turn it was revealed, or null; shown: whether its magnitude shows. */
         makeFixture: function(x, y, subtype, rng=Math.random, type=FIXTURE_LOOT) {
@@ -205,6 +262,7 @@
                 f = {x, y, type:kind.type, subtype, pool:roll(kind.pool), magnitude:roll(kind.magnitude), uses:0, revealedAt:null, shown:false};
             if (kind.hp) f.hp = kind.hp;
             if (Object.keys(kind.state).length) f.state = {...kind.state};
+            if (kind.orientable) f.facing = Math.floor(rng() * 6);
             return f;
         },
         
@@ -226,10 +284,28 @@
         },
         
         /*  What stepping onto (x, y) costs, for its fixture, as a multiple of the floor's:
-            its moveCost, or 1. */
+            its moveCost, or 1 (also for one in the way: what's in the way is the
+            caller's to know, and a door opened costs what its floor does). */
         fixtureMoveCost: function(x, y) {
+            const f = this.fixtures.get(this.key(x, y)),
+                v = f ? this.fixtureValue(f, 'moveCost') : 1;
+            return v > 0 ? v : 1;
+        },
+        
+        /*  Whether there's a fixture at (x, y) in the way that a step into it would do
+            something to (see stepAction): one with an onStep action whose when holds (a
+            shut door that isn't barred), from whatever side. Routes (Go to, Explore, the
+            enemies' paths) count such a cell as one they can go on, an action dearer, for
+            the step that opens it. */
+        stepOpens: function(x, y) {
             const f = this.fixtures.get(this.key(x, y));
-            return f ? this.fixtureValue(f, 'moveCost') : 1;
+            let retval = false;
+            if (f && this.fixtureBlocks(x, y)) {
+                const kind = this.fixtureType(f),
+                    vars = {...kind.state, ...f.state, hp:f.hp ?? 0};
+                retval = Object.values(kind.actions).some(a => a.onStep && pkg.attrs.evaluate(String(a.when), kind.names, vars));
+            }
+            return retval;
         },
         
         /*  How much fixture f blocks sight, 0-100: its material's opacity times its
@@ -280,6 +356,112 @@
                 this.fixtures.set(k, into);
             }
             this._sightKey = null; // what's there may block sight differently
+        },
+        
+        /*  The words for fixture f's state now (its kind's describe: see describe), in
+            order, e.g. ["shut", "barred"]. */
+        fixtureDescription: function(f) {
+            const kind = this.fixtureType(f),
+                vars = {...kind.state, ...f.state, hp:f.hp ?? 0};
+            return kind.describe.filter(d => pkg.attrs.evaluate(String(d.when), kind.names, vars)).map(d => d.text);
+        },
+        
+        // ---- Facing and actions ----
+        
+        /*  Which side of fixture f cell (x, y) is on: "front", "back" or "side" (see
+            orientable), "any" for one that isn't orientable, or null if it isn't next to
+            it. */
+        fixtureSide: function(f, x, y) {
+            const dir = pkg.hex.dirs.findIndex(([dx, dy]) => f.x + dx === x && f.y + dy === y);
+            let side = null;
+            if (dir >= 0) side = this.fixtureType(f).orientable ? ['front', 'front', 'side', 'back', 'back', 'side'][(dir - f.facing + 6) % 6] : 'any';
+            return side;
+        },
+        
+        /*  The names of the actions (see actions) piece p ({owner, x, y}) can do to fixture
+            f now, in its kind's order: p is next to it, on a side the action can be done
+            from, its when holds, and it wouldn't put f in the way of a piece on it; a piece
+            of yours, only to one you know of. An enemy can do only what a step does (see
+            stepAction: it opens doors). (Whether p has the points is the caller's to
+            check.) */
+        fixtureActions: function(p, f) {
+            const kind = f ? this.fixtureType(f) : null,
+                side = kind && p && (p.owner !== 'player' || f.revealedAt != null) ? this.fixtureSide(f, p.x, p.y) : null,
+                vars = side ? {...kind.state, ...f.state, hp:f.hp ?? 0} : null;
+            return side ? Object.entries(kind.actions).filter(([, a]) =>
+                (side === 'any' || a.from.includes(side)) &&
+                pkg.attrs.evaluate(String(a.when), kind.names, vars) &&
+                !(this.pieceAt(f.x, f.y) && !(this.fixtureValue({...f, state:this.actedState(f, a)}, 'moveCost') > 0))
+            ).map(([name]) => name) : [];
+        },
+        
+        /*  Fixture f's state after action a (see actions): its set, worked out from its
+            state as it is (a true or false one stays true or false). */
+        actedState: function(f, a) {
+            const kind = this.fixtureType(f),
+                vars = {...kind.state, ...f.state, hp:f.hp ?? 0},
+                state = {...kind.state, ...f.state};
+            for (const [k, v] of Object.entries(a.set)) {
+                const n = typeof v === 'boolean' ? v : pkg.attrs.evaluate(String(v), kind.names, vars);
+                state[k] = typeof kind.state[k] === 'boolean' ? !!n : Number(n);
+            }
+            return state;
+        },
+        
+        /*  The cells next to piece p with a fixture it can do something to (see
+            fixtureActions), if it has the points. */
+        useTargets: function(p) {
+            return p?.owner === 'player' && this.canAfford(p) ?
+                pkg.hex.dirs.map(([dx, dy]) => this.fixtureAt(p.x + dx, p.y + dy)).filter(f => f && this.fixtureActions(p, f).length).map(f => ({x:f.x, y:f.y})) : [];
+        },
+        canUse: function(p) {return this.useTargets(p).length > 0;},
+        
+        /*  Piece p does action name to the fixture at (x, y), if it can (see fixtureActions),
+            for an action. Returns whether it did. */
+        playerUse: function(p, x, y, name) {
+            const f = this.fixtureAt(x, y),
+                done = !this.over && p?.owner === 'player' && this.canAfford(p) && this.fixtureActions(p, f).includes(name);
+            if (done) {
+                this.actOnFixture(f, name);
+                this.spend(p);
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        /*  Enemy piece p steps into (x, y), if a step there does something to the fixture
+            there (see stepAction: opens a door), for an action. Returns whether it did. */
+        enemyStepAction: function(p, x, y) {
+            const step = this.canAfford(p) ? this.stepAction(p, x, y) : null,
+                done = !!step;
+            if (done) {
+                this.actOnFixture(this.fixtures.get(this.key(x, y)), step.action);
+                this.spend(p);
+            }
+            return done;
+        },
+        
+        /*  Fixture f has action name done to it (see actions): its state is what the action
+            sets. */
+        actOnFixture: function(f, name) {
+            f.state = this.actedState(f, this.fixtureType(f).actions[name]);
+            this._sightKey = null; // it may block sight differently now
+        },
+        
+        /*  What piece p stepping into (x, y) does to the fixture there, if it's one that's
+            in the way (one you know of, for a piece of yours), with an onStep action:
+            {action}, the name of the first of those it can do now (see fixtureActions), or
+            null if it can't do any (it doesn't step, or attack, either: a barred door, say);
+            undefined if there's no such fixture there. */
+        stepAction: function(p, x, y) {
+            const f = p.owner === 'player' ? this.fixtureAt(x, y) : this.fixtures.get(this.key(x, y)),
+                onStep = f && this.fixtureBlocks(x, y) ? Object.entries(this.fixtureType(f).actions).filter(([, a]) => a.onStep).map(([name]) => name) : [];
+            let retval;
+            if (onStep.length) {
+                const name = this.fixtureActions(p, f).find(n => onStep.includes(n));
+                retval = name ? {action:name} : null;
+            }
+            return retval;
         },
         
         /*  Reveals the fixtures your pieces now find (revealMode), and shows the magnitudes

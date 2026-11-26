@@ -55,9 +55,10 @@
         handleClick: function(c, force=false, swap=false) {
             // Stops the selected piece going somewhere by itself, and that's all.
             if (pkg.app.interrupt()) return;
-            // With the menu open, a click anywhere on the board just closes it.
-            if (V.menuOpen) {
+            // With a menu open, a click anywhere on the board just closes it.
+            if (V.menuOpen || V.useChoice) {
                 V.menuOpen = false;
+                V.useChoice = null;
                 draw();
                 return;
             }
@@ -85,6 +86,20 @@
                     if (game.playerJump(game.getSelected(), c.x, c.y)) {
                         this.afterTurn();
                     } else {
+                        draw();
+                    }
+                    return;
+                }
+                if (V.useMode) {
+                    // Use: the one thing the selected piece can do to the fixture there, or
+                    // a choice of them (see App: actionMenu).
+                    V.useMode = false;
+                    const sel = game.getSelected(),
+                        actions = game.canAfford(sel) ? game.fixtureActions(sel, game.fixtureAt(c.x, c.y)) : [];
+                    if (actions.length === 1 && game.playerUse(sel, c.x, c.y, actions[0])) {
+                        this.afterTurn();
+                    } else {
+                        if (actions.length > 1) V.useChoice = {x:c.x, y:c.y};
                         draw();
                     }
                     return;

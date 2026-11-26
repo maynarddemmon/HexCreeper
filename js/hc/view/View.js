@@ -109,6 +109,8 @@
             swapMode:false, // choosing which piece the selected piece swaps with
             jumpMode:false, // choosing the cell the selected piece jumps to
             attackMode:false, // choosing the cell next to the selected piece it attacks
+            useMode:false, // choosing the fixture next to the selected piece it does something to
+            useChoice:null, // {x, y}: the fixture there, choosing which of its actions (see App: Use)
             gotoMode:false, // choosing the cell the selected piece goes to (see App: Go to)
             shift:false, // whether Shift is held: a click moves in Free mode (clickMoves)
             alt:false, // whether Alt (Option) is held: a click swaps (swapAt)

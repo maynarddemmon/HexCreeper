@@ -38,6 +38,8 @@
                 num('wallHoleChance', 25, 0, 100), // % of walls made of holes rather than solid tiles
                 num('doorMin', 1, 0, 10),          // cells left open in the middle of a wall
                 num('doorMax', 2, 0, 10),
+                num('doorChance', 30, 0, 100),     // % chance a wall's gap (not a wall of holes) has doors in it, from doorTable
+                table('doorTable', {wooden_door:1}, fixtureOptions(FIXTURE_FEATURE)),
                 num('solidMin', 0, 0, 20),         // solid tiles per quadrant, in one connected clump
                 num('solidMax', 5, 0, 20),
                 num('holeMin', 0, 0, 20),          // hole tiles per quadrant, in one connected clump (may replace solid tiles)
@@ -212,9 +214,11 @@
         },
         
         // A wall along the border between a quadrant (its cells) and its neighbour (i, j),
-        // on the quadrant's own side: every cell touching the neighbour, except a door in
+        // on the quadrant's own side: every cell touching the neighbour, except a gap in
         // the middle (not at a corner, where another wall may meet it). Some walls are holes
         // rather than solid tiles. Cells with a tile or a piece already are left as they are.
+        // At doorChance, a solid wall's gap has a door (doorTable: see Fixtures.js) in each
+        // of its cells, its sides along the wall, facing either way at random.
         placeWall: function(cells, i, j, wall) {
             const game = this.game,
                 G = pkg.hex,
@@ -239,6 +243,23 @@
             for (const c of border) {
                 if (!door.has(c) && !game.tiles.has(game.key(c.x, c.y)) && !game.fixtures.has(game.key(c.x, c.y)) && !game.pieceAt(c.x, c.y)) {
                     game.tiles.set(game.key(c.x, c.y), game.makeTile(c.x, c.y, kind, wall.hole ? this.attrs.wallHole : this.attrs.wallSolid));
+                }
+            }
+            // (Doors have their own generator, so the rest come out as they would without
+            // them.)
+            const rng = game.rngFor('door', Q.key(cells[0].x, cells[0].y) + '|' + i + ',' + j);
+            if (!wall.hole && rng() * 100 < this.attrs.doorChance) {
+                for (const c of door) {
+                    const k = game.key(c.x, c.y),
+                        subtype = pick(this.attrs.doorTable, rng),
+                        // The wall runs this way from it (to the next cell along the border).
+                        along = G.dirs.findIndex(([dx, dy]) => border.some(b => b !== c && b.x === c.x + dx && b.y === c.y + dy));
+                    if (subtype !== undefined && along >= 0 && !game.tiles.has(k) && !game.fixtures.has(k) && !game.pieceAt(c.x, c.y)) {
+                        const f = game.makeFixture(c.x, c.y, subtype, rng, FIXTURE_FEATURE);
+                        // Its sides (facing + 2 and + 5) along the wall.
+                        f.facing = rng() < 0.5 ? (along + 4) % 6 : (along + 1) % 6;
+                        game.fixtures.set(k, f);
+                    }
                 }
             }
         },
