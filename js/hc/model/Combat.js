@@ -1,22 +1,35 @@
 /*  Stats, levels and combat (a module included in Game).
     
-    Every piece has a species and a profile, from data/init.json5.
+    Every piece has a species, a background and, for an enemy, a profile, from
+    data/init.json5.
     
     A species (`species`) is what a creature is, a template for it: in "stats", for each
     stat, the range it can be in and its typical value, [min, typical, max], or [min,
     max] for a typical value half way (rounded); [3, 10, 18] if not given (a species
     that goes down to 0 should say so). It has a base "damage", [min, max] ([1, 4] if
-    not given), and is "playable" (true or false: false if not given) if you can choose
-    it for a character. Entries can extend others (a sub-species: see Subtypes.js), a
-    stat's whole entry replacing the other's. Stats can't go outside the range (spending
-    stat points can't raise one above its max).
+    not given), is "playable" (true or false: false if not given) if you can choose it
+    for a character, and may have "backgrounds", the ids of the backgrounds it can go
+    with (any, if not given). Entries can extend others (a sub-species: see
+    Subtypes.js), a stat's whole entry replacing the other's. Stats can't go outside the
+    range (spending stat points can't raise one above its max).
     
-    A profile is what a piece is in a fight: yours from `characters` (the "adventurer"
-    for now: a class, which may become a background), an enemy's from `enemies` (its
-    enemyId, or "creeper" for one without). A profile has
-        species      the id of the species it's for, or a list of them (a character's:
-                     the species it can be; it must have at least one). A piece is the
-                     first, unless it's given another of them (see giveProfile)
+    A background (`backgrounds`) is where a creature comes from: for now a name and a
+    description, "playable" (false if not given) if you can choose it for a character,
+    and maybe "species", the ids of the species it can go with (any, if not given). Later
+    it will give skills and abilities. A species and a background fit if each allows
+    the other (see backgroundFits); data can leave a species with none that fit, which
+    is for the designer to fix.
+    
+    Your pieces are, until character creation, the first playable species (a human)
+    with the first playable background that fits it (an urchin). An enemy's profile is
+    what it is in a fight, from `enemies` (its enemyId, or "creeper" for one without).
+    A profile has
+        species      the id of the species it's for, or a list of them (it must have at
+                     least one). A piece is the first, unless it's given another of them
+                     (see giveProfile)
+        backgrounds  the ids of the backgrounds it can have (["denizen"] if not given):
+                     each piece gets one of those that fit its species, at random (none,
+                     with an error, if none do)
         stats        str, agl, con, dex, int, wis, wil, cha, its own: its species'
                      typical values for any it doesn't give (and it must be within every
                      one of its species' ranges)
@@ -84,14 +97,17 @@
         rolled = (rules, min, max, roll, roll2) => Math.max(0, Math.floor(evaluate(rules.damageRoll, DAMAGE_VARS, {min, max, roll, roll2})) || 0),
         
         isRange = v => Array.isArray(v) && v.length === 2 && v.every(isInt) && v[0] <= v[1],
+        isIds = v => v === undefined || (Array.isArray(v) && v.every(s => typeof s === 'string')),
+        isFlag = v => v === undefined || typeof v === 'boolean',
         
         /*  A species as init.json5 has it, made usable ({ranges:{stat:[min, max]},
-            typical:{stat:n}, damage:[min, max], playable}), or null if it isn't. */
+            typical:{stat:n}, damage:[min, max], playable, backgrounds:[ids] or null}), or
+            null if it isn't. */
         parseSpecies = entry => {
             const ranges = {},
                 typical = {},
                 damage = entry.damage ?? DEFAULT_DAMAGE;
-            let ok = isRange(damage) && (entry.playable === undefined || typeof entry.playable === 'boolean');
+            let ok = isRange(damage) && isFlag(entry.playable) && isIds(entry.backgrounds);
             for (const s of STATS) {
                 const v = entry.stats?.[s] ?? DEFAULT_STAT,
                     [min, mid, max] = Array.isArray(v) && v.length === 2 ? [v[0], Math.round((v[0] + v[1]) / 2), v[1]] : Array.isArray(v) ? v : [];
@@ -102,8 +118,13 @@
                     ok = false;
                 }
             }
-            return ok ? {ranges, typical, damage:[...damage], playable:entry.playable === true} : null;
+            return ok ? {ranges, typical, damage:[...damage], playable:entry.playable === true, backgrounds:entry.backgrounds ? [...entry.backgrounds] : null} : null;
         },
+        
+        /*  A background as init.json5 has it, made usable ({playable, species:[ids] or
+            null}), or null if it isn't. */
+        parseBackground = entry => isFlag(entry.playable) && isIds(entry.species) ?
+            {playable:entry.playable === true, species:entry.species ? [...entry.species] : null} : null,
         
         DEFAULT_STAT = [3, 10, 18],          // a species' stat it doesn't give: [min, typical, max]
         DEFAULT_DAMAGE = [1, 4],             // a species' base damage, if it doesn't give one
@@ -133,14 +154,16 @@
                 !(damage === undefined || isRange(damage)) ||
                 !isInt(entry.penetration ?? 0) || !isInt(entry.armor ?? 0) ||
                 !(entry.hp === undefined || (Number.isInteger(entry.hp) && entry.hp >= 1)) ||
-                !isInt(entry.xp ?? 0)) return null;
-            return {species:species.map(sp => sp.id), stats:{...stats}, level, damage:damage ? [...damage] : null,
+                !isInt(entry.xp ?? 0) || !isIds(entry.backgrounds)) return null;
+            return {species:species.map(sp => sp.id), backgrounds:[...(entry.backgrounds ?? [DEFAULT_ENEMY_BACKGROUND])],
+                stats:{...stats}, level, damage:damage ? [...damage] : null,
                 penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp};
         },
         
-        // What a profile is if init.json5 doesn't say (or has no such one)
+        // What a profile is if init.json5 doesn't say (or has no such one), and yours
+        // (nothing of its own: all from its species)
         DEFAULT_ENEMTY = 'creeper',
-        DEFAULT_CHARACTER_CLASS = 'adventurer',
+        DEFAULT_ENEMY_BACKGROUND = 'denizen',
         FALLBACK = parseProfile({}, '', [FALLBACK_SPECIES]),
         
         LOG_MAX = 200,                       // combat log entries kept
@@ -152,19 +175,43 @@
         LEVEL_UP_MS = 1400;                  // how long the rings of a level up take to play
     
     pkg.species = new Subtypes('species', parseSpecies);
-    pkg.characters = new Subtypes('character', parseProfile);
+    pkg.backgrounds = new Subtypes('background', parseBackground);
     pkg.enemies = new Subtypes('enemy', parseProfile);
     
     pkg.Combat = new JS.Module('Combat', {
-        /*  Gives piece p the profile its owner's table has for id (yours: a character's,
-            "adventurer" if none; an enemy's: its enemyId's, "creeper" if none), as the
-            species speciesId if it's one of the profile's (else its first), at full HP,
-            with no status effects. */
-        giveProfile: function(p, id, speciesId) {
+        /*  Whether the species and background with these ids fit: each is there, and
+            allows the other (if it says which it allows). */
+        backgroundFits: function(speciesId, backgroundId) {
+            const s = pkg.species.get(speciesId),
+                b = pkg.backgrounds.get(backgroundId);
+            return !!s && !!b && (!s.backgrounds || s.backgrounds.includes(b.id)) && (!b.species || b.species.includes(s.id));
+        },
+        
+        /*  Gives piece p its species, background and profile, at full HP, with no status
+            effects. An enemy's profile is its table's for id (its enemyId's; "creeper" if
+            none), its species speciesId if that's one of the profile's (else its first),
+            and its background backgroundId if that's one of the profile's that fits, else
+            one that fits at random (none, with an error, if none do). Yours are the
+            species speciesId if there is one (else the first playable one), and the
+            background backgroundId if it's playable and fits (else the first playable one
+            that does). */
+        giveProfile: function(p, id, speciesId, backgroundId) {
             const enemy = p.owner === 'enemy',
-                profile = (enemy ? pkg.enemies : pkg.characters).get(id ?? (enemy ? DEFAULT_ENEMTY : DEFAULT_CHARACTER_CLASS)) ?? FALLBACK,
-                species = pkg.species.get(profile.species.includes(speciesId) ? speciesId : profile.species[0]) ?? FALLBACK_SPECIES;
+                profile = enemy ? pkg.enemies.get(id ?? DEFAULT_ENEMTY) ?? FALLBACK : FALLBACK,
+                species = (enemy ? pkg.species.get(profile.species.includes(speciesId) ? speciesId : profile.species[0]) :
+                    pkg.species.get(speciesId) ?? pkg.species.list().find(s => s.playable)) ?? FALLBACK_SPECIES,
+                fits = b => this.backgroundFits(species.id, b),
+                choices = enemy ? profile.backgrounds.filter(fits) : pkg.backgrounds.list().filter(b => b.playable && fits(b.id)).map(b => b.id);
             p.species = species.id;
+            if (choices.includes(backgroundId)) {
+                p.background = backgroundId;
+            } else if (enemy) {
+                p.background = choices.length ? choices[Math.floor(this.rngFor('background', p.id)() * choices.length)] : '';
+                // (Not for the fallback profile: there's no data, before init.json5 has loaded.)
+                if (!choices.length && profile !== FALLBACK) console.error('Enemy', id ?? DEFAULT_ENEMTY, 'has no background that fits its species', species.id);
+            } else {
+                p.background = choices[0] ?? '';
+            }
             p.stats = {...species.typical, ...profile.stats};
             p.level = profile.level;
             p.xp = 0;

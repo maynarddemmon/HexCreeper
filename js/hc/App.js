@@ -130,7 +130,7 @@
             draw();
             characterSheet ??= new pkg.CharacterSheet(appView);
             characterSheet.show(p, {
-                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', p.level),
+                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? '', p.level),
                 statMax:stat => game.statRange(p, stat)[1],
                 describe:q => ({
                     info:[

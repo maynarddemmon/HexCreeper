@@ -2,8 +2,8 @@
 	// The map played when there's no saved game.
 	"defaultMap":"caverns",
 	
-	// Any entry in the tables below (materials, solids, holes, floors, fixtures, characters,
-	// enemies; not enemy groups) may extend another in the same table:
+	// Any entry in the tables below (materials, solids, holes, floors, fixtures, species,
+	// backgrounds, enemies; not enemy groups) may extend another in the same table:
 	// "extends":"<id>" starts it as that one, with its own properties over it. Objects (like
 	// "stats") merge a property at a time; anything else (text, numbers, arrays like
 	// "damage") replaces the parent's. An entry may extend one that extends another, and so
@@ -384,7 +384,7 @@
 	// entry can extend another (a sub-species), a stat's whole entry replacing the other's.
 	// "damage": its base damage, [min, max] ([1, 4] if not given), a profile's if it
 	// doesn't say. "playable": whether you can choose it for a character (false if not
-	// given).
+	// given). "backgrounds": the backgrounds it can go with (any, if not given).
 	"species":{
 		"human":{
 			"name":"Human",
@@ -448,23 +448,38 @@
 		}
 	},
 	
-	// Profiles: what a piece is in a fight (see js/hc/model/Combat.js). "species" (the id
-	// of the species it's for, or a list of them: for a character, the species it can be,
-	// a piece being the first unless it's chosen; it must have one), "stats" (str, agl,
+	// Backgrounds: where a creature comes from (see js/hc/model/Combat.js). For now a name
+	// and description; later skills and abilities. "playable": whether you can choose it
+	// for a character (false if not given). "species": the species it can go with (any, if
+	// not given; a species can limit its backgrounds too: a pair fits if each allows the
+	// other). Your pieces are the first playable species with the first playable background
+	// that fits it, until character creation.
+	"backgrounds":{
+		"urchin":{
+			"name":"Urchin",
+			"description":"Grew up on the streets.",
+			"playable":true
+		},
+		"denizen":{
+			"name":"Denizen",
+			"description":"A denizen of the wilds."
+		},
+		"reaver":{
+			"name":"Reaver",
+			"description":"You've taken what you want by force.",
+			"playable":true
+		}
+	},
+	
+	// Enemies' profiles: what a piece is in a fight (see js/hc/model/Combat.js). "species" (the id
+	// of the species it's for, or a list of them, a piece being the first unless it's
+	// chosen; it must have one), "backgrounds" (those it can have, one that fits its
+	// species chosen at random for each piece: ["denizen"] if not given), "stats" (str, agl,
 	// con, dex, int, wis, wil, cha, its own: its species' typical values for any not given,
 	// and within all its species' ranges), "level" (1), "damage" ([min, max], its
 	// weapon's, before its str bonus: its species' base damage if not given), "penetration" (how much damage reduction its weapon
 	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
 	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: else the xpValue rule's).
-	
-	// Your pieces: all adventurers for now.
-	"characters":{
-		"adventurer":{
-			"name":"Adventurer",
-			"description":"Someone setting out to see what's down there.",
-			"species":["human", "dwarf", "elf"]
-		}
-	},
 	
 	// Named enemies: what a single enemy piece is, by id ("name", "description", and its
 	// profile). An enemy without a name is a creeper.
@@ -480,12 +495,14 @@
 			"name":"Goblin",
 			"description":"A small humanoid with green skin, big eyes and sharp teeth.",
 			"species":"goblin",
+			"backgrounds":["urchin","denizen"],
 			"hp":5,
 			"xp":5
 		},
 		"goblin_reaver":{
 			"extends":"goblin",
 			"name":"Goblin Reaver",
+			"backgrounds":["reaver"],
 			"description":"A big goblin with a cruel blade.",
 			"stats":{"str":12, "con":12},
 			"damage":[2, 6],

@@ -26,6 +26,9 @@
     /*  Replaces the enemies and groups with those given, as init.json5 has them. */
     pkg.defineEnemies = (enemies, groups) => {
         pkg.enemies.define(enemies);
+        for (const e of pkg.enemies.list()) {
+            for (const b of e.backgrounds) if (!pkg.backgrounds.get(b)) console.warn('Enemy', e.id, 'can have background', b, 'which there is none of');
+        }
         pkg.enemyGroups.define(groups);
         for (const g of pkg.enemyGroups.list()) {
             const why = pkg.enemies.get(g.id) ? 'is an enemy too' : problem(g.id, []);

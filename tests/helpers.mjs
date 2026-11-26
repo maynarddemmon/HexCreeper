@@ -48,7 +48,7 @@ export const waitForGame = async page => {
 /*  Clears the board for a rules test: no enemies, no tiles, and no waves, so a test can
     place exactly what it needs. Combat is made sure, so rules tests don't depend on the
     dice (see Combat.js; combat.spec tests the rolls): every attack hits and does 1 damage,
-    an adventurer (yours) has 2 HP and a creeper (an enemy without a name) 1. And every
+    a piece of yours has 2 HP and a creeper (an enemy without a name) 1. And every
     piece acts once a turn: a pool of 1 action point, all of it back each turn, and no
     initiative. Your pieces start with theirs, and so does every enemy added, so it acts
     in the enemies' next turn; a new piece of yours still starts with none. */
@@ -63,8 +63,16 @@ export const clearBoard = page => page.evaluate(() => {
     g.rules.damageBonus = g.rules.penetrationBonus = '0';
     g.rules.apPool = g.rules.apRecovery = '1';
     g.rules.apInitiative = '0';
-    sure(hc.characters, 'adventurer', 2);
     sure(hc.enemies, 'creeper', 1);
+    // (Yours have no profile of their own to make sure: see Combat.giveProfile.)
+    const giveProfile = g.giveProfile;
+    g.giveProfile = function(p, ...args) {
+        giveProfile.call(this, p, ...args);
+        if (p.owner === 'player') {
+            Object.assign(p, {damage:[1, 1], penetration:0, armor:0, fixedHp:2});
+            p.maxHp = p.hp = 2;
+        }
+    };
     for (const p of g.piecesOf('player')) {
         g.giveProfile(p);
         p.ap = g.apMax(p);

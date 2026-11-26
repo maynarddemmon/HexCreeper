@@ -5,12 +5,12 @@ test.beforeEach(async ({page}) => {
     await startGame(page);
 });
 
-// Runs fn (in the page) with init.json5's data, then puts its species, characters and
+// Runs fn (in the page) with init.json5's data, then puts its species, backgrounds and
 // enemies back as they were.
 const withData = (page, fn) => page.evaluate(fn => new Promise(done => hc.maps.loadIndex(data => {
     const out = new Function('data', 'return (' + fn + ')(data);')(data);
     hc.species.define(data.species);
-    hc.characters.define(data.characters);
+    hc.backgrounds.define(data.backgrounds);
     hc.defineEnemies(data.enemies, data.enemyGroups);
     done(out);
 })), fn.toString());
@@ -31,11 +31,11 @@ test('a piece gets its species\' typical stats and base damage, but for what its
             elf:{name:'Elf', stats:{agl:[3, 14, 18]}, damage:[1, 8]},
             dwarf:{name:'Dwarf', stats:{con:[3, 13, 18]}}
         });
-        hc.characters.define({
+        hc.enemies.define({
             ranger:{name:'Ranger', species:'elf', stats:{dex:13}},
             brute:{name:'Brute', species:'dwarf', damage:[2, 5]}
         });
-        const g = hc.app.game, p = g.addPiece('core', 'player', 9, 9), out = {ranger:hc.characters.get('ranger').species};
+        const g = hc.app.game, p = g.addPiece('core', 'enemy', 9, 9), out = {ranger:hc.enemies.get('ranger').species};
         g.giveProfile(p, 'ranger');
         out.elf = [p.species, p.stats.agl, p.stats.dex, p.stats.str, p.damage];
         g.giveProfile(p, 'brute');
@@ -55,25 +55,25 @@ test('a piece gets its species\' typical stats and base damage, but for what its
     expect(pieces).toEqual(['human', 'goblin', ['goblin']]);
 });
 
-test('a character can be any of a list of species: the first, unless it\'s given another of them', async ({page}) => {
+test('a profile can be for any of a list of species: the first, unless it\'s given another of them', async ({page}) => {
     const r = await withData(page, () => {
         hc.species.define({
             human:{name:'Human', playable:true},
             elf:{name:'Elf', stats:{agl:[3, 14, 18]}, playable:true},
             orc:{name:'Orc', stats:{int:[3, 6, 10]}}
         });
-        hc.characters.define({
+        hc.enemies.define({
             wanderer:{name:'Wanderer', species:['human', 'elf']},
             sage:{name:'Sage', species:['human', 'orc'], stats:{int:12}}
         });
-        const g = hc.app.game, p = g.addPiece('core', 'player', 9, 9), out = [];
+        const g = hc.app.game, p = g.addPiece('core', 'enemy', 9, 9), out = [];
         for (const s of [undefined, 'elf', 'orc']) {
             g.giveProfile(p, 'wanderer', s);
             out.push([p.species, p.stats.agl]);
         }
         g.removePiece(p);
         // The sage's int is over an orc's max, so it's left out.
-        return {out, playable:hc.species.list().filter(s => s.playable).map(s => s.id), wanderer:hc.characters.get('wanderer').species, sage:!!hc.characters.get('sage')};
+        return {out, playable:hc.species.list().filter(s => s.playable).map(s => s.id), wanderer:hc.enemies.get('wanderer').species, sage:!!hc.enemies.get('sage')};
     });
     expect(r).toEqual({out:[['human', 10], ['elf', 14], ['human', 10]], playable:['human', 'elf'], wanderer:['human', 'elf'], sage:false});
 });
@@ -111,17 +111,17 @@ test('bad species and profiles are left out, with an error: no species, stats ou
             long:{name:'Long', stats:{str:[1, 2, 3, 4]}},
             bare:{name:'Bare', stats:{str:10}}
         });
-        hc.characters.define({
+        hc.enemies.define({
             fine:{name:'Fine', species:'ok', stats:{str:0}},
             none:{name:'None'},
             unknown:{name:'Unknown', species:'dwarf'},
             strong:{name:'Strong', species:'ok', stats:{str:6}}
         });
-        return [hc.species.list().map(s => s.id), hc.characters.list().map(c => c.id)];
+        return [hc.species.list().map(s => s.id), hc.enemies.list().map(c => c.id)];
     });
     expect(r).toEqual([['ok'], ['fine']]);
     expect(errors.some(e => e.includes('Bad species odd'))).toBe(true);
-    expect(errors.some(e => e.includes('Bad character unknown'))).toBe(true);
+    expect(errors.some(e => e.includes('Bad enemy unknown'))).toBe(true);
 });
 
 test('stat points can\'t take a stat over its species\' max, and the sheet\'s + stops there', async ({page}) => {

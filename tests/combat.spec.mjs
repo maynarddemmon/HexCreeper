@@ -124,14 +124,14 @@ test('gold looted is kept as a total; spending only lowers what you have', async
 // Combat as the game has it (clearBoard makes it sure): the rules' and profiles' own.
 const realCombat = page => page.evaluate(() => new Promise(done => hc.maps.loadIndex(data => {
     const g = hc.app.game;
-    hc.characters.define(data.characters);
+    delete g.giveProfile;    // (clearBoard's, which makes yours sure)
     hc.defineEnemies(data.enemies, data.enemyGroups);
     for (const id of ['hitMin', 'hitMax', 'damageBonus', 'penetrationBonus']) g.rules[id] = hc.settings.resolveRules({})[id];
     for (const p of g.piecesOf('player')) g.giveProfile(p);
     done();
 })));
 
-test('pieces get their profiles: you an adventurer\'s, an enemy its own, or a creeper\'s', async ({page}) => {
+test('pieces get their profiles: you a human\'s, an enemy its own, or a creeper\'s', async ({page}) => {
     await realCombat(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(),
