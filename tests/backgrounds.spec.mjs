@@ -18,15 +18,17 @@ const withData = (page, fn) => page.evaluate(fn => new Promise(done => hc.maps.l
 test('backgrounds: urchin and reaver playable, denizen not; your pieces are human urchins, enemies denizens', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(),
-            gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin'),
+            plain = g.addPiece('core', 'enemy', 3, 0),
+            gob = g.addPiece('core', 'enemy', 4, 0, null, 'goblin'),
             reaver = g.addPiece('core', 'enemy', 5, 0, null, 'goblin_reaver');
         return {
             playable:Object.fromEntries(['urchin', 'denizen', 'reaver'].map(id => [id, hc.backgrounds.get(id).playable])),
             you:[c.species, c.background],
-            enemies:[gob.background, reaver.background]
+            // (A creeper has no backgrounds of its own: a denizen.)
+            enemies:[plain.background, hc.enemies.get('goblin').backgrounds.includes(gob.background), reaver.background]
         };
     });
-    expect(r).toEqual({playable:{urchin:true, denizen:false, reaver:true}, you:['human', 'urchin'], enemies:['denizen', 'reaver']});
+    expect(r).toEqual({playable:{urchin:true, denizen:false, reaver:true}, you:['human', 'urchin'], enemies:['denizen', true, 'reaver']});
 });
 
 test('a species and a background fit if each allows the other', async ({page}) => {
@@ -113,5 +115,5 @@ test('the character sheet names the species and background', async ({page}) => {
         hc.app.game.selectedId = hc.app.game.playerCoreId;
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Your core · Human · Urchin · Level 1')).toBeVisible();
+    await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
 });

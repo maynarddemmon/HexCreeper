@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, button, clearBoard} from './helpers.mjs';
+import {startGame, button, clearBoard, pressStart} from './helpers.mjs';
 
 /*  Evaluates an expression with the given values (and a "twice" function), or returns the
     message it was refused with. */
@@ -228,7 +228,7 @@ test('the brief and the info panel show the map\'s goals and penalties', async (
     await expect(visible('Take your core 30 steps from where it started.')).toBeVisible();
     await expect(visible('Cull (optional)')).toBeVisible();
     await expect(visible('Penalty: Attrition')).toBeVisible();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     
     await expect(visible('Goals')).toBeVisible();
     await expect(visible('○ Far Afield')).toBeVisible();

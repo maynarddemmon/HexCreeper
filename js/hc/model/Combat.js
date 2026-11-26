@@ -172,7 +172,9 @@
         AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
         XP_UNIT = pkg.XP_UNIT = 100,         // a point, in the hundredths xp is kept in
         MIN_COST = 10,                       // the least an action can cost (so there's an end to them)
-        LEVEL_UP_MS = 1400;                  // how long the rings of a level up take to play
+        LEVEL_UP_MS = 1400,                  // how long the rings of a level up take to play
+        NAME_MAX = pkg.CHARACTER_NAME_MAX = 64, // the longest a character's name can be
+        DESCRIPTION_MAX = pkg.CHARACTER_DESCRIPTION_MAX = 1024; // and its description
     
     pkg.species = new Subtypes('species', parseSpecies);
     pkg.backgrounds = new Subtypes('background', parseBackground);
@@ -185,6 +187,68 @@
             const s = pkg.species.get(speciesId),
                 b = pkg.backgrounds.get(backgroundId);
             return !!s && !!b && (!s.backgrounds || s.backgrounds.includes(b.id)) && (!b.species || b.species.includes(s.id));
+        },
+        
+        // ---- Character creation ----
+        // Your core is created at the start of a game (see Game.reset, and the character
+        // sheet): a name (1 to NAME_MAX letters, not all space), a description (up to
+        // DESCRIPTION_MAX), a playable species and a playable background that fit, and its
+        // stats: from its species' typical ones, each at most creationNegAdj below and
+        // creationPosAdj above (and in its species' range), and creationPoints more in all
+        // (lowering one gives a point to raise another).
+        
+        /*  What's wrong with character ch ({name, description, species, background,
+            stats}): '' if nothing, else 'name', 'description', 'species', 'background' or
+            'stats'. */
+        characterProblem: function(ch) {
+            const species = pkg.species.get(ch?.species);
+            let retval = '';
+            if (typeof ch?.name !== 'string' || !ch.name.trim() || ch.name.length > NAME_MAX) {
+                retval = 'name';
+            } else if (typeof ch.description !== 'string' || ch.description.length > DESCRIPTION_MAX) {
+                retval = 'description';
+            } else if (!species?.playable) {
+                retval = 'species';
+            } else if (!pkg.backgrounds.get(ch.background)?.playable || !this.backgroundFits(species.id, ch.background)) {
+                retval = 'background';
+            } else if (!(ch.stats && STATS.every(s => {
+                const [min, max] = this.creationRange(species.id, s);
+                return Number.isInteger(ch.stats[s]) && ch.stats[s] >= min && ch.stats[s] <= max;
+            }) && STATS.reduce((n, s) => n + ch.stats[s] - species.typical[s], 0) === this.creationPoints())) {
+                retval = 'stats';
+            }
+            return retval;
+        },
+        
+        /*  The stat points to spend creating a character. */
+        creationPoints: function() {return Math.max(0, Math.round(this.rules.creationPoints)) || 0;},
+        
+        /*  The range a created character of the species with id speciesId can have stat
+            in: [min, max], its typical value less creationNegAdj to it plus creationPosAdj,
+            within the species' range. */
+        creationRange: function(speciesId, stat) {
+            const species = pkg.species.get(speciesId) ?? FALLBACK_SPECIES,
+                typical = species.typical[stat],
+                [min, max] = species.ranges[stat];
+            return [Math.max(min, typical - this.rules.creationNegAdj), Math.min(max, typical + this.rules.creationPosAdj)];
+        },
+        
+        /*  Makes piece p (yours) character ch (see characterProblem): its species,
+            background, stats, name and description, at full HP. */
+        makeCharacter: function(p, ch) {
+            this.giveProfile(p, undefined, ch.species, ch.background);
+            p.stats = {...ch.stats};
+            p.name = ch.name.trim();
+            p.description = ch.description;
+            p.maxHp = p.hp = this.maxHpOf(p);
+        },
+        
+        /*  A piece of yours as character ch would be, not on the board: for the character
+            sheet to show. */
+        characterPiece: function(ch) {
+            const p = {type:'core', owner:'player', x:0, y:0, parentId:null, rank:this.rules.rankBase, trail:[]};
+            this.makeCharacter(p, {name:'', description:'', ...ch});
+            return p;
         },
         
         /*  Gives piece p its species, background and profile, at full HP, with no status
@@ -389,6 +453,7 @@
         /*  Who piece p is, for the log: {owner, core (whether it's your core), enemyId}. */
         whoOf: function(p) {
             const who = {owner:p.owner, core:p.id === this.playerCoreId};
+            if (p.name) who.name = p.name;
             if (p.enemyId) who.enemyId = p.enemyId;
             return who;
         },

@@ -56,6 +56,11 @@
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (it sets how XP is shared: see Combat.awardXp)
+            // Character creation (see Combat.characterProblem): the stat points to spend, and
+            // how far a stat can go below and above its species' typical value.
+            num('creationPoints', 2, 0, 30),
+            num('creationNegAdj', 2, 0, 15),
+            num('creationPosAdj', 3, 0, 15),
             // Combat and action points (see Combat.js). Their defaults are in init.json5's
             // "rules", to tune them there; these are only for if it hasn't them. Formulas of
             // a piece's level and stats (pkg.STAT_VARS), rounded down, but the hit chance,

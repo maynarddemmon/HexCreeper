@@ -38,6 +38,7 @@
         initialize: function() {
             this.gameMap = null; // {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives}: the map being played, set by the App
             this.seed = null;  // the seed the map is made from, set before reset (or random)
+            this.character = null; // your core as created, set before reset (see Combat.characterProblem), or null for the default
             this.reset();
         },
         
@@ -76,6 +77,7 @@
             this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
+            if (this.character && !this.characterProblem(this.character)) this.makeCharacter(core, this.character);
             this.recomputeRanks();
             core.hp = core.maxHp;
             core.ap = this.actionCost(core); // so it can act on the first turn
@@ -141,7 +143,8 @@
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
-                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent) && typeof p.species === 'string' && typeof p.background === 'string') ||
+                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent) && typeof p.species === 'string' && typeof p.background === 'string' &&
+                    (p.name === undefined || typeof p.name === 'string') && (p.description === undefined || typeof p.description === 'string')) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
             ) throw new Error('Malformed game data');
@@ -598,7 +601,10 @@
             if (!this.isOpen(x, y) || this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
             const cost = this.placeCost();
             this.gold -= cost;
-            const p = this.addPiece('core', 'player', x, y, parent.id);
+            const p = this.addPiece('core', 'player', x, y, parent.id),
+                core = this.getPlayerCore();
+            // (Of your core's species and background.)
+            if (core) this.giveProfile(p, undefined, core.species, core.background);
             this.piecesPlaced++;
             this.recomputeRanks();
             p.hp = p.maxHp;

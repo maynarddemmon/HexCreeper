@@ -9,7 +9,9 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 /*  Loads the game and waits until it is ready to play. Returns an object that collects page
     errors, console warnings and console errors for the rest of the test.
 
-    The help that opens on a first visit is skipped unless skipHelp is false. Requests to other origins (e.g. the Font Awesome CDN
+    The help that opens on a first visit is skipped unless skipHelp is false. Your
+    character is TEST_CHARACTER (as if you'd created it last time: see waitForGame).
+    Requests to other origins (e.g. the Font Awesome CDN
     used by myt) are answered with an empty response so the tests never depend on the
     network. The game starts on the endless map whatever init.json5's defaultMap is, so
     the tests don't change with it. */
@@ -28,19 +30,32 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
         route.fulfill({response, body:(await response.text()).replace(/"defaultMap":\s*"[^"]*"/, '"defaultMap":"endless"')});
     });
     if (skipHelp) await page.addInitScript(() => {localStorage.setItem('hc.helpSeen', 'true');});
+    await page.addInitScript(ch => {
+        if (!localStorage.getItem('hc.character')) localStorage.setItem('hc.character', JSON.stringify(ch));
+    }, TEST_CHARACTER);
 
     await page.goto('/index.html');
     await waitForGame(page);
     return problems;
 };
 
+/*  The character tests play: a human urchin, its creation points on stats nothing uses
+    yet (int and cha), so it's as a plain human would be. */
+export const TEST_CHARACTER = {
+    name:'Tess', description:'', species:'human', background:'urchin',
+    stats:{str:10, agl:10, con:10, dex:10, int:11, wis:10, wil:10, cha:11}
+};
+
 /*  Waits until the App exists and its game has started. Without a save, the game starts
-    from the map brief, so its Start button is clicked when it shows. */
+    from the map brief, so its Start button is clicked when it shows, and then your
+    character is created: the last you made (TEST_CHARACTER, from startGame), confirmed. */
 export const waitForGame = async page => {
     const isReady = () => window.hc?.app?.ready && window.hc.app.game.getPlayerCore() != null,
-        start = button(page, '✓ Start');
+        start = button(page, '✓ Start'),
+        confirm = button(page, '✓ Confirm');
     while (!await page.evaluate(isReady)) {
         if (await start.count()) await start.click();
+        if (await confirm.count()) await confirm.click();
         await page.waitForTimeout(50);
     }
 };
@@ -126,6 +141,13 @@ export const cellOnPage = (page, x, y) => page.evaluate(([x, y]) => {
 
 /*  A visible button by its exact text. */
 export const button = (page, text) => page.getByRole('button', {name:text, exact:true}).filter({visible:true});
+
+/*  Starts the game a map's brief is for: Start, then your character confirmed as it
+    comes (the last you made: see waitForGame). */
+export const pressStart = async page => {
+    await button(page, '✓ Start').click();
+    await button(page, '✓ Confirm').click();
+};
 
 // An item of the selected piece's menu, while it's open.
 export const menuItem = (page, text) => page.getByRole('menuitem', {name:text, exact:true}).filter({visible:true});

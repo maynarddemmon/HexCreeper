@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, clearBoard, cellOnPage, button, waitForGame} from './helpers.mjs';
+import {startGame, clearBoard, cellOnPage, button, waitForGame, pressStart} from './helpers.mjs';
 
 const settingsTitle = page => page.getByText('Settings', {exact:true}).filter({visible:true});
 
@@ -49,7 +49,7 @@ test('New Game shows the map\'s brief, which warns once the game has started', a
     await button(page, 'End Turn').click();
     await button(page, 'New game').click();
     await expect(warning).toBeVisible();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     expect(await page.evaluate(() => hc.app.game.turn)).toBe(1);
 });
 
@@ -62,7 +62,7 @@ test('losing the core offers to play again', async ({page}) => {
     });
     await expect(page.getByText('Core Destroyed', {exact:true}).filter({visible:true})).toBeVisible();
     await button(page, 'Play Again').click();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     expect(await page.evaluate(() => [hc.app.game.over, hc.app.game.turn])).toEqual([false, 1]);
 });
 

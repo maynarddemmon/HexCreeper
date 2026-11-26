@@ -73,6 +73,23 @@
             }
         },
         
+        // The last character you created, to start the next from (see createCharacter) //
+        LAST_CHARACTER_KEY = 'hc.character',
+        lastCharacter = () => {
+            try {
+                return JSON.parse(localStorage.getItem(LAST_CHARACTER_KEY) ?? 'null');
+            } catch {
+                return null;
+            }
+        },
+        rememberCharacter = ch => {
+            try {
+                localStorage.setItem(LAST_CHARACTER_KEY, JSON.stringify(ch));
+            } catch {
+                // Ignore.
+            }
+        },
+        
         /*  The key for a keydown: the code for numpad keys, the lowercase character for
             others, or the key's name (e.g. "Enter"). */
         // Action points (kept in hundredths: see Combat.js) as points, e.g. "1.75"
@@ -97,6 +114,8 @@
         /*  The name of who (see Combat.whoOf) in the log: an enemy's, or your core or piece.
             Capitalised if first in the line. */
         logName = (who, first=false) => {
+            // (A name of yours, as you gave it.)
+            if (who.name) return who.name;
             const name = who.owner === 'enemy'
                 ? pkg.enemies.get(who.enemyId ?? 'creeper')?.name ?? who.enemyId ?? '?'
                 : i18n(who.core ? 'log-your-core' : 'log-your-piece');
@@ -122,17 +141,8 @@
             return i18n('log-line', e.turn, text);
         },
         
-        /*  The character sheet for your piece p (see CharacterSheet): with stat points to
-            spend, for levelling. */
-        openSheet = p => {
-            // (The menu closes, if it's open, rather than show behind it.)
-            V.menuOpen = false;
-            draw();
-            characterSheet ??= new pkg.CharacterSheet(appView);
-            characterSheet.show(p, {
-                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? '', p.level),
-                statMax:stat => game.statRange(p, stat)[1],
-                describe:q => ({
+        /*  The lines of the character sheet for piece q (see CharacterSheet.show). */
+        describePiece = q => ({
                     info:[
                         [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
                         [i18n('sheet-hp'), q.hp + '/' + q.maxHp],
@@ -148,11 +158,64 @@
                         [i18n('sheet-armor'), q.armor]
                     ]
                 }),
+        
+        /*  The character sheet for your piece p (see CharacterSheet): with stat points to
+            spend, for levelling. */
+        openSheet = p => {
+            // (The menu closes, if it's open, rather than show behind it.)
+            V.menuOpen = false;
+            draw();
+            characterSheet ??= new pkg.CharacterSheet(appView);
+            characterSheet.show(p, {
+                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? '', p.level),
+                statMax:stat => game.statRange(p, stat)[1],
+                describe:describePiece,
                 preview:adds => game.withStats(p, adds),
                 onConfirm:adds => {
                     game.spendStatPoints(p, adds);
                     draw();
                 }
+            });
+        },
+        
+        /*  The character sheet for creating your character for a new game (in the map
+            gameMap's rules), starting from the last you created. onConfirm(ch) is called
+            with it (and it's remembered for next time); onCancel if you cancel. */
+        createCharacter = (gameMap, onConfirm, onCancel) => {
+            characterSheet ??= new pkg.CharacterSheet(appView);
+            // What fn gives in the rules the new game will have (creation's points and
+            // limits, HP and the rest), rather than the game being played's.
+            const rules = pkg.settings.resolveRules(gameMap?.rules ?? {}, 'Creation'),
+                inRules = fn => {
+                    const saved = game.rules;
+                    game.rules = rules;
+                    try {
+                        return fn();
+                    } finally {
+                        game.rules = saved;
+                    }
+                },
+                playable = table => table.list().filter(e => e.playable).map(({id, name}) => ({id, name}));
+            characterSheet.show(null, {
+                create:lastCharacter(),
+                title:i18n('dlg-create-title'),
+                species:playable(pkg.species),
+                backgrounds:playable(pkg.backgrounds),
+                fits:(s, b) => game.backgroundFits(s, b),
+                typical:id => ({...pkg.species.get(id)?.typical}),
+                range:(id, stat) => inRules(() => game.creationRange(id, stat)),
+                points:inRules(() => game.creationPoints()),
+                preview:ch => inRules(() => {
+                    const q = game.characterPiece(ch);
+                    q.ap = game.apMax(q);
+                    return q;
+                }),
+                describe:q => inRules(() => describePiece(q)),
+                onConfirm:ch => {
+                    rememberCharacter(ch);
+                    onConfirm(ch);
+                },
+                onCancel
             });
         },
         
@@ -1059,8 +1122,9 @@
             });
         },
         
-        /*  Loads a map and shows its brief. Start begins a new game in it (with its rules
-            and components) with the seed shown; Cancel leaves the game as it is. If the map
+        /*  Loads a map and shows its brief. Start goes on to create your character (see
+            createCharacter), then begins a new game in it (with its rules and components)
+            with the seed shown and that character; Cancel leaves the game as it is. If the map
             can't be loaded, a dialog says so and the game carries on. callback, if given,
             is called once it's done, whichever way. */
         briefMap: (id, callback) => {
@@ -1075,12 +1139,18 @@
                     mapBrief.show(gameMap, {
                         seed:Number.isInteger(gameMap.seed) ? gameMap.seed : pkg.randomSeed(),
                         underway:!game.over && game.turn > 1,
+                        // Then your character (Cancel there goes back to the brief).
                         onStart: seed => {
-                            const {name, rules, tileGenerator, spawnGenerator, enemyAI, objectives} = gameMap;
-                            game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives};
-                            game.seed = seed;
-                            appView.newGame();
-                            callback?.();
+                            createCharacter(gameMap, ch => {
+                                const {name, rules, tileGenerator, spawnGenerator, enemyAI, objectives} = gameMap;
+                                game.gameMap = {id, name, rules, tileGenerator, spawnGenerator, enemyAI, objectives};
+                                game.seed = seed;
+                                game.character = ch;
+                                appView.newGame();
+                                callback?.();
+                            }, () => {
+                                appView.briefMap(id, callback);
+                            });
                         },
                         onCancel: () => {
                             callback?.();

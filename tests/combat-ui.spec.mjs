@@ -18,16 +18,17 @@ test('attacks, kills, xp and harm go into the combat log, which shows its last l
         g.playerAct(c, 1, 0);
         return g.combatLog.map(({turn, ...e}) => [turn === g.turn, e]);
     });
-    const you = {owner:'player', core:true}, it = {owner:'enemy', core:false};
+    const you = {owner:'player', core:true, name:'Tess'}, it = {owner:'enemy', core:false};
     expect(log).toEqual([
         [true, {kind:'miss', a:you, d:it, roll:expect.any(Number), chance:0}],
         [true, {kind:'hit', a:you, d:it, roll:expect.any(Number), chance:100, dmg:1}],
         [true, {kind:'destroyed', d:it, linked:0}],
         [true, {kind:'xp', a:you, xp:400}]
     ]);
-    await expect(page.getByText(/Your core hits Creeper for 1 \(\d+ vs 100%\)\./)).toBeVisible();
+    // (Your core by the name you gave it: see TEST_CHARACTER.)
+    await expect(page.getByText(/Tess hits Creeper for 1 \(\d+ vs 100%\)\./)).toBeVisible();
     await expect(page.getByText('Creeper is destroyed.')).toBeVisible();
-    await expect(page.getByText('Your core gains 4 XP.')).toBeVisible();
+    await expect(page.getByText('Tess gains 4 XP.')).toBeVisible();
     
     await putFixture(page, 0, 1, 'harm', {magnitude:1});
     await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 0, 1));
@@ -133,7 +134,7 @@ test('I opens the selected piece\'s character sheet', async ({page}) => {
         hc.view.draw();
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Your core · Human · Urchin · Level 1')).toBeVisible();
+    await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
     for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1 of 1 · +1 a turn · +0 initiative', 'Exhausted (1 more turn)']) {
         await expect(page.getByText(text, {exact:true})).toBeVisible();
     }

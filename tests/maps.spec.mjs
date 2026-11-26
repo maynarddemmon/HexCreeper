@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {startGame, button, waitForGame} from './helpers.mjs';
+import {startGame, button, waitForGame, pressStart} from './helpers.mjs';
 
 const mapsTitle = page => page.getByText('Maps', {exact:true}).filter({visible:true});
 
@@ -28,7 +28,7 @@ test('playing a map starts a new game with its values in effect, and the save ke
     await startGame(page);
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'warrens');
     const seed = await page.evaluate(() => hc.app.game.seed);
     const inWarrens = () => page.evaluate(() => ({
@@ -64,7 +64,7 @@ test('the brief shows the map\'s description and a seed (no settings), and start
     await expect(seedInput(page)).toHaveValue(/^\d+$/);
     
     await seedInput(page).fill('1234');
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
     expect(await page.evaluate(() => [hc.app.game.seed, hc.app.game.spawnGenerator.attrs.spawnEvery])).toEqual([1234, 2]);
     await expect(page.getByText('1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
@@ -75,7 +75,7 @@ test('the same seed makes the same map; an empty seed makes a random one', async
     const play = async seed => {
         await button(page, 'New game').click();
         await seedInput(page).fill(seed);
-        await button(page, '✓ Start').click();
+        await pressStart(page);
         return mapOf(page);
     };
     const first = await play('42');
@@ -111,14 +111,14 @@ test('switching maps mid-game warns in the brief; values the new map doesn\'t se
     await startGame(page);
     await button(page, 'Maps').click();
     await button(page, 'Play The Warrens').click();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'warrens');
     await page.evaluate(() => {hc.app.game.playerWait();});
     
     await button(page, 'Maps').click();
     await button(page, 'Play Open Ground').click();
     await expect(page.getByText('Starting abandons the game in progress.')).toBeVisible();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
     expect(await page.evaluate(() => [hc.app.game.tileGenerator.attrs.wallChance, hc.app.game.spawnGenerator.attrs.spawnEvery, hc.app.game.rules.visionRadius, hc.app.game.turn])).toEqual([0, 2, 12, 1]);
 });
@@ -136,7 +136,7 @@ test('a map file that can\'t be loaded says so and the game carries on', async (
 const playMap = async (page, name, id) => {
     await button(page, 'Maps').click();
     await button(page, 'Play ' + name).click();
-    await button(page, '✓ Start').click();
+    await pressStart(page);
     await page.waitForFunction(id => hc.app.game.gameMap?.id === id, id);
 };
 

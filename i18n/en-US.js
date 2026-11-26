@@ -182,6 +182,7 @@ myt.I18N.setDictionary({
 
 // The character sheet
 "dlg-sheet-title":"$0 · $1 · $2 · Level $3",
+"dlg-create-title":"Create your character",
 "sheet-xp":"XP",
 "sheet-hp":"HP",
 "sheet-ap":"Action points",
@@ -191,6 +192,10 @@ myt.I18N.setDictionary({
 "effect-turn":"$0 (1 more turn)",
 "effect-turns":"$0 ($1 more turns)",
 "sheet-stats":"Stats",
+"sheet-name":"Name",
+"sheet-description":"Description",
+"sheet-species":"Species",
+"sheet-background":"Background",
 "sheet-points":"Available Stat Points",
 "sheet-raise":"Raise $0",
 "sheet-lower":"Lower $0",

@@ -8,8 +8,8 @@
         {
             WideView, STATS,
             theme:{
-                spacing, padding, rowHeight,
-                colorText, colorTextMuted, colorSuccess, colorError,
+                spacing, padding, rowHeight, cornerRadius,
+                colorText, colorTextMuted, colorSuccess, colorError, colorPanel,
                 fontSizeMedium
             }
         } = pkg,
@@ -19,13 +19,22 @@
         STEP_SIZE = 24,                        // a + or − button
         VALUE_X = padding + LABEL_WIDTH,
         VALUE_WIDTH = PANEL_WIDTH - VALUE_X - 2*STEP_SIZE - spacing - 2*padding,
+        INPUT_WIDTH = PANEL_WIDTH - VALUE_X - padding,
         ROW_HEIGHT = rowHeight - 6,
+        DESCRIPTION_HEIGHT = 3*ROW_HEIGHT,
         CLOSE_LABEL = pkg.ICON_CANCEL + ' ' + i18n('btn-close'),
         CONFIRM_LABEL = pkg.ICON_CHECKED + ' ' + i18n('btn-confirm'),
+        INPUT_ATTRS = {
+            x:VALUE_X, width:INPUT_WIDTH, fontSize:fontSizeMedium, bgColor:colorPanel, textColor:colorText,
+            border:[1, 'solid', colorTextMuted], roundedCorners:cornerRadius/2
+        },
         
         // A value, and if it would change, what to: the new one beside it in green (or under
         // it, with under).
         changed = (was, now, under) => String(was) === String(now) ? String(was) : was + (under ? '<br>' : ' ') + '<span style="color:' + colorSuccess + ';">' + now + '</span>',
+        
+        // Escaped, to show as text in a Text (which takes HTML).
+        escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
         
         /*  A line of the sheet: a label and a value, and for a stat, buttons to put a point
             into it (+) or take one back (−). */
@@ -33,15 +42,17 @@
             initNode: function(parent, attrs) {
                 const self = this,
                     stat = attrs.stat,
-                    sheet = attrs.sheet;
+                    sheet = attrs.sheet,
+                    wide = attrs.wide;
                 delete attrs.stat;
                 delete attrs.sheet;
+                delete attrs.wide;
                 attrs.height ??= ROW_HEIGHT;
                 
                 self.callSuper(parent, attrs);
                 
                 self._label = new Text(self, {x:padding, y:3, width:LABEL_WIDTH, fontSize:fontSizeMedium, textColor:colorTextMuted});
-                self._value = new Text(self, {x:VALUE_X, y:3, width:VALUE_WIDTH, fontSize:fontSizeMedium, textColor:colorText});
+                self._value = new Text(self, {x:VALUE_X, y:3, width:wide ? INPUT_WIDTH : VALUE_WIDTH, fontSize:fontSizeMedium, textColor:colorText});
                 if (stat) {
                     const label = i18n('stat-' + stat),
                         step = (icon, delta, x) => new pkg.IconBtn(self, {
@@ -55,25 +66,55 @@
             
             /*  Shows label, and the value was, or if it would change, now beside it (or under
                 it, if that's too wide), the row growing to fit. */
-            set: function(label, was, now) {
+            set: function(label, was, now = was) {
                 const self = this,
                     value = self._value;
                 self._label.setText(label);
                 value.setText(changed(was, now));
-                if (value.getIDE().scrollWidth > VALUE_WIDTH) value.setText(changed(was, now, true));
+                if (value.getIDE().scrollWidth > value.width) value.setText(changed(was, now, true));
                 value.sizeViewToDom();
                 self.setHeight(Math.max(ROW_HEIGHT, value.y + value.height + 3));
             }
+        }),
+        
+        /*  A line of the sheet with a label and a control (an input, a text area or a
+            drop-down list), for creating a character. */
+        InputRow = new JSClass('InputRow', WideView, {
+            initNode: function(parent, attrs) {
+                const self = this,
+                    {label, make, height = ROW_HEIGHT + 4} = attrs;
+                delete attrs.label;
+                delete attrs.make;
+                attrs.height = height;
+                
+                self.callSuper(parent, attrs);
+                
+                new Text(self, {x:padding, y:5, width:LABEL_WIDTH, text:label, fontSize:fontSizeMedium, textColor:colorTextMuted});
+                const input = self.input = make(self, {...INPUT_ATTRS, y:2, height:height - 4});
+                input.getIDE().setAttribute('aria-label', label);
+            }
         });
     
-    /*  The character sheet for one of your pieces: its level, XP, HP, action points, status
-        effects, stats, and what they make it in combat. With stat points to spend (see
-        Combat.js) it's for levelling: the points left, and + and − on each stat to put a
-        point in or take one back (never below what it was when the sheet opened, nor
-        above its species' max). What
-        would change shows beside what it is now, in green. Confirm, once every point is
-        in, spends them; Cancel puts them all back. Without points it only shows, with
-        Close. */
+    /*  The character sheet for one of your pieces: its name and description (if it has
+        them), level, XP, HP, action points, status effects, stats, and what they make it
+        in combat. It has three modes.
+        
+        Showing (show, without stat points): only that, with Close.
+        
+        Levelling (show, with stat points to spend: see Combat.js): the points left, and +
+        and − on each stat to put a point in or take one back (never below what it was
+        when the sheet opened, nor above its species' max). Confirm, once every point is
+        in, spends them; Cancel puts them all back.
+        
+        Creating (create): your character for a new game: a name, a description, a
+        species and a background (from the playable ones: one that fits none of the
+        other's playable ones is disabled, and choosing one the other doesn't fit changes
+        the other to the first that does), and the stats, from the species' typical ones
+        (again whenever the species or background changes), + and − on each (lowering one
+        gives a point back), within what creation allows (see Combat.characterProblem).
+        Confirm, once it has a name and every point is in, makes it; Cancel doesn't.
+        
+        Levelling or creating, what would change shows beside what it is now, in green. */
     pkg.CharacterSheet = new JSClass('CharacterSheet', pkg.ConfirmDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -85,7 +126,35 @@
             
             const container = self._container = new WideView(self.getContentView()),
                 row = attrs => new SheetRow(container, {sheet:self, ...attrs}),
-                head = key => new Text(container, {x:padding, text:i18n(key), fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
+                head = key => new Text(container, {x:padding, text:i18n(key), fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'}),
+                select = method => (parent, attrs) => {
+                    const s = new M.InputSelect(parent, attrs);
+                    self.attachToDom(s, method, 'change');
+                    return s;
+                };
+            
+            // Creating
+            self._nameInput = new InputRow(container, {label:i18n('sheet-name'), make:(parent, attrs) => {
+                const input = new M.InputText(parent, {...attrs, maxLength:pkg.CHARACTER_NAME_MAX});
+                input.getIDS().padding = '0 ' + padding/2 + 'px';
+                self.attachToDom(input, '_typed', 'input');
+                return input;
+            }});
+            self._descriptionInput = new InputRow(container, {label:i18n('sheet-description'), height:DESCRIPTION_HEIGHT, make:(parent, attrs) => {
+                const input = new M.InputTextArea(parent, attrs);
+                input.getIDE().maxLength = pkg.CHARACTER_DESCRIPTION_MAX;
+                input.getIDS().padding = padding/2 + 'px';
+                input.getIDS().resize = 'none';
+                self.attachToDom(input, '_typed', 'input');
+                return input;
+            }});
+            self._speciesInput = new InputRow(container, {label:i18n('sheet-species'), make:select('_choseSpecies')});
+            self._backgroundInput = new InputRow(container, {label:i18n('sheet-background'), make:select('_choseBackground')});
+            
+            // Showing
+            self._nameRow = row({wide:true});
+            self._descriptionRow = row({wide:true});
+            
             self._infoRows = [0, 1, 2, 3].map(() => row());
             self._statsHead = head('sheet-stats');
             self._pointsRow = row();
@@ -98,44 +167,165 @@
         
         
         // Methods /////////////////////////////////////////////////////////////
-        /*  p is the piece. describe(q) gives the lines for a piece q, as it is or would be:
+        /*  Shows, or levels, piece p (see above); or, with opts.create (a character to
+            start from, or null for none), creates a character (see _create). describe(q) gives the lines for a piece q, as it is or would be:
             {info:[[label, value], ...], combat:[[label, value], ...]} (four and five of
-            them). statMax(stat) is the most a stat can be (its species'). preview(adds) is p
-            with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them. */
-        show: function(p, {title, describe, statMax, preview, onConfirm}) {
-            const self = this;
-            self.callSuper();
-            
-            self._piece = p;
-            self._describe = describe;
-            self._statMax = statMax;
-            self._preview = preview;
-            self._onConfirm = onConfirm;
-            self._adds = {};
-            self._levelling = p.statPoints.available > 0;
-            
-            self.setTitle(title);
-            const footer = self.getFooterView();
-            footer.cancelBtn.setVisible(self._levelling);
-            // (Close, without points, in red, as other dialogs' Close and Cancel are.)
-            footer.confirmBtn.setText(self._levelling ? CONFIRM_LABEL : CLOSE_LABEL);
-            footer.confirmBtn.setTextColor(self._levelling ? colorSuccess : colorError);
-            self._pointsRow.setVisible(self._levelling);
-            for (const r of self._statRows) {
-                r.minusBtn.setVisible(self._levelling);
-                r.plusBtn.setVisible(self._levelling);
+            them). statMax(stat) is the most a stat can be (its species'). preview(adds) is
+            p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them. */
+        show: function(p, opts) {
+            this.callSuper();
+            if ('create' in opts) {
+                this._create(opts);
+            } else {
+                this._show(p, opts);
             }
+        },
+        
+        /** @private */
+        _show: function(p, {title, describe, statMax, preview, onConfirm}) {
+            const self = this,
+                levelling = p.statPoints.available > 0;
+            self._setMode(levelling ? 'level' : 'show', title, {
+                describe, onConfirm,
+                base: () => p.stats,
+                limits: stat => [0, statMax(stat) - p.stats[stat]],
+                points: () => p.statPoints.available,
+                piece: adds => Object.keys(adds).length ? preview(adds) : p
+            });
+            self._nameRow.setVisible(!!p.name);
+            self._descriptionRow.setVisible(!!p.description);
+            if (p.name) self._nameRow.set(i18n('sheet-name'), escape(p.name));
+            if (p.description) self._descriptionRow.set(i18n('sheet-description'), escape(p.description));
             self.refresh();
         },
         
-        /*  The points put in and not spent yet. */
+        /** @private Creates a character (see above), starting as character create
+            ({name, description, species, background, stats}: its stats, if they're
+            allowed, else its species' typical ones). species and backgrounds are the
+            playable ones ({id, name}), and fits(speciesId, backgroundId) whether a pair
+            fits. typical(speciesId) is a species' typical stats, range(speciesId, stat)
+            the range a stat can be in ([min, max]), points the points to spend, preview(ch)
+            a piece as ch would be, and describe as for show. onConfirm(ch) makes it;
+            onCancel is called if it's not made. */
+        _create: function({create:ch, title, species, backgrounds, fits, typical, range, points, preview, describe, onConfirm, onCancel}) {
+            const self = this,
+                setOptions = (input, list, enabled) => {
+                    const select = input.input;
+                    select.setOptions(list.map(o => ({value:o.id, label:o.name})));
+                    [...select.getIDE().options].forEach((o, i) => {o.disabled = !enabled(list[i].id);});
+                };
+            self._fits = fits;
+            self._speciesList = species;
+            self._backgroundList = backgrounds;
+            self._typical = typical;
+            self._onCancel = onCancel;
+            self._setMode('create', title, {
+                describe,
+                onConfirm: adds => onConfirm(self._character(adds)),
+                base: () => typical(self._speciesInput.input.getIDE().value),
+                limits: stat => {
+                    const id = self._speciesInput.input.getIDE().value,
+                        [min, max] = range(id, stat);
+                    return [min - typical(id)[stat], max - typical(id)[stat]];
+                },
+                points: () => points,
+                piece: adds => preview(self._character(adds))
+            });
+            setOptions(self._speciesInput, species, id => backgrounds.some(b => fits(id, b.id)));
+            setOptions(self._backgroundInput, backgrounds, id => species.some(s => fits(s.id, id)));
+            self._nameInput.input.setValue(ch?.name ?? '');
+            self._descriptionInput.input.setValue(ch?.description ?? '');
+            const sp = species.find(s => s.id === ch?.species && backgrounds.some(b => fits(s.id, b.id))) ?? species.find(s => backgrounds.some(b => fits(s.id, b.id)));
+            self._speciesInput.input.getIDE().value = sp?.id ?? '';
+            self._backgroundInput.input.getIDE().value = backgrounds.find(b => b.id === ch?.background && fits(sp?.id, b.id))?.id ?? backgrounds.find(b => fits(sp?.id, b.id))?.id ?? '';
+            // Its stats, if they're its species' typical ones with points that are allowed
+            const base = sp ? typical(sp.id) : {},
+                adds = Object.fromEntries(STATS.map(s => [s, (ch?.stats?.[s] ?? base[s]) - base[s]])),
+                fine = STATS.every(s => {
+                    const [lo, hi] = self._modeOpts.limits(s);
+                    return Number.isInteger(adds[s]) && adds[s] >= lo && adds[s] <= hi;
+                }) && STATS.reduce((n, s) => n + adds[s], 0) <= points;
+            self._adds = fine ? adds : {};
+            self.refresh();
+            self._nameInput.input.getIDE().focus();
+        },
+        
+        /** @private */
+        _setMode: function(mode, title, opts) {
+            const self = this,
+                editing = mode !== 'show',
+                creating = mode === 'create',
+                footer = self.getFooterView();
+            self._mode = mode;
+            self._modeOpts = opts;
+            self._adds = {};
+            self.setTitle(title);
+            footer.cancelBtn.setVisible(editing);
+            // (Close, just showing, in red, as other dialogs' Close and Cancel are.)
+            footer.confirmBtn.setText(editing ? CONFIRM_LABEL : CLOSE_LABEL);
+            footer.confirmBtn.setTextColor(editing ? colorSuccess : colorError);
+            for (const r of [self._nameInput, self._descriptionInput, self._speciesInput, self._backgroundInput]) r.setVisible(creating);
+            if (creating) {
+                self._nameRow.setVisible(false);
+                self._descriptionRow.setVisible(false);
+            }
+            self._pointsRow.setVisible(editing);
+            for (const r of self._statRows) {
+                r.minusBtn.setVisible(editing);
+                r.plusBtn.setVisible(editing);
+            }
+        },
+        
+        /** @private The character being created, with the points of adds put in. */
+        _character: function(adds) {
+            const self = this,
+                speciesId = self._speciesInput.input.getIDE().value,
+                base = self._typical(speciesId);
+            return {
+                name:self._nameInput.input.value ?? '',
+                description:self._descriptionInput.input.value ?? '',
+                species:speciesId,
+                background:self._backgroundInput.input.getIDE().value,
+                stats:Object.fromEntries(STATS.map(s => [s, base[s] + (adds[s] ?? 0)]))
+            };
+        },
+        
+        /** @private The species was chosen: if the background doesn't fit it, the first
+            that does, and the stats as the species has them. */
+        _choseSpecies: function(_event) {
+            const self = this,
+                species = self._speciesInput.input.getIDE().value,
+                background = self._backgroundInput.input.getIDE();
+            if (!self._fits(species, background.value)) background.value = self._backgroundList.find(b => self._fits(species, b.id))?.id ?? '';
+            self._adds = {};
+            self.refresh();
+        },
+        
+        /** @private The background was chosen: if the species doesn't fit it, the first
+            that does, and the stats as the species has them. */
+        _choseBackground: function(_event) {
+            const self = this,
+                background = self._backgroundInput.input.getIDE().value,
+                species = self._speciesInput.input.getIDE();
+            if (!self._fits(species.value, background)) species.value = self._speciesList.find(s => self._fits(s.id, background))?.id ?? '';
+            self._adds = {};
+            self.refresh();
+        },
+        
+        /** @private The name or description was typed in. */
+        _typed: function(_event) {
+            this.refresh();
+        },
+        
+        /*  The points put in and not spent yet (in all: those taken out count against). */
         getAdded: function() {return Object.values(this._adds).reduce((n, v) => n + v, 0);},
         
         /*  Puts a point into stat (delta 1) or takes one back (-1), if there's one to. */
         step: function(stat, delta) {
             const self = this,
-                n = (self._adds[stat] ?? 0) + delta;
-            if (n >= 0 && self.getAdded() + delta <= self._piece.statPoints.available) {
+                n = (self._adds[stat] ?? 0) + delta,
+                [lo, hi] = self._modeOpts.limits(stat);
+            if (n >= lo && n <= hi && self.getAdded() + delta <= self._modeOpts.points()) {
                 self._adds[stat] = n;
                 self.refresh();
             }
@@ -144,22 +334,27 @@
         /*  Brings every line up to date with the points put in. */
         refresh: function() {
             const self = this,
-                p = self._piece,
-                was = self._describe(p),
-                now = self._describe(self._preview(self._adds)),
-                left = p.statPoints.available - self.getAdded(),
+                opts = self._modeOpts,
+                editing = self._mode !== 'show',
+                was = opts.describe(opts.piece({})),
+                now = opts.describe(opts.piece(self._adds)),
+                base = opts.base(),
+                left = opts.points() - self.getAdded(),
                 fill = (rows, key) => rows.forEach((r, i) => r.set(was[key][i][0], was[key][i][1], now[key][i][1]));
             fill(self._infoRows, 'info');
             fill(self._combatRows, 'combat');
-            self._pointsRow.set(i18n('sheet-points'), left, left);
+            self._pointsRow.set(i18n('sheet-points'), left);
             STATS.forEach((stat, i) => {
                 const r = self._statRows[i],
-                    added = self._adds[stat] ?? 0;
-                r.set(i18n('stat-' + stat), p.stats[stat], p.stats[stat] + added);
-                r.minusBtn.setDisabled(added === 0);
-                r.plusBtn.setDisabled(left === 0 || p.stats[stat] + added >= self._statMax(stat));
+                    added = self._adds[stat] ?? 0,
+                    [lo, hi] = opts.limits(stat);
+                r.set(i18n('stat-' + stat), base[stat], base[stat] + added);
+                r.minusBtn.setDisabled(added <= lo);
+                r.plusBtn.setDisabled(left <= 0 || added >= hi);
             });
-            self.getFooterView().confirmBtn.setDisabled(self._levelling && left > 0);
+            let ready = !editing || left === 0;
+            if (self._mode === 'create') ready = ready && !!(self._nameInput.input.value ?? '').trim() && !!self._speciesInput.input.getIDE().value && !!self._backgroundInput.input.getIDE().value;
+            self.getFooterView().confirmBtn.setDisabled(!ready);
             self.setContentHeightToFit(self._container.height);
         },
         
@@ -172,12 +367,14 @@
             const self = this;
             if (!self.getFooterView().confirmBtn.disabled) {
                 self.hide();
-                if (self._levelling) self._onConfirm(self._adds);
+                if (self._mode !== 'show') self._modeOpts.onConfirm(self._adds);
             }
         },
         
         doCancel: function() {
-            this.hide();
+            const self = this;
+            self.hide();
+            if (self._mode === 'create') self._onCancel?.();
         }
     });
 })(hc);
