@@ -76,19 +76,14 @@ test('an enemy coming into sight gets its initiative, once, and your pieces thei
     expect(r).toEqual([0, [50, 50], [50, 50, 50]]);
 });
 
-test('action points are saved; a save from before them gives every piece a full pool', async ({page}) => {
+test('action points are saved, and the turn initiative was last given', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         c.ap = 125;
         g.initiativeTurn = g.turn;
         const data = JSON.parse(JSON.stringify(g.exportToObj()));
         g.importFromObj(data);
-        const out = [g.getPlayerCore().ap, g.initiativeTurn === g.turn];
-        for (const p of data.pieces) delete p.ap;
-        delete data.initiativeTurn;
-        g.importFromObj(data);
-        out.push(g.getPlayerCore().ap, g.initiativeTurn);
-        return out;
+        return [g.getPlayerCore().ap, g.initiativeTurn === g.turn];
     });
-    expect(r).toEqual([125, true, 200, null]);
+    expect(r).toEqual([125, true]);
 });

@@ -109,21 +109,3 @@ test('opening loot counts toward goals, and the count is saved', async ({page}) 
     });
     expect(r).toEqual([[1, '1/2', null], [2, '2/2', 'won'], 2, [10, 10]]);
 });
-
-test('a save from before fixtures, with heals, harms and loot among its tiles, loads them as fixtures', async ({page}) => {
-    await startGame(page);
-    await clearBoard(page);
-    await putLoot(page, 2, 0, 17);
-    const r = await page.evaluate(() => {
-        const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj()));
-        g.tiles.set('3,0', g.makeTile(3, 0, 'solid', 'boulder'));
-        // As saves were: {kind:'loot', ...} in tiles, and no fixtures.
-        data.tiles = [...data.fixtures.map(({type, ...f}) => ({...f, kind:type})), g.makeTile(3, 0, 'solid', 'boulder')];
-        delete data.fixtures;
-        g.importFromObj(data);
-        return [g.fixtures.get('2,0'), [...g.tiles.keys()]];
-    });
-    expect(r[0]).toMatchObject({x:2, y:0, type:'loot', subtype:'loot', pool:17});
-    expect(r[0].kind).toBeUndefined();
-    expect(r[1]).toEqual(['3,0']);
-});

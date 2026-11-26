@@ -5,7 +5,9 @@
         
         isObj = pkg.isObj,
         
-        SAVE_FORMAT_VERSION = 1,
+        // 2 since 2026-11-25: saves made before then aren't loaded (nothing is kept just
+        // for them).
+        SAVE_FORMAT_VERSION = 2,
         DEFAULT_STORAGE_KEY = 'hc.save',
         
         readStorage = key => {

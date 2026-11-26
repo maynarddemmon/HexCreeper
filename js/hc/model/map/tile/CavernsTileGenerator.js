@@ -274,19 +274,18 @@
         importState: function(state) {
             const n = this.network,
                 saved = state?.network;
-            if (!Array.isArray(state?.madeBlocks) || (n && !(Array.isArray(saved?.sites) && Array.isArray(saved.excluded) && Array.isArray(saved.edges)))) {
+            if (!Array.isArray(state?.madeBlocks) || (n && !(Array.isArray(saved?.sites) && Array.isArray(saved.excluded) && Array.isArray(saved.edges) && Array.isArray(saved.wetEdges)))) {
                 throw new Error('Malformed tile generator state');
             }
             this.madeBlocks = new Set(state.madeBlocks);
             if (n) {
                 for (const [key, parent, deadEnd, stream] of saved.sites) {
-                    n.sites.set(key, {parent:parent === null ? null : parent.split(',').map(Number), deadEnd:!!deadEnd, stream:Number.isInteger(stream) ? stream : null});
+                    n.sites.set(key, {parent:parent === null ? null : parent.split(',').map(Number), deadEnd:!!deadEnd, stream});
                     n.order.push(key);
                 }
                 saved.excluded.forEach(key => n.excluded.add(key));
                 saved.edges.forEach(tk => n.edges.add(tk));
-                // (From before streams, none.)
-                if (Array.isArray(saved.wetEdges)) saved.wetEdges.forEach(tk => n.wetEdges.add(tk));
+                saved.wetEdges.forEach(tk => n.wetEdges.add(tk));
                 for (const key of n.order) this.addCells(...key.split(',').map(Number));
             }
         },

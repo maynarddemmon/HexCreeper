@@ -142,14 +142,11 @@
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
-                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type]) ||
+                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects)) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
-                !(o.fixtures === undefined || (isArr(o.fixtures) && o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))))
+                !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
             ) throw new Error('Malformed game data');
-            // (A save from before 2026-11-25 has an advance rule: there's none now.)
-            const savedRules = {...o.rules};
-            delete savedRules.advance;
-            const rules = pkg.settings.resolveRules(savedRules, 'Saved game'),
+            const rules = pkg.settings.resolveRules(o.rules, 'Saved game'),
                 objectives = o.gameMap?.objectives ?? [];
             try {
                 for (const obj of objectives) {
@@ -199,17 +196,7 @@
             this.board = new Map();
             for (const p of o.pieces) {
                 const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
-                    piece = {...p, trail};
-                // From before pieces had profiles (see Combat.js): an ordinary one, at the
-                // HP it had, if that fits.
-                if (!piece.stats) {
-                    this.giveProfile(piece, piece.enemyId);
-                    piece.hp = Math.min(piece.maxHp, Math.max(1, p.hp | 0));
-                }
-                // From before action points: a full pool
-                if (!Number.isInteger(piece.ap) || piece.ap < 0) piece.ap = this.apMax(piece);
-                // Its status effects (from before them, none)
-                piece.effects = this.loadedEffects(piece);
+                    piece = {...p, trail, effects:p.effects.map(e => ({...e}))};
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -217,18 +204,8 @@
                 this.board.set(this.key(p.x, p.y), p.id);
             }
             this.nextBand = 1 + Math.max(0, ...[...this.pieces.values()].map(p => p.band ?? 0));
-            // From before fixtures, heals, harms and loot were tiles: they're made fixtures.
-            const fixtures = [...(o.fixtures ?? [])];
-            this.tiles = new Map();
-            for (const {...t} of o.tiles) {
-                if (FIXTURE_TYPES.includes(t.kind)) {
-                    const {kind:type, ...rest} = t;
-                    fixtures.push({...rest, type});
-                } else {
-                    this.tiles.set(this.key(t.x, t.y), t);
-                }
-            }
-            this.fixtures = new Map(fixtures.map(f => [this.key(f.x, f.y), {...f, ...f.state ? {state:{...f.state}} : {}}]));
+            this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
+            this.fixtures = new Map(o.fixtures.map(f => [this.key(f.x, f.y), {...f, ...f.state ? {state:{...f.state}} : {}}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
             this.enemyAI = enemyAI;
@@ -569,14 +546,6 @@
                 }
             }
             return broken;
-        },
-        
-        // Back-compat helper (single hit, scored as a 1-kill move).
-        attack: function(attacker, target, dmg = 1) {
-            const lost = this.damage(target, dmg, attacker);
-            const v = lost.reduce((a, g) => a + g.scoreValue, 0);
-            if (v && attacker.owner === 'player') { this.earn(v * lost.length); attacker.score += v; }
-            return lost.length > 0;
         },
         
         // ---- Tiles ----

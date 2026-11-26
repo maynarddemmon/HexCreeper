@@ -20,8 +20,7 @@
 (pkg => {
     'use strict';
 
-    const {Subtypes} = pkg,
-        isEffect = e => typeof e?.id === 'string' && Number.isInteger(e.countdown) && e.countdown > 0;
+    const {Subtypes} = pkg;
     
     pkg.EFFECT_EXHAUSTED = 'exhausted';
     pkg.EFFECT_RALLYING = 'rallying';
@@ -49,12 +48,6 @@
             for (const p of this.pieces.values()) {
                 if (p.effects?.length) p.effects = p.effects.filter(e => --e.countdown > 0);
             }
-        },
-        
-        /*  Piece p's effects as loaded from a save: those that make sense, or [] (from before
-            effects, none). */
-        loadedEffects: function(p) {
-            return Array.isArray(p.effects) ? p.effects.filter(isEffect).map(e => ({id:e.id, countdown:e.countdown})) : [];
         }
     });
 })(hc);

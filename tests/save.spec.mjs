@@ -47,7 +47,7 @@ test('saving with the header button, then reloading, carries on the same game', 
     // Taken after saving: what's in sight is only worked out as the board is drawn, so
     // before then the cells seen may not be up to date yet.
     const before = await snapshot(page);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hc.save')).version)).toBe(1);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hc.save')).version)).toBe(2);
 
     await page.reload();
     await waitForGame(page);
@@ -67,31 +67,16 @@ test('a game\'s rules are saved with it, whatever its map now says', async ({pag
     })).toEqual(['4 + ceil(levels / 2)', '9 * coreLevel']);
 });
 
-test('a save from before advance went (it always happens now) loads without a warning about it', async ({page}) => {
-    const problems = await startGame(page);
-    await page.evaluate(() => {
-        const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj()));
-        data.rules.advance = false;
-        g.importFromObj(data);
-    });
-    expect([...problems.warnings, ...problems.errors].filter(w => /advance/.test(w))).toEqual([]);
-});
-
-test('pieces\' status effects are saved with them; ones that make no sense are dropped', async ({page}) => {
+test('pieces\' status effects are saved with them', async ({page}) => {
     await startGame(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         g.addEffect(c, 'exhausted', 2);
-        const data = JSON.parse(JSON.stringify(g.exportToObj())),
-            core = data.pieces.find(p => p.id === c.id);
-        core.effects.push({id:'stunned', countdown:0}, {countdown:3}, 'dazed');
+        const data = JSON.parse(JSON.stringify(g.exportToObj()));
+        c.effects = [];
         g.importFromObj(data);
-        const out = [g.getPlayerCore().effects];
-        delete core.effects;    // from before effects
-        g.importFromObj(data);
-        out.push(g.getPlayerCore().effects);
-        return out;
-    })).toEqual([[{id:'exhausted', countdown:2}], []]);
+        return g.getPlayerCore().effects;
+    })).toEqual([{id:'exhausted', countdown:2}]);
 });
 
 test('without a save, a reload starts a new game', async ({page}) => {
@@ -104,7 +89,7 @@ test('without a save, a reload starts a new game', async ({page}) => {
 
 test('a save that can\'t be used is cleared, with a message, then the maps are shown', async ({page}) => {
     await startGame(page);
-    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:1, format:'compact', data:{turn:'nope'}}));});
+    await page.evaluate(() => {localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));});
     await page.reload();
     await waitForGame(page);
     await expect(page.getByText('Save Could Not Be Loaded', {exact:true}).filter({visible:true})).toBeVisible();
@@ -118,7 +103,7 @@ test('after losing, a last save that can\'t be used shows the maps after the mes
     await startGame(page);
     await saveWithButton(page);
     await page.evaluate(() => {
-        localStorage.setItem('hc.save', JSON.stringify({version:1, format:'compact', data:{turn:'nope'}}));
+        localStorage.setItem('hc.save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}));
         const g = hc.app.game, e = g.addPiece('core', 'enemy', 50, 50);
         g.damage(g.getPlayerCore(), 99, e);
         hc.view.draw();
@@ -166,7 +151,7 @@ for (const format of ['compact', 'pretty']) {
         const file = await download,
             contents = await (await file.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString());
         expect(file.suggestedFilename()).toBe('hexcreeper-save.json');
-        expect(JSON.parse(contents)).toMatchObject({version:1, format});
+        expect(JSON.parse(contents)).toMatchObject({version:2, format});
         expect(contents.includes('\n')).toBe(format === 'pretty');
         
         await button(page, 'New game').click();
@@ -182,10 +167,11 @@ for (const format of ['compact', 'pretty']) {
 
 for (const [what, contents, msg] of [
     ['not JSON', 'not a save', 'That file is not a HexCreeper save file.'],
-    ['not a save', JSON.stringify({version:1, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
-    ['without a format', JSON.stringify({version:1, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
-    ['in an unknown format', JSON.stringify({version:1, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
-    ['from an unsupported version', JSON.stringify({version:0.5, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (0.5).']
+    ['not a save', JSON.stringify({version:2, format:'compact', data:{turn:'nope'}}), 'That file could not be imported because it could not be applied.'],
+    ['without a format', JSON.stringify({version:2, data:{}}), 'That file could not be imported because it is in an unknown format (undefined).'],
+    ['in an unknown format', JSON.stringify({version:2, format:'zipped', data:{}}), 'That file could not be imported because it is in an unknown format (zipped).'],
+    // (Saves from before version 2, 2026-11-25, aren't loaded.)
+    ['from an unsupported version', JSON.stringify({version:1, format:'compact', data:{}}), 'That file could not be imported because it is from an unsupported version (1).']
 ]) {
     test(`importing a file that is ${what} changes nothing`, async ({page}) => {
         await startGame(page);
