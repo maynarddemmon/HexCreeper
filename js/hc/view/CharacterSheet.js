@@ -69,7 +69,8 @@
     /*  The character sheet for one of your pieces: its level, XP, HP, action points, status
         effects, stats, and what they make it in combat. With stat points to spend (see
         Combat.js) it's for levelling: the points left, and + and − on each stat to put a
-        point in or take one back (never below what it was when the sheet opened). What
+        point in or take one back (never below what it was when the sheet opened, nor
+        above its species' max). What
         would change shows beside what it is now, in green. Confirm, once every point is
         in, spends them; Cancel puts them all back. Without points it only shows, with
         Close. */
@@ -99,14 +100,15 @@
         // Methods /////////////////////////////////////////////////////////////
         /*  p is the piece. describe(q) gives the lines for a piece q, as it is or would be:
             {info:[[label, value], ...], combat:[[label, value], ...]} (four and five of
-            them). preview(adds) is p with the points of adds ({stat:n}) put in, and
-            onConfirm(adds) spends them. */
-        show: function(p, {title, describe, preview, onConfirm}) {
+            them). statMax(stat) is the most a stat can be (its species'). preview(adds) is p
+            with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them. */
+        show: function(p, {title, describe, statMax, preview, onConfirm}) {
             const self = this;
             self.callSuper();
             
             self._piece = p;
             self._describe = describe;
+            self._statMax = statMax;
             self._preview = preview;
             self._onConfirm = onConfirm;
             self._adds = {};
@@ -155,7 +157,7 @@
                     added = self._adds[stat] ?? 0;
                 r.set(i18n('stat-' + stat), p.stats[stat], p.stats[stat] + added);
                 r.minusBtn.setDisabled(added === 0);
-                r.plusBtn.setDisabled(left === 0);
+                r.plusBtn.setDisabled(left === 0 || p.stats[stat] + added >= self._statMax(stat));
             });
             self.getFooterView().confirmBtn.setDisabled(self._levelling && left > 0);
             self.setContentHeightToFit(self._container.height);

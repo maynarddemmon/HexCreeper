@@ -181,7 +181,7 @@ myt.I18N.setDictionary({
 "log-multikill":"A $0× multi-kill!",
 
 // The character sheet
-"dlg-sheet-title":"$0 · Level $1",
+"dlg-sheet-title":"$0 · $1 · Level $2",
 "sheet-xp":"XP",
 "sheet-hp":"HP",
 "sheet-ap":"Action points",

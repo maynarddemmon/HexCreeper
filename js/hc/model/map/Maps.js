@@ -60,7 +60,7 @@
             solids, holes, fixtures, enemies, enemyGroups, ...}, or null if it couldn't be
             loaded. It's loaded once, and its materials and solid subtypes go to pkg.solids,
             its hole and floor subtypes to pkg.holes and pkg.floors, its fixtures to pkg.fixtures (see Fixtures.js),
-            its characters to pkg.characters (see Combat.js), and its enemies and groups to
+            its species and characters to pkg.species and pkg.characters (see Combat.js), and its enemies and groups to
             pkg.enemies and pkg.enemyGroups (see Enemies.js). */
         loadIndex: callback => {
             if (index) {
@@ -83,6 +83,7 @@
                             if (f.destroyInto && !pkg.fixtures.get(f.destroyInto)) console.warn('Fixture', f.id, 'leaves fixture', f.destroyInto, 'which there is none of');
                         }
                         pkg.effects.define(data.effects);
+                        pkg.species.define(data.species);
                         pkg.characters.define(data.characters);
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
                     }

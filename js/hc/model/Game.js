@@ -141,7 +141,7 @@
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
-                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent)) ||
+                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent) && typeof p.species === 'string') ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
             ) throw new Error('Malformed game data');

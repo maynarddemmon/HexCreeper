@@ -24,7 +24,7 @@ test('groups that can\'t be used are left out, with an error', async ({page}) =>
     const errors = [];
     page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
     const kept = await page.evaluate(() => {
-        hc.defineEnemies({a:{name:'A'}, b:{name:'B'}}, {
+        hc.defineEnemies({a:{name:'A', species:'human'}, b:{name:'B', species:'human'}}, {
             ok:{name:'OK', members:['a', {b:['a', 'pair']}]},
             pair:{name:'Pair', members:['a', 'b']},
             unknown:{name:'Unknown', members:['c']},

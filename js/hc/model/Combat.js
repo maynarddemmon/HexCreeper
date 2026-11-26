@@ -1,9 +1,20 @@
 /*  Stats, levels and combat (a module included in Game).
     
-    Every piece has a profile, from data/init.json5: yours from `characters` (the
-    "adventurer" for now), an enemy's from `enemies` (its enemyId, or "creeper" for one
-    without). A profile has
-        stats        str, agl, con, dex, int, wis, wil, cha (10 if not given)
+    Every piece has a species and a profile, from data/init.json5.
+    
+    A species (`species`) is what a creature is, a template for it: in "stats", for each
+    stat, the range it can be in and its typical value, [min, typical, max], or [min,
+    max] for a typical value half way (rounded); [3, 10, 18] if not given (a species
+    that goes down to 0 should say so). Entries can extend others (a sub-species: see
+    Subtypes.js), a stat's whole entry replacing the other's. Stats can't go outside the
+    range (spending stat points can't raise one above its max).
+    
+    A profile is what a piece is in a fight: yours from `characters` (the "adventurer"
+    for now: a class, of a species), an enemy's from `enemies` (its enemyId, or "creeper"
+    for one without). A profile has
+        species      its species' id (it must have one)
+        stats        str, agl, con, dex, int, wis, wil, cha (its species' typical values
+                     if not given; within its ranges)
         level        1 if not given
         damage       [min, max], what its weapon does (before its str bonus)
         penetration  how much of a target's damage reduction its weapon goes through
@@ -66,12 +77,40 @@
             rolls roll and roll2: a whole number, not below 0. */
         rolled = (rules, min, max, roll, roll2) => Math.max(0, Math.floor(evaluate(rules.damageRoll, DAMAGE_VARS, {min, max, roll, roll2})) || 0),
         
-        /*  A profile as init.json5 has it, made usable, or null if it isn't. */
-        parseProfile = entry => {
-            const stats = {}, level = entry.level ?? 1, damage = entry.damage ?? [1, 4];
+        /*  A species as init.json5 has it, made usable ({ranges:{stat:[min, max]},
+            typical:{stat:n}}), or null if it isn't. */
+        parseSpecies = entry => {
+            const ranges = {},
+                typical = {};
+            let ok = true;
             for (const s of STATS) {
-                const v = entry.stats?.[s] ?? 10;
-                if (!isInt(v)) return null;
+                const v = entry.stats?.[s] ?? DEFAULT_STAT,
+                    [min, mid, max] = Array.isArray(v) && v.length === 2 ? [v[0], Math.round((v[0] + v[1]) / 2), v[1]] : Array.isArray(v) ? v : [];
+                if (Array.isArray(v) && (v.length === 2 || v.length === 3) && v.every(isInt) && min <= mid && mid <= max) {
+                    ranges[s] = [min, max];
+                    typical[s] = mid;
+                } else {
+                    ok = false;
+                }
+            }
+            return ok ? {ranges, typical} : null;
+        },
+        
+        DEFAULT_STAT = [3, 10, 18],          // a species' stat it doesn't give: [min, typical, max]
+        // A species for a profile with none (only the fallback profile below)
+        FALLBACK_SPECIES = {id:'', name:'', description:'', ...parseSpecies({})},
+        
+        /*  A profile as init.json5 has it, made usable, or null if it isn't (its species
+            must be in pkg.species). */
+        parseProfile = (entry, id, species = pkg.species.get(entry.species)) => {
+            const stats = {}, level = entry.level ?? 1, damage = entry.damage ?? [1, 4];
+            if (!species) {
+                console.error('Profile', id, 'has no species', JSON.stringify(entry.species), 'that there is');
+                return null;
+            }
+            for (const s of STATS) {
+                const v = entry.stats?.[s] ?? species.typical[s];
+                if (!isInt(v) || v < species.ranges[s][0] || v > species.ranges[s][1]) return null;
                 stats[s] = v;
             }
             if (!(Number.isInteger(level) && level >= 1) ||
@@ -79,14 +118,14 @@
                 !isInt(entry.penetration ?? 0) || !isInt(entry.armor ?? 0) ||
                 !(entry.hp === undefined || (Number.isInteger(entry.hp) && entry.hp >= 1)) ||
                 !isInt(entry.xp ?? 0)) return null;
-            return {stats, level, damage:[...damage], penetration:entry.penetration ?? 0, armor:entry.armor ?? 0,
+            return {species:species.id, stats, level, damage:[...damage], penetration:entry.penetration ?? 0, armor:entry.armor ?? 0,
                 hp:entry.hp, xp:entry.xp};
         },
         
         // What a profile is if init.json5 doesn't say (or has no such one)
         DEFAULT_ENEMTY = 'creeper',
         DEFAULT_CHARACTER_CLASS = 'adventurer',
-        FALLBACK = parseProfile({}),
+        FALLBACK = parseProfile({}, '', FALLBACK_SPECIES),
         
         LOG_MAX = 200,                       // combat log entries kept
         ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
@@ -96,6 +135,7 @@
         MIN_COST = 10,                       // the least an action can cost (so there's an end to them)
         LEVEL_UP_MS = 1400;                  // how long the rings of a level up take to play
     
+    pkg.species = new Subtypes('species', parseSpecies);
     pkg.characters = new Subtypes('character', parseProfile);
     pkg.enemies = new Subtypes('enemy', parseProfile);
     
@@ -106,6 +146,7 @@
         giveProfile: function(p, id) {
             const enemy = p.owner === 'enemy',
                 profile = (enemy ? pkg.enemies : pkg.characters).get(id ?? (enemy ? DEFAULT_ENEMTY : DEFAULT_CHARACTER_CLASS)) ?? FALLBACK;
+            p.species = profile.species;
             p.stats = {...profile.stats};
             p.level = profile.level;
             p.xp = 0;
@@ -409,6 +450,11 @@
             p.maxHp = max;
         },
         
+        /*  The range piece p's stat can be in: [min, max], from its species. */
+        statRange: function(p, stat) {
+            return (pkg.species.get(p.species) ?? FALLBACK_SPECIES).ranges[stat];
+        },
+        
         /*  Piece p as it would be with the points of adds ({stat:n}) put into its stats: a
             copy, its max HP (and HP) worked out again. For the character sheet to show
             what spending them would do. */
@@ -420,14 +466,15 @@
         },
         
         /*  Your piece p spends stat points: adds, {stat:n}, says how many on each stat (none
-            below 0, and in all no more than it has available). Its max HP and the rest
-            follow its stats. Returns whether it did. */
+            below 0, none taking a stat over its species' max, and in all no more than it
+            has available). Its max HP and the rest follow its stats. Returns whether it
+            did. */
         spendStatPoints: function(p, adds) {
             const entries = Object.entries(adds),
                 total = entries.reduce((n, [, v]) => n + v, 0);
             let retval = false;
             if (p?.owner === 'player' && this.pieces.has(p.id) && total <= p.statPoints.available &&
-                entries.every(([s, v]) => STATS.includes(s) && Number.isInteger(v) && v >= 0)) {
+                entries.every(([s, v]) => STATS.includes(s) && Number.isInteger(v) && v >= 0 && p.stats[s] + v <= this.statRange(p, s)[1])) {
                 for (const [s, v] of entries) p.stats[s] += v;
                 p.statPoints.available -= total;
                 p.statPoints.spent += total;

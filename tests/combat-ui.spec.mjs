@@ -133,7 +133,7 @@ test('I opens the selected piece\'s character sheet', async ({page}) => {
         hc.view.draw();
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Your core · Level 1')).toBeVisible();
+    await expect(page.getByText('Your core · Human · Level 1')).toBeVisible();
     for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1 of 1 · +1 a turn · +0 initiative', 'Exhausted (1 more turn)']) {
         await expect(page.getByText(text, {exact:true})).toBeVisible();
     }
