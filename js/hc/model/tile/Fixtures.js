@@ -239,11 +239,12 @@
             return material ? material.opacity * Math.min(100, Math.max(0, this.fixtureValue(f, 'coverage') || 0)) / 100 : 0;
         },
         
-        /*  Whether piece can break fixture f: it's a piece of yours, f has HP and is in the
-            way, and its most damage is more than f's DR (its material's hardness) after its
-            penetration (see Combat.js). */
+        /*  Whether piece can break fixture f: it's a piece of yours, f has HP, and its most
+            damage is more than f's DR (its material's hardness) after its penetration (see
+            Combat.js). A step attacks one only if it's in the way (see Movement.boardView);
+            Attack, any (see Game.attackAt). */
         canBreakFixture: function(piece, f) {
-            return piece.owner === 'player' && f?.hp != null && this.fixtureBlocks(f.x, f.y) &&
+            return piece.owner === 'player' && f?.hp != null &&
                 this.damageRange(piece)[1] > this.armorAgainst(piece, this.fixtureType(f).material?.hardness ?? 0);
         },
         

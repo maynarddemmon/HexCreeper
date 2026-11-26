@@ -88,12 +88,11 @@ test('a fixture blocks as much sight as its material\'s opacity times its covera
     expect(r).toEqual([0.5, 0, 1, false, true]);
 });
 
-test('a fixture with HP in the way can be broken, as a solid can; it leaves its floor and destroyInto', async ({page}) => {
+test('a fixture with HP in the way can be broken, as a solid can; it leaves its floor and destroyInto, which the piece advances onto', async ({page}) => {
     await putFixture(page, 1, 0, 'wall');
     await putFixture(page, 0, 1, 'hard');
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
-        g.rules.advance = false;
         // The hard one's DR is more than the core can do (sure combat: 1 damage).
         out.push(g.legalMoves(c).some(m => m.x === 0 && m.y === 1));
         g.playerAct(c, 1, 0);
@@ -103,7 +102,7 @@ test('a fixture with HP in the way can be broken, as a solid can; it leaves its 
         out.push(f.subtype, f.revealedAt === g.turn, g.tiles.get('1,0')?.subtype, g.isOpen(1, 0), [c.x, c.y]);
         return out;
     });
-    expect(r).toEqual([false, 1, 'rubbish', true, 'mud', true, [0, 0]]);
+    expect(r).toEqual([false, 1, 'rubbish', true, 'mud', true, [1, 0]]);
 });
 
 test('a fixture used up or run out leaves its destroyInto too', async ({page}) => {
@@ -195,4 +194,58 @@ test('the proximity generator puts features (featureTable) on free cells, not by
     expect(features.length).toBeGreaterThan(20);
     expect(features.every(k => some[k][1] === 'wall' && stepsFromStart(k) > 1)).toBe(true);
     expect(Object.fromEntries(Object.entries(some).filter(([, f]) => f[0] !== 'feature'))).toEqual(none);
+});
+
+test('Attack hits a cell next to the piece, for an action, without stepping: a fixture with HP even if you could step onto it', async ({page}) => {
+    await page.evaluate(() => {
+        const F = hc.fixtures;
+        F.byId.set('bush', {id:'bush', name:'Bush', description:'', ...F.parse({type:'feature', composition:'flesh', hp:2, moveCost:1.5, destroyInto:'rubbish'}, 'bush')});
+    });
+    await putFixture(page, 1, 0, 'bush');
+    await putFixture(page, 0, 1, 'hard');
+    await putFixture(page, -1, 1, 'rubbish');
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), e = g.addPiece('core', 'enemy', -1, 0), out = {};
+        // The bush (passable, HP) and the enemy; not the hard one (its DR is too much) or
+        // the rubbish (no HP).
+        out.targets = g.attackTargets(c).map(q => q.x + ',' + q.y).sort();
+        out.hit = [g.playerAttack(c, 1, 0), g.fixtures.get('1,0').hp, c.ap, [c.x, c.y]];
+        g.playerAttack(c, 1, 0);
+        out.broken = g.fixtures.get('1,0').subtype;
+        out.enemy = [g.playerAttack(c, -1, 0), g.pieces.has(e.id)];
+        out.not = g.playerAttack(c, 0, 1);
+        return out;
+    });
+    expect(r).toEqual({targets:['-1,0', '1,0'], hit:[true, 1, 200, [0, 0]], broken:'rubbish', enemy:[true, false], not:false});
+});
+
+test('Attack in the menu (or F) highlights what the piece can attack; a click attacks it', async ({page}) => {
+    await putFixture(page, 1, 0, 'wall');
+    await page.evaluate(() => {
+        hc.app.game.selectedId = hc.app.game.playerCoreId;
+        hc.app.centerOn(false);
+    });
+    await page.keyboard.press('f');
+    await expect(page.getByText('Attack: click a highlighted cell for the selected piece to attack. Esc cancels.')).toBeVisible();
+    await page.mouse.click(...await cellOnPage(page, 1, 0));
+    expect(await page.evaluate(() => [hc.app.game.fixtures.get('1,0').hp, hc.view.attackMode])).toEqual([1, false]);
+});
+
+test('a damaged feature shows its HP bar', async ({page}) => {
+    await putFixture(page, 1, 0, 'wall', {hp:1});
+    await putFixture(page, 0, 1, 'wall');
+    const colours = await page.evaluate(() => {
+        const V = hc.view;
+        V.cam.size = 80;
+        hc.app.centerOn(false);
+        hc.app.game.selectedId = null;  // (nothing tinted round it)
+        V.stopPan();
+        V.render(performance.now());
+        // Near the left end of where the bar goes: --dmg, if it's there.
+        return [[1, 0], [0, 1]].map(([x, y]) => {
+            const [cx, cy] = V.cellCenter(x, y);
+            return [...V.canvas.getContext('2d').getImageData(Math.round((cx - 80 * 0.25) * V.dpr), Math.round(cy * V.dpr), 1, 1).data].join();
+        });
+    });
+    expect(colours).toEqual(['255,102,85,255', expect.not.stringMatching(/^255,102,85/)]);
 });

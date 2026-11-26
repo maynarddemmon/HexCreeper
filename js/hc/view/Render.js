@@ -227,6 +227,21 @@
             return !!n && n.kind === t.kind && n.subtype === t.subtype;
         },
         
+        // Once a solid or fixture at cell c is damaged (hp of maxHp left), a bar across its
+        // middle shows how much it has left.
+        drawDamage = (c, hp, maxHp) => {
+            if (hp < maxHp && cam.size >= 22) {
+                const s = cam.size,
+                    [cx, cy] = cellCenter(c.x, c.y),
+                    w = s * 0.56,
+                    h = Math.max(3, s * 0.06);
+                ctx.fillStyle = css('--grid');
+                ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+                ctx.fillStyle = css('--dmg');
+                ctx.fillRect(cx - w / 2, cy - h / 2, w * Math.max(0, hp) / maxHp, h);
+            }
+        },
+        
         // A floor tile: its hex (and half a pixel more, so there's no seam) in its subtype's
         // colour, so floors of a kind run together (with no grid lines between them).
         drawFloor = t => {
@@ -283,18 +298,7 @@
                 ctx.lineCap = 'round';
                 ctx.stroke();
                 ctx.lineCap = 'butt';
-                // Once damaged, a bar shows how much it has left.
-                const maxHp = solid?.hp ?? t.hp;
-                if (t.hp < maxHp && cam.size >= 22) {
-                    const s = cam.size,
-                        [cx, cy] = cellCenter(t.x, t.y),
-                        w = s * 0.56,
-                        h = Math.max(3, s * 0.06);
-                    ctx.fillStyle = css('--grid');
-                    ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-                    ctx.fillStyle = css('--dmg');
-                    ctx.fillRect(cx - w / 2, cy - h / 2, w * Math.max(0, t.hp) / maxHp, h);
-                }
+                drawDamage(t, t.hp, solid?.hp ?? t.hp);
                 return;
             }
             
@@ -350,7 +354,7 @@
         
         // A feature (a fixture that does nothing when entered: see Fixtures.js): a hexagon
         // inside its cell, in its kind's colours (else a solid's), faint if it isn't in the
-        // way.
+        // way, with its HP bar once it's damaged.
         drawFeature = t => {
             const kind = game.fixtureType(t);
             ctx.globalAlpha = game.fixtureBlocks(t.x, t.y) ? 1 : 0.6;
@@ -362,6 +366,7 @@
             ctx.strokeStyle = dataColor(kind.borderColor, '--solid-edge');
             ctx.stroke();
             ctx.globalAlpha = 1;
+            if (t.hp != null) drawDamage(t, t.hp, kind.hp ?? t.hp);
         },
         
         // A fixture (Fixtures.js): heal, harm, loot or a feature, once it's revealed. Over
@@ -727,6 +732,10 @@
             fillCell(sel.x, sel.y, '--sel-bg');
             for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
             if (V.jumpAt(sel, V.hover)) ghost = [[sel.id, V.hover.x, V.hover.y]];
+        } else if (V.attackMode && sel) {
+            // The cells the selected piece can attack.
+            fillCell(sel.x, sel.y, '--sel-bg');
+            for (const q of game.attackTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--attack-hover' : '--attack');
         } else if ((V.attachMode || V.swapMode) && sel) {
             // The pieces the selected one can attach to, or swap with.
             fillCell(sel.x, sel.y, '--sel-bg');

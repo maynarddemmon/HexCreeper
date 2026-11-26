@@ -444,7 +444,7 @@
                         hit = {attacker:g, target:t};
                     } else if (this.canBreak(g, tile)) {
                         hit = {attacker:g, target:tile, solid:true};
-                    } else if (this.canBreakFixture(g, f)) {
+                    } else if (f && this.fixtureBlocks(x, y) && this.canBreakFixture(g, f)) {
                         hit = {attacker:g, target:f, fixture:true};
                     }
                     return hit;

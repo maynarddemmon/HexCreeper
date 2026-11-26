@@ -155,16 +155,16 @@ test('Settings shows only the preferences, whatever the map', async ({page}) => 
 test('a map\'s rules and component attrs are rounded and clamped, those it can\'t use are skipped, and the rest are at their defaults', async ({page}) => {
     const problems = await startGame(page);
     expect(await page.evaluate(() => {
-        const rules = hc.settings.cleanRules({linkRange:99, hitMin:2.4, advance:'yes', fog:false, spawnEvery:2}, 'Map test'),
+        const rules = hc.settings.cleanRules({linkRange:99, hitMin:2.4, fog:false, spawnEvery:2}, 'Map test'),
             spawn = hc.SpawnGenerator.cleanAttrs('proximity', {spawnEvery:2.4, linkRange:2}, 'Map test spawn generator'),
             ai = hc.EnemyAI.cleanAttrs('squad', {approach:0.26, beam:0, spawnEvery:2}, 'Map test enemy AI');
         const all = hc.settings.resolveRules(rules, 'Map test'),
             gen = hc.SpawnGenerator.make('proximity', hc.app.game, spawn),
             squad = hc.EnemyAI.make('squad', hc.app.game, ai);
-        return [rules, spawn, ai, all.linkRange, all.hitMin, all.advance, gen.attrs.spawnEvery, gen.attrs.initial, squad.attrs.approach, squad.attrs.expose];
-    })).toEqual([{linkRange:20, hitMin:2}, {spawnEvery:2}, {approach:0.3, beam:1}, 20, 2, true, 2, 3, 0.3, 12]);
+        return [rules, spawn, ai, all.linkRange, all.hitMin, gen.attrs.spawnEvery, gen.attrs.initial, squad.attrs.approach, squad.attrs.expose];
+    })).toEqual([{linkRange:20, hitMin:2}, {spawnEvery:2}, {approach:0.3, beam:1}, 20, 2, 2, 3, 0.3, 12]);
     expect(problems.warnings.filter(w => /^Map test/.test(w)).map(w => w.split(' cannot')[0]).sort()).toEqual([
-        'Map test enemy AI attr spawnEvery', 'Map test rules attr advance', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
+        'Map test enemy AI attr spawnEvery', 'Map test rules attr fog', 'Map test rules attr spawnEvery', 'Map test spawn generator attr linkRange'
     ]);
 });
 

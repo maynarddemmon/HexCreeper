@@ -292,12 +292,12 @@ test('a broken solid leaves the floor its kind names, or the base floor', async 
     await clearBoard(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
-        g.rules.advance = false;
         c.damage = [99, 99];
+        // (With Attack, so the core stays where it is.)
         for (const [subtype, x] of [['boulder', 1], ['wooden_barricade', -1]]) {
             g.tiles.set(g.key(x, 0), g.makeTile(x, 0, 'solid', subtype));
             c.ap = 100;
-            g.playerAct(c, x, 0);
+            g.playerAttack(c, x, 0);
             const t = g.tiles.get(g.key(x, 0));
             out.push([hc.solids.get(subtype).floor, t ? [t.kind, t.subtype] : null, g.isOpen(x, 0)]);
         }

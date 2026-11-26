@@ -67,6 +67,16 @@ test('a game\'s rules are saved with it, whatever its map now says', async ({pag
     })).toEqual(['4 + ceil(levels / 2)', '9 * coreLevel']);
 });
 
+test('a save from before advance went (it always happens now) loads without a warning about it', async ({page}) => {
+    const problems = await startGame(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, data = JSON.parse(JSON.stringify(g.exportToObj()));
+        data.rules.advance = false;
+        g.importFromObj(data);
+    });
+    expect([...problems.warnings, ...problems.errors].filter(w => /advance/.test(w))).toEqual([]);
+});
+
 test('pieces\' status effects are saved with them; ones that make no sense are dropped', async ({page}) => {
     await startGame(page);
     expect(await page.evaluate(() => {

@@ -53,7 +53,6 @@
             needs two children to rank up). */
         RULES = [
             num('visionRadius', 12, 1, 30),   // how far your pieces see (see hc.cfg.VISION)
-            bool('advance', true),            // after a kill, the attacker (with its group) steps into the attacked cell if the whole group can (not onto harm)
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
             choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (rank isn't used for now: see Combat.js)

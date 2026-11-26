@@ -9,7 +9,6 @@ test.beforeEach(async ({page}) => {
 test('attacks, kills, xp and harm go into the combat log, which shows its last lines', async ({page}) => {
     const log = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.rules.advance = false;
         g.rules.apPool = '3';               // (so the turn doesn't end in between)
         c.ap = 300;
         g.addPiece('core', 'enemy', 1, 0);
@@ -38,7 +37,6 @@ test('attacks, kills, xp and harm go into the combat log, which shows its last l
 test('K shows and hides the combat log, and it stays that way', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.rules.advance = false;
         g.addPiece('core', 'enemy', 1, 0);
         g.playerAct(c, 1, 0);
     });

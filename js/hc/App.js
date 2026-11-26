@@ -152,6 +152,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.attackMode = false;
             V.gotoMode = false;
             V.menuOpen = false;
             centerOn(false);
@@ -172,6 +173,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.attackMode = false;
             V.gotoMode = false;
             V.menuOpen = false;
             game.playerWait();
@@ -179,8 +181,8 @@
         },
         
         /*  What the selected piece's menu offers, in its order: place (next to it), swap,
-            jump and attach (which then ask for the cell, or the piece to swap with or attach to),
-            detach, rally, its character sheet, and going places and into
+            jump, attach and attack (which then ask for the cell, or the piece to swap with or
+            attach to), detach, rally, its character sheet, and going places and into
             formations. */
         menuItems = () => {
             const sel = () => game.getSelected(),
@@ -200,6 +202,7 @@
                 {id:'swap', label:() => i18n('btn-swap'), tip:() => i18n('tip-swap'), enabled:() => game.canSwap(sel()), run:choose('swapMode')},
                 {id:'jump', label:() => i18n('btn-jump'), tip:() => i18n('tip-jump'), enabled:() => game.canJump(sel()), run:choose('jumpMode')},
                 {id:'attach', label:() => i18n('btn-attach'), tip:() => i18n('tip-attach'), enabled:() => game.canAttach(sel()), run:choose('attachMode')},
+                {id:'attack', label:() => i18n('btn-attack'), tip:() => i18n('tip-attack'), enabled:() => game.canAttack(sel()), run:choose('attackMode')},
                 {id:'detach', label:() => i18n('btn-detach'), tip:() => i18n('tip-detach'), enabled:() => game.canDetach(sel()), run:() => {
                     if (game.playerDetach(sel())) gameView.afterTurn();
                     draw();
@@ -227,7 +230,7 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -417,6 +420,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.attackMode = false;
             V.gotoMode = false;
             V.menuOpen = false;
             draw();
@@ -594,6 +598,8 @@
                         status = i18n('status-swap');
                     } else if (V.jumpMode) {
                         status = i18n('status-jump');
+                    } else if (V.attackMode) {
+                        status = i18n('status-attack');
                     } else if (V.gotoMode) {
                         status = i18n('status-goto');
                     } else if (nav) {
@@ -860,6 +866,7 @@
             V.attachMode = false;
             V.swapMode = false;
             V.jumpMode = false;
+            V.attackMode = false;
             V.gotoMode = false;
             V.menuOpen = false;
             game.reset();
@@ -1037,7 +1044,7 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.gotoMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.attackMode || V.gotoMode) return;
                 if (k === 'Enter') {
                     // Opens the selected piece's menu, its first item focused.
                     if (game.getSelected()) {

@@ -108,6 +108,7 @@
             attachMode:false, // choosing which piece to attach the selected piece to
             swapMode:false, // choosing which piece the selected piece swaps with
             jumpMode:false, // choosing the cell the selected piece jumps to
+            attackMode:false, // choosing the cell next to the selected piece it attacks
             gotoMode:false, // choosing the cell the selected piece goes to (see App: Go to)
             shift:false, // whether Shift is held: a click moves in Free mode (clickMoves)
             alt:false, // whether Alt (Option) is held: a click swaps (swapAt)

@@ -146,7 +146,10 @@
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !(o.fixtures === undefined || (isArr(o.fixtures) && o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))))
             ) throw new Error('Malformed game data');
-            const rules = pkg.settings.resolveRules(o.rules, 'Saved game'),
+            // (A save from before 2026-11-25 has an advance rule: there's none now.)
+            const savedRules = {...o.rules};
+            delete savedRules.advance;
+            const rules = pkg.settings.resolveRules(savedRules, 'Saved game'),
                 objectives = o.gameMap?.objectives ?? [];
             try {
                 for (const obj of objectives) {
@@ -455,38 +458,49 @@
             const m = this.findMove(piece, x, y, mode);
             if (!m) return false;
             if (m.attack) {
-                let kills = 0, value = 0, broken = 0;
-                for (const h of m.hits) {
-                    if (this.pieces.has(h.attacker.id)) {
-                        if (h.solid) {
-                            if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
-                        } else if (h.fixture) {
-                            if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) broken++;
-                        } else if (this.pieces.has(h.target.id)) {
-                            const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
-                            for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
-                            // Your piece learns from the enemies it killed (see Combat.js).
-                            if (h.attacker.owner === 'player' && this.pieces.has(h.attacker.id)) {
-                                const xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
-                                if (xp) this.gainXp(h.attacker, xp);
-                            }
-                        }
-                    }
-                }
-                if (kills && piece.owner === 'player') {
-                    const gain = kills * value;
-                    this.earn(gain);
-                    this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
-                }
-                // Advance into the space cleared, if a piece was destroyed or a solid or
-                // fixture broken.
-                if ((kills || broken) && piece.owner === 'player' && this.rules.advance && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
+                const {kills, broken} = this.applyHits(piece, m.hits);
+                // Your piece advances into the space cleared, if a piece was destroyed or a
+                // solid or fixture broken, and the whole group can step there (not onto harm
+                // you know of). (To attack without moving, there's Attack: playerAttack.)
+                if ((kills || broken) && piece.owner === 'player' && this.pieces.has(piece.id) && this.canStep(piece, m.dx, m.dy, true, mode)) {
                     this.moveGroup(piece, m.dx, m.dy, mode);
                 }
             } else {
                 this.applyMoves(piece, m.moves);
             }
             return true;
+        },
+        
+        /*  Carries out piece's attack's hits ({attacker, target}, and solid or fixture
+            for a tile or a fixture): strikes at pieces (and what's linked below them),
+            damages solids and fixtures. Your piece learns from the enemies it kills, and you
+            score the combo. Returns {kills, broken}: pieces destroyed, solids and fixtures
+            broken. */
+        applyHits: function(piece, hits) {
+            let kills = 0, value = 0, broken = 0;
+            for (const h of hits) {
+                if (this.pieces.has(h.attacker.id)) {
+                    if (h.solid) {
+                        if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
+                    } else if (h.fixture) {
+                        if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) broken++;
+                    } else if (this.pieces.has(h.target.id)) {
+                        const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
+                        for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
+                        // Your piece learns from the enemies it killed (see Combat.js).
+                        if (h.attacker.owner === 'player' && this.pieces.has(h.attacker.id)) {
+                            const xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
+                            if (xp) this.gainXp(h.attacker, xp);
+                        }
+                    }
+                }
+            }
+            if (kills && piece.owner === 'player') {
+                const gain = kills * value;
+                this.earn(gain);
+                this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
+            }
+            return {kills, broken};
         },
         
         // Moves a piece by (dx, dy) in mode (as resolveStep says), if it can. Returns
@@ -707,6 +721,46 @@
             return true;
         },
         
+        // ---- Attack ----
+        // A piece of yours can attack a cell next to it, for an action, without stepping:
+        // an enemy piece there, a solid it can break, or a fixture you know of with HP that
+        // it can damage, in the way or not (see Fixtures.canBreakFixture). Only it attacks
+        // (not what's linked below it), and it doesn't advance after.
+        
+        /*  Piece p's attack on (x, y), {attacker, target} (and solid or fixture), or null if
+            there's nothing there it can attack. */
+        attackAt: function(p, x, y) {
+            const t = this.pieceAt(x, y),
+                tile = this.tiles.get(this.key(x, y)),
+                f = this.fixtureAt(x, y);
+            let hit = null;
+            if (t && t.owner !== p.owner) {
+                hit = {attacker:p, target:t};
+            } else if (this.canBreak(p, tile)) {
+                hit = {attacker:p, target:tile, solid:true};
+            } else if (this.canBreakFixture(p, f)) {
+                hit = {attacker:p, target:f, fixture:true};
+            }
+            return hit;
+        },
+        
+        /*  The cells next to piece p it can attack now ({x, y}): none if it isn't yours or
+            hasn't the points. */
+        attackTargets: function(p) {
+            return p?.owner === 'player' && this.canAfford(p) ?
+                pkg.hex.dirs.map(([dx, dy]) => ({x:p.x + dx, y:p.y + dy})).filter(c => this.attackAt(p, c.x, c.y)) : [];
+        },
+        canAttack: function(p) {return this.attackTargets(p).length > 0;},
+        playerAttack: function(p, x, y) {
+            const done = this.attackTargets(p).some(c => c.x === x && c.y === y);
+            if (done) {
+                this.applyHits(p, [this.attackAt(p, x, y)]);
+                if (this.pieces.has(p.id)) this.spend(p);
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
         // ---- Detach and attach ----
         // A piece other than the core can be detached from its parent, however far apart
         // they are, or, with no parent, attached to an adjacent piece of yours (in any
@@ -756,7 +810,8 @@
             this.evaluateObjectives();
             if (this.over) return;
             // Auto-end once no piece can act and there's nothing to spend score on.
-            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p) || this.canRally(p));
+            const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p) ||
+                this.canRally(p) || this.canAttack(p));
             if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }
             // The selection stays where it is, even on a piece that has acted.
         },

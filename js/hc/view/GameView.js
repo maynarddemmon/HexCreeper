@@ -89,6 +89,15 @@
                     }
                     return;
                 }
+                if (V.attackMode) {
+                    V.attackMode = false;
+                    if (game.playerAttack(game.getSelected(), c.x, c.y)) {
+                        this.afterTurn();
+                    } else {
+                        draw();
+                    }
+                    return;
+                }
                 if (V.attachMode) {
                     V.attachMode = false;
                     if (game.playerAttach(game.getSelected(), game.pieceAt(c.x, c.y))) {

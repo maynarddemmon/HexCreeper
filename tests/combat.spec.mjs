@@ -19,23 +19,21 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
-test('a group attack hits with every member in line; n kills score n squared', async ({page}) => {
+test('a group attack hits with every member in line; n kills score n squared; then the group advances', async ({page}) => {
     const fwd = await setupRow(page);
     const r = await page.evaluate(fwd => {
         const g = hc.app.game, c = g.getPlayerCore();
         for (const p of g.piecesOf('player')) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]);
-        hc.app.game.rules.advance = false;
         const s0 = g.score, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
         g.playerAct(c, m.x, m.y);
-        return {hits:m.hits.length, gained:g.score - s0, left:g.piecesOf('enemy').length, moved:c.x !== 0 || c.y !== 0};
+        return {hits:m.hits.length, gained:g.score - s0, left:g.piecesOf('enemy').length, at:[c.x, c.y]};
     }, fwd);
-    expect(r).toEqual({hits:3, gained:9, left:0, moved:false});
+    expect(r).toEqual({hits:3, gained:9, left:0, at:fwd});
 });
 
 test('killing a squad leader destroys the squad and every piece counts toward the combo', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs, d = D[0];
-        hc.app.game.rules.advance = false;
         const lead = g.addPiece('core', 'enemy', d[0], d[1]);
         const far = D.map(([dx, dy]) => ({x:lead.x + dx, y:lead.y + dy})).filter(q => hc.hexDist(q, c) > 1 && !g.pieceAt(q.x, q.y));
         g.addPiece('core', 'enemy', far[0].x, far[0].y, lead.id);
@@ -52,7 +50,6 @@ test('killing a squad leader destroys the squad and every piece counts toward th
 test('after a kill the attacker advances, unless that would land on harm', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[1];
-        hc.app.game.rules.advance = true;
         g.addPiece('core', 'enemy', d[0], d[1]);
         g.playerAct(c, d[0], d[1]);
         const advanced = c.x === d[0] && c.y === d[1];
@@ -67,15 +64,14 @@ test('after a kill the attacker advances, unless that would land on harm', async
     expect(r).toEqual({advanced:true, stayed:true, hp:true});
 });
 
-test('with advance off, the attacker stays put', async ({page}) => {
+test('a kill with Attack leaves the attacker where it is', async ({page}) => {
     const r = await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[1];
-        hc.app.game.rules.advance = false;
-        g.addPiece('core', 'enemy', d[0], d[1]);
-        g.playerAct(c, d[0], d[1]);
-        return [c.x, c.y];
+        const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[1],
+            e = g.addPiece('core', 'enemy', d[0], d[1]);
+        g.playerAttack(c, d[0], d[1]);
+        return [g.pieces.has(e.id), c.x, c.y];
     });
-    expect(r).toEqual([0, 0]);
+    expect(r).toEqual([false, 0, 0]);
 });
 
 test('moving a parent carries its subtree, keeping its shape', async ({page}) => {
@@ -232,14 +228,14 @@ test('killing enemies gives xp; enough goes up a level, with its HP', async ({pa
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.hitMin = g.rules.hitMax = 100;
-        g.rules.advance = false; // the core stays where it is
         c.damage = [99, 99];
         c.hp = 10;
-        // Goblins (5 xp each) next to the core, killed one at a time
+        // Goblins (5 xp each) next to the core, killed one at a time (with Attack, so the
+        // core stays where it is)
         for (let i = 0; i < 4; i++) {
             g.addPiece('core', 'enemy', 1, 0, null, 'goblin');
             c.ap = 100;
-            g.playerAct(c, 1, 0);
+            g.playerAttack(c, 1, 0);
             out.push([c.xp, c.level]);
         }
         return [out, c.hp, c.maxHp];
