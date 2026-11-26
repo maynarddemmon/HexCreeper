@@ -11,10 +11,10 @@ const setUp = async page => {
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
         g.rules.apPool = g.rules.apRecovery = '2';
-        g.score = 1000;
+        g.gold = 1000;
         g.playerPlace(1, 0, core);
         g.playerWait();
-        g.score = 100;
+        g.gold = 100;
         g.selectedId = g.pieceAt(1, 0).id;
         hc.view.draw();
     });

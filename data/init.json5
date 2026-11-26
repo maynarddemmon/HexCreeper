@@ -1,6 +1,6 @@
 {
 	// The map played when there's no saved game.
-	"defaultMap":"endless",
+	"defaultMap":"caverns",
 	
 	// Any entry in the tables below (materials, solids, holes, floors, fixtures, characters,
 	// enemies; not enemy groups) may extend another in the same table:
@@ -139,13 +139,13 @@
 	
 	// Fixtures: what sits on the ground of a cell (over its open floor), and may do something
 	// when a piece of yours enters it. Each has a name, a description, a "type" ("heal":
-	// heals your pieces, "harm": hurts, "loot": score, "feature": nothing, but it may be in
+	// heals your pieces, "harm": hurts, "loot": gold, "feature": nothing, but it may be in
 	// the way; the game goes by the type, e.g. pieces keep off harm) and how it works (see
 	// js/hc/model/tile/Fixtures.js):
 	//   revealMode: when it shows: "instant" (default: once its cell is in sight),
 	//     "hidden" (once a piece of yours enters it) or {"proximity":n} (once a piece of
 	//     yours is within n cells).
-	//   pool: what it holds (HP, damage or score): n, {"min":n, "max":n} (rolled when it's
+	//   pool: what it holds (HP, damage or gold): n, {"min":n, "max":n} (rolled when it's
 	//     made) or "infinite".
 	//   magnitude: what it gives each piece it affects, each time: n, {"min","max"} or
 	//     "pool" (default: all that's left).
@@ -229,7 +229,7 @@
 		"loot":{
 			"type":"loot",
 			"name":"Loot",
-			"description":"Score for the taking.",
+			"description":"Gold for the taking.",
 			"pool":{"min":10, "max":30}
 		},
 		"cache":{

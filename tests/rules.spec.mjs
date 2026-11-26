@@ -30,7 +30,7 @@ test('what an action costs (a jump too) is a rule, and how long a jump exhausts 
     await clearBoard(page);
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
-        g.score = 0;
+        g.gold = 0;
         g.rules.apRecovery = '0';   // (so the turn ending when it's spent gives nothing back)
         g.rules.actionCost = '0.5';
         g.rules.jumpExhaustion = '1 + con / 10';

@@ -29,10 +29,9 @@ myt.I18N.setDictionary({
 
 // Top Bar
 "lbl-turn":"Turn",
-"lbl-score":"Score",
-"lbl-ap":"AP",
+"lbl-gold":"Gold",
 "tip-end-turn":"End your turn and let the enemies act. (Space)",
-"tip-place":"Place a piece next to this one, linked to it: choose the empty cell. Costs $0 score. (P)",
+"tip-place":"Place a piece next to this one, linked to it: choose the empty cell. Costs $0 gold. (P)",
 "tip-attack":"Attack a cell next to this piece, without stepping: an enemy, or something it can break, like a barricade, even one you could walk onto. Costs an action point. (F)",
 "tip-use":"Do something to a fixture next to this piece, like opening, shutting or barring a door. Costs an action point. (U)",
 "tip-use-action":"$0 the $1.",
@@ -59,7 +58,7 @@ myt.I18N.setDictionary({
 "lbl-help":"Help",
 "tip-export":"Export your game to a save file.",
 "tip-import":"Import a save file and carry on from it.",
-"tip-score":"Score you have to spend / all the score you've earned.",
+"tip-gold":"Gold you have to spend. Only loot gives gold.",
 "lbl-maps":"Maps",
 "tip-maps":"Choose a map to play.",
 "tip-new-game":"Start a new game.",
@@ -148,12 +147,12 @@ myt.I18N.setDictionary({
 "dlg-restore-failed-title":"Save Could Not Be Loaded",
 "dlg-restore-failed-msg":"Your saved game could not be loaded because $0, so it has been cleared.",
 "dlg-game-over-title":"Core Destroyed",
-"dlg-game-over-msg":"Score: $0\nSurvived $1 turns.",
+"dlg-game-over-msg":"Gold looted: $0\nSurvived $1 turns.",
 "dlg-won-title":"Map Complete",
-"dlg-won-msg":"You completed $0 on turn $1.\nScore: $2",
+"dlg-won-msg":"You completed $0 on turn $1.\nGold looted: $2",
 "dlg-lost-title":"Map Failed",
-"dlg-lost-goal-msg":"\"$0\" can no longer be achieved.\nScore: $1\nSurvived $2 turns.",
-"dlg-lost-penalty-msg":"\"$0\" can no longer be avoided.\nScore: $1\nSurvived $2 turns.",
+"dlg-lost-goal-msg":"\"$0\" can no longer be achieved.\nGold looted: $1\nSurvived $2 turns.",
+"dlg-lost-penalty-msg":"\"$0\" can no longer be avoided.\nGold looted: $1\nSurvived $2 turns.",
 "btn-maps":"Maps",
 
 // Settings

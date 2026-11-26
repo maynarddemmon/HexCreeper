@@ -48,8 +48,7 @@
             this.nextBand = 1;               // for enemies spawned together (see newBand)
             this.pieces = new Map();         // id -> piece
             this.board = new Map();          // "x,y" -> id
-            this.score = 0;                  // score you have to spend
-            this.scoreEarned = 0;            // all the score you've earned, spent or not
+            this.gold = 0;                   // gold you have to spend (only loot gives it)
             this.over = false;
             this.outcome = null;             // once over: 'won' or 'lost'
             this.lostBy = null;              // when lost: the index of the objective that lost it, or null for the core
@@ -59,7 +58,7 @@
             this.piecesLost = 0;             // player pieces destroyed
             this.piecesPlaced = 0;
             this.lootOpened = 0;             // loot fixtures emptied
-            this.lootTaken = 0;              // score taken from loot
+            this.lootTaken = 0;              // gold taken from loot, spent or not
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.clearAnimation();
@@ -104,8 +103,7 @@
                 turn:this.turn,
                 nextId:this.nextId,
                 seed:this.seed,
-                score:this.score,
-                scoreEarned:this.scoreEarned,
+                gold:this.gold,
                 over:this.over,
                 outcome:this.outcome,
                 lostBy:this.lostBy,
@@ -138,7 +136,7 @@
         importFromObj: function(o) {
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
-            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.score) || !isNum(o.scoreEarned) ||
+            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.gold) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
@@ -174,8 +172,7 @@
             this.turn = o.turn;
             this.nextId = o.nextId;
             this.seed = Number.isInteger(o.seed) ? o.seed : null;
-            this.score = o.score;
-            this.scoreEarned = o.scoreEarned;
+            this.gold = o.gold;
             this.over = !!o.over;
             this.outcome = this.over ? (o.outcome === 'won' ? 'won' : 'lost') : null;
             this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
@@ -309,13 +306,10 @@
         /*  A new piece, with the profile profileId (see Combat.giveProfile: if not given,
             yours are adventurers, enemies creepers), at full HP. */
         addPiece: function(type, owner, x, y, parentId = null, profileId) {
-            const s = PIECE_TYPES[type].stats[owner],
-                piece = {
+            const piece = {
                     id:this.nextId++, 
                     type, owner, x, y, parentId,
                     rank:this.rules.rankBase, 
-                    scoreValue:s.scoreValue,
-                    score:0,
                     trail:[]    // the cells it was on, latest first (see Movement._leaveCell)
                 };
             this.giveProfile(piece, profileId);
@@ -430,8 +424,6 @@
             return this.legalMoves(piece, mode, afford).find(m => m.x === x && m.y === y) || null;
         },
         
-        // Combo rule: killing n enemies in one move scores n x (their total value),
-        // i.e. n^2 for 1-point enemies.
         act: function(piece, x, y, mode = this.modeFor(piece)) {
             const m = this.findMove(piece, x, y, mode);
             if (!m) return false;
@@ -451,11 +443,10 @@
         
         /*  Carries out piece's attack's hits ({attacker, target}, and solid or fixture
             for a tile or a fixture): strikes at pieces (and what's linked below them),
-            damages solids and fixtures. Your piece learns from the enemies it kills, and you
-            score the combo. Returns {kills, broken}: pieces destroyed, solids and fixtures
-            broken. */
+            damages solids and fixtures. Your piece learns from the enemies it kills.
+            Returns {kills, broken}: pieces destroyed, solids and fixtures broken. */
         applyHits: function(piece, hits) {
-            let kills = 0, value = 0, broken = 0;
+            let kills = 0, broken = 0;
             for (const h of hits) {
                 if (this.pieces.has(h.attacker.id)) {
                     if (h.solid) {
@@ -464,7 +455,7 @@
                         if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) broken++;
                     } else if (this.pieces.has(h.target.id)) {
                         const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
-                        for (const g of lost) { kills++; value += g.scoreValue; h.attacker.score += g.scoreValue; }
+                        kills += lost.length;
                         // Your piece learns from the enemies it killed (see Combat.js).
                         if (h.attacker.owner === 'player' && this.pieces.has(h.attacker.id)) {
                             const xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
@@ -472,11 +463,6 @@
                         }
                     }
                 }
-            }
-            if (kills && piece.owner === 'player') {
-                const gain = kills * value;
-                this.earn(gain);
-                this.fx(piece.x, piece.y, kills > 1 ? `+${gain}  ${kills}× combo!` : `+${gain}`, '--gain', { delay: 120 });
             }
             return {kills, broken};
         },
@@ -573,13 +559,7 @@
         },
         
         // ---- Placing linked pieces ----
-        // Adds to the score you have, and to the total earned.
-        earn: function(n) {
-            this.score += n;
-            this.scoreEarned += n;
-        },
-        
-        canAffordPlace: function() { return this.score >= this.placeCost(); },
+        canAffordPlace: function() { return this.gold >= this.placeCost(); },
         
         /*  A cost rule's formula (placeCost: see Settings.js), of your
             core's level, your highest and your pieces' levels together, rounded down. */
@@ -612,12 +592,12 @@
             if (this.over || !this.canAffordPlace()) return false;
             if (!this.isOpen(x, y) || this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
             const cost = this.placeCost();
-            this.score -= cost;
+            this.gold -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id);
             this.piecesPlaced++;
             this.recomputeRanks();
             p.hp = p.maxHp;
-            this.fx(x, y, `-${cost} score`, '--place-ink', { spawn: true });
+            this.fx(x, y, `-${cost} gold`, '--place-ink', { spawn: true });
             this.landOnFixtures([p]);
             this.piecesMoved();
             this.afterPlayerAction();
@@ -628,9 +608,10 @@
         // Heal units (from a heal tile) heal the piece first; any
         // surplus flows along links: up to the nearest damaged ancestor, or down toward the
         // most damaged child. Units alternate up / down, starting up (so with two spare
-        // units one goes up and one goes down). Units that find nobody to heal become
-        // score, the healScore rule's worth each, if leftoverToScore.
-        applyHeal: function(piece, units, leftoverToScore, x = piece.x, y = piece.y) {
+        // units one goes up and one goes down). Returns how many were used: the rest find
+        // nobody to heal.
+        applyHeal: function(piece, units) {
+            const given = units;
             const self = Math.min(units, piece.maxHp - piece.hp);
             if (self > 0) {
                 piece.hp += self;
@@ -645,11 +626,7 @@
                 t.hp += 1; units -= 1; up = !up;
                 this.fx(t.x, t.y, '+1 HP', '--heal', {delay: 160});
             }
-            if (units > 0 && leftoverToScore) {
-                const gain = units * this.rules.healScore;
-                piece.score += gain; this.earn(gain);
-                this.fx(x, y, `+${gain} score`, '--gain', {delay: 60});
-            }
+            return given - units;
         },
         
         // Nearest damaged ancestor.
@@ -783,7 +760,7 @@
             this.noticeEnemies();
             this.evaluateObjectives();
             if (this.over) return;
-            // Auto-end once no piece can act and there's nothing to spend score on.
+            // Auto-end once no piece can act and there's nothing to spend gold on.
             const canAct = this.piecesOf('player').some(p => this.legalMoves(p).length || this.canDetach(p) || this.canAttach(p) || this.canSwap(p) || this.canJump(p) ||
                 this.canRally(p) || this.canAttack(p) || this.canUse(p));
             if (!canAct && !this.canAffordPlace()) { this.endPlayerTurn(); return; }

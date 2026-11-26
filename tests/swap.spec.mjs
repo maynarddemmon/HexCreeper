@@ -2,18 +2,18 @@ import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage} from './helpers.mjs';
 
 /*  The core at (0, 0), a at (1, 0) linked to it, b at (2, 0) linked to a, c at (-1, 0)
-    linked to the core, in a new turn with plenty of score. Ids on window.ids. */
+    linked to the core, in a new turn with plenty of gold. Ids on window.ids. */
 const setUp = async page => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.score = 1000;
+        g.gold = 1000;
         g.playerPlace(1, 0, core);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.playerPlace(-1, 0, core);
         g.playerWait();
-        g.score = 1000;
+        g.gold = 1000;
         window.ids = {core:core.id, a:g.pieceAt(1, 0).id, b:g.pieceAt(2, 0).id, c:g.pieceAt(-1, 0).id};
     });
 };

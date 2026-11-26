@@ -202,7 +202,7 @@ test.describe('rules', () => {
         const r = await page.evaluate(kind => {
             const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs,
                 block = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind, timer:0});
-            g.score = 100;
+            g.gold = 100;
             block(a[0], a[1]);
             const out = {
                 move:g.playerAct(c, a[0], a[1]),
@@ -232,10 +232,10 @@ test.describe('rules', () => {
         expect(r).toBe(true);
     });
     
-    test('healing flows up to a damaged ancestor first, then down; leftovers become score', async ({page}) => {
+    test('healing flows up to a damaged ancestor first, then down; it says how much was used', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-            g.score = 1000;
+            g.gold = 1000;
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const a = g.pieceAt(D[0][0], D[0][1]);
             const kids = g.placeCells().filter(q => hc.hexDist(q, a) === 1 && hc.hexDist(q, c) > 1).slice(0, 2);
@@ -243,30 +243,50 @@ test.describe('rules', () => {
             const leaf = g.pieceAt(kids[0].x, kids[0].y);
             for (const p of g.piecesOf('player')) p.hp = p.maxHp;
             c.hp = c.maxHp - 1; leaf.hp = leaf.maxHp - 1;
-            g.applyHeal(a, 1, true);
+            const used = [g.applyHeal(a, 1)];
             const oneUp = c.hp === c.maxHp && leaf.hp === leaf.maxHp - 1;
             c.hp -= 1;
-            g.applyHeal(a, 2, true);
+            used.push(g.applyHeal(a, 2));
             const upAndDown = c.hp === c.maxHp && leaf.hp === leaf.maxHp;
-            const s0 = g.score;
-            g.applyHeal(a, 3, true);
-            return {oneUp, upAndDown, leftover:g.score - s0};
+            const gold = g.gold;
+            used.push(g.applyHeal(a, 3));
+            return {oneUp, upAndDown, used, gold:g.gold - gold};
         });
-        expect(r).toEqual({oneUp:true, upAndDown:true, leftover:3});
+        expect(r).toEqual({oneUp:true, upAndDown:true, used:[1, 2, 0], gold:0});
     });
     
     test('eating two heals in one move: each gives its own, with no combo', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-            g.score = 100;
+            g.gold = 100;
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
             const a = g.pieceAt(D[0][0], D[0][1]), m = D[2];
-            for (const p of [c, a]) g.fixtures.set(g.key(p.x + m[0], p.y + m[1]), {...g.makeFixture(p.x + m[0], p.y + m[1], 'heal'), pool:1, revealedAt:0});
-            const s0 = g.score;
+            for (const p of [c, a]) {
+                g.fixtures.set(g.key(p.x + m[0], p.y + m[1]), {...g.makeFixture(p.x + m[0], p.y + m[1], 'heal'), pool:1, revealedAt:0});
+                p.hp = p.maxHp - 1;
+            }
             g.playerAct(c, c.x + m[0], c.y + m[1]);
-            return g.score - s0;   // both at full HP: 1 score each
+            return [c.hp === c.maxHp, a.hp === a.maxHp, g.fixtures.size];
         });
-        expect(r).toBe(2);
+        expect(r).toEqual([true, true, 0]);
+    });
+    
+    test('a heal gives only what\'s needed and keeps the rest; one nobody needs isn\'t used, and gives no gold', async ({page}) => {
+        const r = await page.evaluate(() => {
+            const g = hc.app.game, c = g.getPlayerCore(), [d] = hc.hex.dirs, out = [];
+            g.fixtures.set(g.key(d[0], d[1]), {...g.makeFixture(d[0], d[1], 'heal'), pool:4, revealedAt:0});
+            const heal = g.fixtures.get(g.key(d[0], d[1])), gold = g.gold;
+            c.hp = c.maxHp - 1;
+            g.playerAct(c, d[0], d[1]);
+            out.push(c.hp === c.maxHp, heal.pool, heal.uses);
+            g.playerWait();
+            g.playerAct(c, 0, 0);
+            g.playerWait();
+            g.playerAct(c, d[0], d[1]);
+            out.push(heal.pool, heal.uses, g.fixtures.has(g.key(d[0], d[1])), g.gold - gold);
+            return out;
+        });
+        expect(r).toEqual([true, 3, 1, 3, 1, true, 0]);
     });
 });

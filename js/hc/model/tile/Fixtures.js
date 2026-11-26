@@ -16,7 +16,7 @@
     - revealMode: when the tile shows: "instant" (the default: once its cell is in sight),
       "hidden" (once one of your pieces enters it) or {"proximity":n} (once one of your
       pieces comes within n cells). Once shown it stays shown.
-    - pool: what it holds (HP to heal, damage to do, score): n, {"min","max"} (rolled when
+    - pool: what it holds (HP to heal, damage to do, gold): n, {"min","max"} (rolled when
       the tile is made) or "infinite".
     - magnitude: what it gives each piece it affects, each time it's used: n, {"min","max"}
       (rolled when it's made) or "pool" (the default: all that's left). It never gives more
@@ -70,7 +70,7 @@
       "shut", "barred"): each text whose when (a formula of its state) isn't 0.
     
     Heals heal your pieces (what the piece doesn't need flows along its links, and what
-    nobody needs becomes score); harms damage any piece; loot gives you score. Only your
+    nobody needs stays in the heal); harms damage any piece; loot gives you gold. Only your
     pieces set them off, by entering their cell: a step, being carried, a jump, a swap or
     being placed there. */
 (pkg => {
@@ -494,7 +494,9 @@
         
         /*  One of your pieces has entered fixture t: it's revealed (with its magnitude), and
             gives each piece in its area, nearest first, its magnitude (less with fade), as
-            long as its pool lasts. Then it's gone if its pool is empty or it's used up. */
+            long as its pool lasts (a heal gives only what's needed and keeps the rest).
+            Then it's gone if its pool is empty or it's used up; a heal nobody needed
+            isn't used at all. */
         useFixture: function(t) {
             const type = this.fixtureType(t),
                 {radius, shape} = type.area,
@@ -504,38 +506,42 @@
                 {mode, n} = type.duration;
             t.revealedAt ??= this.turn;
             t.shown = true;
+            let used = 0;
             for (const p of hit) {
                 if (this.pieces.has(p.id) && t.pool !== 0 && !this.over) {
                     const full = t.magnitude ?? t.pool,
                         share = shape === 'fade' ? (radius + 1 - hexDist(p, t)) / (radius + 1) : 1,
                         amount = Math.min(Math.round(full * share), t.pool ?? Infinity);
                     if (amount > 0) {
-                        if (t.pool != null) t.pool -= amount;
-                        this.fixtureEffect(t, p, amount);
+                        const n = this.fixtureEffect(t, p, amount);
+                        if (t.pool != null) t.pool -= n;
+                        used += n;
                     }
                 }
             }
-            t.uses++;
-            if (t.pool === 0 || mode === 'once' || (mode === 'count' && t.uses >= n)) {
+            if (used > 0 || t.type !== FIXTURE_HEAL) t.uses++;
+            if (t.pool === 0 || (mode === 'once' && t.uses > 0) || (mode === 'count' && t.uses >= n)) {
                 this.removeFixture(t);
                 if (t.type === FIXTURE_HARM) this.fx(t.x, t.y, '', '--harm', {vanish:true});
                 if (t.type === FIXTURE_LOOT) this.lootOpened++;
             }
         },
         
-        // What fixture t does to piece p, amount times.
+        // What fixture t does to piece p, amount times. Returns how much of it was used
+        // (all of it but for a heal: what it healed).
         fixtureEffect: function(t, p, amount) {
+            let used = amount;
             if (t.type === FIXTURE_HEAL) {
-                this.applyHeal(p, amount, true);
+                used = this.applyHeal(p, amount);
             } else if (t.type === FIXTURE_HARM) {
                 this.logCombat({kind:'harm', d:this.whoOf(p), dmg:amount});
                 this.damage(p, amount, null);
             } else {
-                p.score += amount;
-                this.earn(amount);
+                this.gold += amount;
                 this.lootTaken += amount;
-                this.fx(p.x, p.y, `+${amount}`, '--loot', {});
+                this.fx(p.x, p.y, `+${amount} gold`, '--loot', {});
             }
+            return used;
         },
         
         /*  At the end of a turn: fixtures whose countdown (from when they were revealed) has

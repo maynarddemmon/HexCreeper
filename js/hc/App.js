@@ -7,8 +7,7 @@
         logTxt,
         gameView,
         
-        scoreView,
-        apView,
+        goldView,
         turnView,
         endTurnBtn,
         modeBtn,
@@ -750,7 +749,7 @@
             
             const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
             turnView = new LabeledValue(hdrView, {label:i18n('lbl-turn'), ...statAttrs});
-            scoreView = new LabeledValue(hdrView, {label:i18n('lbl-score'), tooltip:i18n('tip-score'), ...statAttrs});
+            goldView = new LabeledValue(hdrView, {label:i18n('lbl-gold'), tooltip:i18n('tip-gold'), ...statAttrs});
             
             new Spacer(hdrView);
             
@@ -795,9 +794,6 @@
             
             new Spacer(ftrView);
             
-            const statAttrs = {textColor:colorHeaderText, valueTextColor:colorBtn};
-            apView = new LabeledValue(ftrView, {label:i18n('lbl-ap'), ...statAttrs, paddingRight:padding});
-            
             endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
                 doActivated:endTurn
             }]);
@@ -826,12 +822,8 @@
             and offers a new game once the core is destroyed. */
         update: () => {
             turnView.update(game.turn);
-            scoreView.update(game.score + '/' + game.scoreEarned); // to spend/earned in all
+            goldView.update(game.gold);
             const gameOver = game.over;
-            
-            // The selected piece's action points, and its pool
-            const selected = game.getSelected();
-            apView.update(selected ? formatAp(selected.ap) + '/' + formatAp(game.apMax(selected)) : '–');
             
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
@@ -879,7 +871,7 @@
                     if (game.outcome === 'won') {
                         openConfirmMsgDialog(
                             i18n('dlg-won-title'),
-                            i18n('dlg-won-msg', game.gameMap.name, game.turn, game.scoreEarned),
+                            i18n('dlg-won-msg', game.gameMap.name, game.turn, game.lootTaken),
                             () => {appView.briefNewGame();},
                             () => {appView.openMaps();},
                             i18n('btn-play-again'), i18n('btn-maps')
@@ -891,7 +883,7 @@
                             by = game.getMapObjectives()[game.lostBy];
                         openConfirmMsgDialog(
                             i18n(by ? 'dlg-lost-title' : 'dlg-game-over-title'),
-                            by ? i18n('dlg-lost-' + by.kind + '-msg', by.name, game.scoreEarned, game.turn) : i18n('dlg-game-over-msg', game.scoreEarned, game.turn),
+                            by ? i18n('dlg-lost-' + by.kind + '-msg', by.name, game.lootTaken, game.turn) : i18n('dlg-game-over-msg', game.lootTaken, game.turn),
                             () => {appView.briefNewGame();},
                             hasSave ? () => {appView.loadSave();} : null,
                             i18n('btn-play-again'), hasSave ? i18n('btn-load-save') : I18N_CLOSE_BTN

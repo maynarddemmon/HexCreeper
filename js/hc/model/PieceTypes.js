@@ -37,19 +37,13 @@
             }
         };
     
-    /*  Piece types: per-owner stats, movement (steps) and how each is drawn.
+    /*  Piece types: movement (steps) and how each is drawn.
         
-        stats: default hp / scoreValue for pieces of this type, per owner.
         steps(piece): the offsets this type can move by in one action. The Game
         turns these into legal moves (group movement, link range, attacks). */
     pkg.PIECE_TYPES = {
         core: {
             name:'Core',
-            
-            stats:{
-                player:{hp:10, scoreValue:1},
-                enemy: {hp:1,  scoreValue:1},
-            },
             
             steps() {
                 return pkg.hex.dirs;

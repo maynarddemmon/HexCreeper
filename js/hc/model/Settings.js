@@ -83,7 +83,6 @@
             // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
             // (Not in init.json5: a map can set them, as any rule.)
             expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece
-            num('healScore', 1, 0, 20),       // each unused heal point becomes this much score
             num('corePathLength', 250, 0, 100000) // how many of the core's latest steps the golden path keeps (0: none)
         ],
         

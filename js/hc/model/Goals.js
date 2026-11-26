@@ -9,8 +9,7 @@
         // The values an expression can use, from the game.
         VALUES = {
             turn:g => g.turn,
-            score:g => g.score,
-            scoreEarned:g => g.scoreEarned,
+            gold:g => g.gold,
             coreHp:g => Math.max(0, g.getPlayerCore()?.hp ?? 0),
             coreMaxHp:g => g.getPlayerCore()?.maxHp ?? 0,
             coreLevel:g => g.getPlayerCore()?.level ?? 0,

@@ -44,7 +44,7 @@ test('the golden path keeps only the core\'s last corePathLength steps; with 0, 
 test('moving another piece leaves the golden path alone', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs;
-        g.score = 100;
+        g.gold = 100;
         g.playerPlace(a[0], a[1], c);
         g.playerWait();
         const child = g.pieceAt(a[0], a[1]);

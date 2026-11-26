@@ -2,19 +2,19 @@ import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
 /*  The core with two children, a (east) and c (west), and b linked below a, one step
-    further east; then a new turn, so they can all move. Lots of score, so the turn never
+    further east; then a new turn, so they can all move. Lots of gold, so the turn never
     ends by itself. Puts their ids on window.ids. */
 const setUp = async page => {
     await startGame(page);
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.score = 1000;
+        g.gold = 1000;
         g.playerPlace(1, 0, core);
         g.playerPlace(-1, 0, core);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.playerWait();
-        g.score = 1000;
+        g.gold = 1000;
         window.ids = {core:core.id, a:g.pieceAt(1, 0).id, c:g.pieceAt(-1, 0).id, b:g.pieceAt(2, 0).id};
     });
 };
@@ -46,7 +46,7 @@ test('a piece can be detached however far it is from its parent', async ({page})
         const g = hc.app.game, b = g.pieces.get(window.ids.b);
         g.playerAct(b, 3, 0);                     // two steps from a, within link range
         g.playerWait();
-        g.score = 1000;
+        g.gold = 1000;
         return [hc.hexDist(b, g.pieces.get(window.ids.a)), g.playerDetach(b)];
     });
     expect(r).toEqual([2, true]);
@@ -74,7 +74,7 @@ test('a piece with no parent attaches to an adjacent piece of yours, for an acti
         const g = hc.app.game;
         g.playerDetach(g.pieces.get(window.ids.a));
         g.playerWait();
-        g.score = 1000;
+        g.gold = 1000;
     });
     expect(await piece(page, 'core')).toMatchObject({rank:1});
     const r = await page.evaluate(() => {
@@ -94,7 +94,7 @@ test('no attaching to a piece linked below, a piece that isn\'t adjacent, or for
         const out = [g.canAttach(P('b'))];                         // b has a parent
         g.playerDetach(P('a'));
         g.playerWait();
-        g.score = 1000;
+        g.gold = 1000;
         out.push(g.playerAttach(P('a'), P('b')));                  // b is linked below a
         out.push(g.playerAttach(P('a'), P('c')));                  // c is two steps away
         return out;

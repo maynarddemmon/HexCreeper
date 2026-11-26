@@ -66,9 +66,9 @@ test('each use gives the magnitude while the pool lasts, then the fixture is gon
         await putFixture(page, 1, 0, subtype);
         const out = [];
         for (let i = 0; i < 3; i++) {
-            const before = await page.evaluate(() => hc.app.game.scoreEarned);
+            const before = await page.evaluate(() => hc.app.game.gold);
             await step(page, 1, 0);
-            out.push(await page.evaluate(b => hc.app.game.scoreEarned - b, before));
+            out.push(await page.evaluate(b => hc.app.game.gold - b, before));
             await step(page, -1, 0);
         }
         const fixture = await fixtureAt(page, 1, 0);
@@ -91,7 +91,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     // The core at (0, 0), a at (2, 0) linked to it, and an enemy at (1, 1): the fixture goes at (1, 0).
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.score = 100;
+        g.gold = 100;
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.removePiece(g.pieceAt(1, 0));
@@ -102,10 +102,17 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
         g.recomputeRanks();
         for (const p of g.pieces.values()) p.hp = p.maxHp = 20;
         g.playerWait();
+        // What each piece gets (gold is yours, not a piece's).
+        const effect = g.fixtureEffect;
+        window.got = {};
+        g.fixtureEffect = function(t, p, amount) {
+            window.got[p.id] = (window.got[p.id] ?? 0) + amount;
+            return effect.call(this, t, p, amount);
+        };
     });
     const scores = () => page.evaluate(() => {
         const g = hc.app.game;
-        return [g.getPlayerCore().score, g.pieceAt(2, 0).score];
+        return [window.got[g.getPlayerCore().id] ?? 0, window.got[g.pieceAt(2, 0).id] ?? 0];
     });
     const use = async subtype => {
         const before = await scores();
@@ -157,6 +164,7 @@ test('reveal: instant once in sight, hidden only once entered, proximity within 
     await step(page, -1, 0);                            // within 2 of (-3, 0)
     expect((await revealed())['-3,0']).toBe(true);
     await step(page, 1, 0);
+    await page.evaluate(() => {hc.app.game.getPlayerCore().hp -= 1;}); // so it's needed
     await step(page, 1, 0);                             // onto the hidden one: found, and used
     expect(await revealed()).toMatchObject({'0,-9':false});
     expect(await page.evaluate(() => hc.app.game.fixtures.has('1,0'))).toBe(false);

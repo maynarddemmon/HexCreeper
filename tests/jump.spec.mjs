@@ -28,7 +28,7 @@ const setUp = async page => {
     await twoPoints(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.score = 1000;
+        g.gold = 1000;
         g.playerPlace(1, 0, core);
         g.playerWait();
         window.ids = {core:core.id, a:g.pieceAt(1, 0).id};

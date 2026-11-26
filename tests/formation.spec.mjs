@@ -5,7 +5,7 @@ import {startGame, clearBoard} from './helpers.mjs';
 const status = (page, text) => page.getByText(text, {exact:true}).filter({visible:true});
 
 // An empty board that stays empty, the core at (0, 0) with seven pieces linked to it as a
-// complete binary tree (the core, two below it, four below those), plenty of score and
+// complete binary tree (the core, two below it, four below those), plenty of gold and
 // moves, and animation off.
 test.beforeEach(async ({page}) => {
     await startGame(page);

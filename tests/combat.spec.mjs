@@ -8,7 +8,7 @@ const setupRow = page => page.evaluate(() => {
     // Pick a direction pair (d, -d) for the row and a "forward" direction not along it.
     const row = D.find(([dx, dy]) => dx === 1 && dy === 0);
     const fwd = D.find(([dx, dy]) => dy === -1 && dx === 1);
-    g.score = 100;
+    g.gold = 100;
     g.playerPlace(row[0], row[1], c); g.playerPlace(-row[0], -row[1], c);
     g.playerWait();
     return fwd;
@@ -19,19 +19,19 @@ test.beforeEach(async ({page}) => {
     await clearBoard(page);
 });
 
-test('a group attack hits with every member in line; n kills score n squared; then the group advances', async ({page}) => {
+test('a group attack hits with every member in line, for no gold; then the group advances', async ({page}) => {
     const fwd = await setupRow(page);
     const r = await page.evaluate(fwd => {
         const g = hc.app.game, c = g.getPlayerCore();
         for (const p of g.piecesOf('player')) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]);
-        const s0 = g.score, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
+        const s0 = g.gold, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
         g.playerAct(c, m.x, m.y);
-        return {hits:m.hits.length, gained:g.score - s0, left:g.piecesOf('enemy').length, at:[c.x, c.y]};
+        return {hits:m.hits.length, gained:g.gold - s0, left:g.piecesOf('enemy').length, at:[c.x, c.y]};
     }, fwd);
-    expect(r).toEqual({hits:3, gained:9, left:0, at:fwd});
+    expect(r).toEqual({hits:3, gained:0, left:0, at:fwd});
 });
 
-test('killing a squad leader destroys the squad and every piece counts toward the combo', async ({page}) => {
+test('killing a squad leader destroys the squad and every piece counts as a kill', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs, d = D[0];
         const lead = g.addPiece('core', 'enemy', d[0], d[1]);
@@ -40,11 +40,11 @@ test('killing a squad leader destroys the squad and every piece counts toward th
         g.addPiece('core', 'enemy', far[1].x, far[1].y, lead.id);
         g.recomputeRanks();
         lead.hp = 1;
-        const s0 = g.score;
+        const k0 = g.kills;
         g.playerAct(c, lead.x, lead.y);
-        return {gained:g.score - s0, left:g.piecesOf('enemy').length};
+        return {kills:g.kills - k0, left:g.piecesOf('enemy').length};
     });
-    expect(r).toEqual({gained:9, left:0});
+    expect(r).toEqual({kills:3, left:0});
 });
 
 test('after a kill the attacker advances, unless that would land on harm', async ({page}) => {
@@ -89,7 +89,7 @@ test('moving a parent carries its subtree, keeping its shape', async ({page}) =>
 test('a linked piece must stay within link range of its parent', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[1];
-        g.score = 100; g.playerPlace(d[0], d[1], c);
+        g.gold = 100; g.playerPlace(d[0], d[1], c);
         const a = g.pieceAt(d[0], d[1]);
         let steps = 0;
         for (let t = 0; t < 6; t++) {
@@ -103,20 +103,19 @@ test('a linked piece must stay within link range of its parent', async ({page}) 
     expect(r).toEqual({dist:r.range, steps:r.range - 1, range:3});
 });
 
-test('score earned is kept as a total; spending only lowers what you have', async ({page}) => {
+test('gold looted is kept as a total; spending only lowers what you have', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs;
-        g.addPiece('core', 'enemy', a[0], a[1]);
-        g.playerAct(c, a[0], a[1]);           // a kill: +1
-        const afterKill = [g.score, g.scoreEarned];
-        g.score += 10; g.scoreEarned += 10;   // as if earned elsewhere
+        g.fixtures.set(g.key(a[0], a[1]), {...g.makeFixture(a[0], a[1], 'loot'), pool:11});
+        g.playerAct(c, a[0], a[1]);
+        const afterLoot = [g.gold, g.lootTaken];
         g.playerWait();
         g.playerPlace(c.x + b[0], c.y + b[1], c); // costs 5
-        return {afterKill, afterPlace:[g.score, g.scoreEarned]};
+        return {afterLoot, afterPlace:[g.gold, g.lootTaken]};
     });
-    expect(r).toEqual({afterKill:[1, 1], afterPlace:[6, 11]});
+    expect(r).toEqual({afterLoot:[11, 11], afterPlace:[6, 11]});
 });
 
 

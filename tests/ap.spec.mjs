@@ -16,7 +16,7 @@ test.beforeEach(async ({page}) => {
 test('a piece\'s pool and recovery come from its stats; a new piece starts with none, and each turn they come back', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [[g.apMax(c), g.apRecovery(c)]];
-        g.score = 1000;
+        g.gold = 1000;
         c.ap = 100;
         g.playerPlace(1, 0, c);
         const a = g.pieceAt(1, 0);
@@ -48,7 +48,7 @@ test('every pool is at least a point, whatever the rule gives', async ({page}) =
 test('a piece acts as long as it has the points, and the turn ends once nothing can act', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), turn = g.turn, out = [];
-        g.score = 0;
+        g.gold = 0;
         c.ap = 200;
         out.push(g.playerAct(c, 1, 0), c.ap, g.turn === turn);
         out.push(g.playerAct(c, 2, 0), g.turn === turn + 1, c.ap);

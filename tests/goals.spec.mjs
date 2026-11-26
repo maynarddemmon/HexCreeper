@@ -82,7 +82,7 @@ test('a map\'s goals and penalties get their defaults, and a bad one is refused'
 test('every value an expression can use is a number, at the start of a game', async ({page}) => {
     await startGame(page);
     const names = await page.evaluate(() => hc.goals.NAMES);
-    expect([...names].sort()).toEqual(['coreDist', 'coreHp', 'coreLevel', 'coreMaxHp', 'coreX', 'coreY', 'enemies', 'kills', 'lootOpened', 'lootTaken', 'maxLevel', 'pieces', 'piecesLost', 'piecesPlaced', 'quadsVisited', 'score', 'scoreEarned', 'totalLevels', 'turn']);
+    expect([...names].sort()).toEqual(['coreDist', 'coreHp', 'coreLevel', 'coreMaxHp', 'coreX', 'coreY', 'enemies', 'gold', 'kills', 'lootOpened', 'lootTaken', 'maxLevel', 'pieces', 'piecesLost', 'piecesPlaced', 'quadsVisited', 'totalLevels', 'turn']);
     // n == n is false for NaN and undefined. Optional, so they don't end the game.
     await playWith(page, names.map(name => goal(`${name} == ${name} && ${name} * 0 == 0`, {required:false})));
     expect((await state(page)).objectives.every(s => s.value)).toBe(true);
@@ -98,7 +98,7 @@ test('kills, pieces lost and placed, and the core\'s distance are counted', asyn
     await clearBoard(page); // so (1, 0) is open
     const done = await page.evaluate(() => {
         const g = hc.app.game;
-        g.score = 1000;
+        g.gold = 1000;
         g.playerPlace(1, 0, g.getPlayerCore());
         g.damage(g.pieceAt(1, 0), 99, null);
         g.damage(g.addPiece('core', 'enemy', 4, 4), 99, null);

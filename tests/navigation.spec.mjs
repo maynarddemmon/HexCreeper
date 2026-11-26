@@ -50,7 +50,7 @@ test('a route goes through the piece\'s own swarm, which makes way, but not othe
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
         hc.cfg.VISION.fog = false;
-        g.score = 1000;
+        g.gold = 1000;
         // A tunnel east from the core, with a piece of its swarm in it.
         for (let x = -2; x <= 6; x++) {
             for (let y = -2; y <= 2; y++) {
@@ -87,7 +87,7 @@ test('exploring heads for the nearest cell you\'ve seen next to one you haven\'t
 test('Go to: G, then a cell; the piece goes there a step a turn, its swarm following, and stops there', async ({page}) => {
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.score = 100;
+        g.gold = 100;
         g.playerPlace(-1, 0, core);
         g.playerWait();
         g.selectedId = core.id;
