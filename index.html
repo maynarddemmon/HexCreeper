@@ -53,6 +53,8 @@
 		--hp-bar:#e33; /* A piece's HP bar */
 		--ap-bar:#fff; /* and its action points bar, under it */
 		--effect-icon:#fff; /* A piece's status effect icons, above it */
+		--level-up:#fd4;    /* A piece's level up rings, its stat points marker, and the Character button while it has points */
+		--level-up-bg:#fd44;
 		--enemy-arrow:#f33; /* Arrows at the edge pointing to enemy squads you can see but that are off the board */
 		
 		--heal:      #6d8;
@@ -74,7 +76,7 @@
 		--hole:#111;
 		--hole-line:#666;
 		
-		--header-bg:#333;
+		--header-bg:#0006;
 		--header-text:#eee;
 		
 		--dlg-bg:#333;
@@ -135,6 +137,13 @@
 	.hc-Btn.solid {background-color:var(--core); border-color:var(--core); color:#fff;}
 	.hc-Btn.solid:hover {background-color:var(--core-dark); border-color:var(--core-dark);}
 	.hc-Btn.solid.disabled:hover {background-color:var(--core); border-color:var(--core);}
+
+	/* Something waiting for you, e.g. stat points to spend: the button pulses. */
+	.hc-Btn.attention {animation:hc-attention 1.2s ease-in-out infinite; border-color:var(--level-up); color:var(--ink);}
+	@keyframes hc-attention {
+		0%, 100% {background-color:var(--btn-bg); box-shadow:0 0 0 0 transparent;}
+		50% {background-color:var(--level-up-bg); box-shadow:0 0 6px 1px var(--level-up);}
+	}
 
 	.hc-Btn.underline {
 		background-color:transparent;

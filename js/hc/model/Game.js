@@ -140,7 +140,7 @@
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
-                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects)) ||
+                !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent)) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
             ) throw new Error('Malformed game data');
@@ -193,7 +193,7 @@
             this.board = new Map();
             for (const p of o.pieces) {
                 const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
-                    piece = {...p, trail, effects:p.effects.map(e => ({...e}))};
+                    piece = {...p, trail, effects:p.effects.map(e => ({...e})), statPoints:{...p.statPoints}};
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -893,6 +893,8 @@
             return retval;
         },
         
+        // An effect at (x, y), for the view to play. opts.follow, a piece's id, keeps it on
+        // that piece, wherever it's drawn (moving with it), while it's there.
         fx: function(x, y, text, color, opts = {}) {
             this.effects.push({x, y, text, color, t0:this.actionStart() + (opts.delay || 0), ...opts});
             if (opts.bump && this.inSight(x, y)) this.actionTakes(pkg.animMs(ANIM.BUMP_MS));

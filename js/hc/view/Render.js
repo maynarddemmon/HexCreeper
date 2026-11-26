@@ -8,12 +8,14 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, ANIM, SHADOW},
+            cfg:{PIECE_R, CORE_BORDER, RING_GAP, ANIM, SHADOW},
             TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
             PIECE_TYPES
         } = pkg,
         
-        FX_MS = 650,
+        FX_MS = 650,                 // how long an effect plays, unless it says (its dur)
+        STAT_POINTS_ICON = 'circle-arrow-up', // over a piece of yours with stat points to spend
+        LEVEL_UP_RINGS = 3,
         ENEMY_ARROW_SIZE = 0.75,     // an off-board enemy squad's arrow, of your core's
         
         // A hole's rim lines fade into it in this many steps (see drawTile): each a part of
@@ -607,6 +609,38 @@
         // of its selection ring.
         barGap = (p, s) => s * (0.37 + (p.id === game.playerCoreId ? CORE_BORDER : 0)),
         
+        // A level up, age (0 to 1) through, at (cx, cy): rings, one after another, from the
+        // piece's selection ring (core says whether it's your core's, which is bigger)
+        // out past its cell, easing out, thinning and fading from the level up colour to
+        // white as they go.
+        drawLevelUp = (cx, cy, s, age, core) => {
+            const r0 = s * (PIECE_R + RING_GAP + (core ? CORE_BORDER : 0)),
+                r1 = s * 1.3,
+                from = cssRgb('--level-up');
+            for (let i = 0; i < LEVEL_UP_RINGS; i++) {
+                const t = (age - i * 0.15) / 0.7;
+                if (t > 0 && t < 1) {
+                    const e = 1 - (1 - t) ** 3,
+                        [r, g, b] = from.map(c => Math.round(c + (255 - c) * t));
+                    ctx.globalAlpha = 1 - t;
+                    ctx.strokeStyle = `rgb(${r},${g},${b})`;
+                    ctx.lineWidth = Math.max(1, s * 0.05 * (1 - 0.7 * t));
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r0 + (r1 - r0) * e, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+            ctx.globalAlpha = 1;
+        },
+        
+        // A CSS colour variable's red, green and blue (0 to 255), from #rgb(a) or
+        // #rrggbb(aa).
+        cssRgb = name => {
+            const hex = css(name).trim().replace('#', ''),
+                long = hex.length <= 4 ? [...hex].map(c => c + c).join('') : hex;
+            return [0, 2, 4].map(i => parseInt(long.slice(i, i + 2), 16) || 0);
+        },
+        
         // Under the HP bar (red), a thinner one for the piece's action points (white), out
         // of its pool, with a tick at each whole point.
         drawBars = (p, cx, cy, s) => {
@@ -631,23 +665,27 @@
             }
         },
         
-        // Above the piece, as far out as its bars are below it: an icon for each of its
-        // status effects but muted and hidden ones (see Effects.js; one whose icon hasn't
-        // loaded yet is skipped),
+        // Above the piece, as far out as its bars are below it: first, if it's yours and
+        // has stat points to spend, an arrow up (in the level up colour), then an icon for
+        // each of its status effects but muted and hidden ones (see Effects.js; one whose
+        // icon hasn't loaded yet is skipped),
         // left to right from the left side of its hex (half a cell from its middle).
         drawEffects = (p, cx, cy, s) => {
             const size = Math.max(8, s * 0.2),
-                y = cy - barGap(p, s) - size;
+                y = cy - barGap(p, s) - size,
+                icons = (p.effects ?? []).map(e => {
+                    const kind = pkg.effects.get(e.id);
+                    return [kind && !kind.muted && !kind.hidden ? kind.icon : '', '--effect-icon'];
+                });
+            if (p.owner === 'player' && p.statPoints?.available > 0) icons.unshift([STAT_POINTS_ICON, '--level-up']);
             let x = cx - s / 2;
-            for (const e of p.effects ?? []) {
-                const kind = pkg.effects.get(e.id),
-                    name = kind && !kind.muted && !kind.hidden ? kind.icon : '',
-                    path = name ? iconPath(name) : null;
+            for (const [name, color] of icons) {
+                const path = name ? iconPath(name) : null;
                 if (path) {
                     ctx.save();
                     ctx.translate(x, y);
                     ctx.scale(size / 24, size / 24);
-                    ctx.strokeStyle = css('--effect-icon');
+                    ctx.strokeStyle = css(color);
                     ctx.lineWidth = 2.5;
                     ctx.lineCap = ctx.lineJoin = 'round';
                     ctx.stroke(path);
@@ -984,12 +1022,15 @@
             }
         }
         
-        // Floating text + death bursts
+        // Floating text, death bursts and level up rings
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         for (const f of game.effects) {
-            const age = (now - f.t0) / FX_MS;
+            const age = (now - f.t0) / (f.dur ?? FX_MS);
             if (age < 0 || age >= 1 || !inSight(f.x, f.y)) continue;
-            const [sx, sy] = cellCenter(f.x, f.y);
+            // (On the piece it follows, if it's still there, as it's drawn.)
+            const follow = game.pieces.get(f.follow),
+                at = follow ? placeOf(follow) : f,
+                [sx, sy] = cellCenter(at.x, at.y);
             if (f.text) {
                 ctx.globalAlpha = 1 - age;
                 ctx.fillStyle = css(f.color);
@@ -1002,6 +1043,7 @@
                 const r = s * 0.22 * (1 + age);
                 ctx.beginPath(); ctx.moveTo(sx - r, sy - r); ctx.lineTo(sx + r, sy + r); ctx.moveTo(sx + r, sy - r); ctx.lineTo(sx - r, sy + r); ctx.stroke();
             }
+            if (f.levelUp) drawLevelUp(sx, sy, s, age, f.core);
             if (f.burst) {
                 ctx.globalAlpha = 1 - age;
                 ctx.strokeStyle = css(f.color); ctx.lineWidth = 2;
@@ -1039,7 +1081,7 @@
             if (offBoard(sx, sy)) edgeArrow(sx, sy, '--core', 1);
         }
         
-        game.effects = game.effects.filter(f => now - f.t0 < FX_MS);
+        game.effects = game.effects.filter(f => now - f.t0 < (f.dur ?? FX_MS));
         if (game.effects.length || game.motions.length || panning) draw();
         
         // Update HUD

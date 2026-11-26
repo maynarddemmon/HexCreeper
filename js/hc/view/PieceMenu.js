@@ -8,10 +8,11 @@
         MENU_WIDTH = 120;
     
     /*  A small menu that floats beside the selected piece, listing what can be done on or by
-        it (opened by clicking the piece again, or with Enter: see App). items: [{label(), tip(), enabled(), run()}];
-        labels, tooltips and whether each is enabled are refreshed every frame, so an item
-        that can't be used shows, disabled. Picking an item calls onPick, then the item's
-        run. */
+        it (opened by clicking the piece again, or with Enter: see App). items: [{label(), tip(), enabled(), run()}],
+        and optionally attention() (whether it has something waiting, so it pulses);
+        labels, tooltips, whether each is enabled and wants attention are refreshed every
+        frame, so an item that can't be used shows, disabled. Picking an item calls
+        onPick, then the item's run. */
     pkg.PieceMenu = new JS.Class('PieceMenu', M.View, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -51,6 +52,7 @@
                 btn.setText(item.label());
                 btn.setTooltip(item.tip());
                 btn.setDisabled(!item.enabled());
+                btn[item.attention?.() ? 'addDomClass' : 'removeDomClass']('attention');
             }
         },
         

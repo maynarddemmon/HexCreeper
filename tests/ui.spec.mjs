@@ -252,9 +252,11 @@ test('Enter opens the selected piece\'s menu; the arrow keys move between its it
     const focused = () => page.evaluate(() => document.activeElement?.textContent ?? '');
     await page.keyboard.press('Enter');
     expect(await page.evaluate(() => hc.view.menuOpen)).toBe(true);
-    expect(await focused()).toMatch(/^Place/);
+    expect(await focused()).toMatch(/^Character/);
     await page.keyboard.press('ArrowUp');     // wraps round to the last item that can be used
     expect(await focused()).toMatch(/^Tree/);
+    await page.keyboard.press('ArrowDown');
+    expect(await focused()).toMatch(/^Character/);
     await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Place/);
     await page.keyboard.press('Space');       // the focused item's, not the end of the turn

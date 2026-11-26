@@ -20,6 +20,7 @@
         persistenceMgr, // The PersistenceManager.
         gameOverShown = false,
         settingsDialog,
+        characterSheet,
         mapsDialog,
         mapBrief,
         
@@ -120,27 +121,37 @@
             return i18n('log-line', e.turn, text);
         },
         
-        /*  The character sheet for your piece p: a dialog with its level, XP, HP, action
-            points, status effects, stats, and what they make it in combat. */
+        /*  The character sheet for your piece p (see CharacterSheet): with stat points to
+            spend, for levelling. */
         openSheet = p => {
-            const row = (label, value) => `<tr><td style="padding-right:16px;opacity:0.7;">${label}</td><td>${value}</td></tr>`,
-                head = key => `<tr><td colspan="2" style="padding-top:8px;font-weight:bold;">${i18n(key)}</td></tr>`,
-                rows = [
-                    row(i18n('sheet-xp'), formatXp(p.xp) + '/' + formatXp(game.xpRule('xpToLevel', p))),
-                    row(i18n('sheet-hp'), p.hp + '/' + p.maxHp),
-                    row(i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(p.ap), formatAp(game.apMax(p)),
-                        formatAp(game.apRecovery(p)), formatAp(game.apRule('apInitiative', p)))),
-                    row(i18n('sheet-effects'), formatEffects(p) || i18n('sheet-effects-none')),
-                    head('sheet-stats'),
-                    ...pkg.STATS.map(s => row(i18n('stat-' + s), p.stats[s])),
-                    head('sheet-combat'),
-                    row(i18n('sheet-accuracy'), game.statRule('meleeAccuracy', p)),
-                    row(i18n('sheet-defence'), game.statRule('defence', p)),
-                    row(i18n('sheet-damage'), formatRange(game.damageRange(p))),
-                    row(i18n('sheet-penetration'), game.penetrationOf(p)),
-                    row(i18n('sheet-armor'), p.armor)
-                ];
-            openAckMsgDialog(i18n('dlg-sheet-title', logName(game.whoOf(p), true), p.level), '<table>' + rows.join('') + '</table>', null, null, I18N_CLOSE_BTN);
+            // (The menu closes, if it's open, rather than show behind it.)
+            V.menuOpen = false;
+            draw();
+            characterSheet ??= new pkg.CharacterSheet(appView);
+            characterSheet.show(p, {
+                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), p.level),
+                describe:q => ({
+                    info:[
+                        [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
+                        [i18n('sheet-hp'), q.hp + '/' + q.maxHp],
+                        [i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(q.ap), formatAp(game.apMax(q)),
+                            formatAp(game.apRecovery(q)), formatAp(game.apRule('apInitiative', q)))],
+                        [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')]
+                    ],
+                    combat:[
+                        [i18n('sheet-accuracy'), game.statRule('meleeAccuracy', q)],
+                        [i18n('sheet-defence'), game.statRule('defence', q)],
+                        [i18n('sheet-damage'), formatRange(game.damageRange(q))],
+                        [i18n('sheet-penetration'), game.penetrationOf(q)],
+                        [i18n('sheet-armor'), q.armor]
+                    ]
+                }),
+                preview:adds => game.withStats(p, adds),
+                onConfirm:adds => {
+                    game.spendStatPoints(p, adds);
+                    draw();
+                }
+            });
         },
         
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
@@ -198,28 +209,68 @@
                 };
             return [
                 {
-                    id:'place',
-                    label:() => i18n('btn-place', game.placeCost()),
-                    tip:() => i18n('tip-place', game.placeCost()),
-                    enabled:() => !game.over && game.canAffordPlace() && !!sel() && game.placeCells(sel()).length > 0,
-                    run:choose('placeMode')
+                    id:'sheet',
+                    label:() => i18n('btn-sheet'),
+                    tip:() => i18n(sel()?.statPoints?.available > 0 ? 'tip-sheet-points' : 'tip-sheet'),
+                    enabled:() => !!sel(),
+                    attention:() => sel()?.statPoints?.available > 0,
+                    run:() => openSheet(sel())
                 },
-                {id:'swap', label:() => i18n('btn-swap'), tip:() => i18n('tip-swap'), enabled:() => game.canSwap(sel()), run:choose('swapMode')},
-                {id:'jump', label:() => i18n('btn-jump'), tip:() => i18n('tip-jump'), enabled:() => game.canJump(sel()), run:choose('jumpMode')},
-                {id:'attach', label:() => i18n('btn-attach'), tip:() => i18n('tip-attach'), enabled:() => game.canAttach(sel()), run:choose('attachMode')},
-                {id:'attack', label:() => i18n('btn-attack'), tip:() => i18n('tip-attack'), enabled:() => game.canAttack(sel()), run:choose('attackMode')},
-                {id:'use', label:() => i18n('btn-use'), tip:() => i18n('tip-use'), enabled:() => game.canUse(sel()), run:choose('useMode')},
-                {id:'detach', label:() => i18n('btn-detach'), tip:() => i18n('tip-detach'), enabled:() => game.canDetach(sel()), run:() => {
-                    if (game.playerDetach(sel())) gameView.afterTurn();
-                    draw();
-                }},
+                
+                // Squad Movement
                 {
+                    id:'goto',
+                    label:() => i18n('btn-goto'),
+                    tip:() => i18n('tip-goto'),
+                    enabled:() => !game.over && !!sel(),
+                    run:choose('gotoMode')
+                },{
+                    id:'explore',
+                    label:() => i18n('btn-explore'),
+                    tip:() => i18n('tip-explore'),
+                    enabled:() => !game.over && !!sel(),
+                    run:() => startNav('explore')
+                },
+                
+                // Piece Movement
+                {
+                    id:'swap',
+                    label:() => i18n('btn-swap'),
+                    tip:() => i18n('tip-swap'),
+                    enabled:() => game.canSwap(sel()),
+                    run:choose('swapMode')
+                },{
+                    id:'jump',
+                    label:() => i18n('btn-jump'),
+                    tip:() => i18n('tip-jump'),
+                    enabled:() => game.canJump(sel()),
+                    run:choose('jumpMode')
+                },
+                
+                // Actions
+                {
+                    id:'attack',
+                    label:() => i18n('btn-attack'),
+                    tip:() => i18n('tip-attack'),
+                    enabled:() => game.canAttack(sel()),
+                    run:choose('attackMode')
+                },{
+                    id:'use',
+                    label:() => i18n('btn-use'),
+                    tip:() => i18n('tip-use'),
+                    enabled:() => game.canUse(sel()),
+                    run:choose('useMode')
+                },{
                     id:'rally',
                     label:() => i18n('btn-rally'),
                     tip:() => {
                         const p = sel();
-                        return p ? i18n('tip-rally', formatAp(game.rallyCost(p)), Math.max(0, game.statRule('rallyAmount', p)),
-                            Math.max(1, game.statRule('rallyTurns', p)), game.rallyRefresh(p)) : '';
+                        return p ? i18n('tip-rally',
+                                formatAp(game.rallyCost(p)),
+                                Math.max(0, game.statRule('rallyAmount', p)),
+                                Math.max(1, game.statRule('rallyTurns', p)),
+                                game.rallyRefresh(p)
+                            ) : '';
                     },
                     enabled:() => game.canRally(sel()),
                     run:() => {
@@ -227,11 +278,45 @@
                         draw();
                     }
                 },
-                {id:'sheet', label:() => i18n('btn-sheet'), tip:() => i18n('tip-sheet'), enabled:() => !!sel(), run:() => openSheet(sel())},
-                {id:'goto', label:() => i18n('btn-goto'), tip:() => i18n('tip-goto'), enabled:() => !game.over && !!sel(), run:choose('gotoMode')},
-                {id:'explore', label:() => i18n('btn-explore'), tip:() => i18n('tip-explore'), enabled:() => !game.over && !!sel(), run:() => startNav('explore')},
-                {id:'snake', label:() => i18n('btn-snake'), tip:() => i18n('tip-snake'), enabled:() => !game.over && !!sel(), run:() => startNav('snake')},
-                {id:'tree', label:() => i18n('btn-tree'), tip:() => i18n('tip-tree'), enabled:() => !game.over && !!sel(), run:() => startNav('tree')}
+                
+                // Squad Organization
+                {
+                    id:'place',
+                    label:() => i18n('btn-place', game.placeCost()),
+                    tip:() => i18n('tip-place', game.placeCost()),
+                    enabled:() => !game.over && game.canAffordPlace() && !!sel() && game.placeCells(sel()).length > 0,
+                    run:choose('placeMode')
+                },{
+                    id:'attach',
+                    label:() => i18n('btn-attach'),
+                    tip:() => i18n('tip-attach'),
+                    enabled:() => game.canAttach(sel()),
+                    run:choose('attachMode')
+                },{
+                    id:'detach',
+                    label:() => i18n('btn-detach'),
+                    tip:() => i18n('tip-detach'),
+                    enabled:() => game.canDetach(sel()),
+                    run:() => {
+                        if (game.playerDetach(sel())) gameView.afterTurn();
+                        draw();
+                    }
+                },
+                
+                // Squad Formations
+                {
+                    id:'snake',
+                    label:() => i18n('btn-snake'),
+                    tip:() => i18n('tip-snake'),
+                    enabled:() => !game.over && !!sel(),
+                    run:() => startNav('snake')
+                },{
+                    id:'tree',
+                    label:() => i18n('btn-tree'),
+                    tip:() => i18n('tip-tree'),
+                    enabled:() => !game.over && !!sel(),
+                    run:() => startNav('tree')
+                }
             ];
         },
         
@@ -579,15 +664,14 @@
             // For tests and the console.
             appView.game = game;
             
-            appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT}));
             gameView = appView.gameView = new pkg.GameView(appView, {
-                y:HEADER_HEIGHT, 
-                percentOfParentWidth:100, percentOfParentHeight:100, 
-                percentOfParentHeightOffset:-(HEADER_HEIGHT + FOOTER_HEIGHT)
+                percentOfParentWidth:100, percentOfParentHeight:100
             }, [M.SizeToParent]);
+            appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT}));
             appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
             
-            infoPanel = new InfoPanel(appView, {x:padding, y:HEADER_HEIGHT + padding});
+            const hudY = HEADER_HEIGHT + padding;
+            infoPanel = new InfoPanel(appView, {x:padding, y:hudY});
             
             // The combat log: its last lines, newest at the bottom, over the board's bottom
             // left; clicks go through it. Shown unless the combatLog preference is off.
@@ -613,8 +697,8 @@
             pieceMenu = new pkg.PieceMenu(gameView, {items:menuItems(), onPick:() => {V.menuOpen = false;}});
             
             statusTxt = new PaddedPlainText(appView, {
-                align:'center', valign:'bottom',
-                valignOffset:FOOTER_HEIGHT + padding, padding, visible:false,
+                y:hudY, align:'right', alignOffset:padding,
+                padding, visible:false,
                 textColor:colorText, fontSize:fontSizeMedium
             }, [{
                 /*  Updates the overlays, once per frame. */
@@ -829,7 +913,6 @@
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
             exportBtn.setDisabled(gameOver);
-
             
             modeBtn.setTextAndFit(i18n('btn-mode', i18n('mode-' + game.moveMode)));
             

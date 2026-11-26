@@ -28,6 +28,11 @@
     with it (and its HP by as much). XP is kept in hundredths (XP_UNIT a point), as whole
     numbers, so small shares aren't lost.
     
+    Stat points: each level up gives a piece the statPointsPerLevel rule's points to
+    spend on its stats (piece.statPoints: {available, spent}, spent being all it has
+    spent in all). The character sheet spends them (see spendStatPoints); a stat can only
+    go up by them, never down.
+    
     What happens is kept in the combat log (Game.combatLog, the last LOG_MAX entries, not
     saved), as plain data for the view to put into words: {turn, kind, ...}, kind one of
     'hit' (a, d, roll, chance, dmg), 'soak' and 'miss' (a, d, roll, chance), 'harm' (d,
@@ -86,7 +91,8 @@
         
         AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
         XP_UNIT = pkg.XP_UNIT = 100,         // a point, in the hundredths xp is kept in
-        MIN_COST = 10;                       // the least an action can cost (so there's an end to them)
+        MIN_COST = 10,                       // the least an action can cost (so there's an end to them)
+        LEVEL_UP_MS = 1400;                  // how long the rings of a level up take to play
     
     pkg.characters = new Subtypes('character', parseProfile);
     pkg.enemies = new Subtypes('enemy', parseProfile);
@@ -101,6 +107,7 @@
             p.stats = {...profile.stats};
             p.level = profile.level;
             p.xp = 0;
+            p.statPoints = {available:0, spent:0};
             p.damage = [...profile.damage];
             p.penetration = profile.penetration;
             p.armor = profile.armor;
@@ -349,17 +356,54 @@
             rule's xp. */
         gainXp: function(p, xp) {
             this.logCombat({kind:'xp', a:this.whoOf(p), xp});
-            this.fx(p.x, p.y, `+${xp / XP_UNIT} XP`, '--gain', {delay:160});
+            this.fx(p.x, p.y, `+${xp / XP_UNIT} XP`, '--gain', {delay:160, follow:p.id});
             p.xp += xp;
             for (let need = this.xpRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.xpRule('xpToLevel', p)) {
                 p.xp -= need;
                 p.level++;
-                const max = this.maxHpOf(p);
-                p.hp += Math.max(0, max - p.maxHp);
-                p.maxHp = max;
+                p.statPoints.available += Math.max(0, this.statRule('statPointsPerLevel', p));
+                this.updateMaxHp(p);
                 this.logCombat({kind:'level', a:this.whoOf(p), level:p.level});
-                this.fx(p.x, p.y, 'Level ' + p.level + '!', '--gain', {delay:200});
+                // (After its "+n XP" has risen out of the way.)
+                this.fx(p.x, p.y, 'Level ' + p.level + '!', '--gain', {delay:500, follow:p.id});
+                this.fx(p.x, p.y, '', '--level-up', {levelUp:true, core:p.id === this.playerCoreId, delay:500, dur:LEVEL_UP_MS, follow:p.id});
             }
+        },
+        
+        /*  Piece p's max HP worked out again (after a level or stats changed), its HP going
+            up by as much as it does. */
+        updateMaxHp: function(p) {
+            const max = this.maxHpOf(p);
+            p.hp += Math.max(0, max - p.maxHp);
+            p.maxHp = max;
+        },
+        
+        /*  Piece p as it would be with the points of adds ({stat:n}) put into its stats: a
+            copy, its max HP (and HP) worked out again. For the character sheet to show
+            what spending them would do. */
+        withStats: function(p, adds) {
+            const q = {...p, stats:{...p.stats}};
+            for (const [s, v] of Object.entries(adds)) q.stats[s] += v;
+            this.updateMaxHp(q);
+            return q;
+        },
+        
+        /*  Your piece p spends stat points: adds, {stat:n}, says how many on each stat (none
+            below 0, and in all no more than it has available). Its max HP and the rest
+            follow its stats. Returns whether it did. */
+        spendStatPoints: function(p, adds) {
+            const entries = Object.entries(adds),
+                total = entries.reduce((n, [, v]) => n + v, 0);
+            let retval = false;
+            if (p?.owner === 'player' && this.pieces.has(p.id) && total <= p.statPoints.available &&
+                entries.every(([s, v]) => STATS.includes(s) && Number.isInteger(v) && v >= 0)) {
+                for (const [s, v] of entries) p.stats[s] += v;
+                p.statPoints.available -= total;
+                p.statPoints.spent += total;
+                this.updateMaxHp(p);
+                retval = true;
+            }
+            return retval;
         },
         
         // Your highest level, and the total of your pieces' levels
