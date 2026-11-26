@@ -64,12 +64,13 @@
             DATA_BASE_DIR:'./data/',
             
             // The height of the top "header" view in the App.
-            HEADER_HEIGHT:40,
-            FOOTER_HEIGHT:40,
+            HEADER_HEIGHT:32,
+            FOOTER_HEIGHT:32,
             
             // Dialogs
             DEFAULT_TALL_DIALOG_WIDTH:560,
-            DIALOG_FOOTER_HEIGHT:40,
+            DIALOG_HEADER_HEIGHT:32,
+            DIALOG_FOOTER_HEIGHT:32,
             
             // How exported save files are written: "compact" (as small as possible, one line)
             // or "pretty" (indented, to read). Either can be imported.

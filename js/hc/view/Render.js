@@ -8,7 +8,7 @@
         } = V,
         
         {
-            cfg:{PIECE_R, CORE_BORDER, RING_GAP, ANIM, SHADOW},
+            cfg:{PIECE_R, CORE_BORDER, RING_GAP, ANIM, SHADOW, HEADER_HEIGHT, FOOTER_HEIGHT},
             TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
             PIECE_TYPES
         } = pkg,
@@ -17,6 +17,14 @@
         STAT_POINTS_ICON = 'circle-arrow-up', // over a piece of yours with stat points to spend
         LEVEL_UP_RINGS = 3,
         ENEMY_ARROW_SIZE = 0.75,     // an off-board enemy squad's arrow, of your core's
+        // The board as you see it, in pixels in from each edge of the canvas: the header
+        // and footer lie over the top and bottom of it. Off-board arrows show for what's
+        // outside it, and run along its edges, ARROW_INSET further in.
+        BOARD_INSET_TOP = HEADER_HEIGHT,
+        BOARD_INSET_RIGHT = 0,
+        BOARD_INSET_BOTTOM = FOOTER_HEIGHT,
+        BOARD_INSET_LEFT = 0,
+        ARROW_INSET = 22,
         
         // A hole's rim lines fade into it in this many steps (see drawTile): each a part of
         // the line drawn fainter, rather than a gradient, since making a gradient for every
@@ -1056,15 +1064,20 @@
             ctx.globalAlpha = 1;
         }
         
-        // Off-screen indicators: an arrow at the edge of the board, pointing (from the
-        // middle) at what's off it. Red, and smaller, for each enemy squad you can see none
-        // of on the board, at its leader (or, if you can't see that, a piece of it you
-        // can); gold for your core, over them.
-        const pad = 22,
-            offBoard = (sx, sy) => sx < 0 || sx > W || sy < 0 || sy > H,
+        // Off-screen indicators: an arrow at the edge of the board (as you see it, between
+        // the header and footer: see BOARD_INSET_TOP...), pointing (from its middle) at
+        // what's off it. Red, and smaller, for each enemy squad you can see none of on the
+        // board, at its leader (or, if you can't see that, a piece of it you can); gold for
+        // your core, over them.
+        const left = BOARD_INSET_LEFT,
+            top = BOARD_INSET_TOP,
+            right = W - BOARD_INSET_RIGHT,
+            bottom = H - BOARD_INSET_BOTTOM,
+            offBoard = (sx, sy) => sx < left || sx > right || sy < top || sy > bottom,
             edgeArrow = (sx, sy, color, size) => {
-                const ax = Math.min(W - pad, Math.max(pad, sx)), ay = Math.min(H - pad, Math.max(pad, sy));
-                ctx.save(); ctx.translate(ax, ay); ctx.rotate(Math.atan2(sy - H / 2, sx - W / 2)); ctx.scale(size, size);
+                const ax = Math.min(right - ARROW_INSET, Math.max(left + ARROW_INSET, sx)),
+                    ay = Math.min(bottom - ARROW_INSET, Math.max(top + ARROW_INSET, sy));
+                ctx.save(); ctx.translate(ax, ay); ctx.rotate(Math.atan2(sy - (top + bottom) / 2, sx - (left + right) / 2)); ctx.scale(size, size);
                 ctx.fillStyle = css(color);
                 ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -8); ctx.lineTo(-8, 8); ctx.closePath(); ctx.fill();
                 ctx.restore();

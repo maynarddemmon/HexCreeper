@@ -303,6 +303,7 @@
 			"name":"Wood Scraps",
 			"description":"Scraps of wood.",
 			"composition":"pinewood",
+			"coverage":0,
 			"fillColor":"#7536",
 		}
 	},

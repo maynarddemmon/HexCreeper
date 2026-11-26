@@ -34,16 +34,19 @@
         initNode: function(parent, attrs) {
             attrs.defaultPlacement = '_contentView';
             
-            const title = attrs.title ?? '';
+            const headerHeight = attrs.headerHeight ?? rowHeight,
+                title = attrs.title ?? '';
+            delete attrs.headerHeight;
             delete attrs.title;
             
             this.callSuper(parent, attrs);
             
             const headerView = this._headerView = new WideView(this, {
-                ignorePlacement:true, height:rowHeight, bgColor:colorPanelHeader
+                ignorePlacement:true, height:headerHeight, bgColor:colorPanelHeader
             });
             (this._titleView = new Text(headerView, {
-                text:title, tooltip:title, textColor:colorText, fontSize:fontSizeVeryLarge, y:2, layoutHint:1
+                valign:'middle',
+                text:title, tooltip:title, textColor:colorText, fontSize:fontSizeVeryLarge, layoutHint:1
             })).enableEllipsis();
             new ResizeLayout(headerView, {inset:padding, spacing:spacing, outset:padding/2});
             

@@ -18,7 +18,10 @@
                 colorPanel, colorPanelFooter, colorSuccess, colorError,
                 fontSizeMedium, fontSizeLarge, fontFamilyMono
             },
-            cfg:{DEFAULT_TALL_DIALOG_WIDTH, DIALOG_FOOTER_HEIGHT, HEADER_HEIGHT, FOOTER_HEIGHT}
+            cfg:{
+                DEFAULT_TALL_DIALOG_WIDTH, DIALOG_HEADER_HEIGHT, DIALOG_FOOTER_HEIGHT, 
+                HEADER_HEIGHT, FOOTER_HEIGHT
+            }
         } = pkg,
         
         SPACER_CFG = {klass:pkg.Spacer},
@@ -69,6 +72,7 @@
                 }
                 
                 const panelView = self._panelView = new pkg.Panel(self, {
+                    headerHeight:DIALOG_HEADER_HEIGHT,
                     roundedCorners:cornerRadius, bgColor:colorPanel, overflow:'hidden',
                     boxShadow:[0, 6, 24, '#0004'],
                     ...positionAttrs
@@ -78,7 +82,7 @@
                 if (cancelable) {
                     const header = self.getHeaderView();
                     self._closeBtn = new pkg.IconBtn(header, {
-                        y:2, icon:'x', label:i18n('btn-close'), tooltip:i18n('btn-close'), buttonType:'plain'
+                        valign:'middle', icon:'x', label:i18n('btn-close'), tooltip:i18n('btn-close'), buttonType:'plain'
                     }, [{
                         doActivated: function() {self.doClose();}
                     }]);

@@ -59,14 +59,16 @@ test.describe('fog of war', () => {
     
     test('a squad you can see but that\'s off the board has a red arrow at the edge, pointing at its leader', async ({page}) => {
         // The canvas's colour where the arrow for cell (x, y) goes: at the edge of the
-        // board, towards it from the middle (see Render.js).
+        // board (between the header and footer, which lie over it), 22px in, towards it
+        // from the middle (see Render.js).
         // (Drawn first, and with no pan going on, so the arrow is where it's looked for.)
         const arrowColour = (x, y) => page.evaluate(([x, y]) => {
-            const V = hc.view;
+            const V = hc.view, {HEADER_HEIGHT, FOOTER_HEIGHT} = hc.cfg;
             V.stopPan();
             V.render(performance.now());
             const [sx, sy] = V.cellCenter(x, y), pad = 22,
-                ax = Math.min(V.W - pad, Math.max(pad, sx)), ay = Math.min(V.H - pad, Math.max(pad, sy));
+                ax = Math.min(V.W - pad, Math.max(pad, sx)),
+                ay = Math.min(V.H - FOOTER_HEIGHT - pad, Math.max(HEADER_HEIGHT + pad, sy));
             return [...V.canvas.getContext('2d').getImageData(Math.round(ax * V.dpr), Math.round(ay * V.dpr), 1, 1).data].join();
         }, [x, y]);
         const RED = '255,51,51,255';
@@ -95,6 +97,26 @@ test.describe('fog of war', () => {
             g.addPiece('core', 'enemy', 0, -40);
         });
         expect(await arrowColour(0, -40)).not.toBe(RED);
+        // Above the board, the arrow is under the header; and a squad behind the header
+        // is off the board.
+        await page.evaluate(() => {
+            const g = hc.app.game;
+            for (const e of g.piecesOf('enemy')) g.removePiece(e);
+            g.addPiece('core', 'enemy', 2, -4);
+        });
+        expect(await page.evaluate(() => hc.view.cellCenter(2, -4)[1] < 0)).toBe(true);
+        expect(await arrowColour(2, -4)).toBe(RED);
+        const behind = await page.evaluate(() => {
+            const g = hc.app.game, V = hc.view;
+            for (const e of g.piecesOf('enemy')) g.removePiece(e);
+            g.addPiece('core', 'enemy', 1, -2);
+            // The camera moved down until the piece is half way up the header.
+            V.cam.y += (V.cellCenter(1, -2)[1] - hc.cfg.HEADER_HEIGHT / 2) / V.cam.size;
+            return V.cellCenter(1, -2)[1];
+        });
+        expect(behind).toBeCloseTo(20, 0);
+        expect(await page.evaluate(() => hc.app.game.inSight(1, -2))).toBe(true);
+        expect(await arrowColour(1, -2)).toBe(RED);
     });
     
     test('an enemy\'s link to a piece out of sight shows as a stub, either way round', async ({page}) => {

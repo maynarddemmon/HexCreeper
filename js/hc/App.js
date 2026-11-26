@@ -34,7 +34,7 @@
     const JSClass = JS.Class,
         
         M = myt,
-        {View, PaddedPlainText, PlainText, I18N:{get:i18n}} = M,
+        {View, PaddedPlainText, PlainText, I18N:{get:i18n}, ResizeLayout, ConstantLayout} = M,
         
         {
             view:V,
@@ -667,8 +667,8 @@
             gameView = appView.gameView = new pkg.GameView(appView, {
                 percentOfParentWidth:100, percentOfParentHeight:100
             }, [M.SizeToParent]);
-            appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT}));
-            appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, valign:'bottom'}));
+            appView.buildHdrView(new WideView(appView, {bgColor:colorHeaderBg, height:HEADER_HEIGHT, pointerEvents:'none'}));
+            appView.buildFtrView(new WideView(appView, {bgColor:colorHeaderBg, height:FOOTER_HEIGHT, pointerEvents:'none', valign:'bottom'}));
             
             const hudY = HEADER_HEIGHT + padding;
             infoPanel = new InfoPanel(appView, {x:padding, y:hudY});
@@ -870,8 +870,9 @@
                 doActivated: () => {window.open(GITHUB_URL, '_blank', 'noopener');}
             }]);
             
-            new M.ResizeLayout(hdrView, {inset:padding, spacing:spacing, outset:padding});
-            new M.ConstantLayout(hdrView, {targetAttrName:'valign', targetValue:'middle'});
+            new ResizeLayout(hdrView, {inset:padding, spacing:spacing, outset:padding});
+            new ConstantLayout(hdrView, {targetAttrName:'valign', targetValue:'middle'});
+            new ConstantLayout(hdrView, {targetAttrName:'pointerEvents', targetValue:'auto'});
         },
         
         buildFtrView: ftrView => {
@@ -899,8 +900,9 @@
             
             new Spacer(ftrView);
             
-            new M.ResizeLayout(ftrView, {inset:padding, spacing:spacing, outset:padding});
-            new M.ConstantLayout(ftrView, {targetAttrName:'valign', targetValue:'middle'});
+            new ResizeLayout(ftrView, {inset:padding, spacing:spacing, outset:padding});
+            new ConstantLayout(ftrView, {targetAttrName:'valign', targetValue:'middle'});
+            new ConstantLayout(ftrView, {targetAttrName:'pointerEvents', targetValue:'auto'});
         },
         
         /*  Called once per frame, as the board is drawn: updates the header and overlays,

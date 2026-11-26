@@ -258,6 +258,8 @@ test('Enter opens the selected piece\'s menu; the arrow keys move between its it
     await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Character/);
     await page.keyboard.press('ArrowDown');
+    expect(await focused()).toMatch(/^Go to/);
+    for (let i = 0; i < 12 && !/^Place/.test(await focused()); i++) await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Place/);
     await page.keyboard.press('Space');       // the focused item's, not the end of the turn
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeVisible();
