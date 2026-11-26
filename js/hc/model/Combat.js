@@ -37,7 +37,8 @@
     saved), as plain data for the view to put into words: {turn, kind, ...}, kind one of
     'hit' (a, d, roll, chance, dmg), 'soak' and 'miss' (a, d, roll, chance), 'harm' (d,
     dmg: from a harm tile), 'destroyed' (d, linked: how many linked below it went too),
-    'xp' (a, xp: in hundredths) and 'level' (a, level).
+    'xp' (a, xp: in hundredths), 'level' (a, level) and 'multikill' (count: the kills of
+    one action, when more than one).
     a and d (attacker, defender) are who they were (see whoOf), so an entry still reads
     the same once the piece is gone.
     
@@ -57,6 +58,7 @@
         STATS = pkg.STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
         STAT_VARS = pkg.STAT_VARS = ['level', ...STATS],
         XP_VARS = pkg.XP_VARS = ['xp', 'rank', 'parentRank', 'level'], // the parentXPShare and childXPBonus rules'
+        MULTI_KILL_VARS = pkg.MULTI_KILL_VARS = ['xp', 'killCount', 'level'], // the multiKillBonusXP rule's
         DAMAGE_VARS = pkg.DAMAGE_VARS = ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
         isInt = v => Number.isInteger(v) && v >= 0,
         
@@ -334,6 +336,35 @@
         xpShareRule: function(rule, xp, p, parent) {
             return Math.max(0, Math.round(XP_UNIT * evaluate(this.rules[rule], XP_VARS,
                 {xp:xp / XP_UNIT, rank:p.rank, parentRank:parent.rank, level:p.level}))) || 0;
+        },
+        
+        /*  Gives the xp of the kills since it was last called (the kills of one action: see
+            Game.damage) as one multi-kill. killCount is all the enemy pieces they destroyed
+            (what was linked below a killed piece too), by any of your pieces; each piece of
+            yours that killed some, if it's still there, gets the multiKillBonusXP rule's
+            of their xp (the xp itself for one kill), then shares it (see awardXp). The
+            rule's variables: xp (in points), killCount and level (the killer's). */
+        awardKills: function() {
+            const kills = this.pendingKills;
+            if (kills.length) {
+                this.pendingKills = [];
+                const killCount = kills.reduce((n, k) => n + k.count, 0),
+                    xpBy = new Map();
+                for (const k of kills) xpBy.set(k.killerId, (xpBy.get(k.killerId) ?? 0) + k.xp);
+                const killers = [...xpBy.keys()].map(id => this.pieces.get(id)).filter(Boolean);
+                if (killCount > 1 && killers.length && !this.over) {
+                    const p = killers[0];
+                    this.logCombat({kind:'multikill', count:killCount});
+                    this.fx(p.x, p.y, `${killCount}× multi-kill!`, '--gain', {delay:300, follow:p.id});
+                }
+                for (const p of killers) {
+                    if (!this.over) {
+                        const xp = xpBy.get(p.id),
+                            bonus = Math.round(XP_UNIT * evaluate(this.rules.multiKillBonusXP, MULTI_KILL_VARS, {xp:xp / XP_UNIT, killCount, level:p.level}));
+                        this.awardXp(p, Math.max(0, bonus) || 0);
+                    }
+                }
+            }
         },
         
         /*  Piece p earns xp (hundredths) for a kill, and its parents a share of it: a piece

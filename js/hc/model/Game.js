@@ -61,6 +61,7 @@
             this.lootTaken = 0;              // gold taken from loot, spent or not
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
+            this.pendingKills = [];          // kills of this action, their xp not given yet (see Combat.awardKills)
             this.clearAnimation();
             this.rules = pkg.settings.resolveRules(this.gameMap?.rules, 'Game'); // the map's rules, the rest at their defaults (see Settings.js)
             // The map's components (see MapComponent.js), with its attrs for them.
@@ -188,6 +189,7 @@
                 return {value:!!s?.value, locked:!!s?.locked, progress:typeof s?.progress === 'string' ? s.progress : ''};
             });
             this.effects = [];
+            this.pendingKills = [];
             this.clearAnimation();
             this.pieces = new Map();
             this.board = new Map();
@@ -473,7 +475,8 @@
         // Destroying a piece also destroys everything linked below it. by is the piece the
         // damage is from (the attacker, or who set off a harm). An enemy remembers the last
         // of your pieces to hurt it (lastHitBy), whose kill it is (with what was linked
-        // below it), however it dies: that piece earns their xp (see Combat.awardXp).
+        // below it), however it dies: that piece earns their xp, once the action is over,
+        // with the other kills of the action (see Combat.awardKills).
         damage: function(target, dmg, attacker, by = attacker) {
             if (by?.owner === 'player' && target.owner === 'enemy') target.lastHitBy = by.id;
             target.hp -= dmg;
@@ -496,9 +499,10 @@
             this.fx(target.x, target.y, '', col, {burst:true, piece:{...target}});
             if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
-            const killer = this.pieces.get(target.lastHitBy),
-                xp = lost.reduce((n, g) => n + (g.owner === 'enemy' ? g.xpValue : 0), 0);
-            if (killer && xp && !this.over) this.awardXp(killer, xp);
+            const enemies = lost.filter(g => g.owner === 'enemy');
+            if (target.lastHitBy != null && enemies.length) {
+                this.pendingKills.push({killerId:target.lastHitBy, count:enemies.length, xp:enemies.reduce((n, g) => n + g.xpValue, 0)});
+            }
             return lost;
         },
         
@@ -758,6 +762,7 @@
         },
         
         afterPlayerAction: function() {
+            this.awardKills();
             this.noticeEnemies();
             this.evaluateObjectives();
             if (this.over) return;
@@ -778,6 +783,7 @@
         // its status effects count down (in that order, so an effect for a turn still counts
         // at its end).
         endPlayerTurn: function() {
+            this.awardKills();
             this.enemyPhase();
             if (this.over) return;
             this.noticeEnemies();

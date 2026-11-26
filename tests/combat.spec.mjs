@@ -287,7 +287,50 @@ test('a kill is the last of your pieces to hurt the enemy\'s, however it dies', 
         g.playerAttack(c, 1, 0);           // 1 damage: c's now
         const hurt = [e.hp, e.lastHitBy === c.id];
         g.damage(e, 5, null);              // dies of something else
-        return [hurt, g.pieces.has(e.id), c.xp];
+        const gone = g.pieces.has(e.id);
+        g.playerWait();                    // (its xp comes at the end of the action, or turn)
+        return [hurt, gone, c.xp];
     });
     expect(r).toEqual([[2, true], false, 400]);
+});
+
+test('a multi-kill: the kills of one action give each killer the multiKillBonusXP rule\'s of its xp, the count being all of them', async ({page}) => {
+    const fwd = await setupRow(page);
+    const r = await page.evaluate(fwd => {
+        const g = hc.app.game, c = g.getPlayerCore(), mine = g.piecesOf('player');
+        Object.assign(g.rules, {xpToLevel:'1000', childXPBonus:'0', parentXPShare:'0'}); // (no sharing)
+        // Your three pieces in a row, each with an enemy in front, worth 5 xp; the middle
+        // one's has two more linked below it, out of the way.
+        for (const p of mine) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]).xpValue = 500;
+        const lead = g.pieceAt(c.x + fwd[0], c.y + fwd[1]);
+        for (const [x, y] of [[c.x + 2 * fwd[0], c.y + 2 * fwd[1]], [c.x + 3 * fwd[0], c.y + 3 * fwd[1]]]) g.addPiece('core', 'enemy', x, y, lead.id).xpValue = 500;
+        g.recomputeRanks();
+        for (const p of mine) p.xp = 0;
+        c.ap = 100;
+        g.playerAct(c, c.x + fwd[0], c.y + fwd[1]);
+        return {left:g.piecesOf('enemy').length, xp:mine.map(p => [p === c, p.xp]), log:g.combatLog.filter(e => e.kind === 'multikill').map(e => e.count)};
+    }, fwd);
+    // 5 kills: 5% more for each after the first, 20%. The core killed three (15 xp, 18
+    // with it), the others one each (5, and 6).
+    expect(r.left).toBe(0);
+    expect(r.xp.sort((a, b) => b[0] - a[0])).toEqual([[true, 1800], [false, 600], [false, 600]]);
+    expect(r.log).toEqual([5]);
+});
+
+test('a single kill gets its xp as it is, and the multi-kill bonus is a rule', async ({page}) => {
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.rules.xpToLevel = '1000';
+        const kill = () => {
+            const e = g.addPiece('core', 'enemy', 1, 0);
+            e.xpValue = 500;
+            c.ap = 100;
+            g.playerAttack(c, 1, 0);
+            return c.xp;
+        };
+        const one = kill();
+        g.rules.multiKillBonusXP = 'xp * killCount * 2';
+        return [one, kill() - one];
+    });
+    expect(r).toEqual([500, 1000]);
 });

@@ -116,6 +116,7 @@
                 case 'destroyed': text = e.linked ? i18n('log-destroyed-linked', d, e.linked) : i18n('log-destroyed', d); break;
                 case 'xp': text = i18n('log-xp', a, formatXp(e.xp)); break;
                 case 'level': text = i18n('log-level', a, e.level); break;
+                case 'multikill': text = i18n('log-multikill', e.count); break;
                 default: text = e.kind;
             }
             return i18n('log-line', e.turn, text);

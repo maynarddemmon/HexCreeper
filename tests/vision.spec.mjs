@@ -112,9 +112,9 @@ test.describe('fog of war', () => {
             g.addPiece('core', 'enemy', 1, -2);
             // The camera moved down until the piece is half way up the header.
             V.cam.y += (V.cellCenter(1, -2)[1] - hc.cfg.HEADER_HEIGHT / 2) / V.cam.size;
-            return V.cellCenter(1, -2)[1];
+            return [V.cellCenter(1, -2)[1], hc.cfg.HEADER_HEIGHT / 2];
         });
-        expect(behind).toBeCloseTo(20, 0);
+        expect(behind[0]).toBeCloseTo(behind[1], 0);
         expect(await page.evaluate(() => hc.app.game.inSight(1, -2))).toBe(true);
         expect(await arrowColour(1, -2)).toBe(RED);
     });

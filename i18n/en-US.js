@@ -178,6 +178,7 @@ myt.I18N.setDictionary({
 "log-destroyed-linked":"$0 is destroyed, and $1 linked below it.",
 "log-xp":"$0 gains $1 XP.",
 "log-level":"$0 reaches level $1!",
+"log-multikill":"A $0× multi-kill!",
 
 // The character sheet
 "dlg-sheet-title":"$0 · Level $1",

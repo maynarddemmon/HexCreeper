@@ -73,6 +73,7 @@
             expr('xpToLevel', '20 * level', pkg.STAT_VARS),
             expr('xpValue', '5 * level', pkg.STAT_VARS),
             expr('statPointsPerLevel', '2', pkg.STAT_VARS), // stat points to spend, at each level up (of the new level)
+            expr('multiKillBonusXP', 'xp + xp * Math.min(20, killCount - 1) / 20', pkg.MULTI_KILL_VARS), // a killer's xp from a multi-kill
             expr('parentXPShare', 'xp * rank / 20', pkg.XP_VARS),   // passed up to a piece's parent, of what it got
             expr('childXPBonus', 'xp * parentRank / 20', pkg.XP_VARS), // more for a piece with a parent
             expr('apPool', '1 + con / 10', pkg.STAT_VARS),
