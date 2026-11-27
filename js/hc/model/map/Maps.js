@@ -11,7 +11,9 @@
             whose type is registered with Base. */
         componentOf = (Base, config, where) => {
             if (!isObj(config)) throw new Error(where + ' is missing');
-            if (!Base.has(config.type)) throw new Error(where + ' has an unknown type: ' + config.type);
+            if (!Base.has(config.type)) {
+                throw new Error(where + ' has an unknown type: ' + config.type);
+            }
             const {type, ...attrs} = config;
             return {type, attrs:Base.cleanAttrs(type, attrs, where)};
         },
@@ -46,7 +48,9 @@
                     found = new Array(includes?.length ?? 0);
                 let left = found.length,
                     ok = isObj(data) && !!includes;
-                if (data && !ok) console.error('Data file', path, 'is not an object, or has an include that isn\'t a list of paths');
+                if (data && !ok) {
+                    console.error('Data file', path, 'is not an object, or has an include that isn\'t a list of paths');
+                }
                 const done = () => {
                     let merged = null;
                     if (ok) {
@@ -135,13 +139,19 @@
                         pkg.holes.define(data.holes);
                         pkg.floors.define(data.floors);
                         for (const s of pkg.solids.list()) {
-                            if (s.floor && !pkg.floors.get(s.floor)) console.warn('Solid', s.id, 'leaves floor', s.floor, 'which there is none of');
+                            if (s.floor && !pkg.floors.get(s.floor)) {
+                                console.warn('Solid', s.id, 'leaves floor', s.floor, 'which there is none of');
+                            }
                         }
                         pkg.defineShadow(data.shadow);
                         pkg.fixtures.define(data.fixtures);
                         for (const f of pkg.fixtures.list()) {
-                            if (f.floor && !pkg.floors.get(f.floor)) console.warn('Fixture', f.id, 'leaves floor', f.floor, 'which there is none of');
-                            if (f.destroyInto && !pkg.fixtures.get(f.destroyInto)) console.warn('Fixture', f.id, 'leaves fixture', f.destroyInto, 'which there is none of');
+                            if (f.floor && !pkg.floors.get(f.floor)) {
+                                console.warn('Fixture', f.id, 'leaves floor', f.floor, 'which there is none of');
+                            }
+                            if (f.destroyInto && !pkg.fixtures.get(f.destroyInto)) {
+                                console.warn('Fixture', f.id, 'leaves fixture', f.destroyInto, 'which there is none of');
+                            }
                         }
                         pkg.effects.define(data.effects);
                         
@@ -149,10 +159,14 @@
                         pkg.species.define(data.species);
                         pkg.backgrounds.define(data.backgrounds);
                         for (const s of pkg.species.list()) {
-                            for (const b of s.backgrounds ?? []) if (!pkg.backgrounds.get(b)) console.warn('Species', s.id, 'allows background', b, 'which there is none of');
+                            for (const b of s.backgrounds ?? []) {
+                                if (!pkg.backgrounds.get(b)) console.warn('Species', s.id, 'allows background', b, 'which there is none of');
+                            }
                         }
                         for (const b of pkg.backgrounds.list()) {
-                            for (const s of b.species ?? []) if (!pkg.species.get(s)) console.warn('Background', b.id, 'allows species', s, 'which there is none of');
+                            for (const s of b.species ?? []) {
+                                if (!pkg.species.get(s)) console.warn('Background', b.id, 'allows species', s, 'which there is none of');
+                            }
                         }
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
                     }

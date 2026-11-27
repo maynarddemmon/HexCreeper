@@ -71,7 +71,9 @@
                 const tail = chain.length === 1 || chain.every(p => kidsOf(p).filter(k => k !== head).length <= 1) ?
                         chain.find(p => !kidsOf(p).some(k => k !== head)) : null,
                     whole = !loose.length && chain.length + (head !== top ? 1 : 0) === ps.length;
-                if (cut && !(whole && head.parentId === tail?.id && !kidsOf(head).length)) detach(head);
+                if (cut && !(whole && head.parentId === tail?.id && !kidsOf(head).length)) {
+                    detach(head);
+                }
                 if (tail) {
                     const g = nearest(loose, tail);
                     if (g) {
@@ -90,7 +92,9 @@
                         main.push(k);
                     }
                 }
-                for (const p of main) kidsOf(p).sort((a, b) => size(b) - size(a)).slice(2).forEach(detach);
+                for (const p of main) {
+                    kidsOf(p).sort((a, b) => size(b) - size(a)).slice(2).forEach(detach);
+                }
                 // The places free, shallowest first
                 const free = main.filter(p => kidsOf(p).length < 2),
                     shallowest = Math.min(...free.map(p => depth.get(p.id)));

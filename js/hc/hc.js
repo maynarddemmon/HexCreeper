@@ -23,7 +23,12 @@
         
         AP_UNIT = 100, // Action Points are kept to the hundredth of a point.
         XP_UNIT = 100, // Hit Points are kept to the hundredth of a point.
-        STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'];
+        STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
+        
+        FIXTURE_HEAL = 'heal',
+        FIXTURE_HARM = 'harm',
+        FIXTURE_LOOT = 'loot',
+        FIXTURE_FEATURE = 'feature';
     
     pkg.hc = {
         app:null, // Holds the App instance.
@@ -65,6 +70,17 @@
         AP_UNIT,
         XP_UNIT,
         STATS,
+        CHARACTER_NAME_MAX:64, // the longest a character's name can be
+        CHARACTER_DESCRIPTION_MAX:1024, // and its description
+        
+        // Status Effects (the ones the code uses: see Effects.js)
+        EFFECT_EXHAUSTED:'exhausted',
+        EFFECT_RALLYING:'rallying',
+        EFFECT_RALLIED:'rallied',
+        
+        // Move Modes (see Movement.js)
+        MOVE_MODES:['fixed', 'free', 'follow'],
+        PLAYER_MOVE_MODES:['fixed', 'follow'], // those you can set your moves to
         
         // Expression Vars
         VAR_XP,
@@ -74,12 +90,20 @@
         XP_VARS: [VAR_XP, 'rank', 'parentRank', VAR_LEVEL], // the parentXPShare and childXPBonus rules'
         MULTI_KILL_VARS: [VAR_XP, 'killCount', VAR_LEVEL], // the multiKillBonusXP rule's
         DAMAGE_VARS: ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
+        COST_VARS: ['coreLevel', 'maxLevel', 'levels'], // the cost rules': your core's level, your highest, and your pieces' together (see Game.costRule)
         
         // Tile Types (the terrain: a cell with none is plain floor; heals, harms and loot
         // are fixtures: see Fixtures.js)
         TILE_TYPE_FLOOR:'floor',
         TILE_TYPE_HOLE:'hole',
         TILE_TYPE_SOLID:'solid',
+        
+        // Fixture Types (see Fixtures.js)
+        FIXTURE_HEAL,
+        FIXTURE_HARM,
+        FIXTURE_LOOT,
+        FIXTURE_FEATURE,
+        FIXTURE_TYPES:[FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE],
         
         cfg:{
             // Where help.txt is loaded from.

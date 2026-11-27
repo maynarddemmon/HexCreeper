@@ -86,9 +86,11 @@
     
     const {
             Subtypes, isObj, attrs:{evaluate},
-            AP_UNIT, XP_UNIT, STATS, 
+            AP_UNIT, XP_UNIT, STATS,
             VAR_XP, VAR_LEVEL, STAT_VARS, XP_VARS, MULTI_KILL_VARS, DAMAGE_VARS,
-            isNatNum, isIntOfAtLeast, isIntBetween
+            EFFECT_EXHAUSTED, EFFECT_RALLYING, EFFECT_RALLIED,
+            CHARACTER_NAME_MAX:NAME_MAX, CHARACTER_DESCRIPTION_MAX:DESCRIPTION_MAX,
+            isNatNum, isIntOfAtLeast, isIntBetween, formatXp
         } = pkg,
         
         /*  What the damageRoll rule (of rules) comes to for a range of min to max and the
@@ -125,7 +127,7 @@
         parseBackground = entry => {
             const adj = entry.statAdj ?? {},
                 ok = isFlag(entry.playable) && isIds(entry.species) && isObj(adj) &&
-                    Object.entries(adj).every(([s, v]) => STATS.includes(s) && Number.isInteger(v));
+                    Object.entries(adj).every(([s, v]) => STATS.includes(s) && Number.isInteger(v)); // (below 0 too)
             return ok ? {playable:entry.playable === true, species:entry.species ? [...entry.species] : null, statAdj:{...adj}} : null;
         },
         
@@ -173,9 +175,7 @@
         ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
         
         MIN_COST = 10,                       // the least an action can cost (so there's an end to them)
-        LEVEL_UP_MS = 1400,                  // how long the rings of a level up take to play
-        NAME_MAX = pkg.CHARACTER_NAME_MAX = 64, // the longest a character's name can be
-        DESCRIPTION_MAX = pkg.CHARACTER_DESCRIPTION_MAX = 1024; // and its description
+        LEVEL_UP_MS = 1400;                  // how long the rings of a level up take to play
     
     pkg.species = new Subtypes('species', parseSpecies);
     pkg.backgrounds = new Subtypes('background', parseBackground);
@@ -286,7 +286,9 @@
             } else if (enemy) {
                 p.background = choices.length ? choices[Math.floor(this.rngFor('background', p.id)() * choices.length)] : '';
                 // (Not for the fallback profile: there's no data, before the data has loaded.)
-                if (!choices.length && profile !== FALLBACK) console.error('Enemy', id ?? DEFAULT_ENEMTY, 'has no background that fits its species', species.id);
+                if (!choices.length && profile !== FALLBACK) {
+                    console.error('Enemy', id ?? DEFAULT_ENEMTY, 'has no background that fits its species', species.id);
+                }
             } else {
                 p.background = choices[0] ?? '';
             }
@@ -345,7 +347,7 @@
             to its pool. */
         recoverAp: function() {
             for (const p of this.pieces.values()) {
-                if (!this.effectOn(p, pkg.EFFECT_EXHAUSTED)) this.giveAp(p, this.apRecovery(p));
+                if (!this.effectOn(p, EFFECT_EXHAUSTED)) this.giveAp(p, this.apRecovery(p));
             }
         },
         
@@ -359,15 +361,15 @@
         rallyCost: function(p) {return Math.max(MIN_COST, this.apRule('rallyCost', p));},
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
-            return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, pkg.EFFECT_RALLYING) &&
-                !this.effectOn(p, pkg.EFFECT_RALLIED) && this.canAfford(p, this.rallyCost(p));
+            return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&
+                !this.effectOn(p, EFFECT_RALLIED) && this.canAfford(p, this.rallyCost(p));
         },
         playerRally: function(p) {
             const done = this.canRally(p);
             if (done) {
                 this.spend(p, this.rallyCost(p));
-                this.addEffect(p, pkg.EFFECT_RALLYING, Math.max(1, this.statRule('rallyTurns', p)));
-                this.addEffect(p, pkg.EFFECT_RALLIED, this.rallyRefresh(p));
+                this.addEffect(p, EFFECT_RALLYING, Math.max(1, this.statRule('rallyTurns', p)));
+                this.addEffect(p, EFFECT_RALLIED, this.rallyRefresh(p));
                 this.afterPlayerAction();
             }
             return done;
@@ -376,7 +378,7 @@
         /*  Housekeeping: every rallying piece gets back its rallyAmount in HP, up to its max. */
         rallyHeal: function() {
             for (const p of this.pieces.values()) {
-                if (this.effectOn(p, pkg.EFFECT_RALLYING)) {
+                if (this.effectOn(p, EFFECT_RALLYING)) {
                     const n = Math.min(p.maxHp - p.hp, Math.max(0, this.statRule('rallyAmount', p)));
                     if (n > 0) {
                         p.hp += n;
@@ -398,7 +400,9 @@
             }
             if (seen.length && this.initiativeTurn !== this.turn) {
                 this.initiativeTurn = this.turn;
-                for (const p of this.piecesOf('player')) this.giveAp(p, this.apRule('apInitiative', p));
+                for (const p of this.piecesOf('player')) {
+                    this.giveAp(p, this.apRule('apInitiative', p));
+                }
             }
         },
         
@@ -572,7 +576,7 @@
             rule's xp. */
         gainXp: function(p, xp) {
             this.logCombat({kind:VAR_XP, a:this.whoOf(p), xp});
-            this.fx(p.x, p.y, `+${xp / XP_UNIT} XP`, '--gain', {delay:160, follow:p.id});
+            this.fx(p.x, p.y, `+${formatXp(xp)} XP`, '--gain', {delay:160, follow:p.id});
             p.xp += xp;
             for (let need = this.xpRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.xpRule('xpToLevel', p)) {
                 p.xp -= need;

@@ -132,7 +132,9 @@
                     for (let tries = 0; tries < 50; tries++) {
                         const { x, y } = cells[Math.floor(rng() * cells.length)];
                         const kk = game.key(x, y);
-                        if (!game.isOpen(x, y) || game.fixtures.has(kk) || game.pieceAt(x, y)) continue;
+                        if (!game.isOpen(x, y) || game.fixtures.has(kk) || game.pieceAt(x, y)) {
+                            continue;
+                        }
                         game.fixtures.set(kk, game.makeFixture(x, y, this.attrs[made + 'Type'], rollRng, made));
                         return;
                     }
@@ -199,7 +201,9 @@
                 if (wall?.door === 0) {
                     for (const q of bk.split('|')) {
                         const all = this.bordersOf(q).sort();
-                        if (all[0] === bk && all.every(b => this.seededBorder(b)?.door === 0)) wall.door = 1;
+                        if (all[0] === bk && all.every(b => this.seededBorder(b)?.door === 0)) {
+                            wall.door = 1;
+                        }
                     }
                 }
                 this.borders.set(bk, wall);

@@ -7,7 +7,7 @@
 (pkg => {
     'use strict';
     
-    const {cfg, AP_UNIT} = pkg,
+    const {cfg, AP_UNIT, EFFECT_EXHAUSTED} = pkg,
         UNSEEN_COST = 3, // a step onto a cell you haven't seen counts as this many, so known ways come first
         SWARM_COST = 2,  // and onto one of the piece's swarm, which makes way (Follow), this many
         RADIUS = 120,    // the farthest a route goes, in steps (unseen ones counting as UNSEEN_COST)
@@ -43,7 +43,9 @@
                     if (cost.get(k) === d) {
                         if (d > 0 && isGoal(x, y)) {
                             const route = [];
-                            for (let at = k; at !== start; at = from.get(at)) route.unshift(cell(at));
+                            for (let at = k; at !== start; at = from.get(at)) {
+                                route.unshift(cell(at));
+                            }
                             return route;
                         }
                         if (d < RADIUS * TENTHS) {
@@ -211,7 +213,7 @@
                 start = {
                     pos:new Map(tree.map(id => [id, [this.pieces.get(id).x, this.pieces.get(id).y]])),
                     ap:new Map(tree.map(id => [id, this.pieces.get(id).ap])),
-                    tired:new Map(tree.map(id => [id, this.effectOn(this.pieces.get(id), pkg.EFFECT_EXHAUSTED)?.countdown ?? 0])),
+                    tired:new Map(tree.map(id => [id, this.effectOn(this.pieces.get(id), EFFECT_EXHAUSTED)?.countdown ?? 0])),
                     cost:0,
                     plan:[]
                 },
@@ -257,7 +259,9 @@
                                 tired = tiring ? new Map(base.tired).set(id, base.tired.get(id) + tiring) : base.tired,
                                 lost = tiring * this.apRecovery(this.pieces.get(id)),
                                 child = {pos, ap, tired, cost:base.cost + (spent + lost) / AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
-                            if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
+                            if (other !== undefined) {
+                                ap.set(other, ap.get(other) - costs.get(other));
+                            }
                             child.score = score(child);
                             open.push(child);
                         }
@@ -276,7 +280,9 @@
                                 next(id, 'swap', [[id, ...base.pos.get(other)], [other, x, y]], ...base.pos.get(other), other);
                             }
                         }
-                        for (const c of this.jumpCells(view, id)) next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
+                        for (const c of this.jumpCells(view, id)) {
+                            next(id, 'jump', [[id, c.x, c.y]], c.x, c.y);
+                        }
                     }
                 }
             }

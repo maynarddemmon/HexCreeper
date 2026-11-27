@@ -6,7 +6,7 @@
         {I18N:{get:i18n}, PlainText, SpacedLayout, global:{keys:globalKeys}} = M,
         
         {
-            WideView, settings,
+            WideView, settings, ICON_CANCEL,
             theme:{
                 spacing, padding, cornerRadius, rowHeight,
                 colorText, colorTextMuted, colorPanel,
@@ -62,7 +62,9 @@
             
             /** @private */
             _keyDown: function(event) {
-                if (M.KeyObservable.getCodeFromEvent(event) === globalKeys.CODE_ENTER) this._commit();
+                if (M.KeyObservable.getCodeFromEvent(event) === globalKeys.CODE_ENTER) {
+                    this._commit();
+                }
             }
         }),
         
@@ -97,7 +99,9 @@
             refresh: function() {
                 const select = this.select,
                     options = this.def.options();
-                if (select.getOptions().map(o => o.value).join('|') !== options.map(o => o.value).join('|')) select.setOptions(options);
+                if (select.getOptions().map(o => o.value).join('|') !== options.map(o => o.value).join('|')) {
+                    select.setOptions(options);
+                }
                 select.getIDE().value = settings.get(this.def.id);
             },
             
@@ -124,7 +128,9 @@
                 }, [{
                     setValue: function(v) {
                         this.callSuper(v);
-                        if (this.inited && settings.get(def.id) !== this.value) settings.set(def.id, this.value);
+                        if (this.inited && settings.get(def.id) !== this.value) {
+                            settings.set(def.id, this.value);
+                        }
                     }
                 }]);
             },
@@ -169,7 +175,7 @@
             self.callSuper(parent, attrs);
             
             self.setTitle(i18n('tip-settings'));
-            self.getFooterView().ackBtn.setText(pkg.ICON_CANCEL + ' ' + i18n('btn-close'));
+            self.getFooterView().ackBtn.setText(ICON_CANCEL + ' ' + i18n('btn-close'));
             
             const container = self._container = new WideView(self.getContentView());
             

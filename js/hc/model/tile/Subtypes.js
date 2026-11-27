@@ -15,14 +15,16 @@
 (pkg => {
     'use strict';
     
-    const isText = v => v === undefined || typeof v === 'string',
+    const {isObj} = pkg,
+        isText = v => v === undefined || typeof v === 'string',
         isNum = v => Number.isFinite(v) && v >= 0,
-        isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
         // over on top of base: objects merged a property at a time, all the way down
         merge = (base, over) => {
             const out = {...base};
-            for (const [k, v] of Object.entries(over)) out[k] = isObj(v) && isObj(base[k]) ? merge(base[k], v) : v;
+            for (const [k, v] of Object.entries(over)) {
+                out[k] = isObj(v) && isObj(base[k]) ? merge(base[k], v) : v;
+            }
             return out;
         },
         
@@ -45,7 +47,9 @@
                     } else if (parent === id || chain.includes(parent)) {
                         // Everything in the loop is bad, for the same reason.
                         const loop = [...chain, id].slice([...chain, id].indexOf(parent));
-                        for (const l of loop) bad.set(l, 'it extends in a loop: ' + [...loop, parent].join(' > '));
+                        for (const l of loop) {
+                            bad.set(l, 'it extends in a loop: ' + [...loop, parent].join(' > '));
+                        }
                         return;
                     } else {
                         resolve(parent, [...chain, id]);
@@ -66,11 +70,11 @@
     pkg.Subtypes = new JS.Class('Subtypes', {
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
-            /*  Helpers for parse functions: whether a value is a number that's not negative, a
-                whole one, optional text, or an optional percentage (missing, or 0 to 100). */
+            /*  Helpers for parse functions: whether a value is a number that's not negative,
+                optional text, or an optional percentage (missing, or 0 to 100). (For whole
+                numbers, see pkg.isNatNum and the like.) */
             isText,
             isNum,
-            isInt: v => Number.isInteger(v) && v >= 0,
             isPercent: v => v === undefined || (isNum(v) && v <= 100)
         },
         

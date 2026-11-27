@@ -77,7 +77,7 @@ test('creating a character: from the last made, + and − within the limits, Con
         raise = stat => page.getByRole('button', {name:'Raise ' + stat}),
         lower = stat => page.getByRole('button', {name:'Lower ' + stat}),
         confirm = button(page, '✓ Confirm'),
-        points = page.getByText('Available Stat Points').locator('xpath=..');
+        points = page.getByText('Available Points').locator('xpath=..');
     // The last made (TEST_CHARACTER): int and cha a point up, so none left.
     await expect(name).toHaveValue('Tess');
     await expect(points).toContainText('0');
@@ -134,7 +134,7 @@ test('species and background: those that fit nothing are disabled; choosing one 
     await species.selectOption('gnome');
     await expect(background).toHaveValue('tinker');
     await expect(page.getByText('Intelligence', {exact:true}).locator('xpath=..')).toContainText('13');
-    await expect(page.getByText('Available Stat Points').locator('xpath=..')).toContainText('2');
+    await expect(page.getByText('Available Points').locator('xpath=..')).toContainText('2');
     // An urchin is only human.
     await background.selectOption('urchin');
     await expect(species).toHaveValue('human');
@@ -166,7 +166,7 @@ test('the first time, with no character made before: no name, the first species 
     await expect(page.getByRole('textbox', {name:'Name', exact:true})).toHaveValue('');
     await expect(page.getByRole('combobox', {name:'Species'})).toHaveValue('human');
     await expect(page.getByRole('combobox', {name:'Background'})).toHaveValue('urchin');
-    await expect(page.getByText('Available Stat Points').locator('xpath=..')).toContainText('2');
+    await expect(page.getByText('Available Points').locator('xpath=..')).toContainText('2');
     await expect(page.getByText('Strength', {exact:true}).locator('xpath=..')).toContainText('10');
     await expect(button(page, '✓ Confirm')).toHaveClass(/disabled/);
 });

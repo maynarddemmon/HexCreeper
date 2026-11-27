@@ -205,7 +205,9 @@
                 }
                 if (jump) {
                     best = null;
-                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) this.game.spend(jump[0]);
+                    if (this.game.jumpPiece(jump[0], jump[1].x, jump[1].y)) {
+                        this.game.spend(jump[0]);
+                    }
                 }
             }
             if (best) {

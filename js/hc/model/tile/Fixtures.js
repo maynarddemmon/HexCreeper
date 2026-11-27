@@ -76,15 +76,12 @@
 (pkg => {
     'use strict';
     
-    const {Subtypes, hexDist} = pkg,
-        {isInt, isText, isPercent} = Subtypes,
-        
-        // The types of fixture
-        FIXTURE_HEAL = pkg.FIXTURE_HEAL = 'heal',
-        FIXTURE_HARM = pkg.FIXTURE_HARM = 'harm',
-        FIXTURE_LOOT = pkg.FIXTURE_LOOT = 'loot',
-        FIXTURE_FEATURE = pkg.FIXTURE_FEATURE = 'feature',
-        FIXTURE_TYPES = pkg.FIXTURE_TYPES = [FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE],
+    const {
+            Subtypes, hexDist,
+            FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, FIXTURE_TYPES, TILE_TYPE_FLOOR,
+            isNatNum, isIntOfAtLeast
+        } = pkg,
+        {isText, isPercent} = Subtypes,
         
         SHAPES = ['flat', 'ring', 'fade'],
         
@@ -95,7 +92,7 @@
                 show = {mode:'instant', range:0};
             } else if (v === 'hidden') {
                 show = {mode:'hidden', range:0};
-            } else if (isInt(v?.proximity)) {
+            } else if (isNatNum(v?.proximity)) {
                 show = {mode:'proximity', range:v.proximity};
             }
             return show;
@@ -104,9 +101,9 @@
         // n or {min, max}, as {min, max}.
         parseRange = v => {
             let range = null;
-            if (isInt(v)) {
+            if (isNatNum(v)) {
                 range = {min:v, max:v};
-            } else if (isInt(v?.min) && isInt(v?.max) && v.min <= v.max) {
+            } else if (isNatNum(v?.min) && isIntOfAtLeast(v?.max, v.min)) {
                 range = {min:v.min, max:v.max};
             }
             return range;
@@ -117,9 +114,9 @@
             let area = null;
             if (v === undefined) {
                 area = {radius:0, shape:'flat'};
-            } else if (isInt(v)) {
+            } else if (isNatNum(v)) {
                 area = {radius:v, shape:'flat'};
-            } else if (isInt(v?.radius) && (v.shape === undefined || SHAPES.includes(v.shape))) {
+            } else if (isNatNum(v?.radius) && (v.shape === undefined || SHAPES.includes(v.shape))) {
                 area = {radius:v.radius, shape:v.shape ?? 'flat'};
             }
             return area;
@@ -132,9 +129,9 @@
                 duration = {mode:'exhausted', n:0};
             } else if (v === 'once') {
                 duration = {mode:'once', n:1};
-            } else if (isInt(v?.count) && v.count >= 1) {
+            } else if (isIntOfAtLeast(v?.count, 1)) {
                 duration = {mode:'count', n:v.count};
-            } else if (isInt(v?.countdown) && v.countdown >= 1) {
+            } else if (isIntOfAtLeast(v?.countdown, 1)) {
                 duration = {mode:'countdown', n:v.countdown};
             }
             return duration;
@@ -218,7 +215,7 @@
                 },
                 ok = FIXTURE_TYPES.includes(own.type) && own.reveal && (feature || ((infinite || own.pool) && (wholePool ? !infinite : own.magnitude))) && own.showMagnitude &&
                     typeof own.showPool === 'boolean' && own.area && own.duration && state && material !== undefined &&
-                    (own.hp === null || (Number.isInteger(own.hp) && own.hp >= 1)) && own.coverage !== undefined && own.moveCost !== undefined &&
+                    (own.hp === null || isIntOfAtLeast(own.hp, 1)) && own.coverage !== undefined && own.moveCost !== undefined &&
                     (typeof own.coverage !== 'number' || isPercent(own.coverage)) &&
                     [e.floor, e.destroyInto, e.fillColor, e.borderColor].every(isText) &&
                     ['hex', 'door'].includes(own.shape) && typeof own.orientable === 'boolean' && own.actions && own.describe;
@@ -349,7 +346,9 @@
             const kind = this.fixtureType(f),
                 k = this.key(f.x, f.y);
             this.fixtures.delete(k);
-            if (pkg.floors.get(kind.floor)) this.tiles.set(k, this.makeTile(f.x, f.y, pkg.TILE_TYPE_FLOOR, kind.floor));
+            if (pkg.floors.get(kind.floor)) {
+                this.tiles.set(k, this.makeTile(f.x, f.y, TILE_TYPE_FLOOR, kind.floor));
+            }
             if (pkg.fixtures.get(kind.destroyInto)) {
                 const into = this.makeFixture(f.x, f.y, kind.destroyInto, this.rngFor('rolls', k, 'into', this.turn));
                 if (f.revealedAt != null) into.revealedAt = this.turn;
@@ -374,7 +373,9 @@
         fixtureSide: function(f, x, y) {
             const dir = pkg.hex.dirs.findIndex(([dx, dy]) => f.x + dx === x && f.y + dy === y);
             let side = null;
-            if (dir >= 0) side = this.fixtureType(f).orientable ? ['front', 'front', 'side', 'back', 'back', 'side'][(dir - f.facing + 6) % 6] : 'any';
+            if (dir >= 0) {
+                side = this.fixtureType(f).orientable ? ['front', 'front', 'side', 'back', 'back', 'side'][(dir - f.facing + 6) % 6] : 'any';
+            }
             return side;
         },
         
@@ -477,7 +478,9 @@
                     // One in the way shows once it's in sight, whatever its kind says.
                     reveal = this.fixtureBlocks(f.x, f.y) ? {mode:'instant', range:0} : kind.reveal;
                 if (f.revealedAt == null && finds(f, reveal)) f.revealedAt = this.turn;
-                if (f.revealedAt != null && !f.shown && finds(f, kind.showMagnitude)) f.shown = true;
+                if (f.revealedAt != null && !f.shown && finds(f, kind.showMagnitude)) {
+                    f.shown = true;
+                }
             }
         },
         

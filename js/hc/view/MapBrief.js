@@ -5,7 +5,7 @@
         {I18N:{get:i18n}, Text, global:{keys:globalKeys}} = M,
         
         {
-            WideView,
+            WideView, ICON_CHECKED,
             theme:{
                 padding, cornerRadius, rowHeight,
                 colorText, colorTextMuted, colorError, colorPanel,
@@ -36,7 +36,7 @@
             self.callSuper(parent, attrs);
             
             const footer = self.getFooterView();
-            footer.confirmBtn.setText(pkg.ICON_CHECKED + ' ' + i18n('btn-start'));
+            footer.confirmBtn.setText(ICON_CHECKED + ' ' + i18n('btn-start'));
             
             const container = self._container = new WideView(self.getContentView()),
                 textAttrs = {x:padding, width:PANEL_WIDTH - 2*padding, whiteSpace:'normal'};
@@ -91,7 +91,9 @@
                 let label = o.kind === 'goal' ? o.name : i18n('objective-penalty', o.name);
                 if (!o.required) label = i18n('objective-optional', label);
                 new Text(self._goals, {...textAttrs, text:label, fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
-                if (o.description) new Text(self._goals, {...textAttrs, text:o.description, fontSize:fontSizeSmall, textColor:colorTextMuted});
+                if (o.description) {
+                    new Text(self._goals, {...textAttrs, text:o.description, fontSize:fontSizeSmall, textColor:colorTextMuted});
+                }
             }
             self._goals.setVisible(objectives.length > 0);
             

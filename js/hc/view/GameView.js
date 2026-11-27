@@ -38,7 +38,9 @@
                         const margin = Math.min(size / 2 * pkg.cfg.FOLLOW_MARGIN / 100, size / 2 - 1);
                         if (pos < 0 || pos > size) return 0; // off screen: leave it
                         if (pos < margin) return -Math.ceil((margin - pos) / (step * cam.size));
-                        if (pos > size - margin) return Math.ceil((pos - (size - margin)) / (step * cam.size));
+                        if (pos > size - margin) {
+                            return Math.ceil((pos - (size - margin)) / (step * cam.size));
+                        }
                         return 0;
                     },
                     nx = steps(sx, V.W, stepX), ny = steps(sy, V.H, stepY);
@@ -147,7 +149,9 @@
                     return;
                 }
                 // A move, or a jump to a cell it can jump to (see jumpAt)
-                if (sel && (game.playerAct(sel, c.x, c.y) || (V.jumpAt(sel, c) && game.playerJump(sel, c.x, c.y)))) this.afterTurn();
+                if (sel && (game.playerAct(sel, c.x, c.y) || (V.jumpAt(sel, c) && game.playerJump(sel, c.x, c.y)))) {
+                    this.afterTurn();
+                }
             }
         },
         

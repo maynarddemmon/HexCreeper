@@ -61,7 +61,9 @@
                 let i = 0;
                 while (i < src.length) {
                     const open = src.indexOf('{', i), close = src.indexOf('}', i);
-                    if (close >= 0 && (open < 0 || close < open)) throw new Error(`Unmatched "}" at ${close}`);
+                    if (close >= 0 && (open < 0 || close < open)) {
+                        throw new Error(`Unmatched "}" at ${close}`);
+                    }
                     if (open < 0) {
                         parts.push(src.slice(i));
                         break;
@@ -101,18 +103,28 @@
             const objectives = [];
             for (const kind of ['goal', 'penalty']) {
                 const list = data?.[kind === 'goal' ? 'goals' : 'penalties'] ?? [];
-                if (!Array.isArray(list)) throw new Error(`"${kind === 'goal' ? 'goals' : 'penalties'}" must be a list`);
+                if (!Array.isArray(list)) {
+                    throw new Error(`"${kind === 'goal' ? 'goals' : 'penalties'}" must be a list`);
+                }
                 list.forEach((o, i) => {
                     const where = `${kind} ${i + 1}`;
-                    if (typeof o?.name !== 'string' || !o.name) throw new Error(`The ${where} needs a name`);
-                    if (o.description !== undefined && typeof o.description !== 'string') throw new Error(`The ${where}'s description must be text`);
-                    if (!isBool(o.lockOnSuccess) || !isBool(o.lockOnFailure) || !isBool(o.required)) throw new Error(`The ${where}'s lockOnSuccess, lockOnFailure and required must be true or false`);
+                    if (typeof o?.name !== 'string' || !o.name) {
+                        throw new Error(`The ${where} needs a name`);
+                    }
+                    if (o.description !== undefined && typeof o.description !== 'string') {
+                        throw new Error(`The ${where}'s description must be text`);
+                    }
+                    if (!isBool(o.lockOnSuccess) || !isBool(o.lockOnFailure) || !isBool(o.required)) {
+                        throw new Error(`The ${where}'s lockOnSuccess, lockOnFailure and required must be true or false`);
+                    }
                     try {
                         compile(o.expression);
                     } catch (err) {
                         throw new Error(`The ${where}'s expression: ${err.message}`, {cause:err});
                     }
-                    if (o.progress !== undefined && typeof o.progress !== 'string') throw new Error(`The ${where}'s progress must be text`);
+                    if (o.progress !== undefined && typeof o.progress !== 'string') {
+                        throw new Error(`The ${where}'s progress must be text`);
+                    }
                     try {
                         compileTemplate(o.progress ?? '');
                     } catch (err) {

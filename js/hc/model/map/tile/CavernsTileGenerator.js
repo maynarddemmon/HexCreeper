@@ -395,7 +395,9 @@
                 for (const [di, dj] of hex.dirs) {
                     const nk = (i + di) + ',' + (j + dj),
                         tk = CTG.tunnelKey(key, nk);
-                    if (n.edges.has(tk) && (carried && nk === parent.join() || nk !== parent?.join() && n.sites.get(nk).stream !== null)) n.wetEdges.add(tk);
+                    if (n.edges.has(tk) && (carried && nk === parent.join() || nk !== parent?.join() && n.sites.get(nk).stream !== null)) {
+                        n.wetEdges.add(tk);
+                    }
                 }
             }
         },
@@ -736,7 +738,9 @@
                 for (const p of points) {
                     sweep(p.x, p.y, p.reach, cells);
                     sweep(p.x, p.y, SPINE_RADIUS, spine);
-                    if (collapse && Math.abs(p.s - plugAt) <= collapseLength / 2) sweep(p.x, p.y, p.reach, plug);
+                    if (collapse && Math.abs(p.s - plugAt) <= collapseLength / 2) {
+                        sweep(p.x, p.y, p.reach, plug);
+                    }
                 }
                 this.tunnels.set(tk, {cells, spine, plug, path:points, strokes:points.map(p => [p.x, p.y, p.reach])});
             }
@@ -796,13 +800,17 @@
                             // It was drawn from here: turn it round, and count from the other end.
                             const total = path[path.length - 1].s;
                             path.reverse();
-                            for (let n = 0; n < path.length; n++) path[n] = {...path[n], s:total - path[n].s};
+                            for (let n = 0; n < path.length; n++) {
+                                path[n] = {...path[n], s:total - path[n].s};
+                            }
                         }
                         const end = back(0);
                         if (kind === 'lasso') {
                             draw(loop(rng, end.x, end.y, end.heading, 2 + rng() * 3, tangle), narrow);
                         } else if (kind === 'fork') {
-                            for (let n = 1 + floor(rng() * 3); n > 0; n--) branch(6, 4 + rng() * 5, narrow);
+                            for (let n = 1 + floor(rng() * 3); n > 0; n--) {
+                                branch(6, 4 + rng() * 5, narrow);
+                            }
                         } else if (kind === 'knot') {
                             for (let n = 2 + floor(rng() * 2); n > 0; n--) {
                                 const points = branch(3, 2 + rng() * 3, MIN_REACH);
@@ -990,7 +998,9 @@
             if (!t.water) {
                 const {streamWidth, tunnelWidthMax} = this.attrs;
                 t.water = new Set();
-                for (const [x, y, reach] of t.strokes) sweep(x, y, max(MIN_REACH, Math.min(reach, tunnelWidthMax / 2) * streamWidth / 100), t.water);
+                for (const [x, y, reach] of t.strokes) {
+                    sweep(x, y, max(MIN_REACH, Math.min(reach, tunnelWidthMax / 2) * streamWidth / 100), t.water);
+                }
             }
             return t.water;
         },
@@ -1129,7 +1139,9 @@
             for (const q of sites) {
                 for (const [di, dj] of hex.dirs) {
                     const n = [q[0] + di, q[1] + dj];
-                    if (inRange.has(n.join()) && this.hasTunnel(q, n)) tunnelKeys.add(pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()));
+                    if (inRange.has(n.join()) && this.hasTunnel(q, n)) {
+                        tunnelKeys.add(pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()));
+                    }
                 }
             }
             return {
@@ -1153,7 +1165,9 @@
                 sites = hex.disk(...this.siteOf(x, y), this.siteReach).map(q => [q.x, q.y]);
             for (const q of sites) {
                 const keys = this.cavern(...q);
-                if (keys.has(k)) return {kind:'cavern', id:'cavern ' + q.join(), cells:keys, size:keys.size, start:keys.has('0,0')};
+                if (keys.has(k)) {
+                    return {kind:'cavern', id:'cavern ' + q.join(), cells:keys, size:keys.size, start:keys.has('0,0')};
+                }
             }
             const inRange = new Set(sites.map(q => q.join()));
             for (const q of sites) {
@@ -1162,11 +1176,15 @@
                     if (inRange.has(n.join()) && this.hasTunnel(q, n)) {
                         const tk = pkg.CavernsTileGenerator.tunnelKey(q.join(), n.join()),
                             t = this.tunnel(tk);
-                        if (t.cells.has(k)) return {kind:'tunnel', id:'tunnel ' + tk, cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                        if (t.cells.has(k)) {
+                            return {kind:'tunnel', id:'tunnel ' + tk, cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                        }
                     }
                 }
                 for (const [name, t] of [['dead end', this.deadEndShape(...q)], ['loop', this.cavernLoop(...q)]]) {
-                    if (t?.cells.has(k)) return {kind:'tunnel', id:name + ' ' + q.join(), cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                    if (t?.cells.has(k)) {
+                        return {kind:'tunnel', id:name + ' ' + q.join(), cells:t.cells, size:t.cells.size, start:t.cells.has('0,0')};
+                    }
                 }
             }
             return null;
@@ -1175,7 +1193,9 @@
         /*  Makes the tiles of the cells of region (from regionAt), and those round them, if
             they're not made yet: so what's open there is known, as before spawning there. */
         makeRegion: function(region) {
-            for (const k of region.cells) this.makeBlock(...this.blocks.of(...k.split(',').map(Number)));
+            for (const k of region.cells) {
+                this.makeBlock(...this.blocks.of(...k.split(',').map(Number)));
+            }
         },
         
         // ---- Making cells ----

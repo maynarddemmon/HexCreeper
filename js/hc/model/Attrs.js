@@ -4,7 +4,7 @@
 (pkg => {
     'use strict';
     
-    const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v),
+    const {isObj, isIntBetween} = pkg,
         
         // The functions an expr attr's formula can call: JavaScript's Math functions (max,
         // floor, pow, sign, hypot...), all but random, since a formula gives the same for
@@ -29,7 +29,9 @@
                 let i = 0;
                 const peek = () => tokens[i],
                     take = t => {
-                        if (tokens[i] !== t) throw new Error('expected ' + t + (tokens[i] ? ' at ' + tokens[i] : ' at the end'));
+                        if (tokens[i] !== t) {
+                            throw new Error('expected ' + t + (tokens[i] ? ' at ' + tokens[i] : ' at the end'));
+                        }
                         i++;
                     },
                     binary = (next, ops) => () => {
@@ -65,7 +67,9 @@
                         if (t === 'Math' && peek() === '.') {
                             i++;
                             name = tokens[i++];
-                            if (!Object.hasOwn(FUNCTIONS, name ?? '') || peek() !== '(') throw new Error('no function Math.' + (name ?? ''));
+                            if (!Object.hasOwn(FUNCTIONS, name ?? '') || peek() !== '(') {
+                                throw new Error('no function Math.' + (name ?? ''));
+                            }
                         }
                         if (name) {
                             if (peek() === '(') {
@@ -126,8 +130,8 @@
         // Whether value is a tiers attr's list of tiers: [{min, max?, table}], min and max
         // whole numbers (max no less than min), and table as a table attr's value.
         isTiers = (def, value) => Array.isArray(value) && value.length > 0 && value.every(t => isObj(t) &&
-            Number.isInteger(t.min) && (t.max === undefined || (Number.isInteger(t.max) && t.max >= t.min)) &&
-            isObj(t.table) && Object.entries(t.table).every(([k, w]) => isOption(def, k) && Number.isInteger(w) && w >= 0 && w <= 1000)),
+            Number.isInteger(t.min) && (t.max === undefined || isIntBetween(t.max, t.min)) &&
+            isObj(t.table) && Object.entries(t.table).every(([k, w]) => isOption(def, k) && isIntBetween(w, 0, 1000))),
         
         // Whether value is one of a choice or table attr's options (anything, before the
         // options are known).
@@ -147,11 +151,13 @@
             } else if (def.type === 'choice') {
                 if (typeof value === 'string' && isOption(def, value)) retval = value;
             } else if (def.type === 'table') {
-                if (isObj(value) && Object.entries(value).every(([k, w]) => isOption(def, k) && Number.isInteger(w) && w >= 0 && w <= 1000)) {
+                if (isObj(value) && Object.entries(value).every(([k, w]) => isOption(def, k) && isIntBetween(w, 0, 1000))) {
                     retval = {...value};
                 }
             } else if (def.type === 'expr') {
-                if (typeof value === 'string' && !(compile(value, def.names) instanceof Error)) retval = value;
+                if (typeof value === 'string' && !(compile(value, def.names) instanceof Error)) {
+                    retval = value;
+                }
             } else if (def.type === 'tiers') {
                 if (isTiers(def, value)) retval = value.map(t => ({...t, table:{...t.table}}));
             } else {

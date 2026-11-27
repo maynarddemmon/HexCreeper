@@ -60,7 +60,7 @@ test('the sheet spends stat points: + and −, what would change in green, Confi
     const raise = stat => page.getByRole('button', {name:'Raise ' + stat}),
         lower = stat => page.getByRole('button', {name:'Lower ' + stat}),
         confirm = button(page, '✓ Confirm'),
-        points = page.getByText('Available Stat Points').locator('xpath=..');
+        points = page.getByText('Available Points').locator('xpath=..');
     await expect(points).toContainText('2');
     await expect(lower('Strength')).toHaveClass(/disabled/);   // not below what it was
     await expect(confirm).toHaveClass(/disabled/);
@@ -94,7 +94,7 @@ test('Cancel puts the points back; without points the sheet only shows, with Clo
     })).toEqual([wil, {available:2, spent:0}]);
     await page.evaluate(() => {hc.app.game.getPlayerCore().statPoints.available = 0;});
     await page.keyboard.press('i');
-    await expect(page.getByText('Available Stat Points')).toBeHidden();
+    await expect(page.getByText('Available Points')).toBeHidden();
     await expect(page.getByRole('button', {name:'Raise Will'})).toBeHidden();
     await expect(button(page, '✗ Cancel')).toBeHidden();
     await button(page, 'X Close').click();
@@ -109,7 +109,7 @@ test('Character is first in the menu, and pulses while the piece has points to s
     await levelUp(page);
     await expect(item).toHaveClass(/attention/);
     await item.click();
-    await expect(page.getByText('Available Stat Points')).toBeVisible();
+    await expect(page.getByText('Available Points')).toBeVisible();
 });
 
 test('a piece of yours with points to spend has an arrow up over it, in the level up colour', async ({page}) => {

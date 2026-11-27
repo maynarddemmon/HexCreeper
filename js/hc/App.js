@@ -48,14 +48,15 @@
             cfg:{
                 DATA_BASE_DIR, HEADER_HEIGHT, FOOTER_HEIGHT, GITHUB_URL
             },
-            ICON_SEPARATOR,
+            ICON_SEPARATOR, ICON_CANCEL,
+            TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, PLAYER_MOVE_MODES,
             formatAp, formatXp,
             VAR_XP, VAR_LEVEL
         } = pkg,
         
         {game, draw} = V,
         
-        I18N_CLOSE_BTN = pkg.ICON_CANCEL + ' ' + i18n('btn-close'),
+        I18N_CLOSE_BTN = ICON_CANCEL + ' ' + i18n('btn-close'),
         GITHUB_MARK_URL = './img/github-mark.svg',
         
         // Help //
@@ -534,12 +535,16 @@
             if (did) {
                 gameView.afterTurn();
                 if (did !== 'form' && did !== 'open') nav.visited.add(game.swarmKey(p));
-                if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) stop = 'nav-arrived';
+                if (nav.kind === 'goto' && p.x === nav.target[0] && p.y === nav.target[1]) {
+                    stop = 'nav-arrived';
+                }
             }
             stop ||= navStopReason();
             // A step (or a door opened) that leaves the piece without the points for another
             // ends the turn with it (so the turn is one beat, below).
-            if (!stop && (did === 'step' || did === 'open') && game.turn === turn && !game.canMove(p)) endTurn();
+            if (!stop && (did === 'step' || did === 'open') && game.turn === turn && !game.canMove(p)) {
+                endTurn();
+            }
             if (stop) {
                 stopNav(stop === 'nav-over' ? '' : stop);
             } else {
@@ -774,7 +779,9 @@
                 update: function() {
                     let status = '';
                     // Why going stopped gives way once you point at another cell.
-                    if (navNote && !(V.hover?.x === navNoteAt?.x && V.hover?.y === navNoteAt?.y)) navNote = '';
+                    if (navNote && !(V.hover?.x === navNoteAt?.x && V.hover?.y === navNoteAt?.y)) {
+                        navNote = '';
+                    }
                     if (V.placeMode) {
                         status = i18n('status-place');
                     } else if (V.attachMode) {
@@ -802,15 +809,17 @@
                             enemy = at?.owner === 'enemy' && pkg.enemies.get(at.enemyId ?? 'creeper'),
                             sel = game.getSelected(),
                             tile = game.tileAt(V.hover.x, V.hover.y),
-                            solid = tile?.kind === pkg.TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
+                            solid = tile?.kind === TILE_TYPE_SOLID ? pkg.solids.get(tile.subtype) : null,
                             fixture = game.fixtureAt(V.hover.x, V.hover.y),
-                            other = fixture ? game.fixtureType(fixture) : tile?.kind === pkg.TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : null,
+                            other = fixture ? game.fixtureType(fixture) : tile?.kind === TILE_TYPE_HOLE ? pkg.holes.get(tile.subtype) : null,
                             known = !game.cellsInSight() || game.seenCells.has(game.key(V.hover.x, V.hover.y));
                         if (enemy && (!game.cellsInSight() || game.cellsInSight().has(game.key(V.hover.x, V.hover.y)))) {
                             // With one of your pieces selected, then how it and the enemy
                             // would do against each other.
                             status = enemy.description ? i18n('status-tile', enemy.name, enemy.description) : enemy.name;
-                            if (formatEffects(at)) status = i18n('status-tile', status, formatEffects(at));
+                            if (formatEffects(at)) {
+                                status = i18n('status-tile', status, formatEffects(at));
+                            }
                             if (sel?.owner === 'player') {
                                 status = i18n('status-odds', status, game.hitChance(sel, at), formatRange(game.damageAgainst(sel, at)),
                                     game.hitChance(at, sel), formatRange(game.damageAgainst(at, sel)));
@@ -818,24 +827,30 @@
                         } else if (known) {
                             if (solid) {
                                 status = i18n('status-solid', solid.name, solid.material.name, tile.hp, solid.hp, solid.dr);
-                                if (solid.opacity < 100) status += i18n('status-opacity', Math.round(solid.opacity));
+                                if (solid.opacity < 100) {
+                                    status += i18n('status-opacity', Math.round(solid.opacity));
+                                }
                             } else if (fixture?.hp != null && other.material) {
                                 // A fixture that can be broken: as a solid, and how much it
                                 // blocks sight if it does.
                                 const opacity = game.fixtureOpacity(fixture);
                                 status = i18n('status-solid', other.name, other.material.name, fixture.hp, other.hp, other.material.hardness);
-                                if (opacity > 0 && opacity < 100) status += i18n('status-opacity', Math.round(opacity));
+                                if (opacity > 0 && opacity < 100) {
+                                    status += i18n('status-opacity', Math.round(opacity));
+                                }
                             } else if (other) {
                                 status = other.description ? i18n('status-tile', other.name, other.description) : other.name;
                             }
                             // A fixture's state, in words (a door's "shut, barred": see
                             // Fixtures.fixtureDescription).
                             const words = fixture ? game.fixtureDescription(fixture) : [];
-                            if (words.length) status = i18n('status-tile', status, words.join(', '));
+                            if (words.length) {
+                                status = i18n('status-tile', status, words.join(', '));
+                            }
                             // A floor (a floor tile, or the map's base floor where there's no
                             // tile): what it is and, if it isn't 1, what a step onto it costs
                             // (after any fixture on it).
-                            const floor = tile?.kind === pkg.TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : !tile ? game.baseFloor() : null;
+                            const floor = tile?.kind === TILE_TYPE_FLOOR ? pkg.floors.get(tile.subtype) : !tile ? game.baseFloor() : null;
                             if (floor) {
                                 // (Times a fixture's you know of, if it isn't in the way.)
                                 const cost = fixture && !game.fixtureBlocks(fixture.x, fixture.y) ? floor.moveCost * game.fixtureValue(fixture, 'moveCost') : floor.moveCost,
@@ -954,7 +969,7 @@
             }]);
             modeBtn = new Btn(ftrView, {text:i18n('btn-mode', i18n('mode-fixed')), fontSize:fontSizeMedium, tooltip:i18n('tip-mode')}, [{
                 doActivated: () => {
-                    const modes = pkg.PLAYER_MOVE_MODES;
+                    const modes = PLAYER_MOVE_MODES;
                     game.moveMode = modes[(modes.indexOf(game.moveMode) + 1) % modes.length];
                     draw();
                 }
@@ -1254,7 +1269,9 @@
                     cancelModes();
                     return;
                 }
-                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.attackMode || V.useMode || V.useChoice || V.gotoMode) return;
+                if (V.placeMode || V.attachMode || V.swapMode || V.jumpMode || V.attackMode || V.useMode || V.useChoice || V.gotoMode) {
+                    return;
+                }
                 if (k === 'Enter') {
                     // Opens the selected piece's menu, its first item focused.
                     if (game.getSelected()) {

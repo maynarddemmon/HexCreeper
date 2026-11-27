@@ -120,7 +120,9 @@
                         if (t.value === 'true') return () => true;
                         if (t.value === 'false') return () => false;
                         if (isOp('(')) {
-                            if (!functions.includes(t.value)) throw new Error(`Unknown function "${t.value}" at ${t.at}`);
+                            if (!functions.includes(t.value)) {
+                                throw new Error(`Unknown function "${t.value}" at ${t.at}`);
+                            }
                             pos++;
                             const args = [];
                             if (!isOp(')')) {
@@ -129,7 +131,9 @@
                             expect(')');
                             return () => scope.call(t.value, args.map(a => a()));
                         }
-                        if (!names.includes(t.value)) throw new Error(`Unknown name "${t.value}" at ${t.at}`);
+                        if (!names.includes(t.value)) {
+                            throw new Error(`Unknown name "${t.value}" at ${t.at}`);
+                        }
                         return () => scope.value(t.value);
                     }
                     if (isOp('(')) {

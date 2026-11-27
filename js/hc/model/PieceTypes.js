@@ -31,7 +31,9 @@
                 ctx.stroke();
             } else {
                 const outer = R * 0.85, inner = outer * (rank === 5 ? 0.4 : 0.55);
-                for (let i = 0; i < 2 * rank; i++) ctx.lineTo(...at(i % 2 ? inner : outer, i * PI / rank));
+                for (let i = 0; i < 2 * rank; i++) {
+                    ctx.lineTo(...at(i % 2 ? inner : outer, i * PI / rank));
+                }
                 ctx.closePath();
                 ctx.fill();
             }

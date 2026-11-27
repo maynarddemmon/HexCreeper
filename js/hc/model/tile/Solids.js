@@ -25,7 +25,7 @@
 (pkg => {
     'use strict';
     
-    const {Subtypes} = pkg,
+    const {Subtypes, isIntOfAtLeast} = pkg,
         {isNum, isText, isPercent} = Subtypes,
         
         // {id:{name, hardness, density, opacity, description}}
@@ -41,7 +41,7 @@
         parseSolid = s => {
             const material = materials.get(s.composition);
             let own = null;
-            if (material && Number.isInteger(s.hp) && s.hp >= 1 && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor) && isLength(s.shadowLength) && isText(s.floor)) {
+            if (material && isIntOfAtLeast(s.hp, 1) && isPercent(s.coverage) && isText(s.fillColor) && isText(s.borderColor) && isLength(s.shadowLength) && isText(s.floor)) {
                 const coverage = s.coverage ?? 100;
                 own = {
                     composition:s.composition, hp:s.hp, coverage,

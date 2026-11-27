@@ -7,7 +7,7 @@
         {I18N:{get:i18n}, Text} = M,
         
         {
-            WideView, UnderlineBtn,
+            WideView, UnderlineBtn, ICON_CANCEL,
             theme:{
                 spacing, padding, rowHeight,
                 colorTextMuted,
@@ -71,7 +71,7 @@
             self.callSuper(parent, attrs);
             
             self.setTitle(i18n('dlg-maps-title'));
-            self.getFooterView().ackBtn.setText(pkg.ICON_CANCEL + ' ' + i18n('btn-close'));
+            self.getFooterView().ackBtn.setText(ICON_CANCEL + ' ' + i18n('btn-close'));
             
             self._container = new WideView(self.getContentView());
             self._rows = [];

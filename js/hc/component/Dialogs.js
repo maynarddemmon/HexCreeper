@@ -12,7 +12,7 @@
         {I18N:{get:i18n}, PaddedText, global:{keys:globalKeys}} = M,
         
         {
-            UnderlineBtn,
+            UnderlineBtn, ICON_CHECKED, ICON_UNCHECKED,
             theme:{
                 spacing, padding, cornerRadius,
                 colorPanel, colorPanelFooter, colorSuccess, colorError,
@@ -29,8 +29,8 @@
         REF_ID_CANCEL_FUNC = 'cnclFunc',
         REF_ID_CONFIRM_FUNC = 'confFunc',
         
-        DEFAULT_CONFIRM_LABEL = pkg.ICON_CHECKED + ' ' + i18n('btn-confirm'),
-        DEFAULT_CANCEL_LABEL = pkg.ICON_UNCHECKED + ' ' + i18n('btn-cancel'),
+        DEFAULT_CONFIRM_LABEL = ICON_CHECKED + ' ' + i18n('btn-confirm'),
+        DEFAULT_CANCEL_LABEL = ICON_UNCHECKED + ' ' + i18n('btn-cancel'),
         DEFAULT_ACK_LABEL = i18n('btn-acknowledge'),
         
         // Every ModalDialog showing now, so the game can ignore its keys meanwhile.

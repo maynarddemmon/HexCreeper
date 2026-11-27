@@ -22,9 +22,6 @@
 
     const {Subtypes} = pkg;
     
-    pkg.EFFECT_EXHAUSTED = 'exhausted';
-    pkg.EFFECT_RALLYING = 'rallying';
-    pkg.EFFECT_RALLIED = 'rallied';
     pkg.effects = new Subtypes('effect', e => ({icon:typeof e.icon === 'string' ? e.icon : '', muted:e.muted === true, hidden:e.hidden === true}));
     
     pkg.Effects = new JS.Module('Effects', {

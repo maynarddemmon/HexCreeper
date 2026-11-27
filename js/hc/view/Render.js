@@ -9,7 +9,7 @@
         
         {
             cfg:{PIECE_R, CORE_BORDER, RING_GAP, ANIM, SHADOW, HEADER_HEIGHT, FOOTER_HEIGHT},
-            TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
+            TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT, FIXTURE_FEATURE,
             PIECE_TYPES,
             AP_UNIT
         } = pkg,
@@ -437,7 +437,7 @@
         // A fixture (Fixtures.js): heal, harm, loot or a feature, once it's revealed. Over
         // its tile.
         drawFixture = t => {
-            if (t.revealedAt != null && t.type === pkg.FIXTURE_FEATURE) {
+            if (t.revealedAt != null && t.type === FIXTURE_FEATURE) {
                 drawFeature(t);
             } else if (t.revealedAt != null) {
                 const s = cam.size,
@@ -501,10 +501,16 @@
                     ctx.fillText(text, x, y);
                 };
             ctx.fillStyle = ink;
-            if (t.shown) label(String(t.magnitude ?? t.pool), cx + s * lx, cy + s * ly, 'right', 'bottom', 0.22);
+            if (t.shown) {
+                label(String(t.magnitude ?? t.pool), cx + s * lx, cy + s * ly, 'right', 'bottom', 0.22);
+            }
             ctx.globalAlpha = 0.75;
-            if (type.showPool) label(t.pool == null ? '∞' : String(t.pool), cx - s * lx, cy + s * ly, 'left', 'bottom', 0.18);
-            if (turnsLeft != null) label(String(turnsLeft), cx + s * lx, cy - s * ly, 'right', 'top', 0.18);
+            if (type.showPool) {
+                label(t.pool == null ? '∞' : String(t.pool), cx - s * lx, cy + s * ly, 'left', 'bottom', 0.18);
+            }
+            if (turnsLeft != null) {
+                label(String(turnsLeft), cx + s * lx, cy - s * ly, 'right', 'top', 0.18);
+            }
             ctx.globalAlpha = 1;
         },
         
@@ -688,7 +694,9 @@
                     const kind = pkg.effects.get(e.id);
                     return [kind && !kind.muted && !kind.hidden ? kind.icon : '', '--effect-icon'];
                 });
-            if (p.owner === 'player' && p.statPoints?.available > 0) icons.unshift([STAT_POINTS_ICON, '--level-up']);
+            if (p.owner === 'player' && p.statPoints?.available > 0) {
+                icons.unshift([STAT_POINTS_ICON, '--level-up']);
+            }
             let x = cx - s / 2;
             for (const [name, color] of icons) {
                 const path = name ? iconPath(name) : null;
@@ -790,7 +798,9 @@
         if (SHADOW.on) drawHoleShadows(tilesShown);
         
         // Heals, harms, loot and features (fixtures), over their tiles
-        for (const f of game.fixtures.values()) if (inView(f.x, f.y) && isKnown(f.x, f.y)) drawFixture(f);
+        for (const f of game.fixtures.values()) {
+            if (inView(f.x, f.y) && isKnown(f.x, f.y)) drawFixture(f);
+        }
         
         // The area of the heal, harm or loot under the pointer, if it reaches past it.
         const hoverFixture = V.hover && game.fixtureAt(V.hover.x, V.hover.y);
@@ -829,24 +839,34 @@
         
         if (V.placeMode && sel) {
             // The cells next to the selected piece a piece could be placed on.
-            for (const q of game.placeCells(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
+            for (const q of game.placeCells(sel)) {
+                fillCell(q.x, q.y, sameCell(V.hover, q) ? '--place-hover' : '--place');
+            }
         } else if (V.jumpMode && sel) {
             // The cells the selected piece can jump to.
             fillCell(sel.x, sel.y, '--sel-bg');
-            for (const q of game.jumpTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+            for (const q of game.jumpTargets(sel)) {
+                fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+            }
             if (V.jumpAt(sel, V.hover)) ghost = [[sel.id, V.hover.x, V.hover.y]];
         } else if (V.useMode && sel) {
             // The cells with a fixture the selected piece can do something to.
             fillCell(sel.x, sel.y, '--sel-bg');
-            for (const q of game.useTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+            for (const q of game.useTargets(sel)) {
+                fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+            }
         } else if (V.attackMode && sel) {
             // The cells the selected piece can attack.
             fillCell(sel.x, sel.y, '--sel-bg');
-            for (const q of game.attackTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--attack-hover' : '--attack');
+            for (const q of game.attackTargets(sel)) {
+                fillCell(q.x, q.y, sameCell(V.hover, q) ? '--attack-hover' : '--attack');
+            }
         } else if ((V.attachMode || V.swapMode) && sel) {
             // The pieces the selected one can attach to, or swap with.
             fillCell(sel.x, sel.y, '--sel-bg');
-            for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) linkTargets.add(p.id);
+            for (const p of V.attachMode ? game.attachTargets(sel) : game.swapTargets(sel)) {
+                linkTargets.add(p.id);
+            }
             const q = V.swapMode && V.swapAt(sel, V.hover);
             if (q) ghost = [[sel.id, q.x, q.y], [q.id, sel.x, sel.y]];
         } else if (sel) {
@@ -874,7 +894,9 @@
             // With Alt held, the pieces it can swap with (an Alt-click swaps), and over one,
             // the two as ghosts in each other's cells.
             if (V.alt) {
-                for (const q of game.swapTargets(sel)) fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+                for (const q of game.swapTargets(sel)) {
+                    fillCell(q.x, q.y, sameCell(V.hover, q) ? '--move-hover' : '--move');
+                }
                 const q = V.swapAt(sel, V.hover);
                 if (q) ghost = [[sel.id, q.x, q.y], [q.id, sel.x, sel.y]];
             }
@@ -891,7 +913,9 @@
                 if (type) fillCell(x, y, '--' + type + '-hover');
             }
             // Show every enemy a group attack would hit
-            if (hoverHits) for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
+            if (hoverHits) {
+                for (const h of hoverHits) if (!sameCell(h.target, V.hover)) fillCell(h.target.x, h.target.y, '--attack-hover');
+            }
         }
         
         // Origin marker
@@ -955,12 +979,16 @@
             if (par) {
                 const a = placeOf(p),
                     b = placeOf(par);
-                if (a.seen || b.seen) drawLink(a, b, '--enemy-link', chain(p), a.seen ? (b.seen ? null : 'to') : 'from', linkEndOf(p), linkEndOf(par));
+                if (a.seen || b.seen) {
+                    drawLink(a, b, '--enemy-link', chain(p), a.seen ? (b.seen ? null : 'to') : 'from', linkEndOf(p), linkEndOf(par));
+                }
             }
         }
         for (const p of game.piecesOf('player')) {
             const par = game.parent(p);
-            if (par) drawLink(placeOf(p), placeOf(par), selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p), null, linkEndOf(p), linkEndOf(par));
+            if (par) {
+                drawLink(placeOf(p), placeOf(par), selGroupIds.has(p.id) && p.id !== game.selectedId ? '--sel-link' : '--link', chain(p), null, linkEndOf(p), linkEndOf(par));
+            }
         }
         // The link a piece placed on the hovered cell would have
         if (V.placeMode && sel && V.hover && game.placeCells(sel).some(q => sameCell(q, V.hover))) {

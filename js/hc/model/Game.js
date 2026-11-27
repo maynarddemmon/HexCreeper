@@ -11,7 +11,9 @@
         },
         TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_TYPES,
         hex:{keysNear, lineCellInto},
-        hexDist, PIECE_TYPES
+        hexDist, PIECE_TYPES,
+        PLAYER_MOVE_MODES, COST_VARS,
+        attrs:{evaluate}
     } = pkg,
         
         // Cells along the two sides of a line of sight (see canSee), filled in each time.
@@ -77,7 +79,9 @@
             this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
-            if (this.character && !this.characterProblem(this.character)) this.makeCharacter(core, this.character);
+            if (this.character && !this.characterProblem(this.character)) {
+                this.makeCharacter(core, this.character);
+            }
             this.recomputeRanks();
             core.hp = core.maxHp;
             core.ap = this.actionCost(core); // so it can act on the first turn
@@ -213,7 +217,7 @@
             this.enemyAI = enemyAI;
             this.seenCells = new Set(o.seenCells);
             this.initiativeTurn = Number.isInteger(o.initiativeTurn) ? o.initiativeTurn : null;
-            this.moveMode = pkg.PLAYER_MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
+            this.moveMode = PLAYER_MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             this.rules = rules;
@@ -327,7 +331,9 @@
         removePiece: function(piece) {
             this.pieces.delete(piece.id);
             this.board.delete(this.key(piece.x, piece.y));
-            if (this.selectedId === piece.id) this.selectedId = this.pieces.has(this.playerCoreId) ? this.playerCoreId : null;
+            if (this.selectedId === piece.id) {
+                this.selectedId = this.pieces.has(this.playerCoreId) ? this.playerCoreId : null;
+            }
         },
         
         pieceAt: function(x, y) {
@@ -348,7 +354,9 @@
         recomputeRanks: function() {
             const all = [...this.pieces.values()],
                 kids = new Map(all.map(p => [p.id, []]));
-            for (const p of all) if (p.parentId && kids.has(p.parentId)) kids.get(p.parentId).push(p);
+            for (const p of all) {
+                if (p.parentId && kids.has(p.parentId)) kids.get(p.parentId).push(p);
+            }
             const memo = new Map(),
                 rankOf = p => {
                     if (memo.has(p.id)) return memo.get(p.id);
@@ -400,7 +408,9 @@
                 out = [];
             for (const [dx, dy] of PIECE_TYPES[piece.type].steps(piece)) {
                 const r = this.resolveStep(view, piece.id, dx, dy, mode);
-                if (r && !(mine && !this.canAfford(piece, this.moveCost(piece, r)))) out.push({x:piece.x + dx, y:piece.y + dy, dx, dy, mode, ...r});
+                if (r && !(mine && !this.canAfford(piece, this.moveCost(piece, r)))) {
+                    out.push({x:piece.x + dx, y:piece.y + dy, dx, dy, mode, ...r});
+                }
             }
             return out;
         },
@@ -454,9 +464,13 @@
             for (const h of hits) {
                 if (this.pieces.has(h.attacker.id)) {
                     if (h.solid) {
-                        if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) broken++;
+                        if (this.tiles.get(this.key(h.target.x, h.target.y)) === h.target && this.damageSolid(h.target, h.attacker)) {
+                            broken++;
+                        }
                     } else if (h.fixture) {
-                        if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) broken++;
+                        if (this.fixtures.get(this.key(h.target.x, h.target.y)) === h.target && this.damageFixture(h.target, h.attacker)) {
+                            broken++;
+                        }
                     } else if (this.pieces.has(h.target.id)) {
                         const lost = this.strike(h.attacker, h.target);   // includes pieces linked below the target
                         kills += lost.length;
@@ -498,7 +512,9 @@
             }
             // A burst where each was. `piece` keeps it drawn until then, since in the enemies'
             // turn that can be after it's gone (see actionStart).
-            for (const g of lost.slice(1)) this.fx(g.x, g.y, '', col, {burst:true, delay:80, piece:{...g}});
+            for (const g of lost.slice(1)) {
+                this.fx(g.x, g.y, '', col, {burst:true, delay:80, piece:{...g}});
+            }
             this.fx(target.x, target.y, '', col, {burst:true, piece:{...target}});
             if (lost.some(g => g.id === this.playerCoreId)) this.endGame('lost');
             this.recomputeRanks();
@@ -572,7 +588,7 @@
         /*  A cost rule's formula (placeCost: see Settings.js), of your
             core's level, your highest and your pieces' levels together, rounded down. */
         costRule: function(rule) {
-            return Math.floor(pkg.attrs.evaluate(this.rules[rule], pkg.COST_VARS,
+            return Math.floor(evaluate(this.rules[rule], COST_VARS,
                 {coreLevel:this.coreLevel(), maxLevel:this.maxLevel(), levels:this.totalLevels()})) || 0;
         },
         // Empty cells adjacent to at least one player piece.
@@ -586,7 +602,9 @@
                     const x = p.x + dx,
                         y = p.y + dy,
                         k = this.key(x, y);
-                    if (seen.has(k) || !this.isOpen(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) continue;
+                    if (seen.has(k) || !this.isOpen(x, y) || this.pieceAt(x, y) || this.isHarm(x, y)) {
+                        continue;
+                    }
                     seen.add(k);
                     out.push({x, y});
                 }
@@ -598,7 +616,9 @@
         
         playerPlace: function(x, y, parent) {
             if (this.over || !this.canAffordPlace()) return false;
-            if (!this.isOpen(x, y) || this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) return false;
+            if (!this.isOpen(x, y) || this.pieceAt(x, y) || !parent || parent.owner !== 'player' || hexDist(parent, { x, y }) !== 1) {
+                return false;
+            }
             const cost = this.placeCost();
             this.gold -= cost;
             const p = this.addPiece('core', 'player', x, y, parent.id),
@@ -657,7 +677,9 @@
                 if (!kids.length) return null;
                 const deficit = k => k.maxHp - k.hp;
                 const damaged = kids.filter(k => deficit(k) > 0);
-                if (damaged.length) return damaged.reduce((a, b) => deficit(b) > deficit(a) ? b : a);
+                if (damaged.length) {
+                    return damaged.reduce((a, b) => deficit(b) > deficit(a) ? b : a);
+                }
                 const branch = k => this.group(k).reduce((sum, g) => sum + deficit(g), 0);
                 const best = kids.reduce((a, b) => branch(b) > branch(a) ? b : a);
                 if (branch(best) === 0) return null;
@@ -844,7 +866,9 @@
                 costAt = (x, y) => {
                     const nk = numKey(x, y);
                     let v = costs.get(nk);
-                    if (v === undefined) costs.set(nk, v = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y))) + (openDoors && !this.isOpen(x, y) ? TENTHS : 0));
+                    if (v === undefined) {
+                        costs.set(nk, v = Math.max(1, Math.round(TENTHS * this.moveCostAt(x, y))) + (openDoors && !this.isOpen(x, y) ? TENTHS : 0));
+                    }
                     return v;
                 },
                 kinds = new Map(),    // numeric key -> OPEN (open and not harm you know of), SOLID, or 0
@@ -882,13 +906,17 @@
                     // (Out from your pieces: a piece at the next cell would step onto this one.)
                     if (dist.get(numKey(x, y)) === d && d < far) {
                         const step = costAt(x, y);
-                        for (let s = 0; s < steps.length; s += 2) reach(x + steps[s], y + steps[s + 1], d + step);
+                        for (let s = 0; s < steps.length; s += 2) {
+                            reach(x + steps[s], y + steps[s + 1], d + step);
+                        }
                         // Only over gaps, as enemies jump (see jumpCells): elsewhere walking is
                         // as quick. A jump can't pass over solids only (see canJumpOver).
                         for (let j = 0; j < jumpSteps.length; j += 6) {
                             const ka = kindAt(x + jumpSteps[j + 2], y + jumpSteps[j + 3]),
                                 kb = kindAt(x + jumpSteps[j + 4], y + jumpSteps[j + 5]);
-                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) reach(x + jumpSteps[j], y + jumpSteps[j + 1], d + 2 * TENTHS);
+                            if ((ka !== SOLID || kb !== SOLID) && ka !== OPEN && kb !== OPEN) {
+                                reach(x + jumpSteps[j], y + jumpSteps[j + 1], d + 2 * TENTHS);
+                            }
                         }
                     }
                 }
@@ -946,7 +974,9 @@
         
         // The squad's action is done: its next starts when this one has played.
         endAction: function() {
-            if (this.track != null && this.openAction) this.trackEnds.set(this.track, this.openAction.t0 + this.openAction.dur);
+            if (this.track != null && this.openAction) {
+                this.trackEnds.set(this.track, this.openAction.t0 + this.openAction.dur);
+            }
             this.openAction = null;
         },
         

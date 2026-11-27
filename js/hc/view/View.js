@@ -16,7 +16,9 @@
         
         cssCache = {},
         css = name => {
-            if (!(name in cssCache)) cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            if (!(name in cssCache)) {
+                cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            }
             return cssCache[name];
         },
         

@@ -64,7 +64,9 @@
                 const c = state?.chance?.[kind];
                 if (Number.isFinite(c)) this.chance[kind] = Math.min(100, Math.max(0, c));
             }
-            if (Array.isArray(state?.entered)) this.entered = new Set(state.entered.filter(id => typeof id === 'string'));
+            if (Array.isArray(state?.entered)) {
+                this.entered = new Set(state.entered.filter(id => typeof id === 'string'));
+            }
         },
         
         piecesMoved: function() {

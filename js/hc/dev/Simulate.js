@@ -70,7 +70,9 @@
             hero.level = opts.level;
             hero.maxHp = hero.hp = game.maxHpOf(hero);
             hero.ap = game.actionCost(hero);
-            if (!spawns.spawnGroup(id, [[opts.distance, 0]])) throw new Error('Simulation: cannot spawn ' + id);
+            if (!spawns.spawnGroup(id, [[opts.distance, 0]])) {
+                throw new Error('Simulation: cannot spawn ' + id);
+            }
             game.recomputeRanks();
             game.initiativeTurn = null;   // (the start's enemies, removed, may have had it)
             game.noticeEnemies();
@@ -120,7 +122,9 @@
                 gameMap = {id:'simulation', name:'Simulation', rules:map.rules, objectives:[],
                     tileGenerator:pkg.Game.NO_MAP.tileGenerator, spawnGenerator:pkg.Game.NO_MAP.spawnGenerator, enemyAI:map.enemyAI},
                 rng = pkg.makeRng(opts.seed);
-            if (!opts.groups && !table) throw new Error('Simulation: map ' + opts.map + ' has no challengeTable; give groups');
+            if (!opts.groups && !table) {
+                throw new Error('Simulation: map ' + opts.map + ' has no challengeTable; give groups');
+            }
             const rows = opponents(opts, table).map(({name, pick}) => {
                 const results = [], groups = {};
                 for (let i = 0; i < opts.fights; i++) {

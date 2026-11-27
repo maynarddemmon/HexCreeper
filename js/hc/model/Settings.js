@@ -17,14 +17,11 @@
         {
             isObj,
             attrs:{num, bool, choice, expr, normalize, resolve},
-            cfg
+            cfg,
+            PLAYER_MOVE_MODES, STAT_VARS, DAMAGE_VARS, XP_VARS, MULTI_KILL_VARS, COST_VARS
         } = pkg,
         
         PREFS_KEY = 'hc.prefs',
-        
-        // The cost rules' variables: your core's level, your highest, and your pieces'
-        // levels together (see Game.costRule).
-        COST_VARS = pkg.COST_VARS = ['coreLevel', 'maxLevel', 'levels'],
         
         GROUP_DISPLAY = 'display',
         
@@ -54,7 +51,7 @@
         RULES = [
             num('visionRadius', 12, 1, 30),   // how far your pieces see (see hc.cfg.VISION)
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
-            choice('moveMode', 'fixed', () => pkg.PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
+            choice('moveMode', 'fixed', () => PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (it sets how XP is shared: see Combat.awardXp)
             // Character creation (see Combat.characterProblem): the stat points to spend, and
             // how far a stat can go below and above its species' typical value.
@@ -63,33 +60,33 @@
             num('creationPosAdj', 3, 0, 15),
             // Combat and action points (see Combat.js). Their defaults are in rules.json5's
             // "rules", to tune them there; these are only for if it hasn't them. Formulas of
-            // a piece's level and stats (pkg.STAT_VARS), rounded down, but the hit chance,
+            // a piece's level and stats (STAT_VARS), rounded down, but the hit chance,
             // of accuracy and defence, the damage roll, and action points and xp (kept in
             // hundredths).
-            expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', pkg.STAT_VARS),
-            expr('meleeAccuracy', 'str + level', pkg.STAT_VARS),
-            expr('defence', 'agl + level', pkg.STAT_VARS),
+            expr('maxHp', '10 + con / 2 + (level - 1) * (2 + con / 5)', STAT_VARS),
+            expr('meleeAccuracy', 'str + level', STAT_VARS),
+            expr('defence', 'agl + level', STAT_VARS),
             expr('hitChance', '50 + 3 * (accuracy - defence)', ['accuracy', 'defence']),
             num('hitMin', 5, 0, 100),
             num('hitMax', 95, 0, 100),
-            expr('damageRoll', 'min + floor(roll * (max - min + 1))', pkg.DAMAGE_VARS),
-            expr('damageBonus', '(str - 10) / 2', pkg.STAT_VARS),
-            expr('penetrationBonus', '(str - 10) / 4', pkg.STAT_VARS),
-            expr('xpToLevel', '20 * level', pkg.STAT_VARS),
-            expr('xpValue', '5 * level', pkg.STAT_VARS),
-            expr('statPointsPerLevel', '2', pkg.STAT_VARS), // stat points to spend, at each level up (of the new level)
-            expr('multiKillBonusXP', 'xp + xp * Math.min(20, killCount - 1) / 20', pkg.MULTI_KILL_VARS), // a killer's xp from a multi-kill
-            expr('parentXPShare', 'xp * rank / 20', pkg.XP_VARS),   // passed up to a piece's parent, of what it got
-            expr('childXPBonus', 'xp * parentRank / 20', pkg.XP_VARS), // more for a piece with a parent
-            expr('apPool', '1 + con / 10', pkg.STAT_VARS),
-            expr('apRecovery', '0.5 + agl / 40', pkg.STAT_VARS),
-            expr('apInitiative', '(wis + agl) / 40', pkg.STAT_VARS),
-            expr('actionCost', '1', pkg.STAT_VARS),
-            expr('jumpExhaustion', '2', pkg.STAT_VARS),
-            expr('rallyCost', '0.5', pkg.STAT_VARS),
-            expr('rallyTurns', '3', pkg.STAT_VARS),
-            expr('rallyAmount', '(con / 10) * level', pkg.STAT_VARS),
-            expr('rallyRefresh', 'Math.max(10, 150 - level)', pkg.STAT_VARS),
+            expr('damageRoll', 'min + floor(roll * (max - min + 1))', DAMAGE_VARS),
+            expr('damageBonus', '(str - 10) / 2', STAT_VARS),
+            expr('penetrationBonus', '(str - 10) / 4', STAT_VARS),
+            expr('xpToLevel', '20 * level', STAT_VARS),
+            expr('xpValue', '5 * level', STAT_VARS),
+            expr('statPointsPerLevel', '2', STAT_VARS), // stat points to spend, at each level up (of the new level)
+            expr('multiKillBonusXP', 'xp + xp * Math.min(20, killCount - 1) / 20', MULTI_KILL_VARS), // a killer's xp from a multi-kill
+            expr('parentXPShare', 'xp * rank / 20', XP_VARS),   // passed up to a piece's parent, of what it got
+            expr('childXPBonus', 'xp * parentRank / 20', XP_VARS), // more for a piece with a parent
+            expr('apPool', '1 + con / 10', STAT_VARS),
+            expr('apRecovery', '0.5 + agl / 40', STAT_VARS),
+            expr('apInitiative', '(wis + agl) / 40', STAT_VARS),
+            expr('actionCost', '1', STAT_VARS),
+            expr('jumpExhaustion', '2', STAT_VARS),
+            expr('rallyCost', '0.5', STAT_VARS),
+            expr('rallyTurns', '3', STAT_VARS),
+            expr('rallyAmount', '(con / 10) * level', STAT_VARS),
+            expr('rallyRefresh', 'Math.max(10, 150 - level)', STAT_VARS),
             // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
             // (Not in rules.json5: a map can set them, as any rule.)
             expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece

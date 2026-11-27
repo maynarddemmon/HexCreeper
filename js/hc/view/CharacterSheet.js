@@ -6,7 +6,8 @@
         {I18N:{get:i18n}, Text, SpacedLayout} = M,
         
         {
-            WideView, STATS,
+            WideView, STATS, ICON_CANCEL, ICON_CHECKED, CHARACTER_NAME_MAX, CHARACTER_DESCRIPTION_MAX,
+            isIntBetween,
             theme:{
                 spacing, padding, rowHeight, cornerRadius,
                 colorText, colorTextMuted, colorSuccess, colorError, colorPanel,
@@ -22,8 +23,8 @@
         INPUT_WIDTH = PANEL_WIDTH - VALUE_X - padding,
         ROW_HEIGHT = rowHeight - 6,
         DESCRIPTION_HEIGHT = 3*ROW_HEIGHT,
-        CLOSE_LABEL = pkg.ICON_CANCEL + ' ' + i18n('btn-close'),
-        CONFIRM_LABEL = pkg.ICON_CHECKED + ' ' + i18n('btn-confirm'),
+        CLOSE_LABEL = ICON_CANCEL + ' ' + i18n('btn-close'),
+        CONFIRM_LABEL = ICON_CHECKED + ' ' + i18n('btn-confirm'),
         INPUT_ATTRS = {
             x:VALUE_X, width:INPUT_WIDTH, fontSize:fontSizeMedium, bgColor:colorPanel, textColor:colorText,
             border:[1, 'solid', colorTextMuted], roundedCorners:cornerRadius/2
@@ -148,14 +149,14 @@
             // Showing and levelling: its name; creating: its name (to type in)
             self._nameRow = row(container);
             self._nameInput = new InputRow(container, {label:i18n('sheet-name'), make:(parent, attrs) => {
-                const input = new M.InputText(parent, {...attrs, maxLength:pkg.CHARACTER_NAME_MAX});
+                const input = new M.InputText(parent, {...attrs, maxLength:CHARACTER_NAME_MAX});
                 input.getIDS().padding = '0 ' + padding/2 + 'px';
                 self.attachToDom(input, '_typed', 'input');
                 return input;
             }});
             self._descriptionInput = new InputRow(container, {label:i18n('sheet-description'), height:DESCRIPTION_HEIGHT, make:(parent, attrs) => {
                 const input = new M.InputTextArea(parent, attrs);
-                input.getIDE().maxLength = pkg.CHARACTER_DESCRIPTION_MAX;
+                input.getIDE().maxLength = CHARACTER_DESCRIPTION_MAX;
                 input.getIDS().padding = padding/2 + 'px';
                 input.getIDS().resize = 'none';
                 self.attachToDom(input, '_typedDescription', 'input');
@@ -265,7 +266,7 @@
                 adds = Object.fromEntries(STATS.map(s => [s, (ch?.stats?.[s] ?? base[s]) - base[s]])),
                 fine = STATS.every(s => {
                     const [lo, hi] = self._modeOpts.limits(s);
-                    return Number.isInteger(adds[s]) && adds[s] >= lo && adds[s] <= hi;
+                    return isIntBetween(adds[s], lo, hi);
                 }) && STATS.reduce((n, s) => n + adds[s], 0) <= points;
             self._adds = fine ? adds : {};
             self.refresh();
@@ -287,7 +288,9 @@
             // (Close, just showing, in red, as other dialogs' Close and Cancel are.)
             footer.confirmBtn.setText(editing ? CONFIRM_LABEL : CLOSE_LABEL);
             footer.confirmBtn.setTextColor(editing ? colorSuccess : colorError);
-            for (const r of [self._nameInput, self._speciesInput, self._backgroundInput]) r.setVisible(creating);
+            for (const r of [self._nameInput, self._speciesInput, self._backgroundInput]) {
+                r.setVisible(creating);
+            }
             if (creating) self._nameRow.setVisible(false);
             self._pointsRow.setVisible(editing);
             for (const r of self._statRows) {
@@ -316,7 +319,9 @@
             const self = this,
                 species = self._speciesInput.input.getIDE().value,
                 background = self._backgroundInput.input.getIDE();
-            if (!self._fits(species, background.value)) background.value = self._backgroundList.find(b => self._fits(species, b.id))?.id ?? '';
+            if (!self._fits(species, background.value)) {
+                background.value = self._backgroundList.find(b => self._fits(species, b.id))?.id ?? '';
+            }
             self._adds = {};
             self.refresh();
         },
@@ -327,7 +332,9 @@
             const self = this,
                 background = self._backgroundInput.input.getIDE().value,
                 species = self._speciesInput.input.getIDE();
-            if (!self._fits(species.value, background)) species.value = self._speciesList.find(s => self._fits(s.id, background))?.id ?? '';
+            if (!self._fits(species.value, background)) {
+                species.value = self._speciesList.find(s => self._fits(s.id, background))?.id ?? '';
+            }
             self._adds = {};
             self.refresh();
         },
@@ -384,7 +391,9 @@
                 r.plusBtn.setDisabled(left <= 0 || added >= hi);
             });
             let ready = !editing || left === 0;
-            if (self._mode === 'create') ready = ready && !!(self._nameInput.input.value ?? '').trim() && !!self._speciesInput.input.getIDE().value && !!self._backgroundInput.input.getIDE().value;
+            if (self._mode === 'create') {
+                ready = ready && !!(self._nameInput.input.value ?? '').trim() && !!self._speciesInput.input.getIDE().value && !!self._backgroundInput.input.getIDE().value;
+            }
             self.getFooterView().confirmBtn.setDisabled(!ready);
             self._columns.setHeight(Math.max(self._left.height, self._right.height));
             self.setContentHeightToFit(self._container.height);

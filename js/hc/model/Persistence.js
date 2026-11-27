@@ -3,7 +3,7 @@
     
     const {I18N:{get:i18n}, downloadBlob, prettyFormatJSON} = myt,
         
-        isObj = pkg.isObj,
+        {isObj} = pkg,
         
         // 2 since 2026-11-25: saves made before then aren't loaded (nothing is kept just
         // for them).
@@ -39,8 +39,12 @@
             outline. Problems deeper in the data are caught when it is restored. */
         validateRecord = record => {
             if (!isObj(record)) return i18n('save-problem-not-save');
-            if (record.version !== SAVE_FORMAT_VERSION) return i18n('save-problem-version', record.version);
-            if (!Object.hasOwn(FORMATS, record.format)) return i18n('save-problem-format', record.format);
+            if (record.version !== SAVE_FORMAT_VERSION) {
+                return i18n('save-problem-version', record.version);
+            }
+            if (!Object.hasOwn(FORMATS, record.format)) {
+                return i18n('save-problem-format', record.format);
+            }
             if (!isObj(record.data)) return i18n('save-problem-no-data');
             return null;
         };

@@ -26,7 +26,7 @@
 (pkg => {
     'use strict';
     
-    const {hexDist} = pkg,
+    const {hexDist, EFFECT_EXHAUSTED} = pkg,
         dist = ([ax, ay], [bx, by]) => hexDist({x:ax, y:ay}, {x:bx, y:by}),
         
         // Whether key a comes before key b, comparing their entries in turn.
@@ -34,9 +34,6 @@
             const j = a.findIndex((v, i) => v !== b[i]);
             return j >= 0 && a[j] < b[j];
         };
-    
-    pkg.MOVE_MODES = ['fixed', 'free', 'follow'];
-    pkg.PLAYER_MOVE_MODES = ['fixed', 'follow']; // those you can set your moves to
     
     // How many cells a Follow step tries for its pieces before giving up (see _follow).
     const FOLLOW_TRIES = 3000;
@@ -111,10 +108,14 @@
             
             // Links: none may end out of range unless it got shorter.
             const above = parentOf(top);
-            if (above != null && !linkOk(posOf(top), posOf(above), after.get(top), posOf(above))) return null;
+            if (above != null && !linkOk(posOf(top), posOf(above), after.get(top), posOf(above))) {
+                return null;
+            }
             for (const gid of pieces) {
                 for (const kid of kidsOf(gid)) {
-                    if (!linkOk(posOf(gid), posOf(kid), after.get(gid), after.get(kid))) return null;
+                    if (!linkOk(posOf(gid), posOf(kid), after.get(gid), after.get(kid))) {
+                        return null;
+                    }
                 }
             }
             const moves = [];
@@ -236,7 +237,9 @@
                         o = occupant(...c);
                     if (claimed.has(keyOf(c))) return false;
                     // No trading cells, but with the lead
-                    if (o !== undefined && o !== gid && o !== lead && after.has(o) && same(after.get(o), here)) return false;
+                    if (o !== undefined && o !== gid && o !== lead && after.has(o) && same(after.get(o), here)) {
+                        return false;
+                    }
                     for (const n of linksOf(gid)) {
                         if (after.has(n)) {
                             if (!linkOk(here, posOf(n), c, after.get(n))) return false;
@@ -248,7 +251,9 @@
                     }
                     return gid !== top || above == null || linkOk(here, posOf(above), c, posOf(above));
                 };
-            if (lead === top && above != null && !linkOk(posOf(lead), posOf(above), to, posOf(above))) return null;
+            if (lead === top && above != null && !linkOk(posOf(lead), posOf(above), to, posOf(above))) {
+                return null;
+            }
             
             let tries = FOLLOW_TRIES;
             const place = i => {
@@ -385,7 +390,7 @@
             let done = false;
             if (this.jumpCells(this.boardView(p.owner !== 'player'), p.id).some(c => c.x === x && c.y === y)) {
                 this.applyMoves(p, [[p.id, x, y]], true);
-                this.addEffect(p, pkg.EFFECT_EXHAUSTED, this.statRule('jumpExhaustion', p));
+                this.addEffect(p, EFFECT_EXHAUSTED, this.statRule('jumpExhaustion', p));
                 this.fx(x, y, 'jump', '--place-ink', {});
                 done = true;
             }
