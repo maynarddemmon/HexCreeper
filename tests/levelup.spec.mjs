@@ -153,17 +153,28 @@ test('a level up plays rings out from the piece, which stay on it (with its text
     ]);
 });
 
-test('a change too wide to go beside the value goes under it; Close is red, as Cancel is', async ({page}) => {
+test('the sheet: level, XP and status across it, then stats beside combat (HP and action points in it); Close is red, as Cancel is', async ({page}) => {
     await page.evaluate(() => Object.assign(hc.app.game.rules, {apPool:'1 + con / 10', apRecovery:'0.5 + agl / 40', apInitiative:'(wis + agl) / 40'}));
     await levelUp(page);
     await page.keyboard.press('i');
     await page.getByRole('button', {name:'Raise Constitution'}).click();
-    // Action points: the pool goes up with con, so the line would be too wide.
-    const ap = page.getByText('Action points', {exact:true}).locator('xpath=..');
-    expect(await ap.evaluate(row => !!row.querySelector('br') && !!row.querySelector('span'))).toBe(true);
-    // A short one stays beside it.
-    const con = page.getByText('Constitution', {exact:true}).locator('xpath=..');
-    expect(await con.evaluate(row => !row.querySelector('br') && !!row.querySelector('span'))).toBe(true);
+    const line = label => page.getByText(label, {exact:true}).locator('xpath=..'),
+        x = label => line(label).evaluate(row => row.parentNode.getBoundingClientRect().x),
+        y = label => line(label).evaluate(row => row.getBoundingClientRect().y);
+    // The level is a line of its own, above XP, not in the title.
+    await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
+    await expect(line('Level')).toContainText('2');
+    expect(await y('Level')).toBeLessThan(await y('XP'));
+    // Action points in three lines: the pool (going up with con, beside in green), recovery
+    // and initiative.
+    await expect(line('Action points')).toContainText('1/2.1');
+    await expect(line('Recovery')).toContainText('+0.75 a turn');
+    await expect(line('Initiative')).toContainText('0.5');
+    // Stats in one column, combat in the other, HP and action points with combat.
+    expect(await x('Strength')).toBeLessThan(await x('HP'));
+    expect(await x('HP')).toBe(await x('Action points'));
+    expect(await x('HP')).toBe(await x('Melee accuracy'));
+    expect(await y('Strength')).toBe(await y('Action points'));
     const color = locator => locator.evaluate(e => getComputedStyle(e).color),
         cancelColor = await color(button(page, '✗ Cancel'));
     await button(page, '✗ Cancel').click();
@@ -179,4 +190,17 @@ test('opening the character sheet closes the menu', async ({page}) => {
     await expect(page.getByText('Strength', {exact:true})).toBeVisible();
     expect(await menuOpen()).toBe(false);
     await expect(page.getByRole('menu').filter({visible:true})).toHaveCount(0);
+});
+
+test('the description can always be edited; Enter there is a new line, not Close', async ({page}) => {
+    await page.keyboard.press('i');
+    const description = page.getByRole('textbox', {name:'Description', exact:true});
+    await description.fill('Small but fierce.');
+    await description.press('Enter');
+    await description.pressSequentially('Afraid of spiders.');
+    await expect(button(page, 'X Close')).toBeVisible();
+    expect(await page.evaluate(() => hc.app.game.getPlayerCore().description)).toBe('Small but fierce.\nAfraid of spiders.');
+    await button(page, 'X Close').click();
+    await page.keyboard.press('i');
+    await expect(page.getByRole('textbox', {name:'Description', exact:true})).toHaveValue('Small but fierce.\nAfraid of spiders.');
 });

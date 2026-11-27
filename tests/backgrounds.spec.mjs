@@ -115,7 +115,7 @@ test('the character sheet names the species and background', async ({page}) => {
         hc.app.game.selectedId = hc.app.game.playerCoreId;
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
+    await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
 });
 
 test('a background adjusts its species\' typical stats: the baseline, kept in the species\' range', async ({page}) => {

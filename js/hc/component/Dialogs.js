@@ -164,7 +164,7 @@
                 this.hide();
             }
         }),
-    
+        
         ThreeColFooter = new JSModule('ThreeColFooter', {
             initNode: function(parent, attrs) {
                 attrs.hasFooter ??= true;
@@ -214,7 +214,7 @@
                         name:'cancelBtn', text:DEFAULT_CANCEL_LABEL, textColor:colorError,
                         fontSize:fontSizeLarge, valign:'middle'
                     }, mixins:[{doActivated:self.doCancel.bind(self)}]},
-                    SPACER_CFG,
+                    {klass:pkg.Spacer, attrs:{name:'spacer'}},
                     {klass:UnderlineBtn, attrs:{
                         name:'confirmBtn', text:DEFAULT_CONFIRM_LABEL, textColor:colorSuccess,
                         fontSize:fontSizeLarge, valign:'middle'

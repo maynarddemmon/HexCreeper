@@ -143,21 +143,23 @@
         
         /*  The lines of the character sheet for piece q (see CharacterSheet.show). */
         describePiece = q => ({
-                    info:[
-                        [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
-                        [i18n('sheet-hp'), q.hp + '/' + q.maxHp],
-                        [i18n('sheet-ap'), i18n('sheet-ap-value', formatAp(q.ap), formatAp(game.apMax(q)),
-                            formatAp(game.apRecovery(q)), formatAp(game.apRule('apInitiative', q)))],
-                        [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')]
-                    ],
-                    combat:[
-                        [i18n('sheet-accuracy'), game.statRule('meleeAccuracy', q)],
-                        [i18n('sheet-defence'), game.statRule('defence', q)],
-                        [i18n('sheet-damage'), formatRange(game.damageRange(q))],
-                        [i18n('sheet-penetration'), game.penetrationOf(q)],
-                        [i18n('sheet-armor'), q.armor]
-                    ]
-                }),
+            info:[
+                [i18n('sheet-level'), q.level],
+                [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
+                [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')]
+            ],
+            combat:[
+                [i18n('sheet-hp'), q.hp + '/' + q.maxHp],
+                [i18n('sheet-ap'), formatAp(q.ap) + '/' + formatAp(game.apMax(q))],
+                [i18n('sheet-recovery'), i18n('sheet-recovery-value', formatAp(game.apRecovery(q)))],
+                [i18n('sheet-initiative'), formatAp(game.apRule('apInitiative', q))],
+                [i18n('sheet-accuracy'), game.statRule('meleeAccuracy', q)],
+                [i18n('sheet-defence'), game.statRule('defence', q)],
+                [i18n('sheet-damage'), formatRange(game.damageRange(q))],
+                [i18n('sheet-penetration'), game.penetrationOf(q)],
+                [i18n('sheet-armor'), q.armor]
+            ]
+        }),
         
         /*  The character sheet for your piece p (see CharacterSheet): with stat points to
             spend, for levelling. */
@@ -167,7 +169,10 @@
             draw();
             characterSheet ??= new pkg.CharacterSheet(appView);
             characterSheet.show(p, {
-                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? '', p.level),
+                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? ''),
+                onDescription:text => {
+                    p.description = text;
+                },
                 statMax:stat => game.statRange(p, stat)[1],
                 describe:describePiece,
                 preview:adds => game.withStats(p, adds),

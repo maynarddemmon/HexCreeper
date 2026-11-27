@@ -14,11 +14,11 @@
             }
         } = pkg,
         
-        PANEL_WIDTH = 440,
-        LABEL_WIDTH = 150,
+        PANEL_WIDTH = 480,
+        COLUMN_WIDTH = PANEL_WIDTH / 2,        // Stats on the left, Combat on the right
+        LABEL_WIDTH = 110,                     // across the sheet
         STEP_SIZE = 24,                        // a + or − button
         VALUE_X = padding + LABEL_WIDTH,
-        VALUE_WIDTH = PANEL_WIDTH - VALUE_X - 2*STEP_SIZE - spacing - 2*padding,
         INPUT_WIDTH = PANEL_WIDTH - VALUE_X - padding,
         ROW_HEIGHT = rowHeight - 6,
         DESCRIPTION_HEIGHT = 3*ROW_HEIGHT,
@@ -29,51 +29,59 @@
             border:[1, 'solid', colorTextMuted], roundedCorners:cornerRadius/2
         },
         
-        // A value, and if it would change, what to: the new one beside it in green (or under
-        // it, with under).
-        changed = (was, now, under) => String(was) === String(now) ? String(was) : was + (under ? '<br>' : ' ') + '<span style="color:' + colorSuccess + ';">' + now + '</span>',
+        // A value, and if it would change, what to: the new one beside it in green.
+        changed = (was, now) => String(was) === String(now) ? String(was) : was + ' <span style="color:' + colorSuccess + ';">' + now + '</span>',
         
         // Escaped, to show as text in a Text (which takes HTML).
         escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
         
-        /*  A line of the sheet: a label and a value, and for a stat, buttons to put a point
-            into it (+) or take one back (−). */
+        /*  A line of the sheet, as wide as what it's in: a label (labelWidth wide) and a
+            value, and for a stat, buttons to put a point into it (+) or take one back (−). */
         SheetRow = new JSClass('SheetRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    stat = attrs.stat,
-                    sheet = attrs.sheet,
-                    wide = attrs.wide;
+                    {stat, sheet, labelWidth = LABEL_WIDTH} = attrs,
+                    width = parent.width,
+                    valueX = padding + labelWidth;
                 delete attrs.stat;
                 delete attrs.sheet;
-                delete attrs.wide;
+                delete attrs.labelWidth;
                 attrs.height ??= ROW_HEIGHT;
                 
                 self.callSuper(parent, attrs);
                 
-                self._label = new Text(self, {x:padding, y:3, width:LABEL_WIDTH, fontSize:fontSizeMedium, textColor:colorTextMuted});
-                self._value = new Text(self, {x:VALUE_X, y:3, width:wide ? INPUT_WIDTH : VALUE_WIDTH, fontSize:fontSizeMedium, textColor:colorText});
+                self._label = new Text(self, {x:padding, y:3, width:labelWidth, fontSize:fontSizeMedium, textColor:colorTextMuted});
+                self._value = new Text(self, {x:valueX, y:3, width:width - valueX - padding - (stat ? 2*STEP_SIZE + 2*spacing : 0), fontSize:fontSizeMedium, textColor:colorText});
                 if (stat) {
                     const label = i18n('stat-' + stat),
                         step = (icon, delta, x) => new pkg.IconBtn(self, {
                             x, y:0, width:STEP_SIZE, height:STEP_SIZE, icon, iconSize:14,
                             label:i18n(delta > 0 ? 'sheet-raise' : 'sheet-lower', label)
                         }, [{doActivated: () => sheet.step(stat, delta)}]);
-                    self.minusBtn = step('minus', -1, PANEL_WIDTH - padding - 2*STEP_SIZE - spacing);
-                    self.plusBtn = step('plus', 1, PANEL_WIDTH - padding - STEP_SIZE);
+                    self.minusBtn = step('minus', -1, width - padding - 2*STEP_SIZE - spacing);
+                    self.plusBtn = step('plus', 1, width - padding - STEP_SIZE);
                 }
             },
             
-            /*  Shows label, and the value was, or if it would change, now beside it (or under
-                it, if that's too wide), the row growing to fit. */
+            /*  Shows label, and the value was, or if it would change, now beside it. */
             set: function(label, was, now = was) {
+                this._label.setText(label);
+                this._value.setText(changed(was, now));
+            }
+        }),
+        
+        /*  A section's heading, as wide as what it's in, over a line. */
+        SheetHead = new JSClass('SheetHead', WideView, {
+            initNode: function(parent, attrs) {
                 const self = this,
-                    value = self._value;
-                self._label.setText(label);
-                value.setText(changed(was, now));
-                if (value.getIDE().scrollWidth > value.width) value.setText(changed(was, now, true));
-                value.sizeViewToDom();
-                self.setHeight(Math.max(ROW_HEIGHT, value.y + value.height + 3));
+                    text = attrs.text;
+                delete attrs.text;
+                attrs.height = ROW_HEIGHT;
+                
+                self.callSuper(parent, attrs);
+                
+                self.getIDS().borderBottom = '1px solid ' + colorText;
+                new Text(self, {x:padding, y:3, text, fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
             }
         }),
         
@@ -92,12 +100,15 @@
                 new Text(self, {x:padding, y:5, width:LABEL_WIDTH, text:label, fontSize:fontSizeMedium, textColor:colorTextMuted});
                 const input = self.input = make(self, {...INPUT_ATTRS, y:2, height:height - 4});
                 input.getIDE().setAttribute('aria-label', label);
+                // (In the sheet's font, not the browser's for inputs.)
+                input.getIDS().fontFamily = 'inherit';
             }
         });
     
-    /*  The character sheet for one of your pieces: its name and description (if it has
-        them), level, XP, HP, action points, status effects, stats, and what they make it
-        in combat. It has three modes.
+    /*  The character sheet for one of your pieces: across the top, its name (if it has
+        one), its description (which can always be edited), level, XP and status effects;
+        then, side by side, its stats, and what they make it in combat: HP, action points
+        (its pool, recovery and initiative), accuracy and so on. It has three modes.
         
         Showing (show, without stat points): only that, with Close.
         
@@ -126,15 +137,16 @@
             self.callSuper(parent, attrs);
             
             const container = self._container = new WideView(self.getContentView()),
-                row = attrs => new SheetRow(container, {sheet:self, ...attrs}),
-                head = key => new Text(container, {x:padding, text:i18n(key), fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'}),
+                row = (parent, attrs) => new SheetRow(parent, {sheet:self, ...attrs}),
+                head = (parent, key) => new SheetHead(parent, {text:i18n(key)}),
                 select = method => (parent, attrs) => {
                     const s = new M.InputSelect(parent, attrs);
                     self.attachToDom(s, method, 'change');
                     return s;
                 };
             
-            // Creating
+            // Showing and levelling: its name; creating: its name (to type in)
+            self._nameRow = row(container);
             self._nameInput = new InputRow(container, {label:i18n('sheet-name'), make:(parent, attrs) => {
                 const input = new M.InputText(parent, {...attrs, maxLength:pkg.CHARACTER_NAME_MAX});
                 input.getIDS().padding = '0 ' + padding/2 + 'px';
@@ -146,22 +158,30 @@
                 input.getIDE().maxLength = pkg.CHARACTER_DESCRIPTION_MAX;
                 input.getIDS().padding = padding/2 + 'px';
                 input.getIDS().resize = 'none';
-                self.attachToDom(input, '_typed', 'input');
+                self.attachToDom(input, '_typedDescription', 'input');
                 return input;
             }});
+            // Creating: its species and background
             self._speciesInput = new InputRow(container, {label:i18n('sheet-species'), make:select('_choseSpecies')});
             self._backgroundInput = new InputRow(container, {label:i18n('sheet-background'), make:select('_choseBackground')});
             
-            // Showing
-            self._nameRow = row({wide:true});
-            self._descriptionRow = row({wide:true});
+            // Level, XP and status
+            self._infoRows = [0, 1, 2].map(() => row(container));
             
-            self._infoRows = [0, 1, 2, 3].map(() => row());
-            self._statsHead = head('sheet-stats');
-            self._pointsRow = row();
-            self._statRows = STATS.map(stat => row({stat}));
-            head('sheet-combat');
-            self._combatRows = [0, 1, 2, 3, 4].map(() => row());
+            // Stats on the left, combat on the right
+            const columns = self._columns = new WideView(container),
+                column = x => {
+                    const v = new M.View(columns, {x, width:COLUMN_WIDTH});
+                    new SpacedLayout(v, {axis:'y', spacing:2, collapseParent:true});
+                    return v;
+                },
+                left = self._left = column(0),
+                right = self._right = column(COLUMN_WIDTH);
+            head(left, 'sheet-stats');
+            self._pointsRow = row(left, {labelWidth:LABEL_WIDTH + 2*STEP_SIZE});
+            self._statRows = STATS.map(stat => row(left, {stat, labelWidth:LABEL_WIDTH}));
+            head(right, 'sheet-combat');
+            self._combatRows = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(() => row(right, {labelWidth:LABEL_WIDTH}));
             
             new SpacedLayout(container, {axis:'y', inset:padding, spacing:2, outset:padding, collapseParent:true});
         },
@@ -169,10 +189,12 @@
         
         // Methods /////////////////////////////////////////////////////////////
         /*  Shows, or levels, piece p (see above); or, with opts.create (a character to
-            start from, or null for none), creates a character (see _create). describe(q) gives the lines for a piece q, as it is or would be:
-            {info:[[label, value], ...], combat:[[label, value], ...]} (four and five of
+            start from, or null for none), creates a character (see _create).
+            describe(q) gives the lines for a piece q, as it is or would be:
+            {info:[[label, value], ...], combat:[[label, value], ...]} (three and nine of
             them). statMax(stat) is the most a stat can be (its species'). preview(adds) is
-            p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them. */
+            p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them.
+            onDescription(text) is called as its description is edited. */
         show: function(p, opts) {
             this.callSuper();
             if ('create' in opts) {
@@ -183,20 +205,19 @@
         },
         
         /** @private */
-        _show: function(p, {title, describe, statMax, preview, onConfirm}) {
+        _show: function(p, {title, describe, statMax, preview, onConfirm, onDescription}) {
             const self = this,
                 levelling = p.statPoints.available > 0;
             self._setMode(levelling ? 'level' : 'show', title, {
-                describe, onConfirm,
+                describe, onConfirm, onDescription,
                 base: () => p.stats,
                 limits: stat => [0, statMax(stat) - p.stats[stat]],
                 points: () => p.statPoints.available,
                 piece: adds => Object.keys(adds).length ? preview(adds) : p
             });
             self._nameRow.setVisible(!!p.name);
-            self._descriptionRow.setVisible(!!p.description);
             if (p.name) self._nameRow.set(i18n('sheet-name'), escape(p.name));
-            if (p.description) self._descriptionRow.set(i18n('sheet-description'), escape(p.description));
+            self._descriptionInput.input.setValue(p.description ?? '');
             self.refresh();
         },
         
@@ -262,14 +283,12 @@
             self._adds = {};
             self.setTitle(title);
             footer.cancelBtn.setVisible(editing);
+            footer.spacer.setVisible(editing);
             // (Close, just showing, in red, as other dialogs' Close and Cancel are.)
             footer.confirmBtn.setText(editing ? CONFIRM_LABEL : CLOSE_LABEL);
             footer.confirmBtn.setTextColor(editing ? colorSuccess : colorError);
-            for (const r of [self._nameInput, self._descriptionInput, self._speciesInput, self._backgroundInput]) r.setVisible(creating);
-            if (creating) {
-                self._nameRow.setVisible(false);
-                self._descriptionRow.setVisible(false);
-            }
+            for (const r of [self._nameInput, self._speciesInput, self._backgroundInput]) r.setVisible(creating);
+            if (creating) self._nameRow.setVisible(false);
             self._pointsRow.setVisible(editing);
             for (const r of self._statRows) {
                 r.minusBtn.setVisible(editing);
@@ -318,6 +337,17 @@
             this.refresh();
         },
         
+        /** @private The description was typed in: for the character being created, or the
+            piece shown (onDescription). */
+        _typedDescription: function(_event) {
+            const self = this;
+            if (self._mode === 'create') {
+                self.refresh();
+            } else {
+                self._modeOpts.onDescription?.(self._descriptionInput.input.value ?? '');
+            }
+        },
+        
         /*  The points put in and not spent yet (in all: those taken out count against). */
         getAdded: function() {return Object.values(this._adds).reduce((n, v) => n + v, 0);},
         
@@ -356,12 +386,14 @@
             let ready = !editing || left === 0;
             if (self._mode === 'create') ready = ready && !!(self._nameInput.input.value ?? '').trim() && !!self._speciesInput.input.getIDE().value && !!self._backgroundInput.input.getIDE().value;
             self.getFooterView().confirmBtn.setDisabled(!ready);
+            self._columns.setHeight(Math.max(self._left.height, self._right.height));
             self.setContentHeightToFit(self._container.height);
         },
         
+        // (Not while typing in the description: Enter there is a new line.)
         getDefaultBtn: function() {
             const btn = this.getFooterView().confirmBtn;
-            return btn.disabled ? null : btn;
+            return btn.disabled || document.activeElement === this._descriptionInput.input.getIDE() ? null : btn;
         },
         
         doConfirm: function() {

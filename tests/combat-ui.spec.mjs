@@ -134,8 +134,8 @@ test('I opens the selected piece\'s character sheet', async ({page}) => {
         hc.view.draw();
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
-    for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1 of 1 · +1 a turn · +0 initiative', 'Exhausted (1 more turn)']) {
+    await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
+    for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1/1', '+1 a turn', 'Exhausted (1 more turn)']) {
         await expect(page.getByText(text, {exact:true})).toBeVisible();
     }
 });

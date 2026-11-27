@@ -156,8 +156,8 @@ test('the character sheet shows your name and description', async ({page}) => {
         g.selectedId = g.playerCoreId;
     });
     await page.keyboard.press('i');
-    await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
-    await expect(page.getByText('Fond of <b>tags</b>.', {exact:true})).toBeVisible();
+    await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
+    await expect(page.getByRole('textbox', {name:'Description', exact:true})).toHaveValue('Fond of <b>tags</b>.');
 });
 
 test('the first time, with no character made before: no name, the first species and background, typical stats', async ({page}) => {

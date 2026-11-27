@@ -89,7 +89,7 @@ test('the caverns map knows which cavern or tunnel a cell is in', async ({page})
 test('going into a cavern or tunnel for the first time may spawn a band, by the chances', async ({page}) => {
     // Always in caverns, never in tunnels; a spawn makes caverns never again.
     const found = await caverns(page, {cavernSpawnChance:100, tunnelSpawnChance:0, cavernSpawnChanceModifierOnSuccess:-100,
-        challengeTable:[{min:0, table:{goblin_trio:1}}]});
+        tunnelSpawnChanceModifierOnFailure:5, challengeTable:[{min:0, table:{goblin_trio:1}}]});
     expect(await moveCore(page, ...found.tunnel)).toEqual([]);
     const spawned = await moveCore(page, ...found.cavern);
     expect(spawned.length).toBe(3);
