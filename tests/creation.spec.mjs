@@ -25,13 +25,14 @@ test('a character must have a name, a playable species and background that fit, 
             species:[problem({species:'goblin'}), problem({species:'nobody'})],
             background:problem({background:'denizen'}),
             stats:[
-                problem({stats:stats({int:10})}),                    // a point not spent
-                problem({stats:stats({int:12, cha:10})}),            // spent another way
-                problem({stats:stats({str:7, int:14, cha:12})}),     // 3 below: too far
-                problem({stats:stats({str:8, int:14, cha:12})}),     // 2 below, 4 above: too far
-                problem({stats:stats({str:8, int:13, cha:11})})      // 2 below, 3 above (and 1)
+                // (From the urchin's baseline: int and cha 9.)
+                problem({stats:stats({int:9})}),                     // a point not spent
+                problem({stats:stats({int:11, cha:9})}),             // spent another way
+                problem({stats:stats({str:7, int:13, cha:10})}),     // 3 below: too far
+                problem({stats:stats({str:8, int:13, cha:9})}),      // 2 below, 4 above: too far
+                problem({stats:stats({str:8, int:12, cha:10})})      // 2 below, 3 above (and 1)
             ],
-            range:g.creationRange('human', 'str')
+            range:g.creationRange('human', 'urchin', 'str')
         };
     }, TEST_CHARACTER);
     expect(r).toEqual({
@@ -51,13 +52,13 @@ test('a new game\'s core is the character created; pieces placed are of its spec
         const g = hc.app.game;
         delete g.giveProfile;    // (clearBoard's)
         g.character = {name:' Brin ', description:'Short and stubborn.', species:'dwarf', background:'reaver',
-            stats:{...hc.species.get('dwarf').typical, str:hc.species.get('dwarf').typical.str + 2}};
+            stats:{...g.baselineStats('dwarf', 'reaver'), str:g.baselineStats('dwarf', 'reaver').str + 2}};
         g.reset();
         const c = g.getPlayerCore();
         g.gold = 100;
         g.playerPlace(1, 0, c);
         const p = g.pieceAt(1, 0);
-        return {core:[c.name, c.description, c.species, c.background, c.stats.str - hc.species.get('dwarf').typical.str, c.hp === c.maxHp],
+        return {core:[c.name, c.description, c.species, c.background, c.stats.str - g.baselineStats('dwarf', 'reaver').str, c.hp === c.maxHp],
             placed:[p.name, p.species, p.background], who:g.whoOf(c).name};
     });
     expect(r).toEqual({core:['Brin', 'Short and stubborn.', 'dwarf', 'reaver', 2, true], placed:[undefined, 'dwarf', 'reaver'], who:'Brin'});
@@ -104,7 +105,8 @@ test('creating a character: from the last made, + and − within the limits, Con
         const c = hc.app.game.getPlayerCore();
         return [c.name, c.description, c.stats.str, c.stats.agl, c.stats.int, c.stats.cha, JSON.parse(localStorage.getItem('hc.character')).name];
     });
-    expect(r).toEqual(['Wren', 'Quick to anger.', 13, 8, 10, 11, 'Wren']);
+    // (An urchin's int and cha are 9 to start with.)
+    expect(r).toEqual(['Wren', 'Quick to anger.', 13, 8, 9, 10, 'Wren']);
 });
 
 test('species and background: those that fit nothing are disabled; choosing one the other doesn\'t fit changes the other', async ({page}) => {

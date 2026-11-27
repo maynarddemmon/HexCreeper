@@ -42,6 +42,17 @@
 				"cha":[3, 9,  18]
 			}
 		},
+		"mountain_dwarf":{
+			"extends":"dwarf",
+			"name":"Mountain Dwarf",
+			"description":"Dwarves of the high halls: broad, hard and slow to trust.",
+			"stats":{
+				"str":[3, 12, 18],
+				"agl":[3, 8,  18],
+				"con":[3, 12, 18],
+				"cha":[3, 8,  18]
+			}
+		},
 		"elf":{
 			"name":"Elf",
 			"description":"Graceful, nimble and smart.",
@@ -58,11 +69,156 @@
 				"cha":[3, 10, 18]
 			}
 		},
+		"high_elf":{
+			"extends":"elf",
+			"name":"High Elf",
+			"description":"Elves of the old cities: learned, proud and strong-willed.",
+			"stats":{
+				"agl":[3, 10, 18],
+				"con":[3, 8,  18],
+				"int":[3, 12, 18],
+				"wil":[3, 11, 18]
+			}
+		},
+		"wood_elf":{
+			"extends":"elf",
+			"name":"Wood Elf",
+			"description":"Elves of the deep forests: quick, watchful and wary of strangers.",
+			"stats":{
+				"agl":[3, 12, 18],
+				"int":[3, 10, 18],
+				"wis":[3, 11, 18],
+				"cha":[3, 9,  18]
+			}
+		},
+		"halfling":{
+			"name":"Halfling",
+			"description":"Small, nimble folk with steady nerves and a knack for luck.",
+			"damage":[1, 4],
+			"playable":true,
+			"stats":{
+				"str":[3, 7,  16],
+				"agl":[3, 12, 18],
+				"con":[3, 10, 18],
+				"dex":[3, 11, 18],
+				"int":[3, 10, 18],
+				"wis":[3, 10, 18],
+				"wil":[3, 10, 18],
+				"cha":[3, 10, 18]
+			}
+		},
+		"gnome":{
+			"name":"Gnome",
+			"description":"Small, clever tinkerers with endless curiosity.",
+			"damage":[1, 4],
+			"playable":true,
+			"stats":{
+				"str":[3, 7,  16],
+				"agl":[3, 10, 18],
+				"con":[3, 10, 18],
+				"dex":[3, 11, 18],
+				"int":[3, 12, 18],
+				"wis":[3, 10, 18],
+				"wil":[3, 10, 18],
+				"cha":[3, 10, 18]
+			}
+		},
+		"half_elf":{
+			"name":"Half-Elf",
+			"description":"Of two peoples and at home in neither: charming and adaptable.",
+			"damage":[1, 6],
+			"playable":true,
+			"stats":{
+				"str":[3, 9,  18],
+				"agl":[3, 10, 18],
+				"con":[3, 10, 18],
+				"dex":[3, 10, 18],
+				"int":[3, 10, 18],
+				"wis":[3, 10, 18],
+				"wil":[3, 10, 18],
+				"cha":[3, 11, 18]
+			}
+		},
+		"half_orc":{
+			"name":"Half-Orc",
+			"description":"Strong and tough, with an orc's temper and a human's grit.",
+			"damage":[1, 6],
+			"playable":true,
+			"stats":{
+				"str":[3, 12, 18],
+				"agl":[3, 10, 18],
+				"con":[3, 11, 18],
+				"dex":[3, 9,  18],
+				"int":[3, 8,  18],
+				"wis":[3, 10, 18],
+				"wil":[3, 11, 18],
+				"cha":[3, 9,  18]
+			}
+		},
 		"goblin":{
 			"name":"Goblin",
 			"description":"Small, quick and spiteful, with green skin, big eyes and sharp teeth.",
 			"stats":{"str":[4, 8, 14], "agl":[6, 12, 18], "con":[4, 8, 14], "dex":[4, 10, 16], "int":[3, 6, 12], "wis":[3, 8, 14], "wil":[3, 6, 12], "cha":[3, 6, 12]},
 			"damage":[1, 4]
+		},
+		"hobgoblin":{
+			"extends":"goblin",
+			"name":"Hobgoblin",
+			"description":"Big, disciplined goblins, bred for war.",
+			"damage":[1, 6],
+			"stats":{
+				"str":[6, 11, 17],
+				"agl":[4, 10, 16],
+				"con":[5, 11, 16],
+				"int":[4, 9,  14],
+				"wil":[4, 10, 15],
+				"cha":[3, 7,  13]
+			}
+		},
+		"kobold":{
+			"name":"Kobold",
+			"description":"Small, scaly and cunning: trap-makers who fight in packs.",
+			"damage":[1, 3],
+			"stats":{
+				"str":[3, 6,  12],
+				"agl":[6, 12, 18],
+				"con":[3, 7,  13],
+				"dex":[5, 11, 17],
+				"int":[3, 8,  14],
+				"wis":[3, 8,  14],
+				"wil":[3, 7,  13],
+				"cha":[3, 6,  12]
+			}
+		},
+		"orc":{
+			"name":"Orc",
+			"description":"Big, fierce and brutal raiders.",
+			"damage":[1, 6],
+			"stats":{
+				"str":[5, 12, 19],
+				"agl":[3, 9,  16],
+				"con":[5, 12, 19],
+				"dex":[3, 9,  16],
+				"int":[3, 7,  14],
+				"wis":[3, 9,  15],
+				"wil":[3, 10, 16],
+				"cha":[3, 7,  14]
+			}
+		},
+		"ogre":{
+			"name":"Ogre",
+			"description":"Huge, dim and hungry, and strong enough to crush a man.",
+			"damage":[2, 8],
+			"stats":{
+				"str":[10, 16, 22],
+				"agl":[3, 7,  14],
+				"con":[10, 16, 22],
+				"dex":[3, 7,  14],
+				"int":[3, 5,  10],
+				"wis":[3, 7,  12],
+				"wil":[3, 8,  14],
+				"cha":[3, 5,  10]
+			}
 		},
 		"creeper":{
 			"name":"Creeper",
@@ -72,26 +228,122 @@
 		}
 	},
 	
-	// Backgrounds: where a creature comes from (see js/hc/model/Combat.js). For now a name
-	// and description; later skills and abilities. "playable": whether you can choose it
+	// Backgrounds: where a creature comes from (see js/hc/model/Combat.js). A name and
+	// description; later skills and abilities. "statAdj": what it adds to its species'
+	// typical stats ({stat:n}, n below 0 to lower one), the baseline a creature of the two
+	// starts from (each kept in the species' range). "playable": whether you can choose it
 	// for a character (false if not given). "species": the species it can go with (any, if
 	// not given; a species can limit its backgrounds too: a pair fits if each allows the
 	// other). Your pieces are the first playable species with the first playable background
 	// that fits it, until character creation.
 	"backgrounds":{
-		"urchin":{
-			"name":"Urchin",
-			"description":"Grew up on the streets.",
-			"playable":true
-		},
 		"denizen":{
 			"name":"Denizen",
 			"description":"A denizen of the wilds."
 		},
+		"urchin":{
+			"name":"Urchin",
+			"description":"Grew up on the streets: quick fingers, a hard shell, little schooling and less charm.",
+			"playable":true,
+			"statAdj":{"dex":1, "wil":1, "int":-1, "cha":-1}
+		},
 		"reaver":{
 			"name":"Reaver",
 			"description":"You've taken what you want by force.",
-			"playable":true
+			"playable":true,
+			"statAdj":{"str":2, "wis":-1, "cha":-1}
+		},
+		"soldier":{
+			"name":"Soldier",
+			"description":"Drilled and hardened in a lord's army.",
+			"playable":true,
+			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1}
+		},
+		"acolyte":{
+			"name":"Acolyte",
+			"description":"Raised in a temple, among prayers and old books.",
+			"playable":true,
+			"statAdj":{"wis":1, "wil":1, "str":-1, "agl":-1}
+		},
+		"scholar":{
+			"name":"Scholar",
+			"description":"Years in libraries have sharpened the mind, if not the body.",
+			"playable":true,
+			"statAdj":{"int":2, "str":-1, "con":-1}
+		},
+		"noble":{
+			"name":"Noble",
+			"description":"Born to privilege, trained in manners and command.",
+			"playable":true,
+			"statAdj":{"cha":2, "con":-1, "wil":-1}
+		},
+		"hunter":{
+			"name":"Hunter",
+			"description":"Lived off the land, tracking game through the wild.",
+			"playable":true,
+			"statAdj":{"wis":1, "dex":1, "int":-1, "cha":-1}
+		},
+		"thief":{
+			"name":"Thief",
+			"description":"Made a living from locks, pockets and shadows.",
+			"playable":true,
+			"statAdj":{"agl":1, "dex":1, "wis":-1, "wil":-1}
+		},
+		"artisan":{
+			"name":"Artisan",
+			"description":"Apprenticed to a craft: patient, precise and practical.",
+			"playable":true,
+			"statAdj":{"dex":1, "int":1, "agl":-1, "cha":-1}
+		},
+		"hermit":{
+			"name":"Hermit",
+			"description":"Lived apart for years, alone with your thoughts.",
+			"playable":true,
+			"statAdj":{"wis":2, "cha":-2}
+		},
+		"sailor":{
+			"name":"Sailor",
+			"description":"Hauled ropes and rode out storms on the open sea.",
+			"playable":true,
+			"statAdj":{"agl":1, "con":1, "int":-1, "wis":-1}
+		},
+		"entertainer":{
+			"name":"Entertainer",
+			"description":"Sang, juggled and tumbled for coins in a travelling troupe.",
+			"playable":true,
+			"statAdj":{"cha":1, "agl":1, "wil":-1, "wis":-1}
+		},
+		"merchant":{
+			"name":"Merchant",
+			"description":"Grew up haggling over goods in the market.",
+			"playable":true,
+			"statAdj":{"cha":1, "int":1, "str":-1, "con":-1}
+		},
+		"farmhand":{
+			"name":"Farmhand",
+			"description":"Worked the fields from dawn to dusk.",
+			"playable":true,
+			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1}
+		},
+		"clan_smith":{
+			"name":"Clan Smith",
+			"description":"Learned the forge in the halls of your clan.",
+			"playable":true,
+			"species":["dwarf", "mountain_dwarf", "gnome"],
+			"statAdj":{"str":1, "dex":1, "agl":-1, "cha":-1}
+		},
+		"forest_warden":{
+			"name":"Forest Warden",
+			"description":"Kept watch over the old woods and the paths through them.",
+			"playable":true,
+			"species":["elf", "wood_elf", "high_elf", "half_elf"],
+			"statAdj":{"agl":1, "wis":1, "str":-1, "cha":-1}
+		},
+		"pit_fighter":{
+			"name":"Pit Fighter",
+			"description":"Fought for coin and crowds in the fighting pits.",
+			"playable":true,
+			"statAdj":{"str":1, "con":1, "wis":-1, "int":-1}
 		}
 	},
 	

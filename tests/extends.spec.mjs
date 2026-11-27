@@ -53,8 +53,9 @@ test('enemies extend: the goblin reaver is a goblin with its own stats over a go
     expect(await page.evaluate(() => {
         const r = hc.enemies.get('goblin_reaver'), g = hc.app.game, p = g.addPiece('core', 'enemy', 9, 9);
         g.giveProfile(p, 'goblin_reaver');
-        return [r.name, r.species, r.stats, r.damage, r.hp, r.xp, p.stats];
-    })).toEqual(['Goblin Reaver', ['goblin'], {str:12, con:12}, [2, 6], 8, 10, {str:12, agl:12, con:12, dex:10, int:6, wis:8, wil:6, cha:6}]);
+        // (A piece's stats: a goblin reaver's baseline, then its own.)
+        return [r.name, r.species, r.stats, r.damage, r.hp, r.xp, p.background, JSON.stringify(p.stats) === JSON.stringify({...g.baselineStats('goblin', 'reaver'), str:12, con:12})];
+    })).toEqual(['Goblin Reaver', ['goblin'], {str:12, con:12}, [2, 6], 8, 10, 'reaver', true]);
 });
 
 test('enemy groups don\'t extend', async ({page}) => {

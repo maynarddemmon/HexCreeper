@@ -202,8 +202,8 @@
                 species:playable(pkg.species),
                 backgrounds:playable(pkg.backgrounds),
                 fits:(s, b) => game.backgroundFits(s, b),
-                typical:id => ({...pkg.species.get(id)?.typical}),
-                range:(id, stat) => inRules(() => game.creationRange(id, stat)),
+                baseline:(species, background) => game.baselineStats(species, background),
+                range:(species, background, stat) => inRules(() => game.creationRange(species, background, stat)),
                 points:inRules(() => game.creationPoints()),
                 preview:ch => inRules(() => {
                     const q = game.characterPiece(ch);

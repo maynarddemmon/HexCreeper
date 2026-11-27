@@ -84,7 +84,7 @@
 (pkg => {
     'use strict';
     
-    const {Subtypes, attrs:{evaluate}} = pkg,
+    const {Subtypes, isObj, attrs:{evaluate}} = pkg,
         STATS = pkg.STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
         STAT_VARS = pkg.STAT_VARS = ['level', ...STATS],
         XP_VARS = pkg.XP_VARS = ['xp', 'rank', 'parentRank', 'level'], // the parentXPShare and childXPBonus rules'
@@ -122,9 +122,13 @@
         },
         
         /*  A background as the data has it, made usable ({playable, species:[ids] or
-            null}), or null if it isn't. */
-        parseBackground = entry => isFlag(entry.playable) && isIds(entry.species) ?
-            {playable:entry.playable === true, species:entry.species ? [...entry.species] : null} : null,
+            null, statAdj:{stat:n}}), or null if it isn't. */
+        parseBackground = entry => {
+            const adj = entry.statAdj ?? {},
+                ok = isFlag(entry.playable) && isIds(entry.species) && isObj(adj) &&
+                    Object.entries(adj).every(([s, v]) => STATS.includes(s) && Number.isInteger(v));
+            return ok ? {playable:entry.playable === true, species:entry.species ? [...entry.species] : null, statAdj:{...adj}} : null;
+        },
         
         DEFAULT_STAT = [3, 10, 18],          // a species' stat it doesn't give: [min, typical, max]
         DEFAULT_DAMAGE = [1, 4],             // a species' base damage, if it doesn't give one
@@ -183,6 +187,18 @@
     pkg.Combat = new JS.Module('Combat', {
         /*  Whether the species and background with these ids fit: each is there, and
             allows the other (if it says which it allows). */
+        /*  The stats a creature of the species and background with these ids starts
+            from: the species' typical ones, with the background's statAdj added, each
+            kept in the species' range. */
+        baselineStats: function(speciesId, backgroundId) {
+            const species = pkg.species.get(speciesId) ?? FALLBACK_SPECIES,
+                adj = pkg.backgrounds.get(backgroundId)?.statAdj ?? {};
+            return Object.fromEntries(STATS.map(s => {
+                const [min, max] = species.ranges[s];
+                return [s, Math.min(max, Math.max(min, species.typical[s] + (adj[s] ?? 0)))];
+            }));
+        },
+        
         backgroundFits: function(speciesId, backgroundId) {
             const s = pkg.species.get(speciesId),
                 b = pkg.backgrounds.get(backgroundId);
@@ -193,7 +209,8 @@
         // Your core is created at the start of a game (see Game.reset, and the character
         // sheet): a name (1 to NAME_MAX letters, not all space), a description (up to
         // DESCRIPTION_MAX), a playable species and a playable background that fit, and its
-        // stats: from its species' typical ones, each at most creationNegAdj below and
+        // stats: from its baseline (its species' typical ones with its background's
+        // adjustments: see baselineStats), each at most creationNegAdj below and
         // creationPosAdj above (and in its species' range), and creationPoints more in all
         // (lowering one gives a point to raise another).
         
@@ -212,9 +229,9 @@
             } else if (!pkg.backgrounds.get(ch.background)?.playable || !this.backgroundFits(species.id, ch.background)) {
                 retval = 'background';
             } else if (!(ch.stats && STATS.every(s => {
-                const [min, max] = this.creationRange(species.id, s);
+                const [min, max] = this.creationRange(species.id, ch.background, s);
                 return Number.isInteger(ch.stats[s]) && ch.stats[s] >= min && ch.stats[s] <= max;
-            }) && STATS.reduce((n, s) => n + ch.stats[s] - species.typical[s], 0) === this.creationPoints())) {
+            }) && STATS.reduce((n, s) => n + ch.stats[s] - this.baselineStats(species.id, ch.background)[s], 0) === this.creationPoints())) {
                 retval = 'stats';
             }
             return retval;
@@ -223,14 +240,14 @@
         /*  The stat points to spend creating a character. */
         creationPoints: function() {return Math.max(0, Math.round(this.rules.creationPoints)) || 0;},
         
-        /*  The range a created character of the species with id speciesId can have stat
-            in: [min, max], its typical value less creationNegAdj to it plus creationPosAdj,
-            within the species' range. */
-        creationRange: function(speciesId, stat) {
+        /*  The range a created character of the species and background with these ids
+            can have stat in: [min, max], its baseline value less creationNegAdj to it plus
+            creationPosAdj, within the species' range. */
+        creationRange: function(speciesId, backgroundId, stat) {
             const species = pkg.species.get(speciesId) ?? FALLBACK_SPECIES,
-                typical = species.typical[stat],
+                base = this.baselineStats(speciesId, backgroundId)[stat],
                 [min, max] = species.ranges[stat];
-            return [Math.max(min, typical - this.rules.creationNegAdj), Math.min(max, typical + this.rules.creationPosAdj)];
+            return [Math.max(min, base - this.rules.creationNegAdj), Math.min(max, base + this.rules.creationPosAdj)];
         },
         
         /*  Makes piece p (yours) character ch (see characterProblem): its species,
@@ -276,7 +293,7 @@
             } else {
                 p.background = choices[0] ?? '';
             }
-            p.stats = {...species.typical, ...profile.stats};
+            p.stats = {...this.baselineStats(species.id, p.background), ...profile.stats};
             p.level = profile.level;
             p.xp = 0;
             p.statPoints = {available:0, spent:0};

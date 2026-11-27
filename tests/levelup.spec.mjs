@@ -84,13 +84,14 @@ test('the sheet spends stat points: + and −, what would change in green, Confi
 
 test('Cancel puts the points back; without points the sheet only shows, with Close', async ({page}) => {
     await levelUp(page);
+    const wil = await page.evaluate(() => hc.app.game.getPlayerCore().stats.wil);
     await page.keyboard.press('i');
     await page.getByRole('button', {name:'Raise Will'}).click();
     await button(page, '✗ Cancel').click();
     expect(await page.evaluate(() => {
         const c = hc.app.game.getPlayerCore();
         return [c.stats.wil, c.statPoints];
-    })).toEqual([10, {available:2, spent:0}]);
+    })).toEqual([wil, {available:2, spent:0}]);
     await page.evaluate(() => {hc.app.game.getPlayerCore().statPoints.available = 0;});
     await page.keyboard.press('i');
     await expect(page.getByText('Available Stat Points')).toBeHidden();

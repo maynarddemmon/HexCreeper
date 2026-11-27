@@ -110,7 +110,8 @@
         species and a background (from the playable ones: one that fits none of the
         other's playable ones is disabled, and choosing one the other doesn't fit changes
         the other to the first that does), and the stats, from the species' typical ones
-        (again whenever the species or background changes), + and − on each (lowering one
+        with the background's adjustments (again whenever the species or background
+        changes), + and − on each (lowering one
         gives a point back), within what creation allows (see Combat.characterProblem).
         Confirm, once it has a name and every point is in, makes it; Cancel doesn't.
         
@@ -201,13 +202,13 @@
         
         /** @private Creates a character (see above), starting as character create
             ({name, description, species, background, stats}: its stats, if they're
-            allowed, else its species' typical ones). species and backgrounds are the
+            allowed, else its baseline). species and backgrounds are the
             playable ones ({id, name}), and fits(speciesId, backgroundId) whether a pair
-            fits. typical(speciesId) is a species' typical stats, range(speciesId, stat)
-            the range a stat can be in ([min, max]), points the points to spend, preview(ch)
+            fits. baseline(speciesId, backgroundId) is the stats a pair starts from,
+            range(speciesId, backgroundId, stat) the range a stat can be in ([min, max]), points the points to spend, preview(ch)
             a piece as ch would be, and describe as for show. onConfirm(ch) makes it;
             onCancel is called if it's not made. */
-        _create: function({create:ch, title, species, backgrounds, fits, typical, range, points, preview, describe, onConfirm, onCancel}) {
+        _create: function({create:ch, title, species, backgrounds, fits, baseline, range, points, preview, describe, onConfirm, onCancel}) {
             const self = this,
                 setOptions = (input, list, enabled) => {
                     const select = input.input;
@@ -217,16 +218,16 @@
             self._fits = fits;
             self._speciesList = species;
             self._backgroundList = backgrounds;
-            self._typical = typical;
+            self._baseline = () => baseline(self._speciesInput.input.getIDE().value, self._backgroundInput.input.getIDE().value);
             self._onCancel = onCancel;
             self._setMode('create', title, {
                 describe,
                 onConfirm: adds => onConfirm(self._character(adds)),
-                base: () => typical(self._speciesInput.input.getIDE().value),
+                base: () => self._baseline(),
                 limits: stat => {
-                    const id = self._speciesInput.input.getIDE().value,
-                        [min, max] = range(id, stat);
-                    return [min - typical(id)[stat], max - typical(id)[stat]];
+                    const [min, max] = range(self._speciesInput.input.getIDE().value, self._backgroundInput.input.getIDE().value, stat),
+                        base = self._baseline()[stat];
+                    return [min - base, max - base];
                 },
                 points: () => points,
                 piece: adds => preview(self._character(adds))
@@ -238,8 +239,8 @@
             const sp = species.find(s => s.id === ch?.species && backgrounds.some(b => fits(s.id, b.id))) ?? species.find(s => backgrounds.some(b => fits(s.id, b.id)));
             self._speciesInput.input.getIDE().value = sp?.id ?? '';
             self._backgroundInput.input.getIDE().value = backgrounds.find(b => b.id === ch?.background && fits(sp?.id, b.id))?.id ?? backgrounds.find(b => fits(sp?.id, b.id))?.id ?? '';
-            // Its stats, if they're its species' typical ones with points that are allowed
-            const base = sp ? typical(sp.id) : {},
+            // Its stats, if they're its baseline with points that are allowed
+            const base = sp ? self._baseline() : {},
                 adds = Object.fromEntries(STATS.map(s => [s, (ch?.stats?.[s] ?? base[s]) - base[s]])),
                 fine = STATS.every(s => {
                     const [lo, hi] = self._modeOpts.limits(s);
@@ -280,7 +281,7 @@
         _character: function(adds) {
             const self = this,
                 speciesId = self._speciesInput.input.getIDE().value,
-                base = self._typical(speciesId);
+                base = self._baseline();
             return {
                 name:self._nameInput.input.value ?? '',
                 description:self._descriptionInput.input.value ?? '',

@@ -39,11 +39,13 @@ export const startGame = async (page, {skipHelp=true} = {}) => {
     return problems;
 };
 
-/*  The character tests play: a human urchin, its creation points on stats nothing uses
-    yet (int and cha), so it's as a plain human would be. */
+/*  The character tests play: a human urchin, as a plain human would be in what the rules
+    use (str, agl, con, wis: 10). The urchin's adjustments (dex and wil up a point, int
+    and cha down: see entities.json5) and its creation points (on int and cha) are on
+    stats nothing uses yet. If the urchin's adjustments change, so must this. */
 export const TEST_CHARACTER = {
     name:'Tess', description:'', species:'human', background:'urchin',
-    stats:{str:10, agl:10, con:10, dex:10, int:11, wis:10, wil:10, cha:11}
+    stats:{str:10, agl:10, con:10, dex:11, int:10, wis:10, wil:11, cha:10}
 };
 
 /*  Waits until the App exists and its game has started. Without a save, the game starts
@@ -53,9 +55,17 @@ export const waitForGame = async page => {
     const isReady = () => window.hc?.app?.ready && window.hc.app.game.getPlayerCore() != null,
         start = button(page, '✓ Start'),
         confirm = button(page, '✓ Confirm');
+    let stuck = 0;
     while (!await page.evaluate(isReady)) {
         if (await start.count()) await start.click();
-        if (await confirm.count()) await confirm.click();
+        if (await confirm.count()) {
+            // (Disabled: the character isn't one creation allows, as the data is now.)
+            if (await confirm.evaluate(b => b.classList.contains('disabled'))) {
+                if (++stuck > 40) throw new Error('TEST_CHARACTER can\'t be created with the data as it is: see helpers.mjs');
+            } else {
+                await confirm.click();
+            }
+        }
         await page.waitForTimeout(50);
     }
 };

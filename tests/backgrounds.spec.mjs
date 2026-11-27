@@ -117,3 +117,34 @@ test('the character sheet names the species and background', async ({page}) => {
     await page.keyboard.press('i');
     await expect(page.getByText('Tess · Human · Urchin · Level 1')).toBeVisible();
 });
+
+test('a background adjusts its species\' typical stats: the baseline, kept in the species\' range', async ({page}) => {
+    const r = await withData(page, () => {
+        hc.species.define({
+            human:{name:'Human', playable:true},
+            gnome:{name:'Gnome', playable:true, stats:{str:[3, 7, 8]}}
+        });
+        hc.backgrounds.define({
+            smith:{name:'Smith', playable:true, statAdj:{str:2, cha:-2}},
+            bad:{name:'Bad', statAdj:{luck:1}},
+            worse:{name:'Worse', statAdj:{str:1.5}}
+        });
+        const g = hc.app.game, p = g.addPiece('core', 'player', 9, 9),
+            human = g.baselineStats('human', 'smith'), gnome = g.baselineStats('gnome', 'smith');
+        g.giveProfile(p, undefined, 'human', 'smith');
+        const out = {human:[human.str, human.cha, human.agl], gnome:gnome.str, piece:[p.stats.str, p.stats.cha],
+            range:g.creationRange('human', 'smith', 'str'), bad:[!!hc.backgrounds.get('bad'), !!hc.backgrounds.get('worse')]};
+        g.removePiece(p);
+        return out;
+    });
+    // A gnome's str is at most 8. The range is 2 below and 3 above the baseline (12).
+    expect(r).toEqual({human:[12, 8, 10], gnome:8, piece:[12, 8], range:[10, 15], bad:[false, false]});
+});
+
+test('the data: every playable species has a playable background that fits it', async ({page}) => {
+    const lonely = await page.evaluate(() => {
+        const g = hc.app.game, playable = hc.backgrounds.list().filter(b => b.playable);
+        return hc.species.list().filter(s => s.playable && !playable.some(b => g.backgroundFits(s.id, b.id))).map(s => s.id);
+    });
+    expect(lonely).toEqual([]);
+});
