@@ -7,7 +7,7 @@
 (pkg => {
     'use strict';
     
-    const {cfg} = pkg,
+    const {cfg, AP_UNIT} = pkg,
         UNSEEN_COST = 3, // a step onto a cell you haven't seen counts as this many, so known ways come first
         SWARM_COST = 2,  // and onto one of the piece's swarm, which makes way (Follow), this many
         RADIUS = 120,    // the farthest a route goes, in steps (unseen ones counting as UNSEEN_COST)
@@ -256,7 +256,7 @@
                             const ap = new Map(base.ap).set(id, base.ap.get(id) - spent),
                                 tired = tiring ? new Map(base.tired).set(id, base.tired.get(id) + tiring) : base.tired,
                                 lost = tiring * this.apRecovery(this.pieces.get(id)),
-                                child = {pos, ap, tired, cost:base.cost + (spent + lost) / pkg.AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
+                                child = {pos, ap, tired, cost:base.cost + (spent + lost) / AP_UNIT, plan:[...base.plan, {id, kind, x, y, other}]};
                             if (other !== undefined) ap.set(other, ap.get(other) - costs.get(other));
                             child.score = score(child);
                             open.push(child);

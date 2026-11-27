@@ -48,7 +48,9 @@
             cfg:{
                 DATA_BASE_DIR, HEADER_HEIGHT, FOOTER_HEIGHT, GITHUB_URL
             },
-            ICON_SEPARATOR
+            ICON_SEPARATOR,
+            formatAp, formatXp,
+            VAR_XP, VAR_LEVEL
         } = pkg,
         
         {game, draw} = V,
@@ -92,9 +94,6 @@
         
         /*  The key for a keydown: the code for numpad keys, the lowercase character for
             others, or the key's name (e.g. "Enter"). */
-        // Action points (kept in hundredths: see Combat.js) as points, e.g. "1.75"
-        formatAp = ap => String(ap / pkg.AP_UNIT),
-        formatXp = xp => String(xp / pkg.XP_UNIT),
         
         // Shows or hides the combat log (the combatLog preference, so it's kept).
         toggleLog = () => {pkg.settings.set('combatLog', !pkg.cfg.COMBAT_LOG);},
@@ -133,8 +132,8 @@
                 case 'miss': text = i18n('log-miss', a, d, e.roll, e.chance); break;
                 case 'harm': text = i18n('log-harm', d, e.dmg); break;
                 case 'destroyed': text = e.linked ? i18n('log-destroyed-linked', d, e.linked) : i18n('log-destroyed', d); break;
-                case 'xp': text = i18n('log-xp', a, formatXp(e.xp)); break;
-                case 'level': text = i18n('log-level', a, e.level); break;
+                case VAR_XP: text = i18n('log-xp', a, formatXp(e.xp)); break;
+                case VAR_LEVEL: text = i18n('log-level', a, e.level); break;
                 case 'multikill': text = i18n('log-multikill', e.count); break;
                 default: text = e.kind;
             }

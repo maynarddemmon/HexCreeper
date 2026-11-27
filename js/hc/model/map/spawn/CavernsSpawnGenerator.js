@@ -15,10 +15,11 @@
     'use strict';
     
     const {
-        attrs:{num, expr, tiers, evaluate, pickTier},
-        hexDist
-    } = pkg,
-        CHALLENGE_VARS = ['level', 'levels', 'distance', 'size'],
+            attrs:{num, expr, tiers, evaluate, pickTier},
+            hexDist,
+            VAR_LEVEL
+        } = pkg,
+        CHALLENGE_VARS = [VAR_LEVEL, 'levels', 'distance', 'size'],
         KINDS = ['cavern', 'tunnel'],
         // The enemies and groups a table can name
         enemyOptions = () => [...pkg.enemies.list(), ...pkg.enemyGroups.list()].map(e => ({value:e.id, label:e.name}));

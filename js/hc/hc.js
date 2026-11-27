@@ -16,7 +16,14 @@
             }
             
             return I18N;
-        })(LOCALE_KEY);
+        })(LOCALE_KEY),
+        
+        VAR_LEVEL = 'level',
+        VAR_XP = 'xp',
+        
+        AP_UNIT = 100, // Action Points are kept to the hundredth of a point.
+        XP_UNIT = 100, // Hit Points are kept to the hundredth of a point.
+        STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'];
     
     pkg.hc = {
         app:null, // Holds the App instance.
@@ -52,6 +59,21 @@
             colorSuccess:'var(--gain)',
             colorError:'var(--dmg)'
         },
+        
+        
+        // Entities and Characters //
+        AP_UNIT,
+        XP_UNIT,
+        STATS,
+        
+        // Expression Vars
+        VAR_XP,
+        VAR_LEVEL,
+        
+        STAT_VARS: [VAR_LEVEL, ...STATS],
+        XP_VARS: [VAR_XP, 'rank', 'parentRank', VAR_LEVEL], // the parentXPShare and childXPBonus rules'
+        MULTI_KILL_VARS: [VAR_XP, 'killCount', VAR_LEVEL], // the multiKillBonusXP rule's
+        DAMAGE_VARS: ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
         
         // Tile Types (the terrain: a cell with none is plain floor; heals, harms and loot
         // are fixtures: see Fixtures.js)
@@ -195,9 +217,19 @@
         /*  A new seed for a map: a random whole number below a million, easy to note down. */
         randomSeed: () => Math.floor(Math.random() * 1000000),
         
+        /*  An animation time (ms, one of cfg.ANIM's) at the Animation speed preference. */
+        animMs: ms => ms * 100 / pkg.hc.cfg.ANIM.speed,
+        
+        // Object Utility
         isObj: v => v !== null && typeof v === 'object' && !Array.isArray(v),
         
-        /*  An animation time (ms, one of cfg.ANIM's) at the Animation speed preference. */
-        animMs: ms => ms * 100 / pkg.hc.cfg.ANIM.speed
+        // Math Utility
+        isNatNum: v => Number.isInteger(v) && v >= 0,
+        isIntOfAtLeast: (v, min=0) => Number.isInteger(v) && v >= min,
+        isIntBetween: (v, min=0, max=Infinity) => Number.isInteger(v) && v >= min && v <= max,
+        
+        // Formatting
+        formatAp: ap => String(ap / AP_UNIT),
+        formatXp: xp => String(xp / XP_UNIT)
     };
 })(window);

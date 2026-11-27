@@ -10,7 +10,8 @@
         {
             cfg:{PIECE_R, CORE_BORDER, RING_GAP, ANIM, SHADOW, HEADER_HEIGHT, FOOTER_HEIGHT},
             TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_HEAL, FIXTURE_LOOT,
-            PIECE_TYPES
+            PIECE_TYPES,
+            AP_UNIT
         } = pkg,
         
         FX_MS = 650,                 // how long an effect plays, unless it says (its dur)
@@ -669,7 +670,9 @@
                     ah = Math.max(2, h * 0.5);
                 bar(ay, ah, p.ap / pool, '--ap-bar');
                 ctx.fillStyle = css('--bg');
-                for (let k = pkg.AP_UNIT; k < pool; k += pkg.AP_UNIT) ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);
+                for (let k = AP_UNIT; k < pool; k += AP_UNIT) {
+                    ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);
+                }
             }
         },
         

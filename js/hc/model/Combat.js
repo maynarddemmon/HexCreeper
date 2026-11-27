@@ -84,19 +84,18 @@
 (pkg => {
     'use strict';
     
-    const {Subtypes, isObj, attrs:{evaluate}} = pkg,
-        STATS = pkg.STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
-        STAT_VARS = pkg.STAT_VARS = ['level', ...STATS],
-        XP_VARS = pkg.XP_VARS = ['xp', 'rank', 'parentRank', 'level'], // the parentXPShare and childXPBonus rules'
-        MULTI_KILL_VARS = pkg.MULTI_KILL_VARS = ['xp', 'killCount', 'level'], // the multiKillBonusXP rule's
-        DAMAGE_VARS = pkg.DAMAGE_VARS = ['min', 'max', 'roll', 'roll2'], // the damageRoll rule's
-        isInt = v => Number.isInteger(v) && v >= 0,
+    const {
+            Subtypes, isObj, attrs:{evaluate},
+            AP_UNIT, XP_UNIT, STATS, 
+            VAR_XP, VAR_LEVEL, STAT_VARS, XP_VARS, MULTI_KILL_VARS, DAMAGE_VARS,
+            isNatNum, isIntOfAtLeast, isIntBetween
+        } = pkg,
         
         /*  What the damageRoll rule (of rules) comes to for a range of min to max and the
             rolls roll and roll2: a whole number, not below 0. */
         rolled = (rules, min, max, roll, roll2) => Math.max(0, Math.floor(evaluate(rules.damageRoll, DAMAGE_VARS, {min, max, roll, roll2})) || 0),
         
-        isRange = v => Array.isArray(v) && v.length === 2 && v.every(isInt) && v[0] <= v[1],
+        isRange = v => Array.isArray(v) && v.length === 2 && v.every(isNatNum) && v[0] <= v[1],
         isIds = v => v === undefined || (Array.isArray(v) && v.every(s => typeof s === 'string')),
         isFlag = v => v === undefined || typeof v === 'boolean',
         
@@ -111,7 +110,7 @@
             for (const s of STATS) {
                 const v = entry.stats?.[s] ?? DEFAULT_STAT,
                     [min, mid, max] = Array.isArray(v) && v.length === 2 ? [v[0], Math.round((v[0] + v[1]) / 2), v[1]] : Array.isArray(v) ? v : [];
-                if (Array.isArray(v) && (v.length === 2 || v.length === 3) && v.every(isInt) && min <= mid && mid <= max) {
+                if (Array.isArray(v) && (v.length === 2 || v.length === 3) && v.every(isNatNum) && min <= mid && mid <= max) {
                     ranges[s] = [min, max];
                     typical[s] = mid;
                 } else {
@@ -153,12 +152,12 @@
                 return null;
             }
             if (!(stats && typeof stats === 'object' && !Array.isArray(stats)) ||
-                !Object.entries(stats).every(([s, v]) => STATS.includes(s) && isInt(v) && species.every(sp => v >= sp.ranges[s][0] && v <= sp.ranges[s][1])) ||
-                !(Number.isInteger(level) && level >= 1) ||
+                !Object.entries(stats).every(([s, v]) => STATS.includes(s) && isNatNum(v) && species.every(sp => v >= sp.ranges[s][0] && v <= sp.ranges[s][1])) ||
+                !isIntOfAtLeast(level, 1) ||
                 !(damage === undefined || isRange(damage)) ||
-                !isInt(entry.penetration ?? 0) || !isInt(entry.armor ?? 0) ||
-                !(entry.hp === undefined || (Number.isInteger(entry.hp) && entry.hp >= 1)) ||
-                !isInt(entry.xp ?? 0) || !isIds(entry.backgrounds)) return null;
+                !isNatNum(entry.penetration ?? 0) || !isNatNum(entry.armor ?? 0) ||
+                !(entry.hp === undefined || isIntOfAtLeast(entry.hp, 1)) ||
+                !isNatNum(entry.xp ?? 0) || !isIds(entry.backgrounds)) return null;
             return {species:species.map(sp => sp.id), backgrounds:[...(entry.backgrounds ?? [DEFAULT_ENEMY_BACKGROUND])],
                 stats:{...stats}, level, damage:damage ? [...damage] : null,
                 penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp};
@@ -173,8 +172,6 @@
         LOG_MAX = 200,                       // combat log entries kept
         ODDS_STEPS = 60,                     // rolls tried each way in damageOdds (exact for ranges of 1 to 6, 10, 12... values)
         
-        AP_UNIT = pkg.AP_UNIT = 100,         // a point, in the hundredths action points are kept in
-        XP_UNIT = pkg.XP_UNIT = 100,         // a point, in the hundredths xp is kept in
         MIN_COST = 10,                       // the least an action can cost (so there's an end to them)
         LEVEL_UP_MS = 1400,                  // how long the rings of a level up take to play
         NAME_MAX = pkg.CHARACTER_NAME_MAX = 64, // the longest a character's name can be
@@ -230,7 +227,7 @@
                 retval = 'background';
             } else if (!(ch.stats && STATS.every(s => {
                 const [min, max] = this.creationRange(species.id, ch.background, s);
-                return Number.isInteger(ch.stats[s]) && ch.stats[s] >= min && ch.stats[s] <= max;
+                return isIntBetween(ch.stats[s], min, max);
             }) && STATS.reduce((n, s) => n + ch.stats[s] - this.baselineStats(species.id, ch.background)[s], 0) === this.creationPoints())) {
                 retval = 'stats';
             }
@@ -574,7 +571,7 @@
         /*  Piece p gains xp (hundredths), going up a level (or more) at the xpToLevel
             rule's xp. */
         gainXp: function(p, xp) {
-            this.logCombat({kind:'xp', a:this.whoOf(p), xp});
+            this.logCombat({kind:VAR_XP, a:this.whoOf(p), xp});
             this.fx(p.x, p.y, `+${xp / XP_UNIT} XP`, '--gain', {delay:160, follow:p.id});
             p.xp += xp;
             for (let need = this.xpRule('xpToLevel', p); need > 0 && p.xp >= need; need = this.xpRule('xpToLevel', p)) {
@@ -582,7 +579,7 @@
                 p.level++;
                 p.statPoints.available += Math.max(0, this.statRule('statPointsPerLevel', p));
                 this.updateMaxHp(p);
-                this.logCombat({kind:'level', a:this.whoOf(p), level:p.level});
+                this.logCombat({kind:VAR_LEVEL, a:this.whoOf(p), level:p.level});
                 // (After its "+n XP" has risen out of the way.)
                 this.fx(p.x, p.y, 'Level ' + p.level + '!', '--gain', {delay:500, follow:p.id});
                 this.fx(p.x, p.y, '', '--level-up', {levelUp:true, core:p.id === this.playerCoreId, delay:500, dur:LEVEL_UP_MS, follow:p.id});
@@ -621,7 +618,7 @@
                 total = entries.reduce((n, [, v]) => n + v, 0);
             let retval = false;
             if (p?.owner === 'player' && this.pieces.has(p.id) && total <= p.statPoints.available &&
-                entries.every(([s, v]) => STATS.includes(s) && Number.isInteger(v) && v >= 0 && p.stats[s] + v <= this.statRange(p, s)[1])) {
+                entries.every(([s, v]) => STATS.includes(s) && isNatNum(v) && p.stats[s] + v <= this.statRange(p, s)[1])) {
                 for (const [s, v] of entries) p.stats[s] += v;
                 p.statPoints.available -= total;
                 p.statPoints.spent += total;
