@@ -56,7 +56,7 @@
         });
     
     /*  Lists every map in data/init.json5; pressing a map's name plays it. The list is
-        built the first time it's shown, once init.json5 has loaded. onPlay(mapId) is
+        built the first time it's shown, once the data has loaded. onPlay(mapId) is
         called when a map's name is pressed, after the dialog closes. */
     pkg.MapsDialog = new JSClass('MapsDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////

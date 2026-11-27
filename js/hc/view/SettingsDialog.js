@@ -68,7 +68,7 @@
         
         /*  A label and a drop-down list for one choice setting. The value is set as soon as
             another is chosen. The options are filled in when it's refreshed, since some
-            (the solid subtypes) are only known once data/init.json5 has loaded. */
+            (the solid subtypes) are only known once the data has loaded. */
         ChoiceRow = new JSClass('ChoiceRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,

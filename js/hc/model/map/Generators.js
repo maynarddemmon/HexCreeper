@@ -18,7 +18,7 @@
             types:{}, // name -> TileGenerator subclass (see register)
             
             /*  A set of subtypes (solids, holes, fixtures...), as the options of a choice or
-                table attr. They're known once init.json5 has loaded. */
+                table attr. They're known once the data has loaded (see Maps.loadIndex). */
             optionsOf: subtypes => () => subtypes.list().map(s => ({value:s.id, label:s.name}))
         },
         

@@ -121,7 +121,7 @@
             }
         },
         
-        // ---- Shadows (cfg.SHADOW, from data/init.json5) ----
+        // ---- Shadows (cfg.SHADOW, from data/environs.json5) ----
         // One light, so every shadow falls the same way: away from it, at SHADOW.angle. A
         // solid's shadow is its hex moved that way by its length, on the floor below it,
         // as dark as its coverage; a hole's is the shadow of its rim on the side the light

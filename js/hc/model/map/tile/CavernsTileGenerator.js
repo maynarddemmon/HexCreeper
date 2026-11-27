@@ -181,7 +181,7 @@
                 // cavern floor, off the tunnels' paths, so none cuts a cavern off.
                 num('featureFrequency', 5, 0, 100),
                 
-                // Which kinds, by weight (data/init.json5; heals, harms and loot are fixtures:
+                // Which kinds, by weight (data/environs.json5; heals, harms and loot are fixtures:
                 // see Fixtures.js).
                 table('holeTable', {pit:6, chasm:3, sinkhole:1}, optionsOf(pkg.holes)),
                 table('floorTable', {loose_stone:2, mud:1, pool:1}, optionsOf(pkg.floors)),

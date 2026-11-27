@@ -1,0 +1,170 @@
+{
+	// Who's in them: species, backgrounds, enemies and enemy groups. Included by init.json5.
+	
+	// Species: what a creature is, a template for it (see js/hc/model/Combat.js). "stats":
+	// for each stat, the range it can be in and its typical value (a profile's if it
+	// doesn't say): [min, typical, max], or [min, max] for a typical value half way
+	// (rounded); [3, 10, 18] if not given (a species going down to 0 should say so). An
+	// entry can extend another (a sub-species), a stat's whole entry replacing the other's.
+	// "damage": its base damage, [min, max] ([1, 4] if not given), a profile's if it
+	// doesn't say. "playable": whether you can choose it for a character (false if not
+	// given). "backgrounds": the backgrounds it can go with (any, if not given).
+	"species":{
+		"human":{
+			"name":"Human",
+			"description":"Adaptable, curious and stubborn.",
+			"damage":[1, 6],
+			"playable":true,
+			"stats":{
+				"str":[3, 10, 18], 
+				"agl":[3, 10, 18], 
+				"con":[3, 10, 18], 
+				"dex":[3, 10, 18], 
+				"int":[3, 10, 18], 
+				"wis":[3, 10, 18], 
+				"wil":[3, 10, 18], 
+				"cha":[3, 10, 18]
+			}
+		},
+		"dwarf":{
+			"name":"Dwarf",
+			"description":"Stout, resilient and strong.",
+			"damage":[1, 6],
+			"playable":true,
+			"stats":{
+				"str":[3, 11, 18], 
+				"agl":[3, 9,  18], 
+				"con":[3, 11, 18], 
+				"dex":[3, 10, 18], 
+				"int":[3, 9,  18], 
+				"wis":[3, 10, 18], 
+				"wil":[3, 11, 18], 
+				"cha":[3, 9,  18]
+			}
+		},
+		"elf":{
+			"name":"Elf",
+			"description":"Graceful, nimble and smart.",
+			"damage":[1, 6],
+			"playable":true,
+			"stats":{
+				"str":[3, 8,  18], 
+				"agl":[3, 11, 18], 
+				"con":[3, 9,  18], 
+				"dex":[3, 11, 18], 
+				"int":[3, 11, 18], 
+				"wis":[3, 10, 18], 
+				"wil":[3, 10, 18], 
+				"cha":[3, 10, 18]
+			}
+		},
+		"goblin":{
+			"name":"Goblin",
+			"description":"Small, quick and spiteful, with green skin, big eyes and sharp teeth.",
+			"stats":{"str":[4, 8, 14], "agl":[6, 12, 18], "con":[4, 8, 14], "dex":[4, 10, 16], "int":[3, 6, 12], "wis":[3, 8, 14], "wil":[3, 6, 12], "cha":[3, 6, 12]},
+			"damage":[1, 4]
+		},
+		"creeper":{
+			"name":"Creeper",
+			"description":"Things that crawl out of the dark: nobody knows quite what.",
+			"stats":{"str":[3, 8, 18], "agl":[3, 8, 18], "con":[3, 8, 18]},
+			"damage":[1, 4]
+		}
+	},
+	
+	// Backgrounds: where a creature comes from (see js/hc/model/Combat.js). For now a name
+	// and description; later skills and abilities. "playable": whether you can choose it
+	// for a character (false if not given). "species": the species it can go with (any, if
+	// not given; a species can limit its backgrounds too: a pair fits if each allows the
+	// other). Your pieces are the first playable species with the first playable background
+	// that fits it, until character creation.
+	"backgrounds":{
+		"urchin":{
+			"name":"Urchin",
+			"description":"Grew up on the streets.",
+			"playable":true
+		},
+		"denizen":{
+			"name":"Denizen",
+			"description":"A denizen of the wilds."
+		},
+		"reaver":{
+			"name":"Reaver",
+			"description":"You've taken what you want by force.",
+			"playable":true
+		}
+	},
+	
+	// Enemies' profiles: what a piece is in a fight (see js/hc/model/Combat.js). "species" (the id
+	// of the species it's for, or a list of them, a piece being the first unless it's
+	// chosen; it must have one), "backgrounds" (those it can have, one that fits its
+	// species chosen at random for each piece: ["denizen"] if not given), "stats" (str, agl,
+	// con, dex, int, wis, wil, cha, its own: its species' typical values for any not given,
+	// and within all its species' ranges), "level" (1), "damage" ([min, max], its
+	// weapon's, before its str bonus: its species' base damage if not given), "penetration" (how much damage reduction its weapon
+	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
+	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: else the xpValue rule's).
+	
+	// Named enemies: what a single enemy piece is, by id ("name", "description", and its
+	// profile). An enemy without a name is a creeper.
+	"enemies":{
+		"creeper":{
+			"name":"Creeper",
+			"description":"Something that crawls out of the dark.",
+			"species":"creeper",
+			"hp":4,
+			"xp":4
+		},
+		"goblin":{
+			"name":"Goblin",
+			"description":"A small humanoid with green skin, big eyes and sharp teeth.",
+			"species":"goblin",
+			"backgrounds":["urchin","denizen"],
+			"hp":5,
+			"xp":5
+		},
+		"goblin_reaver":{
+			"extends":"goblin",
+			"name":"Goblin Reaver",
+			"backgrounds":["reaver"],
+			"description":"A big goblin with a cruel blade.",
+			"stats":{"str":12, "con":12},
+			"damage":[2, 6],
+			"hp":8,
+			"xp":10
+		}
+	},
+	
+	// Enemies as they come, linked into trees ("name", "description", "members"). members
+	// is a list of nodes, each an enemy's id (one piece, on its own), {"<enemy id>":[nodes]}
+	// for an enemy with those linked below it, or a group's id, standing for all its trees
+	// (so a group can't have nodes below it). An id names an enemy or a group, not both. A
+	// spawn generator's table can name either (see js/hc/model/Enemies.js).
+	"enemyGroups":{
+		"goblin_pair":{
+			"name":"Goblin Pair",
+			"description":"A pair of goblins.",
+			"members":[{"goblin":["goblin"]}]
+		},
+		"goblin_trio":{
+			"name":"Goblin Trio",
+			"description":"A trio of goblins.",
+			"members":[{"goblin_reaver":["goblin", "goblin"]}]
+		},
+		"goblin_pack":{
+			"name":"Goblin Pack",
+			"description":"A pack of goblins: a leader and three trios.",
+			"members":[{"goblin_reaver":["goblin_trio", "goblin_trio", "goblin_trio"]}]
+		},
+		"goblin_horde":{
+			"name":"Goblin Horde",
+			"description":"A horde of goblins.",
+			"members":[
+				"goblin_pack",
+				"goblin_trio","goblin_trio",
+				"goblin_pair","goblin_pair","goblin_pair",
+				"goblin","goblin","goblin","goblin","goblin","goblin","goblin"
+			]
+		}
+	}
+}

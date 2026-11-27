@@ -1,4 +1,4 @@
-/*  A set of subtypes from data/init.json5: the kinds of a kind of tile (solid, hole,
+/*  A set of subtypes from the game's data (data/environs.json5, entities.json5): the kinds of a kind of tile (solid, hole,
     heal, harm and loot tiles), or the materials solids are made of. Every entry has a
     name and optionally a description; parse(entry, id) makes the rest of it usable, or
     gives null if it isn't, and the entry is left out with a console error ("Bad <kind>
@@ -27,7 +27,7 @@
         },
         
         /*  data ({id:entry}) with every "extends" worked out (see above): {entries:{id:entry},
-            bad:{id:why}}. Entries keep init.json5's order. */
+            bad:{id:why}}. Entries keep the data's order. */
         resolveExtends = data => {
             const done = new Map(),  // id -> the entry worked out
                 bad = new Map(),     // id -> why it can't be
@@ -84,7 +84,7 @@
             this.byId = new Map();
         },
         
-        /*  Replaces the subtypes with those given, as init.json5 has them: {id:entry},
+        /*  Replaces the subtypes with those given, as the data has them: {id:entry},
             with any "extends" worked out. Each is {id, name, description, ...parse(entry,
             id)}. */
         define: function(data) {
@@ -107,7 +107,7 @@
         /*  A subtype by id, or undefined. */
         get: function(id) {return this.byId.get(id);},
         
-        /*  Every subtype, in the order init.json5 lists them. */
+        /*  Every subtype, in the order the data lists them. */
         list: function() {return [...this.byId.values()];}
     });
 })(hc);

@@ -91,7 +91,7 @@
             // Shadows of solids and holes (see Render.js), from one light: angle (degrees
             // clockwise from pointing right, so 90 is straight down), color, blur (px) and
             // length (in hexes, unless a solid or hole subtype says: its shadowLength).
-            // data/init.json5's "shadow" goes over these. on: whether they're drawn (a
+            // data/environs.json5's "shadow" goes over these. on: whether they're drawn (a
             // preference).
             SHADOW:{
                 on:true,

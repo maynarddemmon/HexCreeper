@@ -61,7 +61,7 @@
             num('creationPoints', 2, 0, 30),
             num('creationNegAdj', 2, 0, 15),
             num('creationPosAdj', 3, 0, 15),
-            // Combat and action points (see Combat.js). Their defaults are in init.json5's
+            // Combat and action points (see Combat.js). Their defaults are in rules.json5's
             // "rules", to tune them there; these are only for if it hasn't them. Formulas of
             // a piece's level and stats (pkg.STAT_VARS), rounded down, but the hit chance,
             // of accuracy and defence, the damage roll, and action points and xp (kept in
@@ -91,7 +91,7 @@
             expr('rallyAmount', '(con / 10) * level', pkg.STAT_VARS),
             expr('rallyRefresh', 'Math.max(10, 150 - level)', pkg.STAT_VARS),
             // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
-            // (Not in init.json5: a map can set them, as any rule.)
+            // (Not in rules.json5: a map can set them, as any rule.)
             expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece
             num('corePathLength', 250, 0, 100000) // how many of the core's latest steps the golden path keeps (0: none)
         ],
@@ -132,7 +132,7 @@
     // The preferences in effect from the start.
     for (const def of PREFERENCES) def.obj[def.prop] = prefs[def.id] ?? def.defaultValue;
     
-    // The rules' defaults: init.json5's (see setDefaultRules), else the ones above.
+    // The rules' defaults: rules.json5's (see setDefaultRules), else the ones above.
     let defaultRules = resolve(RULES, undefined, '');
     
     pkg.settings = {
@@ -170,10 +170,10 @@
             used skipped with a warning saying where (e.g. "Map warrens"). */
         cleanRules: (rules, where) => resolve(RULES, rules, where + ' rules', true),
         
-        /*  Sets the rules' defaults from init.json5's "rules" (those it has, made usable as
+        /*  Sets the rules' defaults from rules.json5's "rules" (those it has, made usable as
             cleanRules does), over the ones here. */
         setDefaultRules: rules => {
-            defaultRules = {...resolve(RULES, undefined, ''), ...resolve(RULES, rules, 'init.json5 rules', true)};
+            defaultRules = {...resolve(RULES, undefined, ''), ...resolve(RULES, rules, 'rules.json5 rules', true)};
         },
         
         /*  Every rule, {id:value}: those given, made usable as cleanRules does, and the

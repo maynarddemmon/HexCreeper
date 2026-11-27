@@ -1,7 +1,7 @@
 /*  Stats, levels and combat (a module included in Game).
     
     Every piece has a species, a background and, for an enemy, a profile, from
-    data/init.json5.
+    data/entities.json5.
     
     A species (`species`) is what a creature is, a template for it: in "stats", for each
     stat, the range it can be in and its typical value, [min, typical, max], or [min,
@@ -43,7 +43,7 @@
     and a piece gets a copy (so it can change: a level, and later more), with its xp.
     
     The rules this uses are formulas (expr attrs: see Settings.js), their defaults in
-    init.json5's "rules", to tune them there (or a map, for itself).
+    rules.json5's "rules", to tune them there (or a map, for itself).
     
     An attack: a d100 roll; it hits if that's no more than the hit chance (the hitChance
     rule, of the attacker's accuracy and the target's defence, kept from hitMin to hitMax).
@@ -100,7 +100,7 @@
         isIds = v => v === undefined || (Array.isArray(v) && v.every(s => typeof s === 'string')),
         isFlag = v => v === undefined || typeof v === 'boolean',
         
-        /*  A species as init.json5 has it, made usable ({ranges:{stat:[min, max]},
+        /*  A species as the data has it, made usable ({ranges:{stat:[min, max]},
             typical:{stat:n}, damage:[min, max], playable, backgrounds:[ids] or null}), or
             null if it isn't. */
         parseSpecies = entry => {
@@ -121,7 +121,7 @@
             return ok ? {ranges, typical, damage:[...damage], playable:entry.playable === true, backgrounds:entry.backgrounds ? [...entry.backgrounds] : null} : null;
         },
         
-        /*  A background as init.json5 has it, made usable ({playable, species:[ids] or
+        /*  A background as the data has it, made usable ({playable, species:[ids] or
             null}), or null if it isn't. */
         parseBackground = entry => isFlag(entry.playable) && isIds(entry.species) ?
             {playable:entry.playable === true, species:entry.species ? [...entry.species] : null} : null,
@@ -139,7 +139,7 @@
             return list.length && list.every(Boolean) ? list : null;
         },
         
-        /*  A profile as init.json5 has it, made usable ({species:[ids], stats:{its own},
+        /*  A profile as the data has it, made usable ({species:[ids], stats:{its own},
             damage (or null: its species'), ...}), or null if it isn't (its species must
             be in pkg.species). */
         parseProfile = (entry, id, species = speciesOf(entry.species)) => {
@@ -160,7 +160,7 @@
                 penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp};
         },
         
-        // What a profile is if init.json5 doesn't say (or has no such one), and yours
+        // What a profile is if the data doesn't say (or has no such one), and yours
         // (nothing of its own: all from its species)
         DEFAULT_ENEMTY = 'creeper',
         DEFAULT_ENEMY_BACKGROUND = 'denizen',
@@ -271,7 +271,7 @@
                 p.background = backgroundId;
             } else if (enemy) {
                 p.background = choices.length ? choices[Math.floor(this.rngFor('background', p.id)() * choices.length)] : '';
-                // (Not for the fallback profile: there's no data, before init.json5 has loaded.)
+                // (Not for the fallback profile: there's no data, before the data has loaded.)
                 if (!choices.length && profile !== FALLBACK) console.error('Enemy', id ?? DEFAULT_ENEMTY, 'has no background that fits its species', species.id);
             } else {
                 p.background = choices[0] ?? '';

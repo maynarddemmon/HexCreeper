@@ -1,0 +1,72 @@
+{
+	// The rules' defaults, for every map (see js/hc/model/Settings.js): included by init.json5.
+	
+	// The rules of combat and action points (see js/hc/model/Combat.js), as formulas: numbers,
+	// + - * / % ^, parentheses, Math functions (max(a, b) or Math.max(a, b)), comparisons
+	// (< <= > >= == !=), && || !, and c ? a : b. They're the
+	// defaults for every map (a map's own "rules" can change them, for it). Most are of a
+	// piece's "level" and stats (str agl con dex int wis wil cha), and are rounded down.
+	"rules":{
+		// HP and levels
+		"maxHp":"10 + con / 2 + (level - 1) * (2 + con / 5)", // unless its profile fixes its hp
+		"xpToLevel":"20 * level",                          // the xp to go up from this level
+		"xpValue":"5 * level",                             // what killing an enemy is worth, unless its profile says
+		"statPointsPerLevel":"2",                          // stat points to spend at each level up (of the new level)
+		// The xp a piece gets for its kills in an action that killed killCount enemy pieces
+		// in all (of xp, killCount, level): 5% more for each kill after the first, at most
+		// double. Before XP sharing.
+		"multiKillBonusXP":"xp + xp * Math.min(20, killCount - 1) / 20",
+		// XP sharing up a piece's links: of xp (what the piece got), rank (its), parentRank, level
+		"childXPBonus":"xp * parentRank / 20",             // more for a piece with a parent, first
+		"parentXPShare":"xp * rank / 20",                  // then passed up to its parent (which does the same)
+		
+		// An attack: a d100 roll hits if it's no more than hitChance (in %, of the attacker's
+		// accuracy and the target's defence, kept from hitMin to hitMax).
+		"meleeAccuracy":"str + level",
+		"defence":"agl + level",
+		"hitChance":"50 + 3 * (accuracy - defence)",
+		"hitMin":5,
+		"hitMax":95,
+		// Then the damage: damageRoll, of the weapon's range ("min" and "max", each with
+		// damageBonus, never below 0) and two rolls ("roll" and "roll2", each from 0 up to 1),
+		// less the target's armor after penetration (the weapon's, plus penetrationBonus if
+		// more than 0). E.g. "min + floor((roll + roll2) * (max - min + 1) / 2)" for two dice.
+		"damageRoll":"min + floor(roll * (max - min + 1))",
+		"damageBonus":"(str - 10) / 2",
+		"penetrationBonus":"(str - 10) / 4",
+		
+		// Action points, in points (not rounded: kept in hundredths). A pool is at least a
+		// point, and an action; an action or a jump costs at least 0.1.
+		"apPool":"1 + con / 10",           // the most a piece can have
+		"apRecovery":"0.5 + agl / 40",     // what it gets back at the end of each turn
+		"apInitiative":"(wis + agl) / 40", // what it gets when an enemy first comes into your sight
+		"actionCost":"1",                  // what an action costs (a step, an attack, a jump, a swap, a detach or attach)
+		"jumpExhaustion":"2",              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
+		"rallyCost":"0.5",                 // what rallying costs, in action points
+		"rallyTurns":"3",                  // the turns a rally lasts
+		"rallyAmount":"(con / 10) * level", // the HP a rallying piece gets back at the end of each of them
+		"rallyRefresh":"Math.max(10, 150 - level)" // the turns from rallying until a piece can rally again
+	},
+	
+	// Status effects a piece can have for a while ("name" and "description", to show, and
+	// "icon", drawn above a piece that has it: one of img/icons', by name). "muted":true:
+	// no icon, but it shows in the character sheet; "hidden":true: it shows nowhere. What
+	// each does is the game's, by its id (see js/hc/model/Effects.js).
+	"effects":{
+		"exhausted":{
+			"name":"Exhausted",
+			"description":"Gets no action points back at the end of the turn.",
+			"icon":"battery-low"
+		},
+		"rallying":{
+			"name":"Rallying",
+			"description":"Gets back some HP at the end of each turn.",
+			"hidden":true
+		},
+		"rallied":{
+			"name":"Rallied",
+			"description":"Can't rally again until this wears off.",
+			"muted":true
+		}
+	}
+}

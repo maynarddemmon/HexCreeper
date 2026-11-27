@@ -1,5 +1,5 @@
 /*  Status effects: what a piece is going through for a while (a module included in
-    Game). Their kinds, from data/init.json5's "effects" (see Subtypes.js): a name and a
+    Game). Their kinds, from data/environs.json5's "effects" (see Subtypes.js): a name and a
     description, to show, and an icon, drawn above a piece that has it (one of img/icons',
     by name: see Render.js). A "muted" one has no icon drawn, but shows in the character
     sheet and when you point at an enemy (for long-lasting things: curses, diseases,

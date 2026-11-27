@@ -20,7 +20,7 @@
                 num('quadRadius', 5, 1, 6),        // quadrants' radius; the start cell (0,0) is the centre of quadrant (0,0)
                 choice('baseFloor', 'stone_floor', optionsOf(pkg.floors)), // what a cell with no tile is (see Game.baseFloor)
                 
-                // Heals and harms per quadrant, of these kinds of fixture (data/init.json5;
+                // Heals and harms per quadrant, of these kinds of fixture (data/environs.json5;
                 // see Fixtures.js).
                 num('healPerQuad', 1, 0, 20),
                 num('harmPerQuad', 1, 0, 40),

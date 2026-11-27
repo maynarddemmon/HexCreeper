@@ -861,7 +861,7 @@
             
             game.reset(); // With the stored settings, now they're in effect.
             
-            // Once init.json5 has loaded (it has the materials and solids a game needs), carry on 
+            // Once the data has loaded (it has the materials and solids a game needs), carry on 
             // with the saved game, if there is one, or else show the default map's brief. ready 
             // is true once either is done. Help follows on a first visit.
             const whenReady = () => {

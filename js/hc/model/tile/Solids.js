@@ -1,4 +1,4 @@
-/*  Materials and solid and hole subtypes, from data/init.json5 (see Subtypes.js).
+/*  Materials and solid and hole subtypes, from data/environs.json5 (see Subtypes.js).
     
     A material has a hardness, which is the damage reduction (dr) of anything made of it,
     a density (not used yet) and an opacity (0-100, default 100: how much it blocks sight).
@@ -21,7 +21,7 @@
     
     Either may have a shadowLength: how long its shadow is, in hexes (how tall a solid is,
     or how deep a hole), else cfg.SHADOW's length. The light the shadows come from is
-    init.json5's "shadow" (see defineShadow). */
+    environs.json5's "shadow" (see defineShadow). */
 (pkg => {
     'use strict';
     
@@ -73,7 +73,7 @@
         : null);
     
     /*  Sets the light shadows come from (cfg.SHADOW: angle, color, blur, length) from
-        init.json5's "shadow", {id:value}: those given that are usable, with a warning for
+        environs.json5's "shadow", {id:value}: those given that are usable, with a warning for
         any that aren't. */
     pkg.defineShadow = data => {
         const shadow = pkg.cfg.SHADOW,
@@ -82,7 +82,7 @@
             if (ok[id]?.(value)) {
                 shadow[id] = value;
             } else {
-                console.warn('init.json5 shadow', id, 'cannot be', value);
+                console.warn('environs.json5 shadow', id, 'cannot be', value);
             }
         }
     };

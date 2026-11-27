@@ -1,6 +1,6 @@
 /*  Fixtures: what sits on the ground of a cell: heals, harms and loot, which do something
     when one of your pieces enters it, and features (barricades, brambles, later doors),
-    which may be in the way. Their kinds, from data/init.json5's "fixtures" (see
+    which may be in the way. Their kinds, from data/environs.json5's "fixtures" (see
     Subtypes.js), and how a game makes, reveals, uses and breaks them (a module included in
     Game).
     

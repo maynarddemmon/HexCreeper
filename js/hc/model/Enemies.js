@@ -1,4 +1,4 @@
-/*  Named enemies, from data/init.json5 (see Maps.loadIndex):
+/*  Named enemies, from data/entities.json5 (see Maps.loadIndex):
     
     - enemies: {id:{name, description, ...}}, what a single enemy piece is, with its
       stats (see Combat.js, which makes the table, pkg.enemies).
@@ -23,7 +23,7 @@
     // (Groups are only their members, so there's nothing for one to extend: see Subtypes.js.)
     pkg.enemyGroups = new Subtypes('enemy group', entry => isNodes(entry.members) && entry.members.length ? {members:entry.members} : null, false);
     
-    /*  Replaces the enemies and groups with those given, as init.json5 has them. */
+    /*  Replaces the enemies and groups with those given, as the data has them. */
     pkg.defineEnemies = (enemies, groups) => {
         pkg.enemies.define(enemies);
         for (const e of pkg.enemies.list()) {
