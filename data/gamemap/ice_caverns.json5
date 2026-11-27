@@ -44,6 +44,22 @@
 		"stalactiteSolid":"icicle",
 		"rubbleSolid":"ice_boulder"
 	},
-	"spawnGenerator":{"type":"caverns"},
+	"spawnGenerator":{
+		"type":"caverns",
+		"cavernSpawnChance":85,
+		"tunnelSpawnChance":50,
+		"cavernSpawnChanceModifierOnSuccess":0,
+		"cavernSpawnChanceModifierOnFailure":15,
+		"tunnelSpawnChanceModifierOnSuccess":0,
+		"tunnelSpawnChanceModifierOnFailure":25,
+		"enemyChallenge":"level + floor(levels / 3) + floor(distance / 50) + floor(size / 25)",
+		"challengeTable":[
+			{"min":0,  "max":4,  "table":{"goblin":25, "goblin_reaver":25, "hobgoblin":50}},
+			{"min":5,  "max":8,  "table":{"hobgoblin":25, "hobgoblin_reaver":25, "goblin_pair":50}},
+			{"min":9,  "max":12, "table":{"hobgoblin_reaver":25, "goblin_pair":25, "goblin_trio":50}},
+			{"min":13, "max":15, "table":{"hobgoblin_reaver":15, "goblin_trio":35, "goblin_pack":50}},
+			{"min":16,           "table":{"goblin_trio":15, "goblin_pack":35, "goblin_horde":50}}
+		]
+	},
 	"enemyAI":{"type":"squad"}
 }

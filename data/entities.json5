@@ -379,12 +379,29 @@
 			"extends":"goblin",
 			"name":"Goblin Reaver",
 			"backgrounds":["reaver"],
-			"description":"A big goblin with a cruel blade.",
+			"description":"A goblin with a cruel blade.",
 			"stats":{"str":12, "con":12},
 			"damage":[2, 6],
 			"hp":8,
 			"xp":10
-		}
+		},
+		"hobgoblin":{
+			"name":"Hobgoblin",
+			"description":"A big goblin with a menacing stare.",
+			"species":"hobgoblin",
+			"backgrounds":["urchin","denizen","pit_fighter"],
+			"hp":8,
+			"xp":10
+		},
+		"hobgoblin_reaver":{
+			"name":"Hobgoblin Reaver",
+			"description":"A big goblin with a cruel blade.",
+			"species":"hobgoblin",
+			"backgrounds":["reaver"],
+			"damage":[2, 8],
+			"hp":13,
+			"xp":15
+		},
 	},
 	
 	// Enemies as they come, linked into trees ("name", "description", "members"). members
