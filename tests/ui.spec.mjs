@@ -361,3 +361,33 @@ test('the info panel: the map and seed on a line, then the selected piece\'s nam
     });
     await expect(page.getByText('Detached piece · level 1', {exact:true})).toBeVisible();
 });
+
+test('the info panel: a need\'s value is green while it does the piece good, red while it harms it; AP past whole points is lighter', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const bar = label => page.locator('.myt-HudBar').filter({has:page.getByText(label, {exact:true})});
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), b = n => g.needBounds(c, n);
+        g.rules.thirstHighRecovery = '0.1';
+        g.rules.hungerLowHp = '-0.25';
+        g.rules.fatigueLowStats = '0';
+        g.rules.fatigueLowRecovery = '0';
+        g.rules.fatigueLowHp = '0';
+        c.needs.thirst = b('thirst').max;
+        c.needs.hunger = b('hunger').min;
+        c.needs.fatigue = b('fatigue').min;    // low, but it does nothing
+        c.ap = 150;
+        g.rules.apPool = '2';
+        hc.view.draw();
+    });
+    const color = async label => (await bar(label).locator('.myt-PlainText').last().evaluate(e => e.style.color));
+    expect(await color('Thirst')).toBe('var(--gain)');
+    expect(await color('Hunger')).toContain('var(--');
+    expect(await color('Hunger')).not.toBe('var(--gain)');
+    expect(await color('Fatigue')).toBe(await color('XP'));
+    // The AP bar: a whole point in white, the half past it lighter
+    const widths = await bar('AP').evaluate(e => [...e.querySelectorAll('div')].filter(d => d.style.backgroundColor.includes('ap-bar'))
+        .map(d => [d.style.backgroundColor, parseFloat(d.style.width)]));
+    const full = widths.find(([c]) => c === 'var(--ap-bar)')[1], partial = widths.find(([c]) => c.includes('partial'))[1];
+    expect(partial).toBeCloseTo(full * 1.5, 0);
+});

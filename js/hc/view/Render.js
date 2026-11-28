@@ -678,8 +678,9 @@
             return [0, 2, 4].map(i => parseInt(long.slice(i, i + 2), 16) || 0);
         },
         
-        // Under the HP bar (red), a thinner one for the piece's action points (white), out
-        // of its pool, with a tick at each whole point.
+        // Under the HP bar (red), a thinner one for the piece's action points (white, and
+        // light grey for the part of a point past its whole ones), out of its pool, with a
+        // tick at each whole point.
         drawBars = (p, cx, cy, s) => {
             const w = s * 0.56,
                 h = Math.max(3, s * 0.06),
@@ -696,7 +697,10 @@
             if (pool > 0) {
                 const ay = y + h + 1,
                     ah = Math.max(2, h * 0.5);
-                bar(ay, ah, p.ap / pool, '--ap-bar');
+                // (The part of a point past its whole points in a lighter colour)
+                bar(ay, ah, p.ap / pool, '--ap-bar-partial');
+                ctx.fillStyle = css('--ap-bar');
+                ctx.fillRect(x, ay, w * Math.min(1, Math.floor(p.ap / AP_UNIT) * AP_UNIT / pool), ah);
                 ctx.fillStyle = css('--bg');
                 for (let k = AP_UNIT; k < pool; k += AP_UNIT) {
                     ctx.fillRect(x + w * k / pool - 0.5, ay, 1, ah);

@@ -43,7 +43,7 @@
             dialogUtil:{openConfirmMsgDialog, openAckMsgDialog, openWhenClear, isAnyShowing},
             theme:{
                 spacing, padding,
-                colorAccent, colorText, colorTextMuted, colorError, colorHeaderBg, colorHeaderText, colorBtn,
+                colorAccent, colorText, colorTextMuted, colorError, colorSuccess, colorHeaderBg, colorHeaderText, colorBtn,
                 fontSizeSmall, fontSizeMedium, fontSizeVeryLarge, fontFamilyMono
             },
             cfg:{
@@ -862,19 +862,28 @@
                     x:HUD_VALUE_X, y:3 + (self.height - HUD_BAR_HEIGHT) / 2, width:HUD_BAR_WIDTH, height:HUD_BAR_HEIGHT,
                     bgColor:'var(--grid)', roundedCorners:2
                 });
+                // (Past whole, in a lighter colour: see show)
+                self._partial = new View(self._track, {
+                    height:HUD_BAR_HEIGHT, bgColor:`var(${color}-partial, transparent)`, roundedCorners:2
+                });
                 self._fill = new View(self._track, {height:HUD_BAR_HEIGHT, bgColor:`var(${color})`, roundedCorners:2});
                 self._marks = [];
             },
             
             makeValue: function(textColor) {return this.callSuper(textColor, HUD_VALUE_X + HUD_BAR_WIDTH + HUD_GAP);},
             
-            /*  Shows value of max (as text: shown), with marks at the fractions marks (of the
-                bar's width). */
-            show: function(value, max, text, marks = []) {
+            /*  Shows value of max (as text: shown, in textColor, if given), with marks at the
+                fractions marks (of the bar's width). Given whole, the bar's colour goes only
+                to that, and from there to value in its lighter colour (its colour's CSS
+                variable with "-partial": AP's part of a point). */
+            show: function(value, max, text, marks = [], {whole = value, textColor = colorText} = {}) {
                 const self = this,
-                    track = self._track;
-                self._fill.setWidth(track.width * Math.min(1, Math.max(0, max > 0 ? value / max : 0)));
+                    track = self._track,
+                    width = v => track.width * Math.min(1, Math.max(0, max > 0 ? v / max : 0));
+                self._partial.setWidth(width(value));
+                self._fill.setWidth(width(Math.min(whole, value)));
                 self._value.setText(text);
+                self._value.setTextColor(textColor);
                 while (self._marks.length < marks.length) {
                     self._marks.push(new View(track, {width:1, height:HUD_BAR_HEIGHT, bgColor:'var(--bg)'}));
                 }
@@ -929,14 +938,21 @@
                     const pool = game.apMax(sel),
                         dashes = [];
                     for (let k = AP_UNIT; k < pool; k += AP_UNIT) dashes.push(k / pool);
-                    bars.ap.show(sel.ap, pool, formatAp(sel.ap) + '/' + formatAp(pool), dashes);
+                    bars.ap.show(
+                        sel.ap, pool, formatAp(sel.ap) + '/' + formatAp(pool), dashes, {whole:Math.floor(sel.ap / AP_UNIT) * AP_UNIT}
+                    );
                     bars.hp.show(sel.hp, sel.maxHp, Math.max(0, sel.hp) + '/' + sel.maxHp);
                     // Each need, with marks at its lower and upper (see Needs.js)
                     for (const n of NEEDS) {
                         const v = game.needValue(sel, n);
                         if (v != null) {
                             const {lower, upper, max} = game.needBounds(sel, n);
-                            bars[n].show(v, max, Math.floor(v / NEED_UNIT) + '/' + Math.floor(max / NEED_UNIT), [lower / max, upper / max]);
+                            // Its value green while it does the piece good, red while it does it harm
+                            const effect = ['Recovery', 'Hp', 'Stats'].reduce((t, what) => t + game.needEffect(sel, n, what), 0),
+                                text = Math.floor(v / NEED_UNIT) + '/' + Math.floor(max / NEED_UNIT);
+                            bars[n].show(v, max, text, [lower / max, upper / max], {
+                                textColor:effect > 0 ? colorSuccess : effect < 0 ? colorError : colorText
+                            });
                         }
                     }
                     const toLevel = game.xpRule('xpToLevel', sel);
