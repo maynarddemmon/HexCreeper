@@ -23,6 +23,7 @@
         
         AP_UNIT = 100, // Action Points are kept to the hundredth of a point.
         XP_UNIT = 100, // Hit Points are kept to the hundredth of a point.
+        NEED_UNIT = 100, // Needs (thirst, hunger, fatigue) are kept to the hundredth of a point.
         STATS = ['str', 'agl', 'con', 'dex', 'int', 'wis', 'wil', 'cha'],
         
         FIXTURE_HEAL = 'heal',
@@ -77,6 +78,7 @@
         // Entities and Characters //
         AP_UNIT,
         XP_UNIT,
+        NEED_UNIT,
         STATS,
         CHARACTER_NAME_MAX:64, // the longest a character's name can be
         CHARACTER_DESCRIPTION_MAX:1024, // and its description
@@ -85,6 +87,9 @@
         ITEM_GOLD:'gold_coin', // gold: what loot gives, and placing a piece costs
         // Where a piece can equip things (an item kind's equip.slot: see Items.js)
         EQUIP_SLOTS:['weapon', 'offhand', 'body', 'head', 'hands', 'feet'],
+        
+        // What your pieces need (see Needs.js)
+        NEEDS:['thirst', 'hunger', 'fatigue'],
         
         // Status Effects (the ones the code uses: see Effects.js)
         EFFECT_EXHAUSTED:'exhausted',

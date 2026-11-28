@@ -13,6 +13,7 @@
 	//   inventory: if things can be put in it: {"capacity", "weight", "volume"}, the most
 	//              it can hold (each without limit if not given). One that holds things
 	//              doesn't stack. Its own volume should allow for what it holds.
+	//              "fluids":true: it holds fluids (a flask), and only them.
 	//   equip:     if a piece can equip it: {"slot", "damage", "penetration", "armor"}.
 	//              slot: "weapon", "offhand", "body", "head", "hands" or "feet"; damage: a
 	//              weapon's [min, max], in place of the piece's own (its species' or
@@ -20,6 +21,12 @@
 	//              its own (0 if not given); armor: what it adds to the piece's (0 if not
 	//              given); cost: the action points equipping or unequipping it takes (the
 	//              equipCost rule's if not given). Enemies equip what they're given.
+	//   quench, satiates: what a dose of it does to thirst and hunger, if it can be drunk
+	//              or eaten (below 0 to make them worse: salty food)
+	//   dose:      how many of it a drink or a bite is (1 if not given)
+	//   consumeCost: what eating or drinking it costs (the consumeCost rule's if not given)
+	//   fluid:     true for a fluid (water): it goes only in what holds fluids, and is
+	//              counted in millilitres (its volume is 1)
 	// What a species leaves when it dies is one of these (its "corpse" in entities.json5:
 	// "corpse" if it doesn't say), holding everything it had, and named for it ("goblin
 	// corpse", "creeper husk", "corpse of Tess").
@@ -135,25 +142,64 @@
 			"equip":{"slot":"feet", "cost":0.5}
 		},
 		
-		// Food (it can't be eaten yet)
+		// Food and drink (see js/hc/model/Needs.js)
 		"mushroom_jerky":{
 			"name":"mushroom jerky",
 			"plural":"mushroom jerky",
-			"description":"Dried strips of cave mushroom.",
+			"description":"Dried strips of cave mushroom. Salty.",
 			"material":"fungus",
 			"volume":25,
-			"stack":20
+			"stack":20,
+			"satiates":100,
+			"quench":-20
 		},
 		"centipede_jerky":{
 			"name":"centipede jerky",
 			"plural":"centipede jerky",
-			"description":"Dried giant centipede. Chewy.",
+			"description":"Dried giant centipede. Chewy, and saltier still.",
 			"material":"flesh",
 			"volume":25,
-			"stack":20
+			"stack":20,
+			"satiates":150,
+			"quench":-30
+		},
+		"water":{
+			"name":"water",
+			"plural":"water",
+			"description":"Water: a drink is a quarter of a litre.",
+			"material":"water",
+			"volume":1,
+			"stack":1000000,
+			"fluid":true,
+			"dose":250,
+			"quench":250
 		},
 		
 		// Containers
+		"flask":{
+			"name":"flask",
+			"description":"A small tin flask: a quarter of a litre.",
+			"material":"tin",
+			"volume":300,
+			"weight":150,
+			"inventory":{"capacity":1, "volume":250, "fluids":true}
+		},
+		"canteen":{
+			"name":"canteen",
+			"description":"A tin canteen: a litre.",
+			"material":"tin",
+			"volume":1100,
+			"weight":300,
+			"inventory":{"capacity":1, "volume":1000, "fluids":true}
+		},
+		"water_skin":{
+			"name":"water skin",
+			"description":"A leather skin: two litres.",
+			"material":"leather",
+			"volume":2100,
+			"weight":250,
+			"inventory":{"capacity":1, "volume":2000, "fluids":true}
+		},
 		"belt_pouch":{
 			"name":"belt pouch",
 			"description":"A small leather pouch.",

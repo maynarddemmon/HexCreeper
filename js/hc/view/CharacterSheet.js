@@ -172,8 +172,8 @@
             self._speciesInput = new InputRow(container, {label:i18n('sheet-species'), make:select('_choseSpecies')});
             self._backgroundInput = new InputRow(container, {label:i18n('sheet-background'), make:select('_choseBackground')});
             
-            // Level, XP, status and equipment
-            self._infoRows = [0, 1, 2, 3].map(() => row(container));
+            // Level, XP, status, equipment, thirst, hunger and fatigue
+            self._infoRows = [0, 1, 2, 3, 4, 5, 6].map(() => row(container));
             
             // Stats on the left, combat on the right
             const columns = self._columns = new WideView(container),
@@ -198,7 +198,7 @@
         /*  Shows, or levels, piece p (see above); or, with opts.create (a character to
             start from, or null for none), creates a character (see _create).
             describe(q) gives the lines for a piece q, as it is or would be:
-            {info:[[label, value], ...], combat:[[label, value], ...]} (four and nine of
+            {info:[[label, value], ...], combat:[[label, value], ...]} (seven and nine of
             them). statMax(stat) is the most a stat can be (its species'). preview(adds) is
             p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them.
             onDescription(text) is called as its description is edited, and onInventory()

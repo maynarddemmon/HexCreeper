@@ -18,8 +18,32 @@
             isObj,
             attrs:{num, bool, choice, expr, normalize, resolve},
             cfg,
-            PLAYER_MOVE_MODES, STAT_VARS, DAMAGE_VARS, XP_VARS, MULTI_KILL_VARS, COST_VARS
+            PLAYER_MOVE_MODES, STAT_VARS, DAMAGE_VARS, XP_VARS, MULTI_KILL_VARS, COST_VARS, NEEDS
         } = pkg,
+        
+        /*  Each need's rules (see Needs.js), with their defaults: its bounds (minThirst,
+            lowerThirst, upperThirst, maxThirst), its ticks (thirstTurnTick, thirstApTick),
+            what it does low and high (thirstLowRecovery, thirstHighRecovery, thirstLowHp,
+            thirstHighHp, thirstLowStats, thirstHighStats) and how much more at its min
+            (thirstMinMultiplier). Defaults not given are 0. */
+        NEED_DEFAULTS = {
+            thirst:{TurnTick:'-0.25', ApTick:'-0.05', LowRecovery:'-0.25', HighRecovery:'0.1'},
+            hunger:{TurnTick:'-0.25', ApTick:'-0.05', LowHp:'-0.25', HighHp:'0.1'},
+            fatigue:{TurnTick:'-0.1', ApTick:'-0.15'}
+        },
+        NEED_RULES = NEEDS.flatMap(need => {
+            const Need = need[0].toUpperCase() + need.slice(1),
+                defaults = NEED_DEFAULTS[need] ?? {};
+            return [
+                expr('min' + Need, '0', STAT_VARS),
+                expr('lower' + Need, '25 * (con / 10)', STAT_VARS),
+                expr('upper' + Need, '75 * (con / 10)', STAT_VARS),
+                expr('max' + Need, '100 * (con / 10)', STAT_VARS),
+                ...['TurnTick', 'ApTick', 'LowRecovery', 'HighRecovery', 'LowHp', 'HighHp', 'LowStats', 'HighStats']
+                    .map(k => expr(need + k, defaults[k] ?? '0', STAT_VARS)),
+                expr(need + 'MinMultiplier', '2', STAT_VARS)
+            ];
+        }),
         
         PREFS_KEY = 'hc.prefs',
         
@@ -92,6 +116,10 @@
             expr('dropCost', '0.15', STAT_VARS),
             expr('transferCost', '0.25', STAT_VARS),
             expr('equipCost', '0.5', STAT_VARS),
+            expr('consumeCost', '0.25', STAT_VARS),
+            expr('fillCost', '0.5', STAT_VARS),
+            // Thirst, hunger and fatigue (see NEED_RULES)
+            ...NEED_RULES,
             expr('rallyTurns', '5', STAT_VARS),
             expr('rallyAmount', '(con / 10) * level', STAT_VARS),
             expr('rallyRefresh', 'Math.max(10, 150 - level)', STAT_VARS),

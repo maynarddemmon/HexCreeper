@@ -52,7 +52,7 @@
             ICON_SEPARATOR, ICON_CANCEL,
             TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, PLAYER_MOVE_MODES,
             formatAp, formatXp, formatWeight, formatVolume,
-            VAR_XP, VAR_LEVEL
+            VAR_XP, VAR_LEVEL, NEEDS, NEED_UNIT
         } = pkg,
         
         {game, draw} = V,
@@ -105,8 +105,24 @@
         
         // Piece p's status effects (see Effects.js), but hidden ones, as "Exhausted (2 more
         // turns)", or ''
-        formatEffects = p => (p.effects ?? []).filter(e => !pkg.effects.get(e.id)?.hidden).map(e => i18n(e.countdown === 1 ? 'effect-turn' : 'effect-turns',
-            pkg.effects.get(e.id)?.name ?? e.id, e.countdown)).join(', '),
+        formatEffects = p => [
+            ...(p.effects ?? []).filter(e => !pkg.effects.get(e.id)?.hidden).map(e => i18n(e.countdown === 1 ? 'effect-turn' : 'effect-turns',
+                pkg.effects.get(e.id)?.name ?? e.id, e.countdown)),
+            game.needWords(p)  // (thirst, hunger and fatigue, when they aren't in the middle: see Needs.js)
+        ].filter(Boolean).join(', '),
+        
+        /*  Piece p's need, for the character sheet: "62/100", and what it's like, if it isn't
+            in the middle ("62/100 · Parched"); or a dash, without needs. */
+        formatNeed = (p, need) => {
+            const v = game.needValue(p, need);
+            let retval = '—';
+            if (v != null) {
+                const level = game.needLevel(p, need),
+                    text = Math.floor(v / NEED_UNIT) + '/' + Math.floor(game.needBounds(p, need).max / NEED_UNIT);
+                retval = level === 'mid' ? text : i18n('sheet-need-level', text, i18n('need-' + need + '-' + level));
+            }
+            return retval;
+        },
         
         // ---- The combat log ----
         LOG_LINES = 8,
@@ -148,6 +164,7 @@
                 [i18n('sheet-level'), q.level],
                 [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
                 [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')],
+                ...NEEDS.map(need => [i18n('sheet-' + need), formatNeed(q, need)]),
                 [i18n('sheet-equipment'), game.equipment(q).map(it => game.itemLabel(it)).join(', ') || i18n('sheet-equipment-none')]
             ],
             combat:[
@@ -241,9 +258,18 @@
             const why = problem => problem ? i18n('inv-why-' + problem) : '',
                 // An action's problem, or null when it isn't offered
                 rows = (holder, carried, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => {
-                    const actions = carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))},
-                        slot = game.itemKind(it).equip?.slot;
-                    if (it.inventory) actions.takeAll = why(game.takeAllProblem(p, it.id));
+                    const kind = game.itemKind(it),
+                        // (A fluid can't be taken or dropped: it's poured from one flask to another.)
+                        actions = kind.fluid ? {} : carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))},
+                        slot = kind.equip?.slot;
+                    // Something that holds fluids is filled; anything else that holds things, its
+                    // all taken.
+                    if (kind.inventory?.fluids) {
+                        actions.fill = why(game.fillProblem(p, it.id));
+                    } else if (it.inventory) {
+                        actions.takeAll = why(game.takeAllProblem(p, it.id));
+                    }
+                    if (game.isConsumable(kind)) actions.consume = why(game.consumeProblem(p, it.id));
                     // What it carries itself can be equipped (or unequipped).
                     if (slot && holder === p) actions.equip = why(game.equipProblem(p, it.id, !!it.equipped));
                     actions.transfer = why(game.over ? 'over' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap');
@@ -251,7 +277,7 @@
                         {
                             id:it.id, weight:formatWeight(game.itemWeight(it)), depth,
                             label:it.equipped ? i18n('item-equipped', game.itemLabel(it), i18n('slot-' + slot)) : game.itemLabel(it),
-                            container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped, actions
+                            container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped, fluid:kind.fluid, actions
                         },
                         ...rows(it, carried, depth + 1)
                     ];
@@ -265,30 +291,45 @@
                         part(t.capacity, l.capacity, String), part(t.weight, l.weight, formatWeight), part(t.volume, l.volume, formatVolume)
                     ].join(' · ');
                 },
-                title = ({ref, holder, dir}) => {
-                    const name = ref.startsWith('fixture:') ? game.fixtureType(holder).name : '';
-                    return ref === 'piece' ? i18n('inv-carried') : ref === 'ground' ? i18n('inv-ground') :
-                        dir < 0 ? i18n('inv-fixture-here', name) : i18n('inv-fixture-near', name, i18n('dir-' + dir));
+                // Something named, where it is: "Chest (here)", "Stream (east)"
+                where = (name, dir) => dir < 0 ? i18n('inv-fixture-here', name) : i18n('inv-fixture-near', name, i18n('dir-' + dir)),
+                title = ({ref, holder, dir}) => ref === 'piece' ? i18n('inv-carried') : ref === 'ground' ? i18n('inv-ground') :
+                    where(game.fixtureType(holder).name, dir),
+                // A stream or pool's section: something to drink, or fill a flask from
+                sourceSection = s => ({
+                    ref:s.ref, title:where(s.floor.name, s.dir), summary:'', open:true, expanded:null, takeAll:null, rows:[],
+                    note:'inv-source', drink:why(game.drinkProblem(p, s.ref))
+                }),
+                sourceCost = ref => {
+                    const fluid = game.fluidSources(p).find(s => s.ref === ref)?.fluid;
+                    return cost(game.consumeCostOf(p, {kind:fluid}));
                 },
                 cost = n => formatAp(n);
             inventoryDialog.show({
                 title:i18n('dlg-inventory-title', logName(game.whoOf(p), true)),
-                describe:() => game.reachHolders(p).map(top => ({
-                    ref:top.ref,
-                    title:title(top),
-                    summary:top.open ? summary(top.holder, top.ref !== 'ground') : '',
-                    open:top.open,
-                    expanded:top.ref.startsWith('fixture:') ? top.holder.expanded !== false : null,
-                    takeAll:top.ref === 'piece' ? null : why(game.takeAllProblem(p, top.ref)),
-                    rows:top.open ? rows(top.holder, top.ref === 'piece') : []
-                })),
+                describe:() => [
+                    ...game.reachHolders(p).map(top => ({
+                        ref:top.ref,
+                        title:title(top),
+                        summary:top.open ? summary(top.holder, top.ref !== 'ground') : '',
+                        open:top.open,
+                        expanded:top.ref.startsWith('fixture:') ? top.holder.expanded !== false : null,
+                        takeAll:top.ref === 'piece' ? null : why(game.takeAllProblem(p, top.ref)),
+                        rows:top.open ? rows(top.holder, top.ref === 'piece') : []
+                    })),
+                    ...game.fluidSources(p).map(sourceSection)
+                ],
                 tips:{
                     take:what => i18n('tip-take', what, cost(game.takeCost(p))),
                     drop:what => i18n('tip-drop', what, cost(game.dropCost(p))),
                     takeAll:what => i18n('tip-takeAll', what, cost(game.takeCost(p))),
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
                     equip:(what, id) => i18n('tip-equip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
-                    unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item)))
+                    unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
+                    eat:(what, id) => i18n('tip-eat', what, cost(game.consumeCostOf(p, game.reachItem(p, id).item))),
+                    drink:(what, id) => i18n('tip-drink', what, cost(game.consumeCostOf(p, game.reachItem(p, id).item))),
+                    drinkFrom:(what, ref) => i18n('tip-drink-from', what, sourceCost(ref)),
+                    fill:what => i18n('tip-fill', what, cost(game.fillCost(p)))
                 },
                 hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
                 onToggle:ref => game.toggleExpanded(p, ref),
@@ -301,6 +342,9 @@
                         action === 'take' ? game.playerTake(p, id) :
                         action === 'drop' ? game.playerDrop(p, id) :
                         action === 'transfer' ? game.playerTransfer(p, id, ref) :
+                        action === 'eat' || action === 'drink' ? game.playerConsume(p, id) :
+                        action === 'drinkFrom' ? game.playerDrink(p, ref) :
+                        action === 'fill' ? game.playerFill(p, id) :
                         game.playerTakeAll(p, ref);
                     if (done) gameView.afterTurn();
                     if (game.over || !game.pieces.has(p.id)) {

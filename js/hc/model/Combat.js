@@ -272,6 +272,7 @@
             p.name = ch.name.trim();
             p.description = ch.description;
             p.maxHp = p.hp = this.maxHpOf(p);
+            this.giveNeeds(p);
         },
         
         /*  Piece p gets what its background gives it (see items), and equips what it can
@@ -292,7 +293,8 @@
         /*  Gives piece p its species, background and profile, at full HP, with no status
             effects; an enemy carrying what its profile and its background give it (and
             nothing else), with what it can equipped, and one of yours nothing (your
-            character gets what its background gives it: see makeCharacter). An enemy's profile is its table's for id (its enemyId's; "creeper" if
+            character gets what its background gives it: see makeCharacter), with its
+            needs (see Needs.js). An enemy's profile is its table's for id (its enemyId's; "creeper" if
             none), its species speciesId if that's one of the profile's (else its first),
             and its background backgroundId if that's one of the profile's that fits, else
             one that fits at random (none, with an error, if none do). Yours are the
@@ -306,6 +308,8 @@
                     pkg.species.get(speciesId) ?? pkg.species.list().find(s => s.playable)) ?? FALLBACK_SPECIES,
                 fits = b => this.backgroundFits(species.id, b),
                 choices = enemy ? profile.backgrounds.filter(fits) : pkg.backgrounds.list().filter(b => b.playable && fits(b.id)).map(b => b.id);
+            delete p.needs; // (what they'd do to its stats isn't its profile's)
+            delete p.hpCarry;
             p.species = species.id;
             if (choices.includes(backgroundId)) {
                 p.background = backgroundId;
@@ -335,6 +339,8 @@
             if (enemy) {
                 this.rollItems(p, profile.items, this.rngFor('items', p.id));
                 this.giveBackgroundItems(p);
+            } else {
+                this.giveNeeds(p);
             }
         },
         
@@ -342,13 +348,16 @@
         // A rule's formula (of a piece's level and stats) for piece p, in hundredths of a
         // point, rounded, and not below 0.
         apRule: function(rule, p) {
-            return Math.max(0, Math.round(AP_UNIT * evaluate(this.rules[rule], STAT_VARS, {level:p.level, ...p.stats}))) || 0;
+            return Math.max(0, Math.round(AP_UNIT * evaluate(this.rules[rule], STAT_VARS, this.statVars(p)))) || 0;
         },
         
         /*  The most action points piece p can have (its pool: at least a point, so it can
             act), and what it gets back a turn. */
         apMax: function(p) {return Math.max(AP_UNIT, this.actionCost(p), this.apRule('apPool', p));},
-        apRecovery: function(p) {return this.apRule('apRecovery', p);},
+        // (What its needs add to its recovery too: see Needs.js.)
+        apRecovery: function(p) {
+            return Math.max(0, this.apRule('apRecovery', p) + Math.round(AP_UNIT * this.needsEffect(p, 'Recovery')));
+        },
         
         /*  What an action costs piece p (a jump too): at least MIN_COST. */
         actionCost: function(p) {return Math.max(MIN_COST, this.apRule('actionCost', p));},
@@ -368,8 +377,13 @@
             given), and the game's on. */
         canAfford: function(p, cost) {return !this.over && !!p && p.ap >= (cost ?? this.actionCost(p));},
         
-        /*  Piece p spends cost action points (an action's if not given). */
-        spend: function(p, cost) {p.ap = Math.max(0, p.ap - (cost ?? this.actionCost(p)));},
+        /*  Piece p spends cost action points (an action's if not given), and its needs go
+            down for them (see Needs.needsSpend). */
+        spend: function(p, cost) {
+            cost ??= this.actionCost(p);
+            p.ap = Math.max(0, p.ap - cost);
+            if (p.needs) this.needsSpend(p, cost);
+        },
         
         /*  Piece p gets ap more action points, up to its pool (but never loses any). */
         giveAp: function(p, ap) {p.ap = Math.max(p.ap, Math.min(this.apMax(p), p.ap + ap));},
@@ -405,6 +419,14 @@
             const cost = this.itemKind(it).equip?.cost;
             return cost == null ? this.equipCost(p) : Math.max(MIN_COST, Math.round(cost * AP_UNIT));
         },
+        // What eating or drinking item it costs piece p: its kind's consumeCost, if it has
+        // one (at least MIN_COST), else the consumeCost rule's; and what filling a flask
+        // costs (the fillCost rule's).
+        consumeCostOf: function(p, it) {
+            const cost = this.itemKind(it).consumeCost;
+            return cost == null ? Math.max(MIN_COST, this.apRule('consumeCost', p)) : Math.max(MIN_COST, Math.round(cost * AP_UNIT));
+        },
+        fillCost: function(p) {return Math.max(MIN_COST, this.apRule('fillCost', p));},
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
             return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&
@@ -454,7 +476,7 @@
         
         // A rule's formula (of a piece's level and stats) for piece p, rounded down.
         statRule: function(rule, p) {
-            return Math.floor(evaluate(this.rules[rule], STAT_VARS, {level:p.level, ...p.stats})) || 0;
+            return Math.floor(evaluate(this.rules[rule], STAT_VARS, this.statVars(p))) || 0;
         },
         
         /*  Piece p's max HP: fixed by its profile, or the maxHp rule's. At least 1. */
@@ -581,7 +603,7 @@
         // A rule's formula (of a piece's level and stats) for piece p, in hundredths of an
         // xp point, rounded, and not below 0.
         xpRule: function(rule, p) {
-            return Math.max(0, Math.round(XP_UNIT * evaluate(this.rules[rule], STAT_VARS, {level:p.level, ...p.stats}))) || 0;
+            return Math.max(0, Math.round(XP_UNIT * evaluate(this.rules[rule], STAT_VARS, this.statVars(p)))) || 0;
         },
         
         /*  The parentXPShare or childXPBonus rule's formula for xp (hundredths) that piece p

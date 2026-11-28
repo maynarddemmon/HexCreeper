@@ -47,6 +47,8 @@
 		"dropCost":"0.15",                 // and dropping one
 		"transferCost":"0.25",             // and putting one in something (see Inventory)
 		"equipCost":"0.5",                 // equipping an item, or unequipping one
+		"consumeCost":"0.25",              // eating or drinking (an item's consumeCost if it has one)
+		"fillCost":"0.5",                  // filling a flask (or the like) from a stream or pool
 		"rallyTurns":"5",                  // the turns a rally lasts
 		"rallyAmount":"(con / 10) * level", // the HP a rallying piece gets back at the end of each of them
 		"rallyRefresh":"Math.max(10, 150 - level)", // the turns from rallying until a piece can rally again
@@ -59,7 +61,35 @@
 		// And what the ground of a cell can hold.
 		"groundCapacity":1000,
 		"groundWeight":10000000, // 10 tonnes
-		"groundVolume":10000000  // 10 cubic metres
+		"groundVolume":10000000, // 10 cubic metres
+		
+		// Thirst, hunger and fatigue (see js/hc/model/Needs.js): your pieces' needs, each in
+		// points (kept in hundredths), between its min and max; it starts at its upper. Each
+		// goes down (its ticks are added) every turn (TurnTick) and for each action point
+		// spent (ApTick). At or below its lower it's low, above its upper high, and at its
+		// min the low effects are MinMultiplier times as much. Low and high it adds its
+		// LowRecovery or HighRecovery to the piece's AP recovery, its LowHp or HighHp to its
+		// HP each turn, and its LowStats or HighStats to each of its stats.
+		"minThirst":"0", "lowerThirst":"250 * (con / 10)", "upperThirst":"750 * (con / 10)", "maxThirst":"1000 * (con / 10)",
+		"thirstTurnTick":"-0.25", "thirstApTick":"-0.3",
+		"thirstLowRecovery":"-0.25", "thirstHighRecovery":"0.1",
+		"thirstLowHp":"0", "thirstHighHp":"0",
+		"thirstLowStats":"0", "thirstHighStats":"0",
+		"thirstMinMultiplier":"2",
+		
+		"minHunger":"0", "lowerHunger":"250 * (con / 10)", "upperHunger":"750 * (con / 10)", "maxHunger":"1000 * (con / 10)",
+		"hungerTurnTick":"-0.25", "hungerApTick":"-0.15",
+		"hungerLowRecovery":"0", "hungerHighRecovery":"0",
+		"hungerLowHp":"-0.15", "hungerHighHp":"0.05",
+		"hungerLowStats":"0", "hungerHighStats":"0",
+		"hungerMinMultiplier":"2",
+		
+		"minFatigue":"0", "lowerFatigue":"250 * (con / 10)", "upperFatigue":"750 * (con / 10)", "maxFatigue":"1000 * (con / 10)",
+		"fatigueTurnTick":"-0.25", "fatigueApTick":"-0.1",
+		"fatigueLowRecovery":"0", "fatigueHighRecovery":"0",
+		"fatigueLowHp":"0", "fatigueHighHp":"0",
+		"fatigueLowStats":"0", "fatigueHighStats":"0",
+		"fatigueMinMultiplier":"2"
 	},
 	
 	// Status effects a piece can have for a while ("name" and "description", to show, and

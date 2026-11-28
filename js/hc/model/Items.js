@@ -20,6 +20,15 @@
                    it adds to the piece's (0 if not given); cost: the action points
                    equipping it (or unequipping it) takes, in place of the equipCost
                    rule's (at least 0.1). One that's equipped doesn't stack.
+        quench, satiates  if it can be drunk or eaten: what a dose of it adds to thirst and
+                   to hunger (in points: below 0 takes away; see Needs.js)
+        dose       how many of it are eaten or drunk at once (1 if not given; what's left,
+                   if fewer, does as much less)
+        consumeCost  the action points eating or drinking it takes, in place of the
+                   consumeCost rule's (at least 0.1)
+        fluid      whether it's a fluid (water): it goes only in what holds fluids (an
+                   inventory with "fluids":true: a flask), and nothing else goes there. It's
+                   counted in its volume (a millilitre of water is one).
     Entries can extend others (see Subtypes.js).
 
     An item is plain data, saved with the game: {id, kind, count}, count being how many
@@ -63,7 +72,8 @@
     const {I18N:{get:i18n}} = myt,
         {
             Subtypes, isObj, attrs:{evaluate},
-            STAT_VARS, ITEM_GOLD, EQUIP_SLOTS,
+            STAT_VARS, ITEM_GOLD, EQUIP_SLOTS, NEED_UNIT, TILE_TYPE_FLOOR,
+            formatVolume,
             isNatNum, isIntOfAtLeast
         } = pkg,
         {isText, isNum} = Subtypes,
@@ -72,14 +82,16 @@
         NO_CORPSE = 'none',        // a species that leaves no corpse
         
         // An inventory's limits as the data has them, made usable ({capacity, weight,
-        // volume}, Infinity for none), or null.
+        // volume}, Infinity for none, and fluids: whether it holds fluids, and only them),
+        // or null.
         parseLimits = v => {
             const limits = {
                 capacity:v?.capacity ?? Infinity,
                 weight:v?.weight ?? Infinity,
                 volume:v?.volume ?? Infinity
             };
-            return isObj(v) && Object.values(limits).every(n => n === Infinity || isNum(n)) ? limits : null;
+            return isObj(v) && Object.values(limits).every(n => n === Infinity || isNum(n)) &&
+                (v.fluids === undefined || typeof v.fluids === 'boolean') ? {...limits, fluids:v.fluids === true} : null;
         },
         
         /*  An item kind as the data has it, made usable ({plural, material, volume,
@@ -92,16 +104,18 @@
                 stack = entry.stack ?? 1,
                 inventory = entry.inventory === undefined ? null : parseLimits(entry.inventory) ?? undefined,
                 equip = entry.equip === undefined ? null : parseEquip(entry.equip),
+                {quench = 0, satiates = 0, dose = 1, consumeCost = null, fluid = false} = entry,
                 ok = isText(entry.plural) && material !== undefined && isNum(volume) &&
                     (entry.weight === undefined || isNum(entry.weight)) && isNatNum(capacity) &&
                     isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1) &&
-                    equip !== undefined;
+                    equip !== undefined && Number.isFinite(quench) && Number.isFinite(satiates) && isIntOfAtLeast(dose, 1) &&
+                    (consumeCost === null || (isNum(consumeCost) && consumeCost > 0)) && typeof fluid === 'boolean';
             return ok ? {
                 plural:entry.plural || entry.name + 's',
                 material:entry.material ?? null,
                 volume,
                 weight:entry.weight ?? volume * (material?.density ?? 0),
-                capacity, stack, inventory, equip
+                capacity, stack, inventory, equip, quench, satiates, dose, consumeCost, fluid
             } : null;
         },
         
@@ -121,18 +135,24 @@
         NO_ROOM = {capacity:0, weight:0, volume:0},
         
         /*  A list of items as the data has it (an enemy profile's items, a fixture's
-            contents), made usable ([{kind, count:[min, max]}]: it may be none), or null if
-            it isn't: item kind ids, or {"kind":id, "count":n or [min, max]}. */
+            contents), made usable ([{kind, count:[min, max], contents}]: it may be none),
+            or null if it isn't: item kind ids, or {"kind":id, "count":n or [min, max],
+            "contents":a list of what's in each}, e.g. a full canteen: {"kind":"canteen",
+            "contents":[{"kind":"water", "count":1000}]}. */
         parseItemList = v => {
             const countOf = n => Number.isInteger(n) ? [n, n] : n ?? [1, 1],
                 isRange = r => Array.isArray(r) && r.length === 2 && r.every(isNatNum) && r[0] <= r[1],
-                items = Array.isArray(v ?? []) ? (v ?? []).map(e => typeof e === 'string' ? {kind:e, count:[1, 1]} :
-                    isObj(e) && typeof e.kind === 'string' ? {kind:e.kind, count:countOf(e.count)} : null) : [null];
-            return items.every(e => e && isRange(e.count)) ? items : null;
+                items = Array.isArray(v ?? []) ? (v ?? []).map(e => typeof e === 'string' ? {kind:e, count:[1, 1], contents:[]} :
+                    isObj(e) && typeof e.kind === 'string' ?
+                        {kind:e.kind, count:countOf(e.count), contents:parseItemList(e.contents)} : null) : [null];
+            return items.every(e => e && isRange(e.count) && e.contents) ? items : null;
         },
         
         // An item of a kind that isn't known: it weighs nothing, and takes a place.
-        FALLBACK = {plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null, equip:null},
+        FALLBACK = {
+            plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null, equip:null,
+            quench:0, satiates:0, dose:1, consumeCost:null, fluid:false
+        },
         
         // How many of something weighing (or taking) each, whose limit leaves room, fit.
         howMany = (room, each) => each > 0 ? Math.floor(room / each + 1e-9) : Infinity,
@@ -180,10 +200,11 @@
         },
         
         /*  Item it in words, as count of it (all of it if not given): "dagger", "12 gold
-            coins". */
+            coins", "0.25 L water" (a fluid: its volume). */
         itemLabel: function(it, count = it.count) {
             const name = this.itemName({...it, count});
-            return count > 1 ? i18n('item-count', count, name) : name;
+            return this.itemKind(it).fluid ? i18n('item-fluid', formatVolume(this.itemKind(it).volume * count), name) :
+                count > 1 ? i18n('item-count', count, name) : name;
         },
         
         /*  What item it weighs, in grams: its kind's weight, times how many, and what's in
@@ -217,7 +238,7 @@
             } else if (holder.subtype !== undefined) {
                 limits = this.fixtureType(holder).inventory ?? NO_ROOM;
             } else if (holder.owner !== undefined) {
-                const vars = {level:holder.level, ...holder.stats},
+                const vars = this.statVars(holder),
                     rule = id => Math.max(0, evaluate(this.rules[id], STAT_VARS, vars)) || 0;
                 limits = {
                     capacity:Math.floor(rule('carryCapacity')),
@@ -257,8 +278,10 @@
                 each = this.itemWeight(it) / it.count,
                 room = (holder.inventory?.items ?? []).filter(i => this.stacksWith(i, it))
                     .reduce((n, i) => n + k.stack - i.count, 0),
-                loop = holder.kind !== undefined && this.holdsItem(it, holder);
-            return loop ? {capacity:0, weight:0, volume:0} : {
+                loop = holder.kind !== undefined && this.holdsItem(it, holder),
+                // (A fluid goes only in what holds fluids, and only a fluid does.)
+                misfit = k.fluid !== !!limits.fluids;
+            return loop || misfit ? {capacity:0, weight:0, volume:0} : {
                 capacity:room + howMany(limits.capacity - totals.capacity, k.capacity) * k.stack,
                 weight:howMany(limits.weight - totals.weight, each),
                 volume:howMany(limits.volume - totals.volume, k.volume)
@@ -266,13 +289,16 @@
         },
         
         /*  Why count of item it (all of it if not given) can't go in holder: '' if it can,
-            else 'loop' (it would go in itself), 'capacity', 'weight' or 'volume' (the
-            first limit it's over). */
+            else 'loop' (it would go in itself), 'fluid' (it's a fluid, and holder doesn't
+            hold fluids), 'solid' (holder holds only fluids), 'capacity', 'weight' or
+            'volume' (the first limit it's over). */
         addProblem: function(holder, it, count = it.count) {
             const fits = this._fits(holder, it);
             let retval;
             if (holder.kind !== undefined && this.holdsItem(it, holder)) {
                 retval = 'loop';
+            } else if (this.itemKind(it).fluid !== !!this.inventoryLimits(holder).fluids) {
+                retval = this.itemKind(it).fluid ? 'fluid' : 'solid';
             } else {
                 retval = ['capacity', 'weight', 'volume'].find(limit => fits[limit] < count) ?? '';
             }
@@ -357,11 +383,20 @@
         },
         
         /*  Puts in holder (whatever its limits) the items a list of them (see
-            parseItemList) gives, how many of each rolled by rng. */
+            parseItemList) gives, how many of each rolled by rng, with what's in them. */
         rollItems: function(holder, list, rng) {
-            for (const {kind, count:[min, max]} of list) {
+            for (const {kind, count:[min, max], contents} of list) {
                 const n = min + Math.floor(rng() * (max - min + 1));
-                if (n > 0) this.addItem(holder, this.makeItem(kind, n), true);
+                if (contents.length) {
+                    // Each its own, with what's in it
+                    for (let i = 0; i < n; i++) {
+                        const it = this.makeItem(kind);
+                        this.rollItems(it, contents, rng);
+                        this.addItem(holder, it, true);
+                    }
+                } else if (n > 0) {
+                    this.addItem(holder, this.makeItem(kind, n), true);
+                }
             }
         },
         
@@ -683,6 +718,164 @@
                     }
                 }
                 this.fx(p.x, p.y, i18n('fx-take', took.join(', ')), '--place-ink', {});
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        // ---- Eating and drinking ----
+        /*  The fluid on the floor at (x, y) (a stream's, a pool's: see Solids.js): {floor,
+            fluid (its item kind's id)}, or null. */
+        fluidAt: function(x, y) {
+            const t = this.tiles.get(this.key(x, y)),
+                floor = t ? (t.kind === TILE_TYPE_FLOOR ? pkg.floors.get(t.subtype) : null) : this.baseFloor();
+            return floor?.fluid ? {floor, fluid:floor.fluid} : null;
+        },
+        
+        /*  The fluids piece p can get at: on its cell and next to it, each {ref
+            ('source:x,y'), x, y, dir (as reachHolders'), floor, fluid}. */
+        fluidSources: function(p) {
+            const out = [];
+            for (const [dir, [dx, dy]] of [[-1, [0, 0]], ...pkg.hex.dirs.map((d, i) => [i, d])]) {
+                const x = p.x + dx, y = p.y + dy, at = this.fluidAt(x, y);
+                if (at) out.push({ref:'source:' + this.key(x, y), x, y, dir, ...at});
+            }
+            return out;
+        },
+        
+        /*  Whether a kind can be eaten or drunk: it quenches or satiates. */
+        isConsumable: function(kind) {return !!(kind?.quench || kind?.satiates);},
+        
+        /** @private Piece p eats or drinks n of a kind (a dose's worth, as n is of its dose):
+            its thirst goes by its quench, its hunger by its satiates (see Needs.js). */
+        _consume: function(p, kind, n) {
+            const part = n / kind.dose;
+            this.changeNeed(p, 'thirst', NEED_UNIT * kind.quench * part);
+            this.changeNeed(p, 'hunger', NEED_UNIT * kind.satiates * part);
+        },
+        
+        /*  Why piece p can't eat or drink item id (wherever it can get at it: a dose of it,
+            or what's left): '' if it can, else 'over', 'player', 'missing', 'inedible'
+            (it can't be eaten or drunk), 'needless' (p has no needs) or 'ap'. */
+        consumeProblem: function(p, id) {
+            const found = p?.owner === 'player' ? this.reachItem(p, id) : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!found) {
+                retval = 'missing';
+            } else if (!this.isConsumable(this.itemKind(found.item))) {
+                retval = 'inedible';
+            } else if (!p.needs) {
+                retval = 'needless';
+            } else if (!this.canAfford(p, this.consumeCostOf(p, found.item))) {
+                retval = 'ap';
+            } else {
+                retval = '';
+            }
+            return retval;
+        },
+        
+        /*  Piece p eats or drinks item id (a dose of it, or what's left), for its consume
+            cost, if it can (see consumeProblem). Returns whether it did. */
+        playerConsume: function(p, id) {
+            const done = !this.consumeProblem(p, id);
+            if (done) {
+                const {item, holder} = this.reachItem(p, id),
+                    kind = this.itemKind(item),
+                    n = Math.min(kind.dose, item.count),
+                    cost = this.consumeCostOf(p, item);
+                this.fx(p.x, p.y, i18n(kind.fluid ? 'fx-drink' : 'fx-eat', this.itemLabel(item, n)), '--heal', {});
+                this.takeOut(holder, item, n);
+                this.tidyGround(p.x, p.y);
+                this._consume(p, kind, n);
+                this.spend(p, cost);
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        /*  Why piece p can't drink from the fluid source ref names (see fluidSources: a
+            dose of its fluid): '' if it can, else 'over', 'player', 'nowhere' (it isn't in
+            reach), 'inedible', 'needless' or 'ap' (the consumeCost rule's, or its fluid's). */
+        drinkProblem: function(p, ref) {
+            const source = p?.owner === 'player' ? this.fluidSources(p).find(s => s.ref === ref) : null,
+                kind = source ? pkg.items.get(source.fluid) : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!source) {
+                retval = 'nowhere';
+            } else if (!this.isConsumable(kind)) {
+                retval = 'inedible';
+            } else if (!p.needs) {
+                retval = 'needless';
+            } else if (!this.canAfford(p, this.consumeCostOf(p, {kind:source.fluid}))) {
+                retval = 'ap';
+            } else {
+                retval = '';
+            }
+            return retval;
+        },
+        
+        /*  Piece p drinks a dose from the fluid source ref names, if it can (see
+            drinkProblem). Returns whether it did. */
+        playerDrink: function(p, ref) {
+            const done = !this.drinkProblem(p, ref);
+            if (done) {
+                const {fluid} = this.fluidSources(p).find(s => s.ref === ref),
+                    kind = pkg.items.get(fluid);
+                this.fx(p.x, p.y, i18n('fx-drink', this.itemLabel({kind:fluid, count:kind.dose})), '--heal', {});
+                this._consume(p, kind, kind.dose);
+                this.spend(p, this.consumeCostOf(p, {kind:fluid}));
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        /*  Why piece p can't fill item id (a flask: something that holds fluids, that it can
+            get at) from a fluid source it can get at (the first: see fluidSources): '' if
+            it can (with at least a millilitre), else 'over', 'player', 'missing', 'unfillable'
+            (it doesn't hold fluids), 'dry' (there's no source in reach), 'ap' (the fillCost
+            rule's), or why the fluid doesn't fit (see addProblem). */
+        fillProblem: function(p, id) {
+            const found = p?.owner === 'player' ? this.reachItem(p, id) : null,
+                source = found ? this.fluidSources(p)[0] : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!found) {
+                retval = 'missing';
+            } else if (!this.itemKind(found.item).inventory?.fluids) {
+                retval = 'unfillable';
+            } else if (!source) {
+                retval = 'dry';
+            } else if (!this.canAfford(p, this.fillCost(p))) {
+                retval = 'ap';
+            } else {
+                retval = this.addProblem(found.item, {id:-1, kind:source.fluid, count:1}, 1);
+            }
+            return retval;
+        },
+        
+        /*  Piece p fills item id from the first fluid source in reach, as full as it'll go,
+            for the fillCost rule's action points, if it can (see fillProblem). Returns
+            whether it did. */
+        playerFill: function(p, id) {
+            const done = !this.fillProblem(p, id);
+            if (done) {
+                const {item} = this.reachItem(p, id),
+                    {fluid} = this.fluidSources(p)[0],
+                    n = this.fitCount(item, {id:-1, kind:fluid, count:1e9});
+                this.addItem(item, this.makeItem(fluid, n), true);
+                this.fx(p.x, p.y, i18n('fx-fill', this.itemLabel(item), this.itemLabel({kind:fluid, count:n})), '--heal', {});
+                this.spend(p, this.fillCost(p));
                 this.afterPlayerAction();
             }
             return done;

@@ -82,7 +82,7 @@ test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'
         out.push(dagger.equipped);
         return out;
     });
-    expect(r).toEqual([['long_sword'], 8, ['long_sword', 'belt_pouch', 'dagger'], undefined]);
+    expect(r).toEqual([['long_sword'], 8, ['long_sword', 'belt_pouch', 'canteen', 'dagger'], undefined]);
 });
 
 test('the Inventory dialog equips and unequips; the character sheet shows what\'s equipped and its armor', async ({page}) => {
@@ -125,9 +125,11 @@ test('backgrounds give items: your character starts with them, equipped, and an 
         out.push(g.piecesOf('player').map(p => p.inventory.items.length));
         return out;
     });
-    expect(r[0]).toEqual(['short_sword', 'leather_armor', 'gold_coin']);
-    expect(r[1].filter(k => !k.startsWith('mushroom'))).toEqual(['dagger*']);
-    expect(r.slice(2)).toEqual([['gold_coin', 'leather_armor*', 'short_sword*'], 5, '', ['dagger', 'short_sword*'], [3, 0]]);
+    expect(r[0]).toEqual(['canteen', 'short_sword', 'leather_armor', 'gold_coin']);
+    expect(r[1].filter(k => !k.startsWith('mushroom'))).toEqual(['canteen', 'dagger*']);
+    expect(r.slice(2)).toEqual([
+        ['canteen', 'gold_coin', 'leather_armor*', 'short_sword*'], 5, '', ['canteen', 'dagger', 'short_sword*'], [4, 0]
+    ]);
 });
 
 test('the Inventory dialog and the character sheet each switch to the other', async ({page}) => {

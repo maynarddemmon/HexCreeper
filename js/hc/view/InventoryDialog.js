@@ -141,20 +141,24 @@
                     Items.reachHolder; open: whether what's in it can be got at; expanded:
                     whether what's in it shows, or null if it always does; takeAll: why it
                     can't all be taken, '' if it can, or null for no Take all), its rows
-                    [{id, label, weight, depth, container, expanded, equipped, actions}]
-                    (actions: {take, drop, takeAll, transfer, equip}, each why it can't be
-                    done, '' if it can, if it's offered: equip is Equip, or Unequip for
-                    what's equipped)
+                    [{id, label, weight, depth, container, expanded, equipped, fluid,
+                    actions}] (actions: {take, drop, takeAll, transfer, equip, consume,
+                    fill}, each why it can't be done, '' if it can, if it's offered: equip
+                    is Equip, or Unequip for what's equipped; consume Eat, or Drink for a
+                    fluid). A section for a stream or pool (something to drink from, not
+                    to put things in) has drink (why it can't be drunk from, or '') and
+                    note (what to say in place of its rows: an I18N key).
                 onSheet()   switches to the piece's character sheet (Character, on the
                     left of the footer)
                 onToggle(ref)  shows or hides what's in the holder ref names (see
                     Items.toggleExpanded)
-                tips        {take, drop, takeAll, transfer, equip, unequip}: each action's tooltip, of
-                    what it's for in words (and for equip and unequip, its id)
+                tips        {take, drop, takeAll, transfer, equip, unequip, eat, drink,
+                    drinkFrom, fill}: each action's tooltip, of what it's for in words (and
+                    its id, or for drinkFrom the source's ref)
                 hereProblem(id, ref)  why item id can't go in the holder ref names
                 onAction(action, id, ref)  does an action (take, drop, transfer, equip,
-                    unequip or takeAll): to item id (to holder ref, for transfer), or for
-                    takeAll, to holder ref */
+                    unequip, eat, drink, fill, drinkFrom or takeAll): to item id (to holder
+                    ref, for transfer), or for drinkFrom and takeAll, to ref */
         show: function(opts) {
             this.callSuper();
             this._opts = opts;
@@ -204,7 +208,13 @@
                         onToggle:() => toggle(section.ref), data
                     });
                 if (moving) {
-                    here(head, section.ref, data);
+                    // (A stream isn't somewhere to put anything.)
+                    if (section.drink == null) here(head, section.ref, data);
+                } else if (section.drink != null) {
+                    actionBtn(
+                        head, 1, 'drink', tips.drinkFrom(section.title, section.ref), section.drink,
+                        act('drinkFrom', null, section.ref), data
+                    );
                 } else if (section.takeAll != null) {
                     actionBtn(
                         head, 1, 'takeAll', tips.takeAll(section.title), section.takeAll,
@@ -216,7 +226,7 @@
                 } else if (section.expanded === false) {
                     continue;
                 } else if (!section.rows.length) {
-                    note('inv-nothing');
+                    note(section.note ?? 'inv-nothing');
                 }
                 // Each row, but what's in what isn't expanded
                 let hideBelow = Infinity;
@@ -225,7 +235,7 @@
                     hideBelow = row.container && !row.expanded ? row.depth : Infinity;
                     const view = new ItemRow(container, {row, expanded:row.expanded, onToggle:toggle}),
                         item = {item:row.id},
-                        {take, drop, takeAll, transfer, equip} = row.actions;
+                        {take, drop, takeAll, transfer, equip, consume, fill} = row.actions;
                     if (moving) {
                         if (row.container && row.id !== moving.id) here(view, row.id, item);
                     } else {
@@ -239,6 +249,13 @@
                             actionBtn(
                                 view, 1, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
                             );
+                        }
+                        if (consume != null) {
+                            const action = row.fluid ? 'drink' : 'eat';
+                            actionBtn(view, 1, action, tips[action](row.label, row.id), consume, act(action, row.id), item);
+                        }
+                        if (fill != null) {
+                            actionBtn(view, 1, 'fill', tips.fill(row.label), fill, act('fill', row.id), item);
                         }
                         if (equip != null) {
                             const action = row.equipped ? 'unequip' : 'equip';

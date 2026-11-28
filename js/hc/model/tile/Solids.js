@@ -17,7 +17,9 @@
     A floor subtype is a kind of floor tile: open floor that's harder (or easier) going,
     like mud, ice or loose stone. It doesn't block sight or movement, but stepping onto it
     costs its moveCost (default 1) times an action (see Combat.moveCost); fillColor is the
-    colour it's drawn in (else the usual floor). A cell with no tile is plain floor.
+    colour it's drawn in (else the usual floor). A cell with no tile is plain floor. fluid
+    (optional) is the item kind of the fluid it has (a stream's, a pool's: water), which a
+    piece of yours on it or next to it can drink, or fill a flask with (see Items.js).
     
     Either may have a shadowLength: how long its shadow is, in hexes (how tall a solid is,
     or how deep a hole), else cfg.SHADOW's length. The light the shadows come from is
@@ -62,9 +64,11 @@
         getMaterial: function(id) {return materials.get(id);}
     }))('solid', parseSolid);
     
-    // {id:{name, description, fillColor, moveCost}}
-    pkg.floors = new Subtypes('floor', f => isText(f.fillColor) && (f.moveCost === undefined || (isNum(f.moveCost) && f.moveCost >= 0.1))
-        ? {fillColor:f.fillColor || null, moveCost:f.moveCost ?? 1}
+    // {id:{name, description, fillColor, moveCost, fluid}}: fluid, the item kind (a fluid:
+    // water) a piece next to it can drink or fill a flask with, or null (see Items.js)
+    pkg.floors = new Subtypes('floor', f => isText(f.fillColor) && (f.moveCost === undefined || (isNum(f.moveCost) && f.moveCost >= 0.1)) &&
+        isText(f.fluid)
+        ? {fillColor:f.fillColor || null, moveCost:f.moveCost ?? 1, fluid:f.fluid || null}
         : null);
     
     // {id:{name, description, fillColor, shadowLength}}

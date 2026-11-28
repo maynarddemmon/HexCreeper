@@ -5,9 +5,9 @@
         
         {isObj} = pkg,
         
-        // 8 since 2026-11-27 (items and inventories): saves made before then aren't loaded (nothing is kept just
+        // 9 since 2026-11-27 (needs): saves made before then aren't loaded (nothing is kept just
         // for them).
-        SAVE_FORMAT_VERSION = 8,
+        SAVE_FORMAT_VERSION = 9,
         DEFAULT_STORAGE_KEY = 'hc.save',
         
         readStorage = key => {

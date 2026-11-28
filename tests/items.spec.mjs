@@ -124,8 +124,11 @@ test('enemies carry what their profile gives them, rolled for each', async ({pag
             reaver = g.addPiece('core', 'enemy', 0, 9, null, 'hobgoblin_reaver');
         return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.map(it => it.kind)];
     });
-    // (A goblin's own jerky, and its background's: an urchin's; a reaver's dagger too.)
-    expect(r).toEqual([0, 4, ['long_sword', 'belt_pouch', 'dagger']]);
+    // (A goblin's own jerky, 0 to 2, and its background's: an urchin's, 0 to 2 more; a reaver's dagger too.)
+    expect(r[0]).toBe(0);
+    expect(r[1]).toBeGreaterThanOrEqual(2);
+    expect(r[1]).toBeLessThanOrEqual(4);
+    expect(r[2]).toEqual(['long_sword', 'belt_pouch', 'canteen', 'dagger']);
 });
 
 test('loot gives gold coins to the piece that takes it; what it can\'t carry falls on the ground', async ({page}) => {

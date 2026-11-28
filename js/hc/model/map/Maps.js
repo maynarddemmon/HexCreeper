@@ -162,6 +162,11 @@
                         if (!pkg.items.get(ITEM_GOLD)) {
                             console.warn('There is no gold: no item', ITEM_GOLD);
                         }
+                        for (const f of pkg.floors.list()) {
+                            if (f.fluid && !pkg.items.get(f.fluid)?.fluid) {
+                                console.warn('Floor', f.id, 'has fluid', f.fluid, 'which is no fluid item');
+                            }
+                        }
                         
                         // Entities
                         pkg.species.define(data.species);

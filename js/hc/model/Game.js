@@ -25,7 +25,8 @@
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
         include:[
-            pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures, pkg.Effects, pkg.Items
+            pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures, pkg.Effects, pkg.Items,
+            pkg.Needs
         ],
         
         // Class Methods and Attributes ////////////////////////////////////////
@@ -126,7 +127,7 @@
                 lootOpened:this.lootOpened,
                 lootTaken:this.lootTaken,
                 objectives:this.objectives.map(s => ({...s})),
-                pieces:[...this.pieces.values()].map(p => ({...p, inventory:structuredClone(p.inventory)})),
+                pieces:[...this.pieces.values()].map(p => ({...p, inventory:structuredClone(p.inventory), needs:structuredClone(p.needs)})),
                 ground:[...this.ground.values()].map(g => structuredClone(g)),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
                 fixtures:[...this.fixtures.values()].map(f => structuredClone(f)),
@@ -149,14 +150,15 @@
         importFromObj: function(o) {
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
-            const {isInventory} = pkg.Items;
+            const {isInventory} = pkg.Items,
+                {isNeeds} = pkg.Needs;
             if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.nextItemId) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent) && typeof p.species === 'string' && typeof p.background === 'string' &&
                     (p.name === undefined || typeof p.name === 'string') && (p.description === undefined || typeof p.description === 'string') &&
-                    isInventory(p.inventory)) ||
+                    isInventory(p.inventory) && isNeeds(p.needs) && (p.hpCarry === undefined || Number.isInteger(p.hpCarry))) ||
                 !isArr(o.ground) || !o.ground.every(g => isNum(g?.x) && isNum(g.y) && isInventory(g.inventory)) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type) &&
@@ -214,7 +216,7 @@
                 const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
                     piece = {
                         ...p, trail, effects:p.effects.map(e => ({...e})), statPoints:{...p.statPoints},
-                        inventory:structuredClone(p.inventory)
+                        inventory:structuredClone(p.inventory), needs:structuredClone(p.needs)
                     };
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
@@ -825,9 +827,9 @@
         },
         
         // The rest of the turn: the enemies', then the environment's (tiles, spawning),
-        // then housekeeping: every piece gets back action points, rallying pieces HP, then
-        // its status effects count down (in that order, so an effect for a turn still counts
-        // at its end).
+        // then housekeeping: your pieces' needs tick (and do what they do to HP), every
+        // piece gets back action points, rallying pieces HP, then its status effects count
+        // down (in that order, so an effect for a turn still counts at its end).
         endPlayerTurn: function() {
             this.awardKills();
             this.enemyPhase();
@@ -839,6 +841,8 @@
             this.tickFixtures();
             if (this.over) return;
             this.spawnGenerator.turnEnded();
+            this.tickNeeds();
+            if (this.over) return;
             this.recoverAp();
             this.rallyHeal();
             this.tickEffects();

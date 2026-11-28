@@ -17,6 +17,7 @@
 		"fungus":   {"name":"fungus",    "hardness":0, "density":0.9,  "description":""},
 		"vegetable":{"name":"vegetable", "hardness":0, "density":0.9,  "description":""},
 		"leather":  {"name":"leather",   "hardness":1, "density":0.86, "description":""},
+		"water":    {"name":"water",     "hardness":0, "density":1.0,  "description":""},
 		"cloth":    {"name":"cloth",     "hardness":0, "density":0.5,  "description":""},
 		
 		// Wood
@@ -127,9 +128,9 @@
 		"mud":        {"name":"Mud",         "description":"Thick mud that sucks at your feet.", "moveCost":1.75,"fillColor":"#4a3f33"},
 		"ice":        {"name":"Ice",         "description":"Slick ice.",                         "moveCost":1.5, "fillColor":"#8ac"},
 		// Water
-		"stream":       {"name":"Stream",        "description":"Shallow running water.",         "moveCost":1.5, "fillColor":"#039"},
+		"stream":       {"name":"Stream",        "description":"Shallow running water.",         "moveCost":1.5, "fillColor":"#039", "fluid":"water"},
 		"stream_frozen":{"name":"Frozen Stream", "extends":"ice", "description":"A stream frozen solid."},
-		"pool":         {"name":"Pool",          "description":"A pool of water.",               "moveCost":2.0, "fillColor":"#039"}
+		"pool":         {"name":"Pool",          "description":"A pool of water.",               "moveCost":2.0, "fillColor":"#039", "fluid":"water"}
 	},
 	
 	// Fixtures: what sits on the ground of a cell (over its open floor), and may do something
@@ -356,7 +357,8 @@
 				{"kind":"wooden_shield", "count":[0, 1]},
 				{"kind":"leather_gloves", "count":[0, 1]},
 				{"kind":"leather_boots", "count":[0, 1]},
-				{"kind":"chain_shirt", "count":[0, 1]}
+				{"kind":"chain_shirt", "count":[0, 1]},
+				{"kind":"flask", "count":[0, 1], "contents":[{"kind":"water", "count":250}]}
 			],
 			"destroyInto":"wood_scraps",
 			"fillColor":"#6b4524",
