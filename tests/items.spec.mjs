@@ -124,7 +124,8 @@ test('enemies carry what their profile gives them, rolled for each', async ({pag
             reaver = g.addPiece('core', 'enemy', 0, 9, null, 'hobgoblin_reaver');
         return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.map(it => it.kind)];
     });
-    expect(r).toEqual([0, 2, ['long_sword', 'belt_pouch']]);
+    // (A goblin's own jerky, and its background's: an urchin's; a reaver's dagger too.)
+    expect(r).toEqual([0, 4, ['long_sword', 'belt_pouch', 'dagger']]);
 });
 
 test('loot gives gold coins to the piece that takes it; what it can\'t carry falls on the ground', async ({page}) => {
@@ -251,6 +252,7 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     const ids = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(),
             corpse = g.makeItem('corpse'), dagger = g.makeItem('dagger');
+        c.inventory.items.length = 0;   // (not what an urchin starts with)
         corpse.name = 'goblin corpse';
         g.addItem(corpse, dagger);
         g.addItem(g.groundAt(c.x, c.y, true), corpse);
@@ -264,11 +266,11 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     await expect(dialog.getByText('goblin corpse')).toBeVisible();
     // What's in the corpse shows once it's expanded, and hides again.
     const btn = (id, action) => page.locator(`[data-item="${id}"][data-action="${action}"]`);
-    await expect(dialog.getByText('dagger', {exact:true})).toHaveCount(0);
+    await expect(dialog.getByText('dagger', {exact:true}).filter({visible:true})).toHaveCount(0);
     await btn(ids.corpse, 'toggle').click();
-    await expect(dialog.getByText('dagger', {exact:true})).toBeVisible();
+    await expect(dialog.getByText('dagger', {exact:true}).filter({visible:true})).toBeVisible();
     await btn(ids.corpse, 'toggle').click();
-    await expect(dialog.getByText('dagger', {exact:true})).toHaveCount(0);
+    await expect(dialog.getByText('dagger', {exact:true}).filter({visible:true})).toHaveCount(0);
     // (The corpse keeps whether it's expanded.)
     expect(await page.evaluate(id => hc.app.game.findItem(hc.app.game.groundAt(0, 0), id).item.expanded, ids.corpse)).toBe(false);
     await btn(ids.corpse, 'toggle').click();
@@ -429,7 +431,7 @@ test('the Inventory dialog: containers near, Transfer\'s Here, Take all, and it 
     await expect(page.getByText('belt pouch', {exact:true})).toHaveCount(0);
     expect(await page.evaluate(() => hc.app.game.fixtureAt(0, 0).expanded)).toBe(false);
     await btn('data-holder="fixture:0,0"', 'toggle').click();
-    await expect(page.getByText('dagger', {exact:true})).toHaveCount(0);
+    await expect(page.getByText('dagger', {exact:true}).filter({visible:true})).toHaveCount(0);
     // Transfer the pouch: each place it could go has a Here; Esc leaves the transfer.
     await btn(`data-item="${ids.pouch}"`, 'transfer').click();
     await expect(page.getByText('Transfer belt pouch: where to?')).toBeVisible();

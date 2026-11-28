@@ -84,6 +84,8 @@
             this.playerCoreId = core.id;
             if (this.character && !this.characterProblem(this.character)) {
                 this.makeCharacter(core, this.character);
+            } else {
+                this.giveBackgroundItems(core); // (as a character of its background would)
             }
             this.recomputeRanks();
             core.hp = core.maxHp;

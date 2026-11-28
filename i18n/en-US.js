@@ -53,6 +53,8 @@ myt.I18N.setDictionary({
 "tip-sheet":"The selected piece's character sheet: its stats, and what they make it. (I)",
 "tip-sheet-points":"The selected piece has stat points to spend: open its character sheet to spend them. (I)",
 "btn-inventory":"Inventory",
+"tip-to-inventory":"What this piece carries (its Inventory).",
+"tip-to-sheet":"This piece's character sheet.",
 "tip-inventory":"What the selected piece carries, and what's on the ground under it: take or drop things, for action points. (H)",
 "lbl-save":"Save",
 "lbl-export":"Export",

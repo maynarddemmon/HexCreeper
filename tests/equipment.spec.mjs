@@ -7,12 +7,12 @@ test('item kinds that can be equipped: a slot, and a weapon\'s damage and penetr
     await startGame(page);
     const r = await page.evaluate(() => ['long_sword', 'chain_shirt', 'leather_boots', 'corpse'].map(id => hc.items.get(id).equip));
     expect(r).toEqual([
-        {slot:'weapon', damage:[2, 8], penetration:2, armor:0}, {slot:'body', damage:null, penetration:0, armor:2},
-        {slot:'feet', damage:null, penetration:0, armor:0}, null
+        {slot:'weapon', damage:[2, 8], penetration:2, armor:0, cost:0.25}, {slot:'body', damage:null, penetration:0, armor:2, cost:1},
+        {slot:'feet', damage:null, penetration:0, armor:0, cost:0.5}, null
     ]);
 });
 
-test('equipping: one in each slot, from what the piece carries itself, for the equipCost rule\'s points', async ({page}) => {
+test('equipping: one in each slot, from what the piece carries itself, for its cost (or the equipCost rule\'s)', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const r = await page.evaluate(() => {
@@ -35,11 +35,14 @@ test('equipping: one in each slot, from what the piece carries itself, for the e
         out.push(g.playerEquip(c, shirt.id), g.equippedIn(c, 'body') === shirt, g.equippedIn(c, 'head'));
         // Unequipping
         out.push(g.playerEquip(c, shirt.id, true), g.equipment(c).map(it => it.kind));
+        // A kind without a cost: the equipCost rule's
+        delete hc.items.get('chain_shirt').equip.cost;
         g.rules.equipCost = '20';
         out.push(g.equipProblem(c, shirt.id));
+        hc.items.get('chain_shirt').equip.cost = 1;
         return out;
     });
-    expect(r).toEqual(['unequippable', 'missing', 'unequipped', true, 950, 'equipped', true, ['long_sword'], true, true, undefined,
+    expect(r).toEqual(['unequippable', 'missing', 'unequipped', true, 975, 'equipped', true, ['long_sword'], true, true, undefined,
         true, ['long_sword'], 'ap']);
 });
 
@@ -79,7 +82,7 @@ test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'
         out.push(dagger.equipped);
         return out;
     });
-    expect(r).toEqual([['long_sword'], 8, ['long_sword', 'belt_pouch'], undefined]);
+    expect(r).toEqual([['long_sword'], 8, ['long_sword', 'belt_pouch', 'dagger'], undefined]);
 });
 
 test('the Inventory dialog equips and unequips; the character sheet shows what\'s equipped and its armor', async ({page}) => {
@@ -92,7 +95,7 @@ test('the Inventory dialog equips and unequips; the character sheet shows what\'
     });
     await page.keyboard.press('h');
     const btn = action => page.locator(`[data-item="${id}"][data-action="${action}"]`);
-    await expect(btn('equip')).toHaveAttribute('title', 'Equip chain shirt (in place of what\'s equipped there), for 0.5 action points.');
+    await expect(btn('equip')).toHaveAttribute('title', 'Equip chain shirt (in place of what\'s equipped there), for 1 action points.');
     await btn('equip').click();
     await expect(page.getByText('chain shirt (body)')).toBeVisible();
     await expect(btn('unequip')).toBeVisible();
@@ -101,4 +104,41 @@ test('the Inventory dialog equips and unequips; the character sheet shows what\'
     await expect(page.getByText('chain shirt', {exact:true})).toBeVisible();
     const armor = page.getByText('Armor', {exact:true}).locator('xpath=..');
     await expect(armor).toContainText('2');
+});
+
+test('backgrounds give items: your character starts with them, equipped, and an enemy has them with its own', async ({page}) => {
+    await startGame(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(),
+            kinds = p => p.inventory.items.map(it => it.kind + (it.equipped ? '*' : '')).sort(),
+            out = [hc.backgrounds.get('soldier').items.map(i => i.kind), kinds(c)];   // Tess, an urchin
+        const base = g.baselineStats(g.character.species, 'soldier');
+        g.character = {...g.character, background:'soldier', stats:{...base, str:base.str + 2}};
+        g.reset();
+        out.push(kinds(g.getPlayerCore()), g.goldHeld(), g.characterProblem(g.character));
+        // A goblin reaver: its own short sword (equipped first) and jerky, and a reaver's dagger
+        const e = g.addPiece('core', 'enemy', 5, 5, null, 'goblin_reaver');
+        out.push(kinds(e).filter(k => !k.startsWith('mushroom')));
+        // Placed pieces get nothing.
+        g.setGold(100);
+        g.playerPlace(...Object.values(g.placeCells(g.getPlayerCore())[0]), g.getPlayerCore());
+        out.push(g.piecesOf('player').map(p => p.inventory.items.length));
+        return out;
+    });
+    expect(r[0]).toEqual(['short_sword', 'leather_armor', 'gold_coin']);
+    expect(r[1].filter(k => !k.startsWith('mushroom'))).toEqual(['dagger*']);
+    expect(r.slice(2)).toEqual([['gold_coin', 'leather_armor*', 'short_sword*'], 5, '', ['dagger', 'short_sword*'], [3, 0]]);
+});
+
+test('the Inventory dialog and the character sheet each switch to the other', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.keyboard.press('h');
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
+    await page.getByRole('button', {name:'Character', exact:true}).filter({visible:true}).click();
+    await expect(page.getByText('Tess · Inventory')).toBeHidden();
+    await expect(page.getByText('Tess · Human · Urchin')).toBeVisible();
+    await page.getByRole('button', {name:'Inventory', exact:true}).filter({visible:true}).click();
+    await expect(page.getByText('Tess · Human · Urchin')).toBeHidden();
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
 });

@@ -140,7 +140,7 @@ test('pieces get their profiles: you a human\'s, an enemy its own, or a creeper\
         return [[c.level, c.hp, c.maxHp, c.stats.con, c.damage], [gob.hp, gob.stats.agl, gob.xpValue], [plain.hp, plain.xpValue]];
     });
     // xp in hundredths
-    expect(r).toEqual([[1, 15, 15, 10, [1, 6]], [5, 12, 500], [4, 400]]);
+    expect(r).toEqual([[1, 15, 15, 10, [1, 2]], [5, 12, 500], [4, 400]]);
 });
 
 test('the hit chance comes from accuracy against defence, kept from hitMin to hitMax', async ({page}) => {
@@ -161,6 +161,8 @@ test('damage: the weapon\'s plus the str bonus, less armor after penetration; ar
     await realCombat(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), gob = g.addPiece('core', 'enemy', 3, 0, null, 'goblin');
+        // Unarmed (a human's own damage: no weapon equipped); a goblin's dagger, or its own, 1 to 4
+        for (const it of [...g.equipment(c), ...g.equipment(gob)]) delete it.equipped;
         const out = [g.damageRange(c), g.damageRange(gob)]; // str 10: +0; str 8: -1 (not below 0)
         c.stats.str = 18;                                    // +4 damage, +2 penetration
         out.push(g.damageRange(c), g.armorAgainst(c, 5), g.armorAgainst(c, 1));
@@ -171,7 +173,7 @@ test('damage: the weapon\'s plus the str bonus, less armor after penetration; ar
         out.push(gob.hp);
         return out;
     });
-    expect(r).toEqual([[1, 6], [0, 3], [5, 10], 3, 0, 5]);
+    expect(r).toEqual([[1, 2], [0, 3], [5, 6], 3, 0, 5]);
 });
 
 test('damage odds: the chance of each amount a hit does, after armor, from the damageRoll rule', async ({page}) => {
@@ -215,12 +217,12 @@ test('attacks roll from the seed, and hit about as often as the chance says', as
                 g.removePiece(gob);
                 return [hits, total];
             };
-        return [run(), run(), g.hitChance(c, g.addPiece('core', 'enemy', 9, 0, null, 'goblin'))];
+        return [run(), run(), g.hitChance(c, g.addPiece('core', 'enemy', 9, 0, null, 'goblin')), g.damageRange(c)];
     });
-    const [[hits, total], again, chance] = r;
+    const [[hits, total], again, chance, [min, max]] = r;
     expect(again).toEqual([hits, total]);           // the same rolls again
     expect(Math.abs(hits / 10 - chance)).toBeLessThan(5); // within 5% of 44%
-    expect(Math.abs(total / hits - 3.5)).toBeLessThan(0.3); // 1 to 6, 3.5 on average
+    expect(Math.abs(total / hits - (min + max) / 2)).toBeLessThan(0.3); // its damage's average (a goblin has no armor)
 });
 
 test('killing enemies gives xp; enough goes up a level, with its HP', async ({page}) => {

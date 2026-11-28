@@ -18,7 +18,8 @@
 	//              weapon's [min, max], in place of the piece's own (its species' or
 	//              profile's) while it's its weapon; penetration: a weapon's, in place of
 	//              its own (0 if not given); armor: what it adds to the piece's (0 if not
-	//              given). Enemies equip what they're given.
+	//              given); cost: the action points equipping or unequipping it takes (the
+	//              equipCost rule's if not given). Enemies equip what they're given.
 	// What a species leaves when it dies is one of these (its "corpse" in entities.json5:
 	// "corpse" if it doesn't say), holding everything it had, and named for it ("goblin
 	// corpse", "creeper husk", "corpse of Tess").
@@ -63,28 +64,28 @@
 			"description":"A short blade for close work.",
 			"material":"steel",
 			"volume":65,
-			"equip":{"slot":"weapon", "damage":[1, 4], "penetration":1}
+			"equip":{"slot":"weapon", "damage":[1, 4], "penetration":1, "cost":0.25}
 		},
 		"short_sword":{
 			"name":"short sword",
 			"description":"A bronze blade, handy in a tight spot.",
 			"material":"bronze",
 			"volume":150,
-			"equip":{"slot":"weapon", "damage":[2, 6], "penetration":1}
+			"equip":{"slot":"weapon", "damage":[2, 6], "penetration":1, "cost":0.25}
 		},
 		"long_sword":{
 			"name":"long sword",
 			"description":"A long steel blade.",
 			"material":"steel",
 			"volume":300,
-			"equip":{"slot":"weapon", "damage":[2, 8], "penetration":2}
+			"equip":{"slot":"weapon", "damage":[2, 8], "penetration":2, "cost":0.25}
 		},
 		"club":{
 			"name":"club",
 			"description":"A heavy length of ironwood.",
 			"material":"ironwood",
 			"volume":500,
-			"equip":{"slot":"weapon", "damage":[1, 6]}
+			"equip":{"slot":"weapon", "damage":[1, 6], "cost":0.25}
 		},
 		
 		// Armour
@@ -93,7 +94,7 @@
 			"description":"A round oak shield.",
 			"material":"oakwood",
 			"volume":4000,
-			"equip":{"slot":"offhand", "armor":1}
+			"equip":{"slot":"offhand", "armor":1, "cost":0.5}
 		},
 		"leather_armor":{
 			"name":"leather armour",
@@ -101,21 +102,21 @@
 			"description":"A jerkin of boiled leather.",
 			"material":"leather",
 			"volume":3000,
-			"equip":{"slot":"body", "armor":1}
+			"equip":{"slot":"body", "armor":1, "cost":1}
 		},
 		"chain_shirt":{
 			"name":"chain shirt",
 			"description":"Steel rings, heavy but sure.",
 			"material":"steel",
 			"volume":1200,
-			"equip":{"slot":"body", "armor":2}
+			"equip":{"slot":"body", "armor":2, "cost":1}
 		},
 		"iron_helm":{
 			"name":"iron helm",
 			"description":"A plain iron cap.",
 			"material":"iron",
 			"volume":250,
-			"equip":{"slot":"head", "armor":1}
+			"equip":{"slot":"head", "armor":1, "cost":0.25}
 		},
 		"leather_gloves":{
 			"name":"leather gloves",
@@ -123,7 +124,7 @@
 			"description":"Worn but supple. No protection to speak of, yet.",
 			"material":"leather",
 			"volume":300,
-			"equip":{"slot":"hands"}
+			"equip":{"slot":"hands", "cost":0.25}
 		},
 		"leather_boots":{
 			"name":"leather boots",
@@ -131,7 +132,7 @@
 			"description":"Sturdy boots. No protection to speak of, yet.",
 			"material":"leather",
 			"volume":1200,
-			"equip":{"slot":"feet"}
+			"equip":{"slot":"feet", "cost":0.5}
 		},
 		
 		// Food (it can't be eaten yet)

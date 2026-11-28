@@ -243,7 +243,9 @@
 	// for a character (false if not given). "species": the species it can go with (any, if
 	// not given; a species can limit its backgrounds too: a pair fits if each allows the
 	// other). Your pieces are the first playable species with the first playable background
-	// that fits it, until character creation.
+	// that fits it, until character creation. "items": what it gives a creature, as an
+	// enemy's "items" (below): your character starts with them, and an enemy has them as
+	// well as its own; what can be is equipped.
 	"backgrounds":{
 		"denizen":{
 			"name":"Denizen",
@@ -253,105 +255,122 @@
 			"name":"Urchin",
 			"description":"Grew up on the streets: quick fingers, a hard shell, little schooling and less charm.",
 			"playable":true,
-			"statAdj":{"dex":1, "wil":1, "int":-1, "cha":-1}
+			"statAdj":{"dex":1, "wil":1, "int":-1, "cha":-1},
+			"items":["dagger", {"kind":"mushroom_jerky", "count":[0, 2]}]
 		},
 		"reaver":{
 			"name":"Reaver",
 			"description":"You've taken what you want by force.",
 			"playable":true,
-			"statAdj":{"str":2, "wis":-1, "cha":-1}
+			"statAdj":{"str":2, "wis":-1, "cha":-1},
+			"items":["dagger"]
 		},
 		"soldier":{
 			"name":"Soldier",
 			"description":"Drilled and hardened in a lord's army.",
 			"playable":true,
-			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1}
+			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1},
+			"items":["short_sword", "leather_armor", {"kind":"gold_coin", "count":5}]
 		},
 		"acolyte":{
 			"name":"Acolyte",
 			"description":"Raised in a temple, among prayers and old books.",
 			"playable":true,
-			"statAdj":{"wis":1, "wil":1, "str":-1, "agl":-1}
+			"statAdj":{"wis":1, "wil":1, "str":-1, "agl":-1},
+			"items":["club", {"kind":"gold_coin", "count":3}]
 		},
 		"scholar":{
 			"name":"Scholar",
 			"description":"Years in libraries have sharpened the mind, if not the body.",
 			"playable":true,
-			"statAdj":{"int":2, "str":-1, "con":-1}
+			"statAdj":{"int":2, "str":-1, "con":-1},
+			"items":["dagger", "belt_pouch", {"kind":"gold_coin", "count":8}]
 		},
 		"noble":{
 			"name":"Noble",
 			"description":"Born to privilege, trained in manners and command.",
 			"playable":true,
-			"statAdj":{"cha":2, "con":-1, "wil":-1}
+			"statAdj":{"cha":2, "con":-1, "wil":-1},
+			"items":["long_sword", {"kind":"gold_coin", "count":20}]
 		},
 		"hunter":{
 			"name":"Hunter",
 			"description":"Lived off the land, tracking game through the wild.",
 			"playable":true,
-			"statAdj":{"wis":1, "dex":1, "int":-1, "cha":-1}
+			"statAdj":{"wis":1, "dex":1, "int":-1, "cha":-1},
+			"items":["dagger", "leather_boots", {"kind":"centipede_jerky", "count":3}]
 		},
 		"thief":{
 			"name":"Thief",
 			"description":"Made a living from locks, pockets and shadows.",
 			"playable":true,
-			"statAdj":{"agl":1, "dex":1, "wis":-1, "wil":-1}
+			"statAdj":{"agl":1, "dex":1, "wis":-1, "wil":-1},
+			"items":["dagger", "leather_gloves", {"kind":"gold_coin", "count":[3, 12]}]
 		},
 		"artisan":{
 			"name":"Artisan",
 			"description":"Apprenticed to a craft: patient, precise and practical.",
 			"playable":true,
-			"statAdj":{"dex":1, "int":1, "agl":-1, "cha":-1}
+			"statAdj":{"dex":1, "int":1, "agl":-1, "cha":-1},
+			"items":["club", "leather_gloves", {"kind":"gold_coin", "count":8}]
 		},
 		"hermit":{
 			"name":"Hermit",
 			"description":"Lived apart for years, alone with your thoughts.",
 			"playable":true,
-			"statAdj":{"wis":2, "cha":-2}
+			"statAdj":{"wis":2, "cha":-2},
+			"items":["club", {"kind":"mushroom_jerky", "count":6}]
 		},
 		"sailor":{
 			"name":"Sailor",
 			"description":"Hauled ropes and rode out storms on the open sea.",
 			"playable":true,
-			"statAdj":{"agl":1, "con":1, "int":-1, "wis":-1}
+			"statAdj":{"agl":1, "con":1, "int":-1, "wis":-1},
+			"items":["dagger", {"kind":"gold_coin", "count":5}]
 		},
 		"entertainer":{
 			"name":"Entertainer",
 			"description":"Sang, juggled and tumbled for coins in a travelling troupe.",
 			"playable":true,
-			"statAdj":{"cha":1, "agl":1, "wil":-1, "wis":-1}
+			"statAdj":{"cha":1, "agl":1, "wil":-1, "wis":-1},
+			"items":["dagger", {"kind":"gold_coin", "count":[5, 15]}]
 		},
 		"merchant":{
 			"name":"Merchant",
 			"description":"Grew up haggling over goods in the market.",
 			"playable":true,
-			"statAdj":{"cha":1, "int":1, "str":-1, "con":-1}
+			"statAdj":{"cha":1, "int":1, "str":-1, "con":-1},
+			"items":["dagger", "belt_pouch", {"kind":"gold_coin", "count":15}]
 		},
 		"farmhand":{
 			"name":"Farmhand",
 			"description":"Worked the fields from dawn to dusk.",
 			"playable":true,
-			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1}
+			"statAdj":{"str":1, "con":1, "int":-1, "cha":-1},
+			"items":["club", {"kind":"mushroom_jerky", "count":3}]
 		},
 		"clan_smith":{
 			"name":"Clan Smith",
 			"description":"Learned the forge in the halls of your clan.",
 			"playable":true,
 			"species":["dwarf", "mountain_dwarf", "gnome"],
-			"statAdj":{"str":1, "dex":1, "agl":-1, "cha":-1}
+			"statAdj":{"str":1, "dex":1, "agl":-1, "cha":-1},
+			"items":["iron_helm", "club", {"kind":"gold_coin", "count":5}]
 		},
 		"forest_warden":{
 			"name":"Forest Warden",
 			"description":"Kept watch over the old woods and the paths through them.",
 			"playable":true,
 			"species":["elf", "wood_elf", "high_elf", "half_elf"],
-			"statAdj":{"agl":1, "wis":1, "str":-1, "cha":-1}
+			"statAdj":{"agl":1, "wis":1, "str":-1, "cha":-1},
+			"items":["dagger", "leather_boots"]
 		},
 		"pit_fighter":{
 			"name":"Pit Fighter",
 			"description":"Fought for coin and crowds in the fighting pits.",
 			"playable":true,
-			"statAdj":{"str":1, "con":1, "wis":-1, "int":-1}
+			"statAdj":{"str":1, "con":1, "wis":-1, "int":-1},
+			"items":["club", "leather_gloves"]
 		}
 	},
 	

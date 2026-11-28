@@ -10,7 +10,7 @@
             theme:{
                 padding, rowHeight,
                 colorText, colorTextMuted,
-                fontSizeSmall, fontSizeMedium, fontFamilyMono
+                fontSizeSmall, fontSizeMedium, fontSizeLarge, fontFamilyMono
             }
         } = pkg,
 
@@ -120,6 +120,9 @@
             attrs.sizingStrategy = 'fit';
             attrs.tallWidth = PANEL_WIDTH;
             attrs.cancelable = true;
+            attrs.leftItemCfgs = [{klass:UnderlineBtn, attrs:{
+                name:'sheetBtn', text:i18n('btn-sheet'), tooltip:i18n('tip-to-sheet'), fontSize:fontSizeLarge, valign:'middle'
+            }, mixins:[{doActivated:() => self._opts?.onSheet?.()}]}];
 
             self.callSuper(parent, attrs);
 
@@ -142,10 +145,12 @@
                     (actions: {take, drop, takeAll, transfer, equip}, each why it can't be
                     done, '' if it can, if it's offered: equip is Equip, or Unequip for
                     what's equipped)
+                onSheet()   switches to the piece's character sheet (Character, on the
+                    left of the footer)
                 onToggle(ref)  shows or hides what's in the holder ref names (see
                     Items.toggleExpanded)
                 tips        {take, drop, takeAll, transfer, equip, unequip}: each action's tooltip, of
-                    what it's for
+                    what it's for in words (and for equip and unequip, its id)
                 hereProblem(id, ref)  why item id can't go in the holder ref names
                 onAction(action, id, ref)  does an action (take, drop, transfer, equip,
                     unequip or takeAll): to item id (to holder ref, for transfer), or for
@@ -237,7 +242,7 @@
                         }
                         if (equip != null) {
                             const action = row.equipped ? 'unequip' : 'equip';
-                            actionBtn(view, 1, action, tips[action](row.label), equip, act(action, row.id), item);
+                            actionBtn(view, 1, action, tips[action](row.label, row.id), equip, act(action, row.id), item);
                         }
                         if (transfer != null) {
                             actionBtn(view, 2, 'transfer', tips.transfer(row.label), transfer, () => {

@@ -134,12 +134,15 @@
         },
         
         /*  A background as the data has it, made usable ({playable, species:[ids] or
-            null, statAdj:{stat:n}}), or null if it isn't. */
+            null, statAdj:{stat:n}, items}), or null if it isn't. */
         parseBackground = entry => {
             const adj = entry.statAdj ?? {},
-                ok = isFlag(entry.playable) && isIds(entry.species) && isObj(adj) &&
+                items = parseItemList(entry.items),
+                ok = isFlag(entry.playable) && isIds(entry.species) && isObj(adj) && items &&
                     Object.entries(adj).every(([s, v]) => STATS.includes(s) && Number.isInteger(v)); // (below 0 too)
-            return ok ? {playable:entry.playable === true, species:entry.species ? [...entry.species] : null, statAdj:{...adj}} : null;
+            return ok ? {
+                playable:entry.playable === true, species:entry.species ? [...entry.species] : null, statAdj:{...adj}, items
+            } : null;
         },
         
         DEFAULT_STAT = [3, 10, 18],          // a species' stat it doesn't give: [min, typical, max]
@@ -260,13 +263,22 @@
         },
         
         /*  Makes piece p (yours) character ch (see characterProblem): its species,
-            background, stats, name and description, at full HP. */
+            background, stats, name and description, at full HP, carrying what its
+            background gives it, with what it can equipped. */
         makeCharacter: function(p, ch) {
             this.giveProfile(p, undefined, ch.species, ch.background);
+            this.giveBackgroundItems(p);
             p.stats = {...ch.stats};
             p.name = ch.name.trim();
             p.description = ch.description;
             p.maxHp = p.hp = this.maxHpOf(p);
+        },
+        
+        /*  Piece p gets what its background gives it (see items), and equips what it can
+            (as your character does, and enemies, with their own: see giveProfile). */
+        giveBackgroundItems: function(p) {
+            this.rollItems(p, pkg.backgrounds.get(p.background)?.items ?? [], this.rngFor('items', p.id, 'background'));
+            this.equipAll(p);
         },
         
         /*  A piece of yours as character ch would be, not on the board: for the character
@@ -278,7 +290,9 @@
         },
         
         /*  Gives piece p its species, background and profile, at full HP, with no status
-            effects, carrying what its profile gives it (and nothing else). An enemy's profile is its table's for id (its enemyId's; "creeper" if
+            effects; an enemy carrying what its profile and its background give it (and
+            nothing else), with what it can equipped, and one of yours nothing (your
+            character gets what its background gives it: see makeCharacter). An enemy's profile is its table's for id (its enemyId's; "creeper" if
             none), its species speciesId if that's one of the profile's (else its first),
             and its background backgroundId if that's one of the profile's that fits, else
             one that fits at random (none, with an error, if none do). Yours are the
@@ -318,8 +332,10 @@
             p.ap = 0;
             p.effects = [];
             p.inventory = {items:[]};
-            this.rollItems(p, profile.items, this.rngFor('items', p.id));
-            if (p.owner !== 'player') this.equipAll(p);
+            if (enemy) {
+                this.rollItems(p, profile.items, this.rngFor('items', p.id));
+                this.giveBackgroundItems(p);
+            }
         },
         
         // ---- Action points ----
@@ -383,6 +399,12 @@
         dropCost: function(p) {return Math.max(MIN_COST, this.apRule('dropCost', p));},
         transferCost: function(p) {return Math.max(MIN_COST, this.apRule('transferCost', p));},
         equipCost: function(p) {return Math.max(MIN_COST, this.apRule('equipCost', p));},
+        // What equipping (or unequipping) item it costs piece p: its kind's equip cost, if
+        // it has one (at least MIN_COST), else the equipCost rule's.
+        equipCostOf: function(p, it) {
+            const cost = this.itemKind(it).equip?.cost;
+            return cost == null ? this.equipCost(p) : Math.max(MIN_COST, Math.round(cost * AP_UNIT));
+        },
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
             return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&

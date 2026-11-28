@@ -182,6 +182,13 @@
                             }
                         }
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
+                        for (const b of pkg.backgrounds.list()) {
+                            for (const {kind} of b.items) {
+                                if (!pkg.items.get(kind)) {
+                                    console.warn('Background', b.id, 'gives item', kind, 'which there is none of');
+                                }
+                            }
+                        }
                         for (const e of pkg.enemies.list()) {
                             for (const {kind} of e.items) {
                                 if (!pkg.items.get(kind)) {

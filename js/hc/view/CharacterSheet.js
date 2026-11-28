@@ -6,12 +6,12 @@
         {I18N:{get:i18n}, Text, SpacedLayout} = M,
         
         {
-            WideView, STATS, ICON_CANCEL, ICON_CHECKED, CHARACTER_NAME_MAX, CHARACTER_DESCRIPTION_MAX,
+            WideView, UnderlineBtn, STATS, ICON_CANCEL, ICON_CHECKED, CHARACTER_NAME_MAX, CHARACTER_DESCRIPTION_MAX,
             isIntBetween,
             theme:{
                 spacing, padding, rowHeight, cornerRadius,
                 colorText, colorTextMuted, colorSuccess, colorError, colorPanel,
-                fontSizeMedium
+                fontSizeMedium, fontSizeLarge
             }
         } = pkg,
         
@@ -127,13 +127,19 @@
         gives a point back), within what creation allows (see Combat.characterProblem).
         Confirm, once it has a name and every point is in, makes it; Cancel doesn't.
         
-        Levelling or creating, what would change shows beside what it is now, in green. */
+        Levelling or creating, what would change shows beside what it is now, in green.
+        
+        Showing or levelling, Inventory (on the left of the footer) switches to its
+        Inventory dialog, if show was given onInventory (see App). */
     pkg.CharacterSheet = new JSClass('CharacterSheet', pkg.ConfirmDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
             const self = this;
             attrs.sizingStrategy = 'fit';
             attrs.tallWidth = PANEL_WIDTH;
+            attrs.leftItemCfgs = [{klass:UnderlineBtn, attrs:{
+                name:'inventoryBtn', text:i18n('btn-inventory'), tooltip:i18n('tip-to-inventory'), fontSize:fontSizeLarge, valign:'middle'
+            }, mixins:[{doActivated:() => self._onInventory?.()}]}];
             
             self.callSuper(parent, attrs);
             
@@ -195,7 +201,8 @@
             {info:[[label, value], ...], combat:[[label, value], ...]} (four and nine of
             them). statMax(stat) is the most a stat can be (its species'). preview(adds) is
             p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them.
-            onDescription(text) is called as its description is edited. */
+            onDescription(text) is called as its description is edited, and onInventory()
+            when Inventory is clicked. */
         show: function(p, opts) {
             this.callSuper();
             if ('create' in opts) {
@@ -206,9 +213,10 @@
         },
         
         /** @private */
-        _show: function(p, {title, describe, statMax, preview, onConfirm, onDescription}) {
+        _show: function(p, {title, describe, statMax, preview, onConfirm, onDescription, onInventory}) {
             const self = this,
                 levelling = p.statPoints.available > 0;
+            self._onInventory = onInventory;
             self._setMode(levelling ? 'level' : 'show', title, {
                 describe, onConfirm, onDescription,
                 base: () => p.stats,
@@ -283,6 +291,7 @@
             self._modeOpts = opts;
             self._adds = {};
             self.setTitle(title);
+            footer.inventoryBtn.setVisible(!creating && !!self._onInventory);
             footer.cancelBtn.setVisible(editing);
             footer.spacer.setVisible(editing);
             // (Close, just showing, in red, as other dialogs' Close and Cancel are.)

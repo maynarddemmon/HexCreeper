@@ -17,8 +17,9 @@
                    weapon's [min, max], which replaces the piece's own (its species' or
                    profile's: unarmed) while it's equipped as its weapon; penetration: a
                    weapon's (it replaces the piece's own too; 0 if not given); armor: what
-                   it adds to the piece's (0 if not given). One that's equipped doesn't
-                   stack.
+                   it adds to the piece's (0 if not given); cost: the action points
+                   equipping it (or unequipping it) takes, in place of the equipCost
+                   rule's (at least 0.1). One that's equipped doesn't stack.
     Entries can extend others (see Subtypes.js).
 
     An item is plain data, saved with the game: {id, kind, count}, count being how many
@@ -105,12 +106,15 @@
         },
         
         /*  An item kind's equip as the data has it, made usable ({slot, damage (or null),
-            penetration, armor}), or undefined if it isn't. */
+            penetration, armor, cost (or null)}), or undefined if it isn't. */
         parseEquip = v => {
             const isRange = r => Array.isArray(r) && r.length === 2 && r.every(isNatNum) && r[0] <= r[1],
-                equip = isObj(v) ? {slot:v.slot, damage:v.damage ?? null, penetration:v.penetration ?? 0, armor:v.armor ?? 0} : null;
+                equip = isObj(v) ? {
+                    slot:v.slot, damage:v.damage ?? null, penetration:v.penetration ?? 0, armor:v.armor ?? 0, cost:v.cost ?? null
+                } : null;
             return equip && EQUIP_SLOTS.includes(equip.slot) && (equip.damage === null || isRange(equip.damage)) &&
-                isNatNum(equip.penetration) && isNatNum(equip.armor) ? {...equip, damage:equip.damage && [...equip.damage]} : undefined;
+                isNatNum(equip.penetration) && isNatNum(equip.armor) && (equip.cost === null || (isNum(equip.cost) && equip.cost > 0)) ?
+                {...equip, damage:equip.damage && [...equip.damage]} : undefined;
         },
         
         // The limits of what holds nothing
@@ -476,7 +480,7 @@
         /*  Why piece p can't equip item id (or with unequip, unequip it): '' if it can,
             else 'over', 'player' (not yours), 'missing' (it doesn't carry it, not in
             something it carries), 'unequippable' (it can't be equipped), 'equipped' (or
-            'unequipped': it already is), or 'ap' (not the equipCost rule's points). */
+            'unequipped': it already is), or 'ap' (not the points: see Combat.equipCostOf). */
         equipProblem: function(p, id, unequip = false) {
             const it = p?.owner === 'player' ? (p.inventory?.items ?? []).find(i => i.id === id) : null;
             let retval;
@@ -490,7 +494,7 @@
                 retval = 'unequippable';
             } else if (!!it.equipped !== unequip) {
                 retval = unequip ? 'unequipped' : 'equipped';
-            } else if (!this.canAfford(p, this.equipCost(p))) {
+            } else if (!this.canAfford(p, this.equipCostOf(p, it))) {
                 retval = 'ap';
             } else {
                 retval = '';
@@ -499,7 +503,7 @@
         },
         
         /*  Piece p equips item id (in place of what's in its slot), or with unequip,
-            unequips it, for the equipCost rule's action points, if it can (see
+            unequips it, for its kind's equip cost (see Combat.equipCostOf), if it can (see
             equipProblem). Returns whether it did. */
         playerEquip: function(p, id, unequip = false) {
             const done = !this.equipProblem(p, id, unequip);
@@ -513,7 +517,7 @@
                     it.equipped = true;
                 }
                 this.fx(p.x, p.y, i18n(unequip ? 'fx-unequip' : 'fx-equip', this.itemLabel(it)), '--place-ink', {});
-                this.spend(p, this.equipCost(p));
+                this.spend(p, this.equipCostOf(p, it));
                 this.afterPlayerAction();
             }
             return done;

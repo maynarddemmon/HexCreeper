@@ -181,6 +181,10 @@
                 onConfirm:adds => {
                     game.spendStatPoints(p, adds);
                     draw();
+                },
+                onInventory:() => {
+                    characterSheet.hide();
+                    openInventory(p);
                 }
             });
         },
@@ -283,11 +287,15 @@
                     drop:what => i18n('tip-drop', what, cost(game.dropCost(p))),
                     takeAll:what => i18n('tip-takeAll', what, cost(game.takeCost(p))),
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
-                    equip:what => i18n('tip-equip', what, cost(game.equipCost(p))),
-                    unequip:what => i18n('tip-unequip', what, cost(game.equipCost(p)))
+                    equip:(what, id) => i18n('tip-equip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
+                    unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item)))
                 },
                 hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
                 onToggle:ref => game.toggleExpanded(p, ref),
+                onSheet:() => {
+                    inventoryDialog.hide();
+                    openSheet(p);
+                },
                 onAction:(action, id, ref) => {
                     const done = action === 'equip' || action === 'unequip' ? game.playerEquip(p, id, action === 'unequip') :
                         action === 'take' ? game.playerTake(p, id) :

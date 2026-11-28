@@ -55,7 +55,7 @@ test('enemies extend: the goblin reaver is a goblin with its own stats over a go
         g.giveProfile(p, 'goblin_reaver');
         // (A piece's stats: a goblin reaver's baseline, then its own.)
         return [r.name, r.species, r.stats, r.damage, r.hp, r.xp, p.background, JSON.stringify(p.stats) === JSON.stringify({...g.baselineStats('goblin', 'reaver'), str:12, con:12})];
-    })).toEqual(['Goblin Reaver', ['goblin'], {str:12, con:12}, [2, 6], 8, 10, 'reaver', true]);
+    })).toEqual(['Goblin Reaver', ['goblin'], {str:12, con:12}, null, 8, 10, 'reaver', true]);
 });
 
 test('enemy groups don\'t extend', async ({page}) => {
