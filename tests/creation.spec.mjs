@@ -56,8 +56,10 @@ test('a new game\'s core is the character created; pieces placed are of its spec
         g.reset();
         const c = g.getPlayerCore();
         g.setGold(100);
-        g.playerPlace(1, 0, c);
-        const p = g.pieceAt(1, 0);
+        // (Wherever there's room: the new game's map is random.)
+        const {x, y} = g.placeCells(c)[0];
+        g.playerPlace(x, y, c);
+        const p = g.pieceAt(x, y);
         return {core:[c.name, c.description, c.species, c.background, c.stats.str - g.baselineStats('dwarf', 'reaver').str, c.hp === c.maxHp],
             placed:[p.name, p.species, p.background], who:g.whoOf(c).name};
     });

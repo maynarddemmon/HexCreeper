@@ -89,8 +89,8 @@
             expr('jumpExhaustion', '2', STAT_VARS),
             expr('rallyCost', '0.5', STAT_VARS),
             expr('takeCost', '0.25', STAT_VARS),
-            expr('dropCost', '0.25', STAT_VARS),
-            expr('rallyTurns', '3', STAT_VARS),
+            expr('dropCost', '0.15', STAT_VARS),
+            expr('rallyTurns', '5', STAT_VARS),
             expr('rallyAmount', '(con / 10) * level', STAT_VARS),
             expr('rallyRefresh', 'Math.max(10, 150 - level)', STAT_VARS),
             // What a piece can carry (see Items.js): the most stacks (each its kind's

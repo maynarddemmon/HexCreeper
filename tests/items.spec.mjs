@@ -270,7 +270,7 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     await take(ids.dagger).click();
     // It's carried now, to drop.
     await expect(take(ids.dagger)).toHaveText('Drop');
-    await expect(take(ids.dagger)).toHaveAttribute('title', 'Drop dagger on the ground here, for 0.25 action points.');
+    await expect(take(ids.dagger)).toHaveAttribute('title', 'Drop dagger on the ground here, for 0.15 action points.');
     expect(await page.evaluate(() => hc.app.game.getPlayerCore().ap)).toBe(75);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
