@@ -94,12 +94,13 @@ test('a piece that dies leaves its corpse, named for it, holding what it had; a 
         delete hc.species.get('creeper').corpse;
         return {
             had, ground:ground.length, kind:corpse.kind, name:corpse.name, inside:corpse.inventory.items.map(it => it.kind),
+            expanded:corpse.expanded,
             husk, bare:g.groundAt(0, 1).inventory.items.map(it => it.kind)
         };
     });
     expect(r.had[0]).toBe('dagger');
     expect(r).toMatchObject({
-        ground:1, kind:'small_corpse', name:'goblin corpse', inside:r.had, husk:['creeper husk'], bare:['dagger']
+        ground:1, kind:'small_corpse', name:'goblin corpse', inside:r.had, expanded:true, husk:['creeper husk'], bare:['dagger']
     });
 });
 
@@ -268,6 +269,8 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     await expect(dialog.getByText('dagger', {exact:true})).toBeVisible();
     await btn(ids.corpse, 'toggle').click();
     await expect(dialog.getByText('dagger', {exact:true})).toHaveCount(0);
+    // (The corpse keeps whether it's expanded.)
+    expect(await page.evaluate(id => hc.app.game.findItem(hc.app.game.groundAt(0, 0), id).item.expanded, ids.corpse)).toBe(false);
     await btn(ids.corpse, 'toggle').click();
     // The corpse is too heavy (66.5 kg); the dagger in it can be taken.
     await expect(btn(ids.corpse, 'take')).toHaveClass(/disabled/);
@@ -420,6 +423,12 @@ test('the Inventory dialog: containers near, Transfer\'s Here, Take all, and it 
     await expect(page.getByText('Table (here)')).toBeVisible();
     await expect(page.getByText('Chest (east)')).toBeVisible();
     await expect(page.getByText('It\'s shut: open it first (Use).')).toBeVisible();
+    // A container fixture's ▾ hides what's in it, and it keeps that.
+    await expect(page.getByText('belt pouch', {exact:true})).toBeVisible();
+    await btn('data-holder="fixture:0,0"', 'toggle').click();
+    await expect(page.getByText('belt pouch', {exact:true})).toHaveCount(0);
+    expect(await page.evaluate(() => hc.app.game.fixtureAt(0, 0).expanded)).toBe(false);
+    await btn('data-holder="fixture:0,0"', 'toggle').click();
     await expect(page.getByText('dagger', {exact:true})).toHaveCount(0);
     // Transfer the pouch: each place it could go has a Here; Esc leaves the transfer.
     await btn(`data-item="${ids.pouch}"`, 'transfer').click();

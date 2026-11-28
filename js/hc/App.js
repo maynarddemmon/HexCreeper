@@ -242,7 +242,7 @@
                     return [
                         {
                             id:it.id, label:game.itemLabel(it), weight:formatWeight(game.itemWeight(it)), depth,
-                            container:!!it.inventory, actions
+                            container:!!it.inventory, expanded:!!it.expanded, actions
                         },
                         ...rows(it, carried, depth + 1)
                     ];
@@ -269,6 +269,7 @@
                     title:title(top),
                     summary:top.open ? summary(top.holder, top.ref !== 'ground') : '',
                     open:top.open,
+                    expanded:top.ref.startsWith('fixture:') ? top.holder.expanded !== false : null,
                     takeAll:top.ref === 'piece' ? null : why(game.takeAllProblem(p, top.ref)),
                     rows:top.open ? rows(top.holder, top.ref === 'piece') : []
                 })),
@@ -279,6 +280,7 @@
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p)))
                 },
                 hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
+                onToggle:ref => game.toggleExpanded(p, ref),
                 onAction:(action, id, ref) => {
                     const done = action === 'take' ? game.playerTake(p, id) :
                         action === 'drop' ? game.playerDrop(p, id) :

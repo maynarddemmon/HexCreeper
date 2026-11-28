@@ -120,6 +120,7 @@
         isInventory = v => isObj(v) && Array.isArray(v.items) && v.items.every(it => isObj(it) &&
             Number.isInteger(it.id) && typeof it.kind === 'string' && isIntOfAtLeast(it.count, 1) &&
             (it.name === undefined || typeof it.name === 'string') &&
+            (it.expanded === undefined || typeof it.expanded === 'boolean') &&
             (it.inventory === undefined || isInventory(it.inventory)));
     
     pkg.items = new Subtypes('item', parseItem);
@@ -382,6 +383,7 @@
                 const c = this.makeItem(corpse),
                     into = c.inventory ? c : ground,
                     kindName = this.itemKind(c).name;
+                c.expanded = true; // (what it had shows)
                 c.name = p.name ? i18n('item-remains-of', p.name, kindName) :
                     species ? i18n('item-remains', species.name.toLowerCase(), kindName) : kindName;
                 for (const it of had) this.addItem(into, it, true);
@@ -415,6 +417,20 @@
             const core = this.getPlayerCore();
             for (const p of this.piecesOf('player')) this.removeKind(p, ITEM_GOLD, Infinity);
             if (core && n > 0) this.addItem(core, this.makeItem(ITEM_GOLD, n), true);
+        },
+        
+        /*  Shows or hides, in the Inventory dialog, what's in the holder ref names, that
+            piece p can get at (see reachHolder; shut or not): a container item (expanded:
+            hidden unless it's true; a corpse's is, when it's left) or fixture (shown
+            unless it's false). Saved with it. Not an action: it costs nothing. */
+        toggleExpanded: function(p, ref) {
+            if (typeof ref === 'number') {
+                const it = this.reachItem(p, ref)?.item;
+                if (it?.inventory) it.expanded = !it.expanded;
+            } else {
+                const top = this.reachHolders(p).find(t => t.ref === ref && t.ref.startsWith('fixture:'));
+                if (top) top.holder.expanded = top.holder.expanded === false;
+            }
         },
         
         // ---- Reach: what your pieces can get at ----

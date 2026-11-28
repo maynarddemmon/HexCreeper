@@ -36,21 +36,41 @@
             Object.assign(btn.getIDE().dataset, {action, ...data});
             return btn;
         },
+        
+        /*  The ▸ / ▾ at x in view that shows or hides what's in a container (what, in
+            words), as it's expanded or not; onToggle on a click. data as actionBtn's. */
+        toggleBtn = (view, x, what, expanded, onToggle, data) => {
+            const btn = new UnderlineBtn(view, {
+                x, width:TOGGLE_WIDTH, valign:'middle', fontSize:fontSizeMedium, text:expanded ? '▾' : '▸',
+                tooltip:i18n(expanded ? 'tip-collapse' : 'tip-expand', what)
+            }, [{doActivated:onToggle}]);
+            Object.assign(btn.getIDE().dataset, {action:'toggle', ...data});
+            btn.getIDE().setAttribute('aria-expanded', String(expanded));
+            return btn;
+        },
 
-        /*  A section's heading, as wide as what it's in, over a line: its name, a summary
-            (what it holds against what it can), and maybe an action. */
+        /*  A section's heading, as wide as what it's in, over a line: a ▸ / ▾ (if expanded
+            isn't null: see toggleBtn), its name, a summary (what it holds against what it
+            can), and maybe an action. */
         InventoryHead = new JSClass('InventoryHead', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    {text, summary} = attrs;
+                    {text, summary, expanded, onToggle, data} = attrs;
                 delete attrs.text;
                 delete attrs.summary;
+                delete attrs.expanded;
+                delete attrs.onToggle;
+                delete attrs.data;
                 attrs.height = ROW_HEIGHT;
-
+                
                 self.callSuper(parent, attrs);
-
+                
                 self.getIDS().borderBottom = '1px solid ' + colorText;
-                new Text(self, {x:padding, y:3, text, fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
+                if (expanded != null) toggleBtn(self, padding, text, expanded, onToggle, data);
+                new Text(self, {
+                    x:padding + (expanded != null ? TOGGLE_WIDTH : 0), y:3, text,
+                    fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'
+                });
                 new Text(self, {
                     x:PANEL_WIDTH / 3, y:5, width:ACTIONS_X - padding - PANEL_WIDTH / 3, textAlign:'right', text:summary,
                     fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
@@ -73,14 +93,7 @@
                 self.callSuper(parent, attrs);
 
                 const x = padding + row.depth * INDENT;
-                if (row.container) {
-                    const toggle = new UnderlineBtn(self, {
-                        x, width:TOGGLE_WIDTH, valign:'middle', fontSize:fontSizeMedium, text:expanded ? '▾' : '▸',
-                        tooltip:i18n(expanded ? 'tip-collapse' : 'tip-expand', row.label)
-                    }, [{doActivated:() => onToggle(row.id)}]);
-                    Object.assign(toggle.getIDE().dataset, {action:'toggle', item:row.id});
-                    toggle.getIDE().setAttribute('aria-expanded', String(expanded));
-                }
+                if (row.container) toggleBtn(self, x, row.label, expanded, () => onToggle(row.id), {item:row.id});
                 new Text(self, {
                     x:x + TOGGLE_WIDTH, y:3, width:WEIGHT_X - x - TOGGLE_WIDTH - padding, text:row.label,
                     fontSize:fontSizeMedium, textColor:colorText
@@ -112,7 +125,6 @@
 
             self.getFooterView().ackBtn.setText(ICON_CANCEL + ' ' + i18n('btn-close'));
 
-            self._expanded = new Set();
             const container = self._container = new WideView(self.getContentView());
             new SpacedLayout(container, {axis:'y', inset:padding, spacing:2, outset:padding, collapseParent:true});
         },
@@ -121,13 +133,16 @@
         // Methods /////////////////////////////////////////////////////////////
         /*  Shows it. opts:
                 title
-                describe()  what to show: [{ref, title, summary, open, takeAll, rows}], a
-                    section for each holder (ref: what names it: see Items.reachHolder;
-                    open: whether what's in it can be got at; takeAll: why it can't all
-                    be taken, '' if it can, or null for no Take all), its rows [{id,
-                    label, weight, depth, container, actions}] (actions: {take, drop,
-                    takeAll, transfer}, each why it can't be done, '' if it can, if it's
-                    offered)
+                describe()  what to show: [{ref, title, summary, open, expanded, takeAll,
+                    rows}], a section for each holder (ref: what names it: see
+                    Items.reachHolder; open: whether what's in it can be got at; expanded:
+                    whether what's in it shows, or null if it always does; takeAll: why it
+                    can't all be taken, '' if it can, or null for no Take all), its rows
+                    [{id, label, weight, depth, container, expanded, actions}] (actions:
+                    {take, drop, takeAll, transfer}, each why it can't be done, '' if it
+                    can, if it's offered)
+                onToggle(ref)  shows or hides what's in the holder ref names (see
+                    Items.toggleExpanded)
                 tips        {take, drop, takeAll, transfer}: each action's tooltip, of
                     what it's for
                 hereProblem(id, ref)  why item id can't go in the holder ref names
@@ -144,10 +159,13 @@
         /*  Brings it up to date. */
         refresh: function() {
             const self = this,
-                {describe, tips, hereProblem, onAction} = self._opts,
+                {describe, tips, hereProblem, onAction, onToggle} = self._opts,
                 moving = self._moving,
                 container = self._container,
-                expanded = self._expanded,
+                toggle = ref => {
+                    onToggle(ref);
+                    self.refresh();
+                },
                 act = (action, id, ref) => () => {
                     self._moving = null;
                     onAction(action, id, ref);
@@ -173,8 +191,11 @@
                 }, {});
             }
             for (const section of describe()) {
-                const head = new InventoryHead(container, {text:section.title, summary:section.summary}),
-                    data = {holder:section.ref};
+                const data = {holder:section.ref},
+                    head = new InventoryHead(container, {
+                        text:section.title, summary:section.summary, expanded:section.expanded,
+                        onToggle:() => toggle(section.ref), data
+                    });
                 if (moving) {
                     here(head, section.ref, data);
                 } else if (section.takeAll != null) {
@@ -185,6 +206,8 @@
                 }
                 if (!section.open) {
                     note('inv-shut');
+                } else if (section.expanded === false) {
+                    continue;
                 } else if (!section.rows.length) {
                     note('inv-nothing');
                 }
@@ -192,14 +215,8 @@
                 let hideBelow = Infinity;
                 for (const row of section.rows) {
                     if (row.depth > hideBelow) continue;
-                    hideBelow = row.container && !expanded.has(row.id) ? row.depth : Infinity;
-                    const view = new ItemRow(container, {
-                            row, expanded:expanded.has(row.id),
-                            onToggle:id => {
-                                expanded[expanded.has(id) ? 'delete' : 'add'](id);
-                                self.refresh();
-                            }
-                        }),
+                    hideBelow = row.container && !row.expanded ? row.depth : Infinity;
+                    const view = new ItemRow(container, {row, expanded:row.expanded, onToggle:toggle}),
                         item = {item:row.id},
                         {take, drop, takeAll, transfer} = row.actions;
                     if (moving) {
@@ -212,7 +229,7 @@
                             actionBtn(view, 0, 'drop', tips.drop(row.label), drop, act('drop', row.id), item);
                         }
                         if (takeAll != null) {
-                                actionBtn(
+                            actionBtn(
                                 view, 1, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
                             );
                         }
