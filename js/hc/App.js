@@ -147,7 +147,8 @@
             info:[
                 [i18n('sheet-level'), q.level],
                 [i18n('sheet-xp'), formatXp(q.xp) + '/' + formatXp(game.xpRule('xpToLevel', q))],
-                [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')]
+                [i18n('sheet-effects'), formatEffects(q) || i18n('sheet-effects-none')],
+                [i18n('sheet-equipment'), game.equipment(q).map(it => game.itemLabel(it)).join(', ') || i18n('sheet-equipment-none')]
             ],
             combat:[
                 [i18n('sheet-hp'), q.hp + '/' + q.maxHp],
@@ -158,7 +159,7 @@
                 [i18n('sheet-defence'), game.statRule('defence', q)],
                 [i18n('sheet-damage'), formatRange(game.damageRange(q))],
                 [i18n('sheet-penetration'), game.penetrationOf(q)],
-                [i18n('sheet-armor'), q.armor]
+                [i18n('sheet-armor'), game.armorOf(q)]
             ]
         }),
         
@@ -236,13 +237,17 @@
             const why = problem => problem ? i18n('inv-why-' + problem) : '',
                 // An action's problem, or null when it isn't offered
                 rows = (holder, carried, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => {
-                    const actions = carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))};
+                    const actions = carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))},
+                        slot = game.itemKind(it).equip?.slot;
                     if (it.inventory) actions.takeAll = why(game.takeAllProblem(p, it.id));
+                    // What it carries itself can be equipped (or unequipped).
+                    if (slot && holder === p) actions.equip = why(game.equipProblem(p, it.id, !!it.equipped));
                     actions.transfer = why(game.over ? 'over' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap');
                     return [
                         {
-                            id:it.id, label:game.itemLabel(it), weight:formatWeight(game.itemWeight(it)), depth,
-                            container:!!it.inventory, expanded:!!it.expanded, actions
+                            id:it.id, weight:formatWeight(game.itemWeight(it)), depth,
+                            label:it.equipped ? i18n('item-equipped', game.itemLabel(it), i18n('slot-' + slot)) : game.itemLabel(it),
+                            container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped, actions
                         },
                         ...rows(it, carried, depth + 1)
                     ];
@@ -277,12 +282,15 @@
                     take:what => i18n('tip-take', what, cost(game.takeCost(p))),
                     drop:what => i18n('tip-drop', what, cost(game.dropCost(p))),
                     takeAll:what => i18n('tip-takeAll', what, cost(game.takeCost(p))),
-                    transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p)))
+                    transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
+                    equip:what => i18n('tip-equip', what, cost(game.equipCost(p))),
+                    unequip:what => i18n('tip-unequip', what, cost(game.equipCost(p)))
                 },
                 hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
                 onToggle:ref => game.toggleExpanded(p, ref),
                 onAction:(action, id, ref) => {
-                    const done = action === 'take' ? game.playerTake(p, id) :
+                    const done = action === 'equip' || action === 'unequip' ? game.playerEquip(p, id, action === 'unequip') :
+                        action === 'take' ? game.playerTake(p, id) :
                         action === 'drop' ? game.playerDrop(p, id) :
                         action === 'transfer' ? game.playerTransfer(p, id, ref) :
                         game.playerTakeAll(p, ref);

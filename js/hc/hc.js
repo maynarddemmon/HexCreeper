@@ -83,6 +83,8 @@
         
         // Items (see Items.js)
         ITEM_GOLD:'gold_coin', // gold: what loot gives, and placing a piece costs
+        // Where a piece can equip things (an item kind's equip.slot: see Items.js)
+        EQUIP_SLOTS:['weapon', 'offhand', 'body', 'head', 'hands', 'feet'],
         
         // Status Effects (the ones the code uses: see Effects.js)
         EFFECT_EXHAUSTED:'exhausted',

@@ -98,7 +98,7 @@ test('a piece that dies leaves its corpse, named for it, holding what it had; a 
             husk, bare:g.groundAt(0, 1).inventory.items.map(it => it.kind)
         };
     });
-    expect(r.had[0]).toBe('dagger');
+    expect(r.had[0]).toBe('short_sword');
     expect(r).toMatchObject({
         ground:1, kind:'small_corpse', name:'goblin corpse', inside:r.had, expanded:true, husk:['creeper husk'], bare:['dagger']
     });
@@ -124,7 +124,7 @@ test('enemies carry what their profile gives them, rolled for each', async ({pag
             reaver = g.addPiece('core', 'enemy', 0, 9, null, 'hobgoblin_reaver');
         return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.map(it => it.kind)];
     });
-    expect(r).toEqual([0, 2, ['short_sword', 'belt_pouch']]);
+    expect(r).toEqual([0, 2, ['long_sword', 'belt_pouch']]);
 });
 
 test('loot gives gold coins to the piece that takes it; what it can\'t carry falls on the ground', async ({page}) => {
@@ -342,7 +342,7 @@ test('containers: a chest, cabinet and table hold things, start with their conte
         out.push(g.takeProblem(c, ids.coins), g.transferProblem(c, ids.pouch, 'fixture:1,0'));
         return out;
     }, ids);
-    expect(r).toEqual([20, ['gold_coin:40', 'dagger:1', 'short_sword:1', 'belt_pouch:1'],
+    expect(r).toEqual([20, ['gold_coin:40', 'dagger:1', 'short_sword:1', 'belt_pouch:1', 'leather_armor:1', 'iron_helm:1'],
         ['piece', 'ground', 'fixture:0,0', 'fixture:1,0@1'], true, 1, 'missing', 'nowhere']);
 });
 

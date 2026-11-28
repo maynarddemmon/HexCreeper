@@ -10,7 +10,7 @@ JS.Packages(file => {
         VIEW_ROOT = HC_ROOT + 'view/';
     
     file(HC_ROOT + 'hc.js').provides('hc','hc.theme','hc.cfg',
-        'hc.AP_UNIT','hc.XP_UNIT','hc.STATS','hc.CHARACTER_NAME_MAX','hc.CHARACTER_DESCRIPTION_MAX','hc.ITEM_GOLD',
+        'hc.AP_UNIT','hc.XP_UNIT','hc.STATS','hc.CHARACTER_NAME_MAX','hc.CHARACTER_DESCRIPTION_MAX','hc.ITEM_GOLD','hc.EQUIP_SLOTS',
         'hc.EFFECT_EXHAUSTED','hc.EFFECT_RALLYING','hc.EFFECT_RALLIED',
         'hc.MOVE_MODES','hc.PLAYER_MOVE_MODES',
         'hc.STAT_VARS','hc.XP_VARS','hc.MULTI_KILL_VARS','hc.DAMAGE_VARS','hc.COST_VARS',
@@ -70,7 +70,9 @@ JS.Packages(file => {
     file(MODEL_ROOT + 'Combat.js').provides('hc.Combat','hc.species','hc.backgrounds','hc.enemies').requires(
         'hc.Subtypes','hc.attrs','hc.Items','hc.EFFECT_EXHAUSTED','hc.EFFECT_RALLYING','hc.EFFECT_RALLIED'
     );
-    file(MODEL_ROOT + 'Items.js').provides('hc.Items','hc.items').requires('hc.Subtypes','hc.attrs','hc.solids','hc.STAT_VARS','hc.ITEM_GOLD');
+    file(MODEL_ROOT + 'Items.js').provides('hc.Items','hc.items').requires(
+        'hc.Subtypes','hc.attrs','hc.solids','hc.STAT_VARS','hc.ITEM_GOLD','hc.EQUIP_SLOTS'
+    );
     file(MODEL_ROOT + 'Enemies.js').provides('hc.enemyGroups','hc.defineEnemies','hc.enemyTrees').requires('hc.Subtypes','hc.enemies');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Combat','hc.Goals','hc.solids','hc.Fixtures','hc.Effects','hc.Items','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');
     file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.attrs','hc.PLAYER_MOVE_MODES','hc.STAT_VARS','hc.XP_VARS','hc.MULTI_KILL_VARS','hc.DAMAGE_VARS');

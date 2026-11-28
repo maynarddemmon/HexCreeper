@@ -15,7 +15,7 @@
 		"human":{
 			"name":"Human",
 			"description":"Adaptable, curious and stubborn.",
-			"damage":[1, 6],
+			"damage":[1, 2],
 			"playable":true,
 			"stats":{
 				"str":[3, 10, 18], 
@@ -31,7 +31,7 @@
 		"dwarf":{
 			"name":"Dwarf",
 			"description":"Stout, resilient and strong.",
-			"damage":[1, 6],
+			"damage":[1, 2],
 			"playable":true,
 			"stats":{
 				"str":[3, 11, 18], 
@@ -58,7 +58,7 @@
 		"elf":{
 			"name":"Elf",
 			"description":"Graceful, nimble and smart.",
-			"damage":[1, 6],
+			"damage":[1, 2],
 			"playable":true,
 			"stats":{
 				"str":[3, 8,  18], 
@@ -96,7 +96,7 @@
 		"halfling":{
 			"name":"Halfling",
 			"description":"Small, nimble folk with steady nerves and a knack for luck.",
-			"damage":[1, 4],
+			"damage":[1, 1],
 			"corpse":"small_corpse",
 			"playable":true,
 			"stats":{
@@ -113,7 +113,7 @@
 		"gnome":{
 			"name":"Gnome",
 			"description":"Small, clever tinkerers with endless curiosity.",
-			"damage":[1, 4],
+			"damage":[1, 1],
 			"corpse":"small_corpse",
 			"playable":true,
 			"stats":{
@@ -130,7 +130,7 @@
 		"half_elf":{
 			"name":"Half-Elf",
 			"description":"Of two peoples and at home in neither: charming and adaptable.",
-			"damage":[1, 6],
+			"damage":[1, 2],
 			"playable":true,
 			"stats":{
 				"str":[3, 9,  18],
@@ -146,7 +146,7 @@
 		"half_orc":{
 			"name":"Half-Orc",
 			"description":"Strong and tough, with an orc's temper and a human's grit.",
-			"damage":[1, 6],
+			"damage":[1, 2],
 			"playable":true,
 			"stats":{
 				"str":[3, 12, 18],
@@ -170,7 +170,6 @@
 			"extends":"goblin",
 			"name":"Hobgoblin",
 			"description":"Big, disciplined goblins, bred for war.",
-			"damage":[1, 6],
 			"corpse":"corpse",
 			"stats":{
 				"str":[6, 11, 17],
@@ -200,7 +199,7 @@
 		"orc":{
 			"name":"Orc",
 			"description":"Big, fierce and brutal raiders.",
-			"damage":[1, 6],
+			"damage":[1, 3],
 			"stats":{
 				"str":[5, 12, 19],
 				"agl":[3, 9,  16],
@@ -215,7 +214,7 @@
 		"ogre":{
 			"name":"Ogre",
 			"description":"Huge, dim and hungry, and strong enough to crush a man.",
-			"damage":[2, 8],
+			"damage":[2, 6],
 			"corpse":"large_corpse",
 			"stats":{
 				"str":[10, 16, 22],
@@ -393,10 +392,9 @@
 			"backgrounds":["reaver"],
 			"description":"A goblin with a cruel blade.",
 			"stats":{"str":12, "con":12},
-			"damage":[2, 6],
 			"hp":8,
 			"xp":10,
-			"items":["dagger", {"kind":"mushroom_jerky", "count":[0, 2]}]
+			"items":["short_sword", {"kind":"mushroom_jerky", "count":[0, 2]}]
 		},
 		"hobgoblin":{
 			"name":"Hobgoblin",
@@ -412,10 +410,9 @@
 			"description":"A big goblin with a cruel blade.",
 			"species":"hobgoblin",
 			"backgrounds":["reaver"],
-			"damage":[2, 8],
 			"hp":13,
 			"xp":15,
-			"items":["short_sword", "belt_pouch"]
+			"items":["long_sword", "belt_pouch"]
 		},
 	},
 	

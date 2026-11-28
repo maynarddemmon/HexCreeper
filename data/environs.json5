@@ -325,7 +325,9 @@
 				{"kind":"gold_coin", "count":[0, 40]},
 				{"kind":"dagger", "count":[0, 1]},
 				{"kind":"short_sword", "count":[0, 1]},
-				{"kind":"belt_pouch", "count":[0, 1]}
+				{"kind":"belt_pouch", "count":[0, 1]},
+				{"kind":"leather_armor", "count":[0, 1]},
+				{"kind":"iron_helm", "count":[0, 1]}
 			],
 			"destroyInto":"wood_scraps",
 			"fillColor":"#8a5a2b",
@@ -350,7 +352,11 @@
 			"contents":[
 				{"kind":"mushroom_jerky", "count":[0, 6]},
 				{"kind":"centipede_jerky", "count":[0, 6]},
-				{"kind":"club", "count":[0, 1]}
+				{"kind":"club", "count":[0, 1]},
+				{"kind":"wooden_shield", "count":[0, 1]},
+				{"kind":"leather_gloves", "count":[0, 1]},
+				{"kind":"leather_boots", "count":[0, 1]},
+				{"kind":"chain_shirt", "count":[0, 1]}
 			],
 			"destroyInto":"wood_scraps",
 			"fillColor":"#6b4524",

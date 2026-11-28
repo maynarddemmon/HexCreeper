@@ -13,6 +13,12 @@
 	//   inventory: if things can be put in it: {"capacity", "weight", "volume"}, the most
 	//              it can hold (each without limit if not given). One that holds things
 	//              doesn't stack. Its own volume should allow for what it holds.
+	//   equip:     if a piece can equip it: {"slot", "damage", "penetration", "armor"}.
+	//              slot: "weapon", "offhand", "body", "head", "hands" or "feet"; damage: a
+	//              weapon's [min, max], in place of the piece's own (its species' or
+	//              profile's) while it's its weapon; penetration: a weapon's, in place of
+	//              its own (0 if not given); armor: what it adds to the piece's (0 if not
+	//              given). Enemies equip what they're given.
 	// What a species leaves when it dies is one of these (its "corpse" in entities.json5:
 	// "corpse" if it doesn't say), holding everything it had, and named for it ("goblin
 	// corpse", "creeper husk", "corpse of Tess").
@@ -51,30 +57,81 @@
 			"weight":3000
 		},
 		
-		// Weapons (from Ouroboros: they do nothing yet)
+		// Weapons (from Ouroboros)
 		"dagger":{
 			"name":"dagger",
 			"description":"A short blade for close work.",
 			"material":"steel",
-			"volume":65
+			"volume":65,
+			"equip":{"slot":"weapon", "damage":[1, 4], "penetration":1}
 		},
 		"short_sword":{
 			"name":"short sword",
 			"description":"A bronze blade, handy in a tight spot.",
 			"material":"bronze",
-			"volume":150
+			"volume":150,
+			"equip":{"slot":"weapon", "damage":[2, 6], "penetration":1}
 		},
 		"long_sword":{
 			"name":"long sword",
 			"description":"A long steel blade.",
 			"material":"steel",
-			"volume":300
+			"volume":300,
+			"equip":{"slot":"weapon", "damage":[2, 8], "penetration":2}
 		},
 		"club":{
 			"name":"club",
 			"description":"A heavy length of ironwood.",
 			"material":"ironwood",
-			"volume":500
+			"volume":500,
+			"equip":{"slot":"weapon", "damage":[1, 6]}
+		},
+		
+		// Armour
+		"wooden_shield":{
+			"name":"wooden shield",
+			"description":"A round oak shield.",
+			"material":"oakwood",
+			"volume":4000,
+			"equip":{"slot":"offhand", "armor":1}
+		},
+		"leather_armor":{
+			"name":"leather armour",
+			"plural":"leather armour",
+			"description":"A jerkin of boiled leather.",
+			"material":"leather",
+			"volume":3000,
+			"equip":{"slot":"body", "armor":1}
+		},
+		"chain_shirt":{
+			"name":"chain shirt",
+			"description":"Steel rings, heavy but sure.",
+			"material":"steel",
+			"volume":1200,
+			"equip":{"slot":"body", "armor":2}
+		},
+		"iron_helm":{
+			"name":"iron helm",
+			"description":"A plain iron cap.",
+			"material":"iron",
+			"volume":250,
+			"equip":{"slot":"head", "armor":1}
+		},
+		"leather_gloves":{
+			"name":"leather gloves",
+			"plural":"pairs of leather gloves",
+			"description":"Worn but supple. No protection to speak of, yet.",
+			"material":"leather",
+			"volume":300,
+			"equip":{"slot":"hands"}
+		},
+		"leather_boots":{
+			"name":"leather boots",
+			"plural":"pairs of leather boots",
+			"description":"Sturdy boots. No protection to speak of, yet.",
+			"material":"leather",
+			"volume":1200,
+			"equip":{"slot":"feet"}
 		},
 		
 		// Food (it can't be eaten yet)

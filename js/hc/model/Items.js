@@ -12,6 +12,13 @@
         inventory  if things can be put in it: {capacity, weight, volume}, the most it can
                    hold (each without limit if not given). One that holds things doesn't
                    stack.
+        equip      if a piece can equip it: {slot, damage, penetration, armor}. slot: one
+                   of EQUIP_SLOTS (weapon, offhand, body, head, hands, feet); damage: a
+                   weapon's [min, max], which replaces the piece's own (its species' or
+                   profile's: unarmed) while it's equipped as its weapon; penetration: a
+                   weapon's (it replaces the piece's own too; 0 if not given); armor: what
+                   it adds to the piece's (0 if not given). One that's equipped doesn't
+                   stack.
     Entries can extend others (see Subtypes.js).
 
     An item is plain data, saved with the game: {id, kind, count}, count being how many
@@ -55,7 +62,7 @@
     const {I18N:{get:i18n}} = myt,
         {
             Subtypes, isObj, attrs:{evaluate},
-            STAT_VARS, ITEM_GOLD,
+            STAT_VARS, ITEM_GOLD, EQUIP_SLOTS,
             isNatNum, isIntOfAtLeast
         } = pkg,
         {isText, isNum} = Subtypes,
@@ -83,16 +90,27 @@
                 capacity = entry.capacity ?? 1,
                 stack = entry.stack ?? 1,
                 inventory = entry.inventory === undefined ? null : parseLimits(entry.inventory) ?? undefined,
+                equip = entry.equip === undefined ? null : parseEquip(entry.equip),
                 ok = isText(entry.plural) && material !== undefined && isNum(volume) &&
                     (entry.weight === undefined || isNum(entry.weight)) && isNatNum(capacity) &&
-                    isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1);
+                    isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1) &&
+                    equip !== undefined;
             return ok ? {
                 plural:entry.plural || entry.name + 's',
                 material:entry.material ?? null,
                 volume,
                 weight:entry.weight ?? volume * (material?.density ?? 0),
-                capacity, stack, inventory
+                capacity, stack, inventory, equip
             } : null;
+        },
+        
+        /*  An item kind's equip as the data has it, made usable ({slot, damage (or null),
+            penetration, armor}), or undefined if it isn't. */
+        parseEquip = v => {
+            const isRange = r => Array.isArray(r) && r.length === 2 && r.every(isNatNum) && r[0] <= r[1],
+                equip = isObj(v) ? {slot:v.slot, damage:v.damage ?? null, penetration:v.penetration ?? 0, armor:v.armor ?? 0} : null;
+            return equip && EQUIP_SLOTS.includes(equip.slot) && (equip.damage === null || isRange(equip.damage)) &&
+                isNatNum(equip.penetration) && isNatNum(equip.armor) ? {...equip, damage:equip.damage && [...equip.damage]} : undefined;
         },
         
         // The limits of what holds nothing
@@ -110,7 +128,7 @@
         },
         
         // An item of a kind that isn't known: it weighs nothing, and takes a place.
-        FALLBACK = {plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null},
+        FALLBACK = {plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null, equip:null},
         
         // How many of something weighing (or taking) each, whose limit leaves room, fit.
         howMany = (room, each) => each > 0 ? Math.floor(room / each + 1e-9) : Infinity,
@@ -121,6 +139,7 @@
             Number.isInteger(it.id) && typeof it.kind === 'string' && isIntOfAtLeast(it.count, 1) &&
             (it.name === undefined || typeof it.name === 'string') &&
             (it.expanded === undefined || typeof it.expanded === 'boolean') &&
+            (it.equipped === undefined || typeof it.equipped === 'boolean') &&
             (it.inventory === undefined || isInventory(it.inventory)));
     
     pkg.items = new Subtypes('item', parseItem);
@@ -175,7 +194,8 @@
         
         /*  Whether item b can go in item a's stack. */
         stacksWith: function(a, b) {
-            return a.kind === b.kind && this.itemKind(a).stack > 1 && a.name === undefined && b.name === undefined;
+            return a.kind === b.kind && this.itemKind(a).stack > 1 && a.name === undefined && b.name === undefined &&
+                !a.equipped && !b.equipped;
         },
         
         /*  Whether item it is target, or holds it (at any depth). */
@@ -377,6 +397,7 @@
                 ground = this.groundAt(p.x, p.y, true),
                 had = p.inventory?.items ?? [];
             p.inventory = {items:[]};
+            for (const it of had) delete it.equipped;
             if (corpse === NO_CORPSE) {
                 for (const it of had) this.addItem(ground, it, true);
             } else {
@@ -431,6 +452,71 @@
                 const top = this.reachHolders(p).find(t => t.ref === ref && t.ref.startsWith('fixture:'));
                 if (top) top.holder.expanded = top.holder.expanded === false;
             }
+        },
+        
+        // ---- Equipment ----
+        /*  What piece p has equipped: what it carries (not in something it carries) that's
+            equipped (equipped: true, saved). At most one in each slot (see equip). Its
+            weapon's damage and penetration and its armor's armor count in a fight (see
+            Combat.damageRange, penetrationOf and armorOf). */
+        equipment: function(p) {return (p.inventory?.items ?? []).filter(it => it.equipped);},
+        
+        /*  What piece p has equipped in slot, or undefined. */
+        equippedIn: function(p, slot) {return this.equipment(p).find(it => this.itemKind(it).equip?.slot === slot);},
+        
+        /*  Piece p equips what it carries that it can, each in a slot with nothing in it
+            yet, in order (as an enemy does what its profile gives it). */
+        equipAll: function(p) {
+            for (const it of p.inventory?.items ?? []) {
+                const slot = this.itemKind(it).equip?.slot;
+                if (slot && !this.equippedIn(p, slot)) it.equipped = true;
+            }
+        },
+        
+        /*  Why piece p can't equip item id (or with unequip, unequip it): '' if it can,
+            else 'over', 'player' (not yours), 'missing' (it doesn't carry it, not in
+            something it carries), 'unequippable' (it can't be equipped), 'equipped' (or
+            'unequipped': it already is), or 'ap' (not the equipCost rule's points). */
+        equipProblem: function(p, id, unequip = false) {
+            const it = p?.owner === 'player' ? (p.inventory?.items ?? []).find(i => i.id === id) : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!it) {
+                retval = 'missing';
+            } else if (!this.itemKind(it).equip) {
+                retval = 'unequippable';
+            } else if (!!it.equipped !== unequip) {
+                retval = unequip ? 'unequipped' : 'equipped';
+            } else if (!this.canAfford(p, this.equipCost(p))) {
+                retval = 'ap';
+            } else {
+                retval = '';
+            }
+            return retval;
+        },
+        
+        /*  Piece p equips item id (in place of what's in its slot), or with unequip,
+            unequips it, for the equipCost rule's action points, if it can (see
+            equipProblem). Returns whether it did. */
+        playerEquip: function(p, id, unequip = false) {
+            const done = !this.equipProblem(p, id, unequip);
+            if (done) {
+                const it = p.inventory.items.find(i => i.id === id);
+                if (unequip) {
+                    delete it.equipped;
+                } else {
+                    const was = this.equippedIn(p, this.itemKind(it).equip.slot);
+                    if (was) delete was.equipped;
+                    it.equipped = true;
+                }
+                this.fx(p.x, p.y, i18n(unequip ? 'fx-unequip' : 'fx-equip', this.itemLabel(it)), '--place-ink', {});
+                this.spend(p, this.equipCost(p));
+                this.afterPlayerAction();
+            }
+            return done;
         },
         
         // ---- Reach: what your pieces can get at ----
@@ -522,6 +608,7 @@
                 to = ref === 'ground' ? this.groundAt(p.x, p.y, true) : this.reachHolder(p, ref),
                 n = this.fitCount(to, item),
                 label = this.itemLabel(item, n);
+            delete item.equipped; // (it's no longer carried as it was)
             this.addItem(to, this.takeOut(holder, item, n), true);
             this.tidyGround(p.x, p.y);
             this.spend(p, cost);

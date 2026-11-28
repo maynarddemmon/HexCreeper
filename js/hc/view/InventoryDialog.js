@@ -138,16 +138,18 @@
                     Items.reachHolder; open: whether what's in it can be got at; expanded:
                     whether what's in it shows, or null if it always does; takeAll: why it
                     can't all be taken, '' if it can, or null for no Take all), its rows
-                    [{id, label, weight, depth, container, expanded, actions}] (actions:
-                    {take, drop, takeAll, transfer}, each why it can't be done, '' if it
-                    can, if it's offered)
+                    [{id, label, weight, depth, container, expanded, equipped, actions}]
+                    (actions: {take, drop, takeAll, transfer, equip}, each why it can't be
+                    done, '' if it can, if it's offered: equip is Equip, or Unequip for
+                    what's equipped)
                 onToggle(ref)  shows or hides what's in the holder ref names (see
                     Items.toggleExpanded)
-                tips        {take, drop, takeAll, transfer}: each action's tooltip, of
+                tips        {take, drop, takeAll, transfer, equip, unequip}: each action's tooltip, of
                     what it's for
                 hereProblem(id, ref)  why item id can't go in the holder ref names
-                onAction(action, id, ref)  does an action: to item id (to holder ref,
-                    for transfer), or for takeAll, to holder ref */
+                onAction(action, id, ref)  does an action (take, drop, transfer, equip,
+                    unequip or takeAll): to item id (to holder ref, for transfer), or for
+                    takeAll, to holder ref */
         show: function(opts) {
             this.callSuper();
             this._opts = opts;
@@ -218,7 +220,7 @@
                     hideBelow = row.container && !row.expanded ? row.depth : Infinity;
                     const view = new ItemRow(container, {row, expanded:row.expanded, onToggle:toggle}),
                         item = {item:row.id},
-                        {take, drop, takeAll, transfer} = row.actions;
+                        {take, drop, takeAll, transfer, equip} = row.actions;
                     if (moving) {
                         if (row.container && row.id !== moving.id) here(view, row.id, item);
                     } else {
@@ -232,6 +234,10 @@
                             actionBtn(
                                 view, 1, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
                             );
+                        }
+                        if (equip != null) {
+                            const action = row.equipped ? 'unequip' : 'equip';
+                            actionBtn(view, 1, action, tips[action](row.label), equip, act(action, row.id), item);
                         }
                         if (transfer != null) {
                             actionBtn(view, 2, 'transfer', tips.transfer(row.label), transfer, () => {

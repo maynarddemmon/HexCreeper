@@ -35,10 +35,13 @@
                      typical values for any it doesn't give (and it must be within every
                      one of its species' ranges)
         level        1 if not given
-        damage       [min, max], what its weapon does (before its str bonus): its
-                     species' base damage if not given
-        penetration  how much of a target's damage reduction its weapon goes through
-        armor        its damage reduction: taken off each hit's damage
+        damage       [min, max], what it does unarmed (before its str bonus): its
+                     species' base damage if not given; a weapon it has equipped
+                     replaces it (see Items.js)
+        penetration  how much of a target's damage reduction it goes through, unarmed (a
+                     weapon's replaces it)
+        armor        its damage reduction: taken off each hit's damage (what it has
+                     equipped adds to it)
         hp           its max HP, if fixed (else the maxHp rule works it out)
         xp           (enemies) what killing it is worth (the xpValue rule's if not given)
         items        what it carries, whatever it can (see Items.js): item kind ids, or
@@ -316,6 +319,7 @@
             p.effects = [];
             p.inventory = {items:[]};
             this.rollItems(p, profile.items, this.rngFor('items', p.id));
+            if (p.owner !== 'player') this.equipAll(p);
         },
         
         // ---- Action points ----
@@ -378,6 +382,7 @@
         takeCost: function(p) {return Math.max(MIN_COST, this.apRule('takeCost', p));},
         dropCost: function(p) {return Math.max(MIN_COST, this.apRule('dropCost', p));},
         transferCost: function(p) {return Math.max(MIN_COST, this.apRule('transferCost', p));},
+        equipCost: function(p) {return Math.max(MIN_COST, this.apRule('equipCost', p));},
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
             return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&
@@ -442,10 +447,25 @@
             return Math.min(this.rules.hitMax, Math.max(this.rules.hitMin, chance));
         },
         
-        /*  The damage attacker a's hit does, before armor: [min, max], neither below 0. */
+        /*  The damage attacker a's hit does, before armor: [min, max], neither below 0:
+            its weapon's (what it has equipped as its weapon: see Items.equipment), or if it
+            has none (or one without damage), its own, with its damageBonus. */
         damageRange: function(a) {
-            const bonus = this.statRule('damageBonus', a);
-            return a.damage.map(n => Math.max(0, n + bonus));
+            const bonus = this.statRule('damageBonus', a),
+                weapon = this.weaponOf(a);
+            return (weapon?.damage ?? a.damage).map(n => Math.max(0, n + bonus));
+        },
+        
+        /*  What piece p has equipped as its weapon (its kind's equip: {damage,
+            penetration, ...}), or undefined. */
+        weaponOf: function(p) {
+            const it = this.equippedIn(p, 'weapon');
+            return it && this.itemKind(it).equip;
+        },
+        
+        /*  Piece p's armor: its own (its profile's), and what it has equipped adds. */
+        armorOf: function(p) {
+            return (p.armor ?? 0) + this.equipment(p).reduce((n, it) => n + (this.itemKind(it).equip?.armor ?? 0), 0);
         },
         
         /*  A roll of attacker a's damage, before armor (the damageRoll rule, of its range
@@ -462,7 +482,7 @@
             otherwise. */
         damageOdds: function(a, d) {
             const [min, max] = this.damageRange(a),
-                armor = this.armorAgainst(a, d.armor),
+                armor = this.armorAgainst(a, this.armorOf(d)),
                 each = 1 / (ODDS_STEPS * ODDS_STEPS),
                 odds = [];
             for (let i = 0; i < ODDS_STEPS; i++) {
@@ -474,15 +494,19 @@
             return Array.from(odds, v => v ?? 0);
         },
         
-        /*  Attacker a's penetration: its weapon's, and its penetrationBonus if more than 0. */
-        penetrationOf: function(a) {return a.penetration + Math.max(0, this.statRule('penetrationBonus', a));},
+        /*  Attacker a's penetration: its weapon's (what it has equipped as its weapon, or
+            if it has none, its own), and its penetrationBonus if more than 0. */
+        penetrationOf: function(a) {
+            const weapon = this.weaponOf(a);
+            return (weapon ? weapon.penetration : a.penetration) + Math.max(0, this.statRule('penetrationBonus', a));
+        },
         
         /*  How much of armor (damage reduction) gets through attacker a's penetration. */
         armorAgainst: function(a, armor) {return Math.max(0, armor - this.penetrationOf(a));},
         
         /*  The damage attacker a's hit does to piece d, after its armor: [min, max]. */
         damageAgainst: function(a, d) {
-            const armor = this.armorAgainst(a, d.armor);
+            const armor = this.armorAgainst(a, this.armorOf(d));
             return this.damageRange(a).map(n => Math.max(0, n - armor));
         },
         
@@ -519,7 +543,7 @@
                 this.logCombat({kind:'miss', ...entry});
                 this.fx(d.x, d.y, 'miss', '--miss', {bump:{from:a}});
             } else {
-                const dmg = Math.max(0, this.rollDamage(a) - this.armorAgainst(a, d.armor));
+                const dmg = Math.max(0, this.rollDamage(a) - this.armorAgainst(a, this.armorOf(d)));
                 if (dmg > 0) {
                     this.logCombat({kind:'hit', ...entry, dmg});
                     lost = this.damage(d, dmg, a);
