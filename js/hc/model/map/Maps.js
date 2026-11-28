@@ -1,7 +1,7 @@
 (pkg => {
     'use strict';
     
-    const {cfg:{DATA_BASE_DIR}, isObj} = pkg,
+    const {cfg:{DATA_BASE_DIR}, isObj, ITEM_GOLD} = pkg,
         
         MAPS_DIR = DATA_BASE_DIR + 'gamemap/',
         
@@ -91,7 +91,8 @@
     const loaded = new Map(); // map id -> map, once loaded
     
     /*  The game's data is data/init.json5 and the files it includes (rules.json5,
-        environs.json5 and entities.json5, which could include more in turn: see loadData),
+        environs.json5, items.json5 and entities.json5, which could include more in turn:
+        see loadData),
         their tables merged into one.
         
         The maps. data/init.json5 lists every map with what a list of maps needs (its
@@ -116,11 +117,12 @@
         warning). A map whose goals or components can't be used isn't loaded. */
     pkg.maps = {
         /*  Calls back with the game's data (init.json5 and what it includes),
-            {defaultMap, maps:[...], rules, materials, solids, holes, fixtures, species,
-            enemies, enemyGroups, ...}, or null if it couldn't be loaded. It's loaded once,
+            {defaultMap, maps:[...], rules, materials, solids, holes, fixtures, items,
+            species, enemies, enemyGroups, ...}, or null if it couldn't be loaded. It's loaded once,
             and its rules become the defaults; its materials and solid subtypes go to
             pkg.solids, its hole and floor subtypes to pkg.holes and pkg.floors, its
-            fixtures to pkg.fixtures (see Fixtures.js), its species and backgrounds to
+            fixtures to pkg.fixtures (see Fixtures.js), its items to pkg.items (see
+            Items.js), its species and backgrounds to
             pkg.species and pkg.backgrounds (see Combat.js), and its enemies and groups to
             pkg.enemies and pkg.enemyGroups (see Enemies.js). */
         loadIndex: callback => {
@@ -155,12 +157,23 @@
                         }
                         pkg.effects.define(data.effects);
                         
+                        // Items (after the materials they're made of)
+                        pkg.items.define(data.items);
+                        if (!pkg.items.get(ITEM_GOLD)) {
+                            console.warn('There is no gold: no item', ITEM_GOLD);
+                        }
+                        
                         // Entities
                         pkg.species.define(data.species);
                         pkg.backgrounds.define(data.backgrounds);
                         for (const s of pkg.species.list()) {
                             for (const b of s.backgrounds ?? []) {
                                 if (!pkg.backgrounds.get(b)) console.warn('Species', s.id, 'allows background', b, 'which there is none of');
+                            }
+                            const {DEFAULT_CORPSE, NO_CORPSE} = pkg.Items,
+                                corpse = s.corpse ?? DEFAULT_CORPSE;
+                            if (corpse !== NO_CORPSE && !pkg.items.get(corpse)?.inventory) {
+                                console.warn('Species', s.id, 'leaves corpse', corpse, 'which there is none of that holds things');
                             }
                         }
                         for (const b of pkg.backgrounds.list()) {
@@ -169,6 +182,13 @@
                             }
                         }
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
+                        for (const e of pkg.enemies.list()) {
+                            for (const {kind} of e.items) {
+                                if (!pkg.items.get(kind)) {
+                                    console.warn('Enemy', e.id, 'carries item', kind, 'which there is none of');
+                                }
+                            }
+                        }
                     }
                     callback(index);
                 });

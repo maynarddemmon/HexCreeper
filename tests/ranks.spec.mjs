@@ -9,12 +9,12 @@ test.beforeEach(async ({page}) => {
 test('rank needs two children; it sets neither max HP (level does) nor action points', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [d0, d1] = [hc.hex.dirs[0], hc.hex.dirs[3]];
-        g.gold = 100;
+        g.setGold(100);
         const before = {rank:c.rank, hp:c.hp, max:c.maxHp, pool:g.apMax(c), cost:g.placeCost()};
         g.playerPlace(d0[0], d0[1], c);
         const oneChild = c.rank;
         g.playerPlace(d1[0], d1[1], c);
-        return {before, oneChild, after:{rank:c.rank, hp:c.hp, max:c.maxHp, pool:g.apMax(c), cost:g.placeCost()}, gold:g.gold};
+        return {before, oneChild, after:{rank:c.rank, hp:c.hp, max:c.maxHp, pool:g.apMax(c), cost:g.placeCost()}, gold:g.goldHeld()};
     });
     expect(r.before).toEqual({rank:1, hp:2, max:2, pool:100, cost:5});
     expect(r.oneChild).toBe(1);
@@ -26,7 +26,7 @@ test('rank needs two children; it sets neither max HP (level does) nor action po
 test('placing costs 4, plus 1 for every 2 of your pieces (rounded up), whatever their ranks', async ({page}) => {
     const costs = await page.evaluate(() => {
         const g = hc.app.game, out = [g.placeCost()];
-        g.gold = 1000;
+        g.setGold(1000);
         for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1]]) {
             g.playerPlace(x, y, g.getPlayerCore());
             out.push(g.placeCost());
@@ -42,7 +42,7 @@ test('placing costs 4, plus 1 for every 2 of your pieces (rounded up), whatever 
 test('a piece acts while it has the action points (here, once a turn); new pieces start with none', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
         const a = g.pieceAt(D[0][0], D[0][1]);
         const freshCanMove = g.legalMoves(a).length > 0;
@@ -58,7 +58,7 @@ test('a piece acts while it has the action points (here, once a turn); new piece
 test('destroying a piece destroys everything linked below it and lowers ranks', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
         const a = g.pieceAt(D[0][0], D[0][1]);
         const kids = g.placeCells().filter(q => hc.hexDist(q, a) === 1 && hc.hexDist(q, c) > 1).slice(0, 2);

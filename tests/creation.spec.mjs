@@ -55,7 +55,7 @@ test('a new game\'s core is the character created; pieces placed are of its spec
             stats:{...g.baselineStats('dwarf', 'reaver'), str:g.baselineStats('dwarf', 'reaver').str + 2}};
         g.reset();
         const c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, c);
         const p = g.pieceAt(1, 0);
         return {core:[c.name, c.description, c.species, c.background, c.stats.str - g.baselineStats('dwarf', 'reaver').str, c.hp === c.maxHp],

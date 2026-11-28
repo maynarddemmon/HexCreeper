@@ -1,0 +1,466 @@
+/*  Items and inventories (a module included in Game).
+
+    An item kind (`items`, in data/items.json5) is what a thing is. It has a name, a
+    description, and
+        plural     its name for more than one (its name with an "s" if not given)
+        material   the id of the material it's made of (see environs.json5's "materials")
+        volume     its volume, in cubic centimetres
+        weight     its weight, in grams: if not given, its volume times its material's
+                   density (grams a cubic centimetre)
+        capacity   the room it takes in an inventory (1 if not given; 0 takes none)
+        stack      the most that make one stack (1 if not given: it doesn't stack)
+        inventory  if things can be put in it: {capacity, weight, volume}, the most it can
+                   hold (each without limit if not given). One that holds things doesn't
+                   stack.
+    Entries can extend others (see Subtypes.js).
+
+    An item is plain data, saved with the game: {id, kind, count}, count being how many
+    there are (a stack: they're one item), and inventory if its kind has one, and name if
+    it has its own (a corpse: "goblin corpse"). Item ids are the game's (nextItemId), apart
+    from pieces'.
+
+    An inventory is {items:[...]}. A holder is what has one: a piece (what it carries), a
+    cell's ground (what's on the ground there: Game.ground, "x,y" -> {x, y, inventory}) or
+    an item (what's in it: so inventories nest, a corpse holding a sack holding coins). What
+    a holder holds can't come to more than its limits:
+        capacity  each stack takes its kind's capacity
+        weight    each item's weight, with what's in it
+        volume    each item's own volume (what's in it is inside it)
+    A piece's limits are the carryCapacity, carryWeight and carryVolume rules', of its
+    stats; a cell's, the groundCapacity, groundWeight and groundVolume rules'; an item's,
+    its kind's. Some things are put in whatever the limits (force): what a piece had when
+    it died goes into its corpse, and the corpse onto the ground, and an enemy starts with
+    what its profile gives it.
+
+    When a piece dies it leaves its remains on its cell: its species' corpse (an item kind:
+    "corpse" if it doesn't say), holding all it had, named for it (see leaveRemains). A
+    species whose corpse is "none" leaves nothing of itself, only what it had.
+
+    Gold is an item (ITEM_GOLD, gold coins): loot gives it to the piece that takes it (what
+    it can't carry falls on the ground), and placing a piece spends it (see spendGold).
+    Your gold is all your pieces carry (see goldHeld).
+
+    Your pieces can take what's on the ground under them (or in something on the ground
+    there), and drop what they carry (or what's in something they carry), each for an
+    action (see playerTake and playerDrop). */
+(pkg => {
+    'use strict';
+    
+    const {I18N:{get:i18n}} = myt,
+        {
+            Subtypes, isObj, attrs:{evaluate},
+            STAT_VARS, ITEM_GOLD,
+            isNatNum, isIntOfAtLeast
+        } = pkg,
+        {isText, isNum} = Subtypes,
+        
+        DEFAULT_CORPSE = 'corpse', // what a species leaves when it dies, if it doesn't say
+        NO_CORPSE = 'none',        // a species that leaves no corpse
+        
+        // An inventory's limits as the data has them, made usable ({capacity, weight,
+        // volume}, Infinity for none), or null.
+        parseLimits = v => {
+            const limits = {
+                capacity:v?.capacity ?? Infinity,
+                weight:v?.weight ?? Infinity,
+                volume:v?.volume ?? Infinity
+            };
+            return isObj(v) && Object.values(limits).every(n => n === Infinity || isNum(n)) ? limits : null;
+        },
+        
+        /*  An item kind as the data has it, made usable ({plural, material, volume,
+            weight, capacity, stack, inventory}: inventory null if it holds nothing), or
+            null if it isn't. */
+        parseItem = entry => {
+            const material = entry.material === undefined ? null : pkg.solids.getMaterial(entry.material) ?? undefined,
+                volume = entry.volume,
+                capacity = entry.capacity ?? 1,
+                stack = entry.stack ?? 1,
+                inventory = entry.inventory === undefined ? null : parseLimits(entry.inventory) ?? undefined,
+                ok = isText(entry.plural) && material !== undefined && isNum(volume) &&
+                    (entry.weight === undefined || isNum(entry.weight)) && isNatNum(capacity) &&
+                    isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1);
+            return ok ? {
+                plural:entry.plural || entry.name + 's',
+                material:entry.material ?? null,
+                volume,
+                weight:entry.weight ?? volume * (material?.density ?? 0),
+                capacity, stack, inventory
+            } : null;
+        },
+        
+        // An item of a kind that isn't known: it weighs nothing, and takes a place.
+        FALLBACK = {plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null},
+        
+        // How many of something weighing (or taking) each, whose limit leaves room, fit.
+        howMany = (room, each) => each > 0 ? Math.floor(room / each + 1e-9) : Infinity,
+        
+        // Whether an inventory as saved makes sense: {items:[...]}, each item {id, kind,
+        // count, name?, inventory?}, all the way down.
+        isInventory = v => isObj(v) && Array.isArray(v.items) && v.items.every(it => isObj(it) &&
+            Number.isInteger(it.id) && typeof it.kind === 'string' && isIntOfAtLeast(it.count, 1) &&
+            (it.name === undefined || typeof it.name === 'string') &&
+            (it.inventory === undefined || isInventory(it.inventory)));
+    
+    pkg.items = new Subtypes('item', parseItem);
+    
+    pkg.Items = new JS.Module('Items', {
+        // Class Methods and Attributes ////////////////////////////////////////
+        extend: {
+            isInventory,
+            DEFAULT_CORPSE,
+            NO_CORPSE
+        },
+        
+        // ---- Items ----
+        /*  Item it's kind (FALLBACK's properties, named for its kind, if that isn't known). */
+        itemKind: function(it) {
+            return pkg.items.get(it.kind) ?? {...FALLBACK, id:it.kind, name:it.kind, description:'', plural:it.kind};
+        },
+        
+        /*  A new item of the kind with id kind, count of them, holding nothing. (More than
+            a stack is made into stacks when it's put somewhere: see addItem.) */
+        makeItem: function(kind, count = 1) {
+            const it = {id:this.nextItemId++, kind, count};
+            if (this.itemKind(it).inventory) it.inventory = {items:[]};
+            return it;
+        },
+        
+        /*  What item it is called: its own name, or its kind's (its plural for more
+            than one). */
+        itemName: function(it) {
+            const k = this.itemKind(it);
+            return it.name ?? (it.count === 1 ? k.name : k.plural);
+        },
+        
+        /*  Item it in words, as count of it (all of it if not given): "dagger", "12 gold
+            coins". */
+        itemLabel: function(it, count = it.count) {
+            const name = this.itemName({...it, count});
+            return count > 1 ? i18n('item-count', count, name) : name;
+        },
+        
+        /*  What item it weighs, in grams: its kind's weight, times how many, and what's in
+            it. */
+        itemWeight: function(it) {
+            const inside = (it.inventory?.items ?? []).reduce((n, i) => n + this.itemWeight(i), 0);
+            return this.itemKind(it).weight * it.count + inside;
+        },
+        
+        /*  Item it's volume, in cubic centimetres (not counting what's in it). */
+        itemVolume: function(it) {return this.itemKind(it).volume * it.count;},
+        
+        /*  Whether item b can go in item a's stack. */
+        stacksWith: function(a, b) {
+            return a.kind === b.kind && this.itemKind(a).stack > 1 && a.name === undefined && b.name === undefined;
+        },
+        
+        /*  Whether item it is target, or holds it (at any depth). */
+        holdsItem: function(it, target) {
+            return it === target || (it.inventory?.items ?? []).some(i => this.holdsItem(i, target));
+        },
+        
+        // ---- Inventories ----
+        /*  The most holder (a piece, a cell's ground or an item) can hold: {capacity,
+            weight, volume}. */
+        inventoryLimits: function(holder) {
+            let limits;
+            if (holder.kind !== undefined) {
+                limits = this.itemKind(holder).inventory ?? {capacity:0, weight:0, volume:0};
+            } else if (holder.owner !== undefined) {
+                const vars = {level:holder.level, ...holder.stats},
+                    rule = id => Math.max(0, evaluate(this.rules[id], STAT_VARS, vars)) || 0;
+                limits = {
+                    capacity:Math.floor(rule('carryCapacity')),
+                    weight:rule('carryWeight'),
+                    volume:rule('carryVolume')
+                };
+            } else {
+                const rules = this.rules;
+                limits = {capacity:rules.groundCapacity, weight:rules.groundWeight, volume:rules.groundVolume};
+            }
+            return limits;
+        },
+        
+        /*  What holder holds comes to: {capacity, weight, volume} (see above). */
+        inventoryTotals: function(holder) {
+            const totals = {capacity:0, weight:0, volume:0};
+            for (const it of holder.inventory?.items ?? []) {
+                totals.capacity += this.itemKind(it).capacity;
+                totals.weight += this.itemWeight(it);
+                totals.volume += this.itemVolume(it);
+            }
+            return totals;
+        },
+        
+        /*  How many of item it would fit in holder (from 0 to its count): stacks of its
+            kind there take what they have room for, and the rest need new stacks. */
+        fitCount: function(holder, it) {
+            return Math.min(it.count, ...Object.values(this._fits(holder, it)));
+        },
+        
+        /** @private How many of item it fit in holder, by each limit: {capacity, weight,
+            volume}. None, if it would go in itself. */
+        _fits: function(holder, it) {
+            const k = this.itemKind(it),
+                limits = this.inventoryLimits(holder),
+                totals = this.inventoryTotals(holder),
+                each = this.itemWeight(it) / it.count,
+                room = (holder.inventory?.items ?? []).filter(i => this.stacksWith(i, it))
+                    .reduce((n, i) => n + k.stack - i.count, 0),
+                loop = holder.kind !== undefined && this.holdsItem(it, holder);
+            return loop ? {capacity:0, weight:0, volume:0} : {
+                capacity:room + howMany(limits.capacity - totals.capacity, k.capacity) * k.stack,
+                weight:howMany(limits.weight - totals.weight, each),
+                volume:howMany(limits.volume - totals.volume, k.volume)
+            };
+        },
+        
+        /*  Why count of item it (all of it if not given) can't go in holder: '' if it can,
+            else 'loop' (it would go in itself), 'capacity', 'weight' or 'volume' (the
+            first limit it's over). */
+        addProblem: function(holder, it, count = it.count) {
+            const fits = this._fits(holder, it);
+            let retval;
+            if (holder.kind !== undefined && this.holdsItem(it, holder)) {
+                retval = 'loop';
+            } else {
+                retval = ['capacity', 'weight', 'volume'].find(limit => fits[limit] < count) ?? '';
+            }
+            return retval;
+        },
+        
+        /*  Puts item it (all of it) in holder, if it fits (or whatever its limits, with
+            force: but never in itself). Stacks of its kind there take what they have room
+            for, the rest making new stacks (it, and more if it's more than a stack). Returns
+            why it couldn't (see addProblem), or '' if it did. */
+        addItem: function(holder, it, force = false) {
+            const loop = holder.kind !== undefined && this.holdsItem(it, holder),
+                problem = force ? (loop ? 'loop' : '') : this.addProblem(holder, it);
+            if (!problem) {
+                const k = this.itemKind(it),
+                    items = (holder.inventory ??= {items:[]}).items;
+                let left = it.count;
+                for (const i of items) {
+                    if (left > 0 && this.stacksWith(i, it) && i.count < k.stack) {
+                        const n = Math.min(left, k.stack - i.count);
+                        i.count += n;
+                        left -= n;
+                    }
+                }
+                let next = it;
+                while (left > 0) {
+                    next.count = Math.min(left, k.stack);
+                    left -= next.count;
+                    items.push(next);
+                    if (left > 0) next = this.makeItem(it.kind, left);
+                }
+            }
+            return problem;
+        },
+        
+        /*  Takes count of item it (all of it if not given) out of holder: it, or for some
+            of a stack, a new item of them. */
+        takeOut: function(holder, it, count = it.count) {
+            const items = holder.inventory.items;
+            let retval = it;
+            if (count < it.count) {
+                it.count -= count;
+                retval = this.makeItem(it.kind, count);
+            } else {
+                items.splice(items.indexOf(it), 1);
+            }
+            return retval;
+        },
+        
+        /*  Item id, wherever it is in holder (at any depth): {item, holder} (holder being
+            what holds it directly), or null. */
+        findItem: function(holder, id) {
+            let retval = null;
+            for (const it of holder.inventory?.items ?? []) {
+                retval = it.id === id ? {item:it, holder} : this.findItem(it, id);
+                if (retval) break;
+            }
+            return retval;
+        },
+        
+        /*  How many items of the kind with id kind holder holds (at any depth). */
+        countOf: function(holder, kind) {
+            return (holder.inventory?.items ?? [])
+                .reduce((n, it) => n + (it.kind === kind ? it.count : 0) + this.countOf(it, kind), 0);
+        },
+        
+        /*  Takes up to n items of the kind with id kind out of holder (at any depth, what
+            it holds directly first). Returns how many it took. */
+        removeKind: function(holder, kind, n) {
+            let taken = 0;
+            for (const it of [...holder.inventory?.items ?? []]) {
+                if (taken < n && it.kind === kind) {
+                    const m = Math.min(n - taken, it.count);
+                    this.takeOut(holder, it, m);
+                    taken += m;
+                }
+            }
+            for (const it of holder.inventory?.items ?? []) {
+                if (taken < n) taken += this.removeKind(it, kind, n - taken);
+            }
+            return taken;
+        },
+        
+        // ---- The ground ----
+        /*  What's on the ground at (x, y), a holder ({x, y, inventory}), or undefined if
+            there's nothing; with make, one with nothing in it, kept. */
+        groundAt: function(x, y, make = false) {
+            const k = this.key(x, y);
+            let g = this.ground.get(k);
+            if (!g && make) this.ground.set(k, g = {x, y, inventory:{items:[]}});
+            return g;
+        },
+        
+        /*  The ground at (x, y) is let go of if there's nothing on it. */
+        tidyGround: function(x, y) {
+            if (!this.groundAt(x, y)?.inventory.items.length) this.ground.delete(this.key(x, y));
+        },
+        
+        /*  Puts item it in piece p's inventory, as much of it as fits: the rest falls on the
+            ground under it. Returns how many p took. */
+        giveItem: function(p, it) {
+            const n = this.fitCount(p, it);
+            if (n < it.count) {
+                const rest = this.takeOut({inventory:{items:[it]}}, it, it.count - n);
+                this.addItem(this.groundAt(p.x, p.y, true), rest, true);
+            }
+            if (n > 0) this.addItem(p, it, true);
+            return n;
+        },
+        
+        /*  Piece p has died: its remains are left on the ground where it was, its corpse
+            (its species' corpse: see above) holding all it had, or with no corpse, what it
+            had. Its corpse is named for it: by its name, if it has one, or its species'. */
+        leaveRemains: function(p) {
+            const species = pkg.species.get(p.species),
+                corpse = species?.corpse ?? DEFAULT_CORPSE,
+                ground = this.groundAt(p.x, p.y, true),
+                had = p.inventory?.items ?? [];
+            p.inventory = {items:[]};
+            if (corpse === NO_CORPSE) {
+                for (const it of had) this.addItem(ground, it, true);
+            } else {
+                const c = this.makeItem(corpse),
+                    into = c.inventory ? c : ground,
+                    kindName = this.itemKind(c).name;
+                c.name = p.name ? i18n('item-remains-of', p.name, kindName) :
+                    species ? i18n('item-remains', species.name.toLowerCase(), kindName) : kindName;
+                for (const it of had) this.addItem(into, it, true);
+                this.addItem(ground, c, true);
+            }
+            this.tidyGround(p.x, p.y);
+        },
+        
+        // ---- Gold ----
+        /*  The gold your pieces carry. */
+        goldHeld: function() {
+            return this.piecesOf('player').reduce((n, p) => n + this.countOf(p, ITEM_GOLD), 0);
+        },
+        
+        /*  Spends n of your gold (if you have it), from piece first's first, then from your
+            other pieces', in order. Returns whether it did. */
+        spendGold: function(n, first) {
+            const done = this.goldHeld() >= n;
+            if (done) {
+                let left = n;
+                for (const p of [first, ...this.piecesOf('player').filter(q => q !== first)]) {
+                    if (p && left > 0) left -= this.removeKind(p, ITEM_GOLD, left);
+                }
+            }
+            return done;
+        },
+        
+        /*  Your core carries n gold, and your other pieces none (whatever it can carry):
+            for tests, and trying things out. */
+        setGold: function(n) {
+            const core = this.getPlayerCore();
+            for (const p of this.piecesOf('player')) this.removeKind(p, ITEM_GOLD, Infinity);
+            if (core && n > 0) this.addItem(core, this.makeItem(ITEM_GOLD, n), true);
+        },
+        
+        // ---- Taking and dropping ----
+        /*  Item id on the ground under piece p, or in something there (at any depth):
+            {item, holder}, or null. */
+        findOnGround: function(p, id) {
+            const g = this.groundAt(p.x, p.y);
+            return g ? this.findItem(g, id) : null;
+        },
+        
+        /*  Why piece p can't take item id from the ground under it: '' if it can (as
+            much as it can carry: at least one), else 'over', 'player' (not yours),
+            'missing' (not there), 'ap' (not the points), or the limit it's over (see
+            addProblem). */
+        takeProblem: function(p, id) {
+            const found = p ? this.findOnGround(p, id) : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!found) {
+                retval = 'missing';
+            } else if (!this.canAfford(p)) {
+                retval = 'ap';
+            } else {
+                retval = this.addProblem(p, found.item, 1);
+            }
+            return retval;
+        },
+        
+        /*  Piece p takes item id from the ground under it (all of it it can carry), for an
+            action. Returns whether it did. */
+        playerTake: function(p, id) {
+            const done = !this.takeProblem(p, id);
+            if (done) {
+                const {item, holder} = this.findOnGround(p, id),
+                    n = this.fitCount(p, item);
+                this.fx(p.x, p.y, i18n('fx-take', this.itemLabel(item, n)), '--place-ink', {});
+                this.addItem(p, this.takeOut(holder, item, n), true);
+                this.tidyGround(p.x, p.y);
+                this.spend(p);
+                this.afterPlayerAction();
+            }
+            return done;
+        },
+        
+        /*  Why piece p can't drop item id (it carries it, or something it carries holds
+            it): '' if it can, else 'over', 'player', 'missing', 'ap', or the ground's limit
+            it's over (see addProblem). */
+        dropProblem: function(p, id) {
+            const found = p?.owner === 'player' ? this.findItem(p, id) : null;
+            let retval;
+            if (this.over) {
+                retval = 'over';
+            } else if (p?.owner !== 'player') {
+                retval = 'player';
+            } else if (!found) {
+                retval = 'missing';
+            } else if (!this.canAfford(p)) {
+                retval = 'ap';
+            } else {
+                retval = this.addProblem(this.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}}, found.item);
+            }
+            return retval;
+        },
+        
+        /*  Piece p drops item id (all of it) on the ground under it, for an action. Returns
+            whether it did. */
+        playerDrop: function(p, id) {
+            const done = !this.dropProblem(p, id);
+            if (done) {
+                const {item, holder} = this.findItem(p, id);
+                this.fx(p.x, p.y, i18n('fx-drop', this.itemLabel(item)), '--place-ink', {});
+                this.addItem(this.groundAt(p.x, p.y, true), this.takeOut(holder, item), true);
+                this.spend(p);
+                this.afterPlayerAction();
+            }
+            return done;
+        }
+    });
+})(hc);

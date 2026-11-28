@@ -8,7 +8,7 @@ const setUp = async page => {
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(1, 0, core);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.playerWait();
@@ -161,7 +161,7 @@ test('in follow a blocked piece shifts around the obstacle to keep its link leng
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(-1, 0, core);       // a, west of the core
         g.playerWait();
         window.ids = {core:core.id, a:g.pieceAt(-1, 0).id};

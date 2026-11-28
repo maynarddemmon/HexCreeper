@@ -8,12 +8,12 @@ const setUp = async page => {
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(1, 0, core);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.playerPlace(-1, 0, core);
         g.playerWait();
-        g.gold = 1000;
+        g.setGold(1000);
         window.ids = {core:core.id, a:g.pieceAt(1, 0).id, b:g.pieceAt(2, 0).id, c:g.pieceAt(-1, 0).id};
     });
 };

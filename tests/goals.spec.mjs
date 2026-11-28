@@ -98,7 +98,7 @@ test('kills, pieces lost and placed, and the core\'s distance are counted', asyn
     await clearBoard(page); // so (1, 0) is open
     const done = await page.evaluate(() => {
         const g = hc.app.game;
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(1, 0, g.getPlayerCore());
         g.damage(g.pieceAt(1, 0), 99, null);
         g.damage(g.addPiece('core', 'enemy', 4, 4), 99, null);

@@ -10,7 +10,7 @@ const rewrite = (page, file, change) => page.route('**/data/' + file, async rout
 // Serves data/<file> as text.
 const serve = (page, file, text) => page.route('**/data/' + file, route => route.fulfill({status:200, contentType:'text/plain', body:text}));
 
-test('the data is init.json5\'s tables and those of the files it includes: rules, environs and entities', async ({page}) => {
+test('the data is init.json5\'s tables and those of the files it includes: rules, environs, items and entities', async ({page}) => {
     await startGame(page);
     const r = await page.evaluate(() => new Promise(done => hc.maps.loadIndex(data => done({
         tables:Object.keys(data).sort(),
@@ -20,7 +20,10 @@ test('the data is init.json5\'s tables and those of the files it includes: rules
         solids:hc.solids.list().length > 0
     }))));
     expect(r).toEqual({
-        tables:['backgrounds', 'defaultMap', 'effects', 'enemies', 'enemyGroups', 'fixtures', 'floors', 'holes', 'maps', 'materials', 'rules', 'shadow', 'solids', 'species'],
+        tables:[
+            'backgrounds', 'defaultMap', 'effects', 'enemies', 'enemyGroups', 'fixtures', 'floors', 'holes', 'items', 'maps', 'materials',
+            'rules', 'shadow', 'solids', 'species'
+        ],
         maps:true, rules:'number', species:true, solids:true
     });
 });

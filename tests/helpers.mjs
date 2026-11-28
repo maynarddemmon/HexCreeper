@@ -83,6 +83,7 @@ export const clearBoard = page => page.evaluate(() => {
     for (const e of g.piecesOf('enemy')) g.removePiece(e);
     g.tiles.clear();
     g.fixtures.clear();
+    g.ground.clear();
     g.spawnGenerator.spawnWave = () => {};
     g.rules.hitMin = g.rules.hitMax = 100;
     g.rules.damageBonus = g.rules.penetrationBonus = '0';

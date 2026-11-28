@@ -28,7 +28,15 @@
         FIXTURE_HEAL = 'heal',
         FIXTURE_HARM = 'harm',
         FIXTURE_LOOT = 'loot',
-        FIXTURE_FEATURE = 'feature';
+        FIXTURE_FEATURE = 'feature',
+        
+        // Units: what weights (grams) and volumes (cubic centimetres) are shown in
+        GRAMS_PER_POUND = 453.59237,
+        CM3_PER_GALLON = 3785.411784,
+        // n to 3 significant figures, but no more than 2 decimals (a whole number from 100),
+        // as text: "<0.01" for less than that
+        roughly = n => n > 0 && n < 0.005 ? '<0.01' :
+            String(n >= 100 ? Math.round(n) : Number(Number(n.toPrecision(3)).toFixed(2)));
     
     pkg.hc = {
         app:null, // Holds the App instance.
@@ -72,6 +80,9 @@
         STATS,
         CHARACTER_NAME_MAX:64, // the longest a character's name can be
         CHARACTER_DESCRIPTION_MAX:1024, // and its description
+        
+        // Items (see Items.js)
+        ITEM_GOLD:'gold_coin', // gold: what loot gives, and placing a piece costs
         
         // Status Effects (the ones the code uses: see Effects.js)
         EFFECT_EXHAUSTED:'exhausted',
@@ -133,6 +144,11 @@
             
             // Whether the combat log shows (a preference; K toggles it).
             COMBAT_LOG:true,
+            
+            // What weights and volumes are shown in (a preference): "metric" (kilograms and
+            // litres) or "imperial" (pounds and US gallons). The game keeps them in grams
+            // and cubic centimetres.
+            UNITS:'metric',
             
             // Shadows of solids and holes (see Render.js), from one light: angle (degrees
             // clockwise from pointing right, so 90 is straight down), color, blur (px) and
@@ -254,6 +270,12 @@
         
         // Formatting
         formatAp: ap => String(ap / AP_UNIT),
-        formatXp: xp => String(xp / XP_UNIT)
+        formatXp: xp => String(xp / XP_UNIT),
+        // A weight (grams) or a volume (cubic centimetres) in the Units preference's units,
+        // e.g. "2.36 kg", "5.2 lb", "0.3 L", "0.08 gal"
+        formatWeight: g => pkg.hc.cfg.UNITS === 'imperial' ?
+            roughly(g / GRAMS_PER_POUND) + ' lb' : roughly(g / 1000) + ' kg',
+        formatVolume: cm3 => pkg.hc.cfg.UNITS === 'imperial' ?
+            roughly(cm3 / CM3_PER_GALLON) + ' gal' : roughly(cm3 / 1000) + ' L'
     };
 })(window);

@@ -25,6 +25,8 @@
         
         GROUP_DISPLAY = 'display',
         
+        UNITS = ['metric', 'imperial'], // what weights and volumes can be shown in (see hc.cfg.UNITS)
+        
         // An attr (see Attrs.js) that edits obj[prop], with obj[prop] as its default.
         onto = (obj, prop, make, id, ...rest) => ({...make(id, obj[prop], ...rest), obj, prop}),
         
@@ -38,7 +40,9 @@
             pref(GROUP_DISPLAY, onto(cfg.ANIM, 'speed', num, 'animSpeed', 25, 200)),
             pref(GROUP_DISPLAY, onto(cfg, 'FOLLOW_MARGIN', num, 'followMargin', 5, 45)),
             pref(GROUP_DISPLAY, onto(cfg, 'COMBAT_LOG', bool, 'combatLog')),
-            pref(GROUP_DISPLAY, onto(cfg.SHADOW, 'on', bool, 'shadows'))
+            pref(GROUP_DISPLAY, onto(cfg.SHADOW, 'on', bool, 'shadows')),
+            pref(GROUP_DISPLAY, onto(cfg, 'UNITS', choice, 'units',
+                () => UNITS.map(value => ({value, label:i18n('units-' + value)}))))
         ],
         
         GROUPS = [GROUP_DISPLAY].map(id => ({
@@ -87,6 +91,15 @@
             expr('rallyTurns', '3', STAT_VARS),
             expr('rallyAmount', '(con / 10) * level', STAT_VARS),
             expr('rallyRefresh', 'Math.max(10, 150 - level)', STAT_VARS),
+            // What a piece can carry (see Items.js): the most stacks (each its kind's
+            // capacity), grams and cubic centimetres, of its level and stats.
+            expr('carryCapacity', '10 + str / 2', STAT_VARS),
+            expr('carryWeight', '2500 * str', STAT_VARS),
+            expr('carryVolume', '2000 * con', STAT_VARS),
+            // And what the ground of a cell can hold.
+            num('groundCapacity', 1000, 0, 1000000),
+            num('groundWeight', 10000000, 0, 1000000000),  // 10 tonnes
+            num('groundVolume', 10000000, 0, 1000000000),  // 10 cubic metres
             // Costs (see Game.costRule): formulas of your levels (COST_VARS), rounded down.
             // (Not in rules.json5: a map can set them, as any rule.)
             expr('placeCost', '4 + ceil(levels / 2)', COST_VARS),   // to place a piece

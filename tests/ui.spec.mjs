@@ -86,7 +86,7 @@ test('after losing, recentering goes to the start cell', async ({page}) => {
 test('Esc cancels choosing where to place', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await page.evaluate(() => {hc.app.game.gold = 100; hc.view.draw();});
+    await page.evaluate(() => {hc.app.game.setGold(100); hc.view.draw();});
     await page.keyboard.press('p');
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeVisible();
     await page.keyboard.press('Escape');
@@ -98,7 +98,7 @@ test('click selects your piece; shift-click moves onto it instead', async ({page
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), [dx, dy] = hc.hex.dirs[1];
-        g.gold = 100; g.playerPlace(dx, dy, c); g.playerWait();
+        g.setGold(100); g.playerPlace(dx, dy, c); g.playerWait();
         g.selectedId = c.id;
         hc.app.centerOn(false);
     });
@@ -118,7 +118,7 @@ test('shift-click moves just the piece, in Fixed or Follow', async ({page}) => {
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, c);
         g.playerWait();
         g.selectedId = c.id;
@@ -186,7 +186,7 @@ test('alt-click on a piece the selected one can swap with swaps them; a click se
     await clearBoard(page);
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, c);
         g.playerWait();
         g.selectedId = c.id;
@@ -248,7 +248,7 @@ test('W and X go up and down, zigzagging, and to the other side when the next is
 test('Enter opens the selected piece\'s menu; the arrow keys move between its items, and Enter picks one', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await page.evaluate(() => {hc.app.game.gold = 100; hc.view.draw();});
+    await page.evaluate(() => {hc.app.game.setGold(100); hc.view.draw();});
     const focused = () => page.evaluate(() => document.activeElement?.textContent ?? '');
     await page.keyboard.press('Enter');
     expect(await page.evaluate(() => hc.view.menuOpen)).toBe(true);
@@ -258,7 +258,7 @@ test('Enter opens the selected piece\'s menu; the arrow keys move between its it
     await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Character/);
     await page.keyboard.press('ArrowDown');
-    expect(await focused()).toMatch(/^Go to/);
+    expect(await focused()).toMatch(/^Inventory/);
     for (let i = 0; i < 12 && !/^Place/.test(await focused()); i++) await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Place/);
     await page.keyboard.press('Space');       // the focused item's, not the end of the turn
@@ -319,7 +319,7 @@ test('the selection stays on a piece after it moves', async ({page}) => {
     await clearBoard(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, core);
         g.playerPlace(-1, 0, core);
         g.playerWait();

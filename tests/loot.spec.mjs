@@ -43,9 +43,9 @@ test('a player piece landing on loot takes it: its gold is yours and the loot is
     await clearBoard(page);
     await putLoot(page, 1, 0, 25);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, before = [g.gold, g.lootTaken];
+        const g = hc.app.game, before = [g.goldHeld(), g.lootTaken];
         g.playerAct(g.getPlayerCore(), 1, 0);
-        return [before, [g.gold, g.lootTaken], g.fixtures.has('1,0')];
+        return [before, [g.goldHeld(), g.lootTaken], g.fixtures.has('1,0')];
     });
     expect(r[1]).toEqual([r[0][0] + 25, r[0][1] + 25]);
     expect(r[2]).toBe(false);
@@ -57,9 +57,9 @@ test('placing a piece on loot takes it too', async ({page}) => {
     await putLoot(page, 1, 0, 12);
     const r = await page.evaluate(() => {
         const g = hc.app.game;
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, g.getPlayerCore());
-        return [g.gold, g.fixtures.has('1,0')];
+        return [g.goldHeld(), g.fixtures.has('1,0')];
     });
     expect(r).toEqual([100 - 5 + 12, false]);
 });
@@ -69,10 +69,10 @@ test('enemies leave loot where it is', async ({page}) => {
     await clearBoard(page);
     await putLoot(page, 6, 0, 10);
     const r = await page.evaluate(() => {
-        const g = hc.app.game, e = g.addPiece('core', 'enemy', 5, 0), gold = g.gold;
+        const g = hc.app.game, e = g.addPiece('core', 'enemy', 5, 0), gold = g.goldHeld();
         g.moveGroup(e, 1, 0);
         g.landOnFixtures([e]);
-        return [e.x, g.fixtures.get('6,0')?.type, g.gold === gold];
+        return [e.x, g.fixtures.get('6,0')?.type, g.goldHeld() === gold];
     });
     expect(r).toEqual([6, 'loot', true]);
 });

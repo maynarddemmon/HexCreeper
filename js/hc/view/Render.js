@@ -486,6 +486,28 @@
             }
         },
         
+        /*  The marker on a cell with things on the ground (see Items.js): a small bundle
+            in its top left corner. */
+        drawGround = g => {
+            const s = cam.size,
+                [cx, cy] = cellCenter(g.x, g.y),
+                [lx, ly] = TILE_LABEL_OFFSET,
+                x = cx - lx * s,
+                y = cy - ly * s,
+                r = s * 0.11;
+            ctx.beginPath();
+            ctx.moveTo(x, y - r);
+            ctx.lineTo(x + r, y);
+            ctx.lineTo(x, y + r);
+            ctx.lineTo(x - r, y);
+            ctx.closePath();
+            ctx.fillStyle = css('--item');
+            ctx.fill();
+            ctx.lineWidth = Math.max(1, s * 0.025);
+            ctx.strokeStyle = css('--item-ink');
+            ctx.stroke();
+        },
+        
         /*  A fixture's numbers, in its corners: its magnitude bottom right
             (once shown; all that's left, for a magnitude of the whole pool), what's left in
             it bottom left (with showPool; ∞ for an infinite pool) and, for a countdown, the
@@ -800,6 +822,11 @@
         // Heals, harms, loot and features (fixtures), over their tiles
         for (const f of game.fixtures.values()) {
             if (inView(f.x, f.y) && isKnown(f.x, f.y)) drawFixture(f);
+        }
+        
+        // What's on the ground, on cells you know
+        for (const g of game.ground.values()) {
+            if (inView(g.x, g.y) && isKnown(g.x, g.y)) drawGround(g);
         }
         
         // The area of the heal, harm or loot under the pointer, if it reaches past it.

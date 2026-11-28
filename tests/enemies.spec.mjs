@@ -57,10 +57,10 @@ test('a squad facing a wall strikes and pulls back out of reach', async ({page})
     const r = await page.evaluate(adjSrc => {
         const adj = eval(adjSrc), g = hc.app.game, c = g.getPlayerCore();
         hc.app.game.rules.hpPer = 25;   // a sturdy wall, so the test is about the AI, not survival
-        g.gold = 1000;
+        g.setGold(1000);
         let L = c, R = c;
         for (let k = 1; k <= 3; k++) { g.playerPlace(-k, 0, L); L = g.pieceAt(-k, 0); g.playerPlace(k, 0, R); R = g.pieceAt(k, 0); }
-        g.gold = 0;
+        g.setGold(0);
         for (const p of g.piecesOf('player')) p.hp = p.maxHp;
         const lead = g.addPiece('core', 'enemy', 0, -4), A = g.addPiece('core', 'enemy', -1, -4, lead.id), B = g.addPiece('core', 'enemy', 1, -4, lead.id);
         g.addPiece('core', 'enemy', -2, -4, A.id); g.addPiece('core', 'enemy', -1, -5, A.id);
@@ -101,7 +101,7 @@ for (const [chance, strikes] of [[100, true], [5, false]]) {
 test('a plan gone stale is made again: once a strike kills a piece, the next one planned on it isn\'t a step into its cell', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(c.x, c.y - 1, c);
         const p = g.pieceAt(c.x, c.y - 1);
         // Two creepers next to that piece (2 HP), but not the core: each hit does 1 or 2

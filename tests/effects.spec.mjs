@@ -66,9 +66,9 @@ test('each use gives the magnitude while the pool lasts, then the fixture is gon
         await putFixture(page, 1, 0, subtype);
         const out = [];
         for (let i = 0; i < 3; i++) {
-            const before = await page.evaluate(() => hc.app.game.gold);
+            const before = await page.evaluate(() => hc.app.game.goldHeld());
             await step(page, 1, 0);
-            out.push(await page.evaluate(b => hc.app.game.gold - b, before));
+            out.push(await page.evaluate(b => hc.app.game.goldHeld() - b, before));
             await step(page, -1, 0);
         }
         const fixture = await fixtureAt(page, 1, 0);
@@ -91,7 +91,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     // The core at (0, 0), a at (2, 0) linked to it, and an enemy at (1, 1): the fixture goes at (1, 0).
     await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, c);
         g.playerPlace(2, 0, g.pieceAt(1, 0));
         g.removePiece(g.pieceAt(1, 0));

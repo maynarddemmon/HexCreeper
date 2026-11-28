@@ -70,7 +70,8 @@
       "shut", "barred"): each text whose when (a formula of its state) isn't 0.
     
     Heals heal your pieces (what the piece doesn't need flows along its links, and what
-    nobody needs stays in the heal); harms damage any piece; loot gives you gold. Only your
+    nobody needs stays in the heal); harms damage any piece; loot gives gold coins to the
+    piece that takes it (what it can't carry falls on the ground there: see Items.js). Only your
     pieces set them off, by entering their cell: a step, being carried, a jump, a swap or
     being placed there. */
 (pkg => {
@@ -78,7 +79,7 @@
     
     const {
             Subtypes, hexDist,
-            FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, FIXTURE_TYPES, TILE_TYPE_FLOOR,
+            FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, FIXTURE_TYPES, TILE_TYPE_FLOOR, ITEM_GOLD,
             isNatNum, isIntOfAtLeast
         } = pkg,
         {isText, isPercent} = Subtypes,
@@ -541,7 +542,7 @@
                 this.logCombat({kind:'harm', d:this.whoOf(p), dmg:amount});
                 this.damage(p, amount, null, by);
             } else {
-                this.gold += amount;
+                this.giveItem(p, this.makeItem(ITEM_GOLD, amount));
                 this.lootTaken += amount;
                 this.fx(p.x, p.y, `+${amount} gold`, '--loot', {});
             }

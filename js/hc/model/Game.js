@@ -24,7 +24,9 @@
     // Game state
     // ---------------------------------------------------------------------------
     pkg.Game = new JS.Class('Game', {
-        include:[pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures, pkg.Effects],
+        include:[
+            pkg.Movement, pkg.Navigation, pkg.Formation, pkg.Combat, pkg.Goals, pkg.Fixtures, pkg.Effects, pkg.Items
+        ],
         
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
@@ -48,10 +50,10 @@
             if (!Number.isInteger(this.seed)) this.seed = pkg.randomSeed();
             this.turn = 1;
             this.nextId = 1;
+            this.nextItemId = 1;             // for items (see Items.js)
             this.nextBand = 1;               // for enemies spawned together (see newBand)
             this.pieces = new Map();         // id -> piece
             this.board = new Map();          // "x,y" -> id
-            this.gold = 0;                   // gold you have to spend (only loot gives it)
             this.over = false;
             this.outcome = null;             // once over: 'won' or 'lost'
             this.lostBy = null;              // when lost: the index of the objective that lost it, or null for the core
@@ -62,6 +64,7 @@
             this.piecesPlaced = 0;
             this.lootOpened = 0;             // loot fixtures emptied
             this.lootTaken = 0;              // gold taken from loot, spent or not
+            this.ground = new Map();         // "x,y" -> {x, y, inventory}: what's on the ground (see Items.js)
             this.objectives = this.getMapObjectives().map(() => ({value:false, locked:false, progress:''})); // state of each of the map's goals and penalties
             this.effects = [];               // transient visuals (floating text, flashes)
             this.pendingKills = [];          // kills of this action, their xp not given yet (see Combat.awardKills)
@@ -109,8 +112,8 @@
             return {
                 turn:this.turn,
                 nextId:this.nextId,
+                nextItemId:this.nextItemId,
                 seed:this.seed,
-                gold:this.gold,
                 over:this.over,
                 outcome:this.outcome,
                 lostBy:this.lostBy,
@@ -121,7 +124,8 @@
                 lootOpened:this.lootOpened,
                 lootTaken:this.lootTaken,
                 objectives:this.objectives.map(s => ({...s})),
-                pieces:[...this.pieces.values()].map(p => ({...p})),
+                pieces:[...this.pieces.values()].map(p => ({...p, inventory:structuredClone(p.inventory)})),
+                ground:[...this.ground.values()].map(g => structuredClone(g)),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
                 fixtures:[...this.fixtures.values()].map(f => ({...f, ...f.state ? {state:{...f.state}} : {}})),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
@@ -143,12 +147,15 @@
         importFromObj: function(o) {
             const isNum = v => Number.isFinite(v),
                 isArr = Array.isArray;
-            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.gold) ||
+            const {isInventory} = pkg.Items;
+            if (!isNum(o?.turn) || !isNum(o.nextId) || !isNum(o.nextItemId) ||
                 !isNum(o.kills) || !isNum(o.piecesLost) || !isNum(o.piecesPlaced) || !isNum(o.lootOpened) || !isNum(o.lootTaken) ||
                 !pkg.isObj(o.rules) ||
                 ![o.pieces, o.tiles, o.seenCells, o.corePath].every(isArr) ||
                 !o.pieces.every(p => isNum(p?.id) && isNum(p.x) && isNum(p.y) && PIECE_TYPES[p.type] && isNum(p.ap) && isArr(p.effects) && isNum(p.statPoints?.available) && isNum(p.statPoints.spent) && typeof p.species === 'string' && typeof p.background === 'string' &&
-                    (p.name === undefined || typeof p.name === 'string') && (p.description === undefined || typeof p.description === 'string')) ||
+                    (p.name === undefined || typeof p.name === 'string') && (p.description === undefined || typeof p.description === 'string') &&
+                    isInventory(p.inventory)) ||
+                !isArr(o.ground) || !o.ground.every(g => isNum(g?.x) && isNum(g.y) && isInventory(g.inventory)) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
                 !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
             ) throw new Error('Malformed game data');
@@ -179,8 +186,8 @@
             
             this.turn = o.turn;
             this.nextId = o.nextId;
+            this.nextItemId = o.nextItemId;
             this.seed = Number.isInteger(o.seed) ? o.seed : null;
-            this.gold = o.gold;
             this.over = !!o.over;
             this.outcome = this.over ? (o.outcome === 'won' ? 'won' : 'lost') : null;
             this.lostBy = Number.isInteger(o.lostBy) ? o.lostBy : null;
@@ -202,7 +209,10 @@
             this.board = new Map();
             for (const p of o.pieces) {
                 const trail = isArr(p.trail) && p.trail.every(c => isArr(c) && c.length === 2 && c.every(Number.isInteger)) ? p.trail : [],
-                    piece = {...p, trail, effects:p.effects.map(e => ({...e})), statPoints:{...p.statPoints}};
+                    piece = {
+                        ...p, trail, effects:p.effects.map(e => ({...e})), statPoints:{...p.statPoints},
+                        inventory:structuredClone(p.inventory)
+                    };
                 // A named enemy's id and band (see newBand), if it has them and they're usable
                 if (typeof piece.enemyId !== 'string') delete piece.enemyId;
                 if (!Number.isInteger(piece.band)) delete piece.band;
@@ -211,6 +221,8 @@
             }
             this.nextBand = 1 + Math.max(0, ...[...this.pieces.values()].map(p => p.band ?? 0));
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
+            this.ground = new Map(o.ground.filter(g => g.inventory.items.length)
+                .map(g => [this.key(g.x, g.y), structuredClone(g)]));
             this.fixtures = new Map(o.fixtures.map(f => [this.key(f.x, f.y), {...f, ...f.state ? {state:{...f.state}} : {}}]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
@@ -489,7 +501,8 @@
         },
         
         // Damage a piece; returns the list of pieces destroyed (empty if it survived).
-        // Destroying a piece also destroys everything linked below it. by is the piece the
+        // Destroying a piece also destroys everything linked below it, each leaving its
+        // remains where it was (see Items.leaveRemains). by is the piece the
         // damage is from (the attacker, or who set off a harm). An enemy remembers the last
         // of your pieces to hurt it (lastHitBy), whose kill it is (with what was linked
         // below it), however it dies: that piece earns their xp, once the action is over,
@@ -504,6 +517,7 @@
             this.logCombat({kind:'destroyed', d:this.whoOf(target), linked:lost.length - 1});
             for (const g of lost) {
                 this.removePiece(g);
+                this.leaveRemains(g);
                 if (g.owner === 'player') {
                     this.piecesLost++;
                 } else {
@@ -583,7 +597,7 @@
         },
         
         // ---- Placing linked pieces ----
-        canAffordPlace: function() { return this.gold >= this.placeCost(); },
+        canAffordPlace: function() {return this.goldHeld() >= this.placeCost();},
         
         /*  A cost rule's formula (placeCost: see Settings.js), of your
             core's level, your highest and your pieces' levels together, rounded down. */
@@ -620,7 +634,8 @@
                 return false;
             }
             const cost = this.placeCost();
-            this.gold -= cost;
+            // (From what parent carries first: see Items.spendGold.)
+            this.spendGold(cost, parent);
             const p = this.addPiece('core', 'player', x, y, parent.id),
                 core = this.getPlayerCore();
             // (Of your core's species and background.)

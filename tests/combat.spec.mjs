@@ -8,7 +8,7 @@ const setupRow = page => page.evaluate(() => {
     // Pick a direction pair (d, -d) for the row and a "forward" direction not along it.
     const row = D.find(([dx, dy]) => dx === 1 && dy === 0);
     const fwd = D.find(([dx, dy]) => dy === -1 && dx === 1);
-    g.gold = 100;
+    g.setGold(100);
     g.playerPlace(row[0], row[1], c); g.playerPlace(-row[0], -row[1], c);
     g.playerWait();
     return fwd;
@@ -24,9 +24,9 @@ test('a group attack hits with every member in line, for no gold; then the group
     const r = await page.evaluate(fwd => {
         const g = hc.app.game, c = g.getPlayerCore();
         for (const p of g.piecesOf('player')) g.addPiece('core', 'enemy', p.x + fwd[0], p.y + fwd[1]);
-        const s0 = g.gold, m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
+        const s0 = g.goldHeld(), m = g.findMove(c, c.x + fwd[0], c.y + fwd[1]);
         g.playerAct(c, m.x, m.y);
-        return {hits:m.hits.length, gained:g.gold - s0, left:g.piecesOf('enemy').length, at:[c.x, c.y]};
+        return {hits:m.hits.length, gained:g.goldHeld() - s0, left:g.piecesOf('enemy').length, at:[c.x, c.y]};
     }, fwd);
     expect(r).toEqual({hits:3, gained:0, left:0, at:fwd});
 });
@@ -89,7 +89,7 @@ test('moving a parent carries its subtree, keeping its shape', async ({page}) =>
 test('a linked piece must stay within link range of its parent', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), d = hc.hex.dirs[1];
-        g.gold = 100; g.playerPlace(d[0], d[1], c);
+        g.setGold(100); g.playerPlace(d[0], d[1], c);
         const a = g.pieceAt(d[0], d[1]);
         let steps = 0;
         for (let t = 0; t < 6; t++) {
@@ -110,10 +110,10 @@ test('gold looted is kept as a total; spending only lowers what you have', async
         const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs;
         g.fixtures.set(g.key(a[0], a[1]), {...g.makeFixture(a[0], a[1], 'loot'), pool:11});
         g.playerAct(c, a[0], a[1]);
-        const afterLoot = [g.gold, g.lootTaken];
+        const afterLoot = [g.goldHeld(), g.lootTaken];
         g.playerWait();
         g.playerPlace(c.x + b[0], c.y + b[1], c); // costs 5
-        return {afterLoot, afterPlace:[g.gold, g.lootTaken]};
+        return {afterLoot, afterPlace:[g.goldHeld(), g.lootTaken]};
     });
     expect(r).toEqual({afterLoot:[11, 11], afterPlace:[6, 11]});
 });

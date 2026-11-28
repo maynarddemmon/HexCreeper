@@ -8,7 +8,9 @@
 	// entry can extend another (a sub-species), a stat's whole entry replacing the other's.
 	// "damage": its base damage, [min, max] ([1, 4] if not given), a profile's if it
 	// doesn't say. "playable": whether you can choose it for a character (false if not
-	// given). "backgrounds": the backgrounds it can go with (any, if not given).
+	// given). "backgrounds": the backgrounds it can go with (any, if not given). "corpse":
+	// the item it leaves when it dies, holding all it had (see items.json5: "corpse" if not
+	// given; "none" leaves nothing but what it had).
 	"species":{
 		"human":{
 			"name":"Human",
@@ -95,6 +97,7 @@
 			"name":"Halfling",
 			"description":"Small, nimble folk with steady nerves and a knack for luck.",
 			"damage":[1, 4],
+			"corpse":"small_corpse",
 			"playable":true,
 			"stats":{
 				"str":[3, 7,  16],
@@ -111,6 +114,7 @@
 			"name":"Gnome",
 			"description":"Small, clever tinkerers with endless curiosity.",
 			"damage":[1, 4],
+			"corpse":"small_corpse",
 			"playable":true,
 			"stats":{
 				"str":[3, 7,  16],
@@ -159,13 +163,15 @@
 			"name":"Goblin",
 			"description":"Small, quick and spiteful, with green skin, big eyes and sharp teeth.",
 			"stats":{"str":[4, 8, 14], "agl":[6, 12, 18], "con":[4, 8, 14], "dex":[4, 10, 16], "int":[3, 6, 12], "wis":[3, 8, 14], "wil":[3, 6, 12], "cha":[3, 6, 12]},
-			"damage":[1, 4]
+			"damage":[1, 4],
+			"corpse":"small_corpse"
 		},
 		"hobgoblin":{
 			"extends":"goblin",
 			"name":"Hobgoblin",
 			"description":"Big, disciplined goblins, bred for war.",
 			"damage":[1, 6],
+			"corpse":"corpse",
 			"stats":{
 				"str":[6, 11, 17],
 				"agl":[4, 10, 16],
@@ -179,6 +185,7 @@
 			"name":"Kobold",
 			"description":"Small, scaly and cunning: trap-makers who fight in packs.",
 			"damage":[1, 3],
+			"corpse":"small_corpse",
 			"stats":{
 				"str":[3, 6,  12],
 				"agl":[6, 12, 18],
@@ -209,6 +216,7 @@
 			"name":"Ogre",
 			"description":"Huge, dim and hungry, and strong enough to crush a man.",
 			"damage":[2, 8],
+			"corpse":"large_corpse",
 			"stats":{
 				"str":[10, 16, 22],
 				"agl":[3, 7,  14],
@@ -224,7 +232,8 @@
 			"name":"Creeper",
 			"description":"Things that crawl out of the dark: nobody knows quite what.",
 			"stats":{"str":[3, 8, 18], "agl":[3, 8, 18], "con":[3, 8, 18]},
-			"damage":[1, 4]
+			"damage":[1, 4],
+			"corpse":"husk"
 		}
 	},
 	
@@ -355,7 +364,9 @@
 	// and within all its species' ranges), "level" (1), "damage" ([min, max], its
 	// weapon's, before its str bonus: its species' base damage if not given), "penetration" (how much damage reduction its weapon
 	// goes through), "armor" (its damage reduction), "hp" (its max HP, if fixed: else the
-	// maxHp rule's) and, for enemies, "xp" (what killing it is worth: else the xpValue rule's).
+	// maxHp rule's), for enemies, "xp" (what killing it is worth: else the xpValue rule's),
+	// and "items", what it carries (see items.json5): item ids, or {"kind":id, "count":n}
+	// for more than one, count also [min, max] (rolled for each piece, so it may have none).
 	
 	// Named enemies: what a single enemy piece is, by id ("name", "description", and its
 	// profile). An enemy without a name is a creeper.
@@ -373,7 +384,8 @@
 			"species":"goblin",
 			"backgrounds":["urchin","denizen"],
 			"hp":5,
-			"xp":5
+			"xp":5,
+			"items":[{"kind":"mushroom_jerky", "count":[0, 2]}]
 		},
 		"goblin_reaver":{
 			"extends":"goblin",
@@ -383,7 +395,8 @@
 			"stats":{"str":12, "con":12},
 			"damage":[2, 6],
 			"hp":8,
-			"xp":10
+			"xp":10,
+			"items":["dagger", {"kind":"mushroom_jerky", "count":[0, 2]}]
 		},
 		"hobgoblin":{
 			"name":"Hobgoblin",
@@ -391,7 +404,8 @@
 			"species":"hobgoblin",
 			"backgrounds":["urchin","denizen","pit_fighter"],
 			"hp":8,
-			"xp":10
+			"xp":10,
+			"items":["club", {"kind":"centipede_jerky", "count":[0, 3]}]
 		},
 		"hobgoblin_reaver":{
 			"name":"Hobgoblin Reaver",
@@ -400,7 +414,8 @@
 			"backgrounds":["reaver"],
 			"damage":[2, 8],
 			"hp":13,
-			"xp":15
+			"xp":15,
+			"items":["short_sword", "belt_pouch"]
 		},
 	},
 	

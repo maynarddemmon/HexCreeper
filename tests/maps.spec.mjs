@@ -147,7 +147,8 @@ test('Settings shows only the preferences, whatever the map', async ({page}) => 
     await expect(page.getByText('Animate pieces', {exact:true}).filter({visible:true})).toBeVisible();
     await expect(page.getByText('Follow margin (% of the board)', {exact:true}).filter({visible:true})).toBeVisible();
     await expect(page.getByText('Animation speed (%)', {exact:true}).filter({visible:true})).toBeVisible();
-    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(2); // the number rows: animation speed, follow margin
+    // The number rows (animation speed, follow margin) and the choice of units
+    await expect(page.locator('[data-setting]').filter({visible:true})).toHaveCount(3);
     await expect(page.getByText('Fog of war', {exact:true}).filter({visible:true})).toHaveCount(0);
     await expect(button(page, 'Reset to Defaults')).toHaveCount(0);
 });

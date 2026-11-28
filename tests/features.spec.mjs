@@ -81,7 +81,7 @@ test('a fixture whose moveCost is 0 or less is in the way, as a solid is', async
     await putFixture(page, 1, 0, 'gate');
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = {};
-        g.gold = 100;
+        g.setGold(100);
         const shut = () => [g.isOpen(1, 0), g.legalMoves(c).some(m => m.x === 1 && m.y === 0), g.placeCells(c).some(q => q.x === 1 && q.y === 0),
             g.jumpTargets(c).some(q => q.x === 2 && q.y === 0)];
         out.shut = shut();
@@ -130,7 +130,7 @@ test('a fixture used up or run out leaves its destroyInto too', async ({page}) =
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         g.playerAct(c, 1, 0);
-        return [g.fixtures.get('1,0')?.subtype, g.gold > 0];
+        return [g.fixtures.get('1,0')?.subtype, g.goldHeld() > 0];
     });
     expect(r).toEqual(['rubbish', true]);
 });

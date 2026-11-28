@@ -21,6 +21,7 @@
         gameOverShown = false,
         settingsDialog,
         characterSheet,
+        inventoryDialog,
         mapsDialog,
         mapBrief,
         
@@ -50,7 +51,7 @@
             },
             ICON_SEPARATOR, ICON_CANCEL,
             TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, PLAYER_MOVE_MODES,
-            formatAp, formatXp,
+            formatAp, formatXp, formatWeight, formatVolume,
             VAR_XP, VAR_LEVEL
         } = pkg,
         
@@ -224,6 +225,52 @@
             });
         },
         
+        /*  The inventory of your piece p, and what's on the ground under it (see
+            InventoryDialog and Items.js): each thing can be dropped or taken, for an
+            action. It closes if the turn ends, or p is gone. */
+        openInventory = p => {
+            V.menuOpen = false;
+            draw();
+            inventoryDialog ??= new pkg.InventoryDialog(appView);
+            const rows = (holder, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => [
+                    {id:it.id, label:game.itemLabel(it), weight:formatWeight(game.itemWeight(it)), depth},
+                    ...rows(it, depth + 1)
+                ]),
+                ground = () => game.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}},
+                why = problem => problem ? i18n('inv-why-' + problem) : '',
+                act = fn => id => {
+                    const turn = game.turn;
+                    if (fn(id)) {
+                        gameView.afterTurn();
+                        if (game.over || game.turn !== turn || !game.pieces.has(p.id)) {
+                            inventoryDialog.hide();
+                        } else {
+                            inventoryDialog.refresh();
+                        }
+                    }
+                };
+            inventoryDialog.show({
+                title:i18n('dlg-inventory-title', logName(game.whoOf(p), true)),
+                describe:() => {
+                    const t = game.inventoryTotals(p),
+                        l = game.inventoryLimits(p),
+                        g = game.inventoryTotals(ground());
+                    return {
+                        carried:{
+                            rows:rows(p),
+                            summary:i18n('inv-summary', t.capacity, l.capacity, formatWeight(t.weight), formatWeight(l.weight),
+                                formatVolume(t.volume), formatVolume(l.volume))
+                        },
+                        ground:{rows:rows(ground()), summary:i18n('inv-ground-summary', formatWeight(g.weight), formatVolume(g.volume))}
+                    };
+                },
+                dropProblem:id => why(game.dropProblem(p, id)),
+                takeProblem:id => why(game.takeProblem(p, id)),
+                onDrop:act(id => game.playerDrop(p, id)),
+                onTake:act(id => game.playerTake(p, id))
+            });
+        },
+        
         keyOf = e => e.code.startsWith('Numpad') ? e.code : (e.key.length === 1 ? e.key.toLowerCase() : e.key),
         
         /*  After the game has been replaced by a saved one. */
@@ -285,6 +332,12 @@
                     enabled:() => !!sel(),
                     attention:() => sel()?.statPoints?.available > 0,
                     run:() => openSheet(sel())
+                },{
+                    id:'inventory',
+                    label:() => i18n('btn-inventory'),
+                    tip:() => i18n('tip-inventory'),
+                    enabled:() => sel()?.owner === 'player',
+                    run:() => openInventory(sel())
                 },
                 
                 // Squad Movement
@@ -410,7 +463,10 @@
         },
         
         // Keys for the menu's items, which act on the selected piece.
-        MENU_KEYS = {p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', u:'use', r:'rally', i:'sheet', g:'goto', o:'explore', n:'snake', t:'tree'},
+        MENU_KEYS = {
+            p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', u:'use', r:'rally', i:'sheet', h:'inventory',
+            g:'goto', o:'explore', n:'snake', t:'tree'
+        },
         
         // ---- Go to and Explore ----
         // The selected piece goes somewhere by itself, a step a turn in Follow mode, so the
@@ -857,6 +913,12 @@
                                     what = cost === 1 ? floor.name : i18n('status-floor', floor.name, Math.round(cost * 100) / 100);
                                 status = status ? status + ' · ' + what : floor.description ? i18n('status-tile', what, floor.description) : what;
                             }
+                            // What's on the ground there (see Items.js).
+                            const onGround = game.groundAt(V.hover.x, V.hover.y)?.inventory.items ?? [];
+                            if (onGround.length) {
+                                const what = i18n('status-ground', onGround.map(it => game.itemLabel(it)).join(', '));
+                                status = status ? status + ' · ' + what : what;
+                            }
                         }
                     }
                     if (this.text !== status) {
@@ -993,7 +1055,7 @@
             and offers a new game once the core is destroyed. */
         update: () => {
             turnView.update(game.turn);
-            goldView.update(game.gold);
+            goldView.update(game.goldHeld());
             const gameOver = game.over;
             
             endTurnBtn.setDisabled(gameOver);

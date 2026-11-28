@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard, button, cellOnPage, menuItem, openMenu} from './helpers.mjs';
 
-const ITEMS = ['Character', 'Go to', 'Explore', 'Swap', 'Jump', 'Attack', 'Use', 'Rally', 'Place · 5', 'Attach', 'Detach', 'Snake', 'Tree'];
+const ITEMS = ['Character', 'Inventory', 'Go to', 'Explore', 'Swap', 'Jump', 'Attack', 'Use', 'Rally', 'Place · 5', 'Attach', 'Detach', 'Snake', 'Tree'];
 
 /*  The core at (0, 0) with a at (1, 0) linked to it, in a new turn, a selected. Pools are
     2 action points, all of it back each turn, so a can jump. */
@@ -11,10 +11,10 @@ const setUp = async page => {
     await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore();
         g.rules.apPool = g.rules.apRecovery = '2';
-        g.gold = 1000;
+        g.setGold(1000);
         g.playerPlace(1, 0, core);
         g.playerWait();
-        g.gold = 100;
+        g.setGold(100);
         g.selectedId = g.pieceAt(1, 0).id;
         hc.view.draw();
     });
@@ -28,11 +28,11 @@ test('clicking the selected piece again opens its menu beside it, with what it c
     await openMenu(page);
     await expect(items(page)).toHaveText(ITEMS);
     const disabled = await items(page).evaluateAll(els => els.map(e => e.classList.contains('disabled')));
-    // It always has a character sheet (first), and can always go to a cell or explore. a
+    // It always has a character sheet (first) and an inventory, and can always go to a cell or explore. a
     // can swap with the core and jump; there's nothing to attack or use; it isn't hurt, so
     // it can't rally. A piece can go next to a; it has a parent, so it can't attach, but
     // can be detached. It can always get into formation.
-    expect(disabled).toEqual([false, false, false, false, false, true, true, true, false, true, false, false, false]);
+    expect(disabled).toEqual([false, false, false, false, false, false, true, true, true, false, true, false, false, false]);
     // Beside the piece.
     const [px, py] = await cellOnPage(page, 1, 0),
         box = await page.getByRole('menu').filter({visible:true}).boundingBox();

@@ -9,7 +9,7 @@ test.beforeEach(async ({page}) => {
 test('moves are recorded to animate: a group step together, a jump as a jump', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, 0, c);
         g.playerWait();
         g.motions = [];
@@ -64,7 +64,7 @@ test('moving a piece again drops what of its move was still to play', async ({pa
 test('a piece destroyed in a squad\'s later action stays drawn until then', async ({page}) => {
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(0, -1, c);
         const kid = g.pieceAt(0, -1);
         g.playerWait();
@@ -90,7 +90,7 @@ test('with Animate pieces off, nothing is animated, and the enemies\' turn shows
         g.motions = [];
         g.playerAct(c, 1, 0);
         const moved = g.motions.length;
-        g.gold = 100;
+        g.setGold(100);
         g.playerPlace(1, -1, c);
         const kid = g.pieceAt(1, -1);
         kid.hp = 1;

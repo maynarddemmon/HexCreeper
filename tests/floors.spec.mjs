@@ -38,8 +38,8 @@ test('a floor blocks neither sight nor movement, and a fixture can sit on it', a
     await putFloors(page, 'mud', [[1, 0]]);
     await putFixture(page, 1, 0, 'loot', {pool:5});
     expect(await page.evaluate(() => {
-        const g = hc.app.game, c = g.getPlayerCore(), gold = g.gold;
-        return [g.isOpen(1, 0), g.seeThrough(1, 0), g.playerAct(c, 1, 0), c.x, g.gold - gold];
+        const g = hc.app.game, c = g.getPlayerCore(), gold = g.goldHeld();
+        return [g.isOpen(1, 0), g.seeThrough(1, 0), g.playerAct(c, 1, 0), c.x, g.goldHeld() - gold];
     })).toEqual([true, 1, true, 1, 5]);
 });
 
@@ -49,7 +49,7 @@ test('a step onto dear going costs its moveCost times an action; a group pays fo
     expect(await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.apPool = '4';
-        g.gold = 100;
+        g.setGold(100);
         c.ap = 400;
         g.playerAct(c, 1, 0);                    // onto mud: 2
         out.push(c.ap);

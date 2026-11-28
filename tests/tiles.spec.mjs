@@ -202,7 +202,7 @@ test.describe('rules', () => {
         const r = await page.evaluate(kind => {
             const g = hc.app.game, c = g.getPlayerCore(), [a, b] = hc.hex.dirs,
                 block = (x, y) => g.tiles.set(g.key(x, y), {x, y, kind, timer:0});
-            g.gold = 100;
+            g.setGold(100);
             block(a[0], a[1]);
             const out = {
                 move:g.playerAct(c, a[0], a[1]),
@@ -235,7 +235,7 @@ test.describe('rules', () => {
     test('healing flows up to a damaged ancestor first, then down; it says how much was used', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-            g.gold = 1000;
+            g.setGold(1000);
             g.playerPlace(D[0][0], D[0][1], c); g.playerPlace(D[3][0], D[3][1], c);
             const a = g.pieceAt(D[0][0], D[0][1]);
             const kids = g.placeCells().filter(q => hc.hexDist(q, a) === 1 && hc.hexDist(q, c) > 1).slice(0, 2);
@@ -248,9 +248,9 @@ test.describe('rules', () => {
             c.hp -= 1;
             used.push(g.applyHeal(a, 2));
             const upAndDown = c.hp === c.maxHp && leaf.hp === leaf.maxHp;
-            const gold = g.gold;
+            const gold = g.goldHeld();
             used.push(g.applyHeal(a, 3));
-            return {oneUp, upAndDown, used, gold:g.gold - gold};
+            return {oneUp, upAndDown, used, gold:g.goldHeld() - gold};
         });
         expect(r).toEqual({oneUp:true, upAndDown:true, used:[1, 2, 0], gold:0});
     });
@@ -258,7 +258,7 @@ test.describe('rules', () => {
     test('eating two heals in one move: each gives its own, with no combo', async ({page}) => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), D = hc.hex.dirs;
-            g.gold = 100;
+            g.setGold(100);
             g.playerPlace(D[0][0], D[0][1], c);
             g.playerWait();
             const a = g.pieceAt(D[0][0], D[0][1]), m = D[2];
@@ -276,7 +276,7 @@ test.describe('rules', () => {
         const r = await page.evaluate(() => {
             const g = hc.app.game, c = g.getPlayerCore(), [d] = hc.hex.dirs, out = [];
             g.fixtures.set(g.key(d[0], d[1]), {...g.makeFixture(d[0], d[1], 'heal'), pool:4, revealedAt:0});
-            const heal = g.fixtures.get(g.key(d[0], d[1])), gold = g.gold;
+            const heal = g.fixtures.get(g.key(d[0], d[1])), gold = g.goldHeld();
             c.hp = c.maxHp - 1;
             g.playerAct(c, d[0], d[1]);
             out.push(c.hp === c.maxHp, heal.pool, heal.uses);
@@ -284,7 +284,7 @@ test.describe('rules', () => {
             g.playerAct(c, 0, 0);
             g.playerWait();
             g.playerAct(c, d[0], d[1]);
-            out.push(heal.pool, heal.uses, g.fixtures.has(g.key(d[0], d[1])), g.gold - gold);
+            out.push(heal.pool, heal.uses, g.fixtures.has(g.key(d[0], d[1])), g.goldHeld() - gold);
             return out;
         });
         expect(r).toEqual([true, 3, 1, 3, 1, true, 0]);

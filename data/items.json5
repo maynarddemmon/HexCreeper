@@ -1,0 +1,108 @@
+{
+	// Items: what can be carried, dropped, and put in things (see js/hc/model/Items.js).
+	// Included by init.json5.
+
+	// Each has a "name" and a "description", and
+	//   plural:    its name for more than one (its name with an "s" if not given)
+	//   material:  what it's made of (one of environs.json5's "materials")
+	//   volume:    in cubic centimetres
+	//   weight:    in grams; if not given, its volume times its material's density
+	//              (grams a cubic centimetre)
+	//   capacity:  the room it takes in an inventory (1 if not given; 0 takes none)
+	//   stack:     the most that make one stack (1 if not given: it doesn't stack)
+	//   inventory: if things can be put in it: {"capacity", "weight", "volume"}, the most
+	//              it can hold (each without limit if not given). One that holds things
+	//              doesn't stack. Its own volume should allow for what it holds.
+	// What a species leaves when it dies is one of these (its "corpse" in entities.json5:
+	// "corpse" if it doesn't say), holding everything it had, and named for it ("goblin
+	// corpse", "creeper husk", "corpse of Tess").
+	"items":{
+		// Money
+		"gold_coin":{
+			"name":"gold coin",
+			"description":"Gold: what loot gives, and placing a piece costs.",
+			"material":"gold",
+			"volume":0.25,
+			"stack":100000
+		},
+		
+		// Remains
+		"corpse":{
+			"name":"corpse",
+			"description":"What's left of something that died, and everything it had.",
+			"material":"flesh",
+			"volume":70000,
+			"inventory":{}
+		},
+		"small_corpse":{
+			"extends":"corpse",
+			"volume":30000
+		},
+		"large_corpse":{
+			"extends":"corpse",
+			"volume":250000
+		},
+		"husk":{
+			"extends":"corpse",
+			"name":"husk",
+			"description":"The dry shell a creeper leaves.",
+			"material":"fungus",
+			"volume":20000,
+			"weight":3000
+		},
+		
+		// Weapons (from Ouroboros: they do nothing yet)
+		"dagger":{
+			"name":"dagger",
+			"description":"A short blade for close work.",
+			"material":"steel",
+			"volume":65
+		},
+		"short_sword":{
+			"name":"short sword",
+			"description":"A bronze blade, handy in a tight spot.",
+			"material":"bronze",
+			"volume":150
+		},
+		"long_sword":{
+			"name":"long sword",
+			"description":"A long steel blade.",
+			"material":"steel",
+			"volume":300
+		},
+		"club":{
+			"name":"club",
+			"description":"A heavy length of ironwood.",
+			"material":"ironwood",
+			"volume":500
+		},
+		
+		// Food (it can't be eaten yet)
+		"mushroom_jerky":{
+			"name":"mushroom jerky",
+			"plural":"mushroom jerky",
+			"description":"Dried strips of cave mushroom.",
+			"material":"fungus",
+			"volume":25,
+			"stack":20
+		},
+		"centipede_jerky":{
+			"name":"centipede jerky",
+			"plural":"centipede jerky",
+			"description":"Dried giant centipede. Chewy.",
+			"material":"flesh",
+			"volume":25,
+			"stack":20
+		},
+		
+		// Containers
+		"belt_pouch":{
+			"name":"belt pouch",
+			"description":"A small leather pouch.",
+			"material":"leather",
+			"volume":600,
+			"weight":150,
+			"inventory":{"capacity":5, "volume":500}
+		}
+	}
+}

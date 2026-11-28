@@ -9,7 +9,8 @@
     that goes down to 0 should say so). It has a base "damage", [min, max] ([1, 4] if
     not given), is "playable" (true or false: false if not given) if you can choose it
     for a character, and may have "backgrounds", the ids of the backgrounds it can go
-    with (any, if not given). Entries can extend others (a sub-species: see
+    with (any, if not given), and "corpse", the item kind it leaves when it dies ("corpse"
+    if not given; "none" for nothing: see Items.js). Entries can extend others (a sub-species: see
     Subtypes.js), a stat's whole entry replacing the other's. Stats can't go outside the
     range (spending stat points can't raise one above its max).
     
@@ -40,6 +41,9 @@
         armor        its damage reduction: taken off each hit's damage
         hp           its max HP, if fixed (else the maxHp rule works it out)
         xp           (enemies) what killing it is worth (the xpValue rule's if not given)
+        items        what it carries, whatever it can (see Items.js): item kind ids, or
+                     {"kind":id, "count":n or [min, max]} for more than one (rolled for
+                     each piece: it may have none)
     and a piece gets a copy (so it can change: a level, and later more), with its xp.
     
     The rules this uses are formulas (expr attrs: see Settings.js), their defaults in
@@ -102,13 +106,14 @@
         isFlag = v => v === undefined || typeof v === 'boolean',
         
         /*  A species as the data has it, made usable ({ranges:{stat:[min, max]},
-            typical:{stat:n}, damage:[min, max], playable, backgrounds:[ids] or null}), or
-            null if it isn't. */
+            typical:{stat:n}, damage:[min, max], playable, backgrounds:[ids] or null,
+            corpse:id or undefined}), or null if it isn't. */
         parseSpecies = entry => {
             const ranges = {},
                 typical = {},
                 damage = entry.damage ?? DEFAULT_DAMAGE;
-            let ok = isRange(damage) && isFlag(entry.playable) && isIds(entry.backgrounds);
+            let ok = isRange(damage) && isFlag(entry.playable) && isIds(entry.backgrounds) &&
+                (entry.corpse === undefined || (typeof entry.corpse === 'string' && !!entry.corpse));
             for (const s of STATS) {
                 const v = entry.stats?.[s] ?? DEFAULT_STAT,
                     [min, mid, max] = Array.isArray(v) && v.length === 2 ? [v[0], Math.round((v[0] + v[1]) / 2), v[1]] : Array.isArray(v) ? v : [];
@@ -119,7 +124,10 @@
                     ok = false;
                 }
             }
-            return ok ? {ranges, typical, damage:[...damage], playable:entry.playable === true, backgrounds:entry.backgrounds ? [...entry.backgrounds] : null} : null;
+            return ok ? {
+                ranges, typical, damage:[...damage], playable:entry.playable === true,
+                backgrounds:entry.backgrounds ? [...entry.backgrounds] : null, corpse:entry.corpse
+            } : null;
         },
         
         /*  A background as the data has it, made usable ({playable, species:[ids] or
@@ -144,11 +152,21 @@
             return list.length && list.every(Boolean) ? list : null;
         },
         
+        /*  A profile's items as the data has them, made usable ([{kind, count:[min,
+            max]}]: it may have none), or null. */
+        parseItems = v => {
+            const countOf = n => Number.isInteger(n) ? [n, n] : n ?? [1, 1],
+                items = (v ?? []).map(e => typeof e === 'string' ? {kind:e, count:[1, 1]} :
+                    isObj(e) && typeof e.kind === 'string' ? {kind:e.kind, count:countOf(e.count)} : null);
+            return Array.isArray(v ?? []) && items.every(e => e && isRange(e.count)) ? items : null;
+        },
+        
         /*  A profile as the data has it, made usable ({species:[ids], stats:{its own},
-            damage (or null: its species'), ...}), or null if it isn't (its species must
-            be in pkg.species). */
+            damage (or null: its species'), items, ...}), or null if it isn't (its species
+            must be in pkg.species). */
         parseProfile = (entry, id, species = speciesOf(entry.species)) => {
-            const stats = entry.stats ?? {}, level = entry.level ?? 1, damage = entry.damage;
+            const stats = entry.stats ?? {}, level = entry.level ?? 1, damage = entry.damage,
+                items = parseItems(entry.items);
             if (!species) {
                 console.error('Profile', id, 'has no species', JSON.stringify(entry.species), 'that there is');
                 return null;
@@ -159,10 +177,10 @@
                 !(damage === undefined || isRange(damage)) ||
                 !isNatNum(entry.penetration ?? 0) || !isNatNum(entry.armor ?? 0) ||
                 !(entry.hp === undefined || isIntOfAtLeast(entry.hp, 1)) ||
-                !isNatNum(entry.xp ?? 0) || !isIds(entry.backgrounds)) return null;
+                !isNatNum(entry.xp ?? 0) || !isIds(entry.backgrounds) || !items) return null;
             return {species:species.map(sp => sp.id), backgrounds:[...(entry.backgrounds ?? [DEFAULT_ENEMY_BACKGROUND])],
                 stats:{...stats}, level, damage:damage ? [...damage] : null,
-                penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp};
+                penetration:entry.penetration ?? 0, armor:entry.armor ?? 0, hp:entry.hp, xp:entry.xp, items};
         },
         
         // What a profile is if the data doesn't say (or has no such one), and yours
@@ -266,7 +284,7 @@
         },
         
         /*  Gives piece p its species, background and profile, at full HP, with no status
-            effects. An enemy's profile is its table's for id (its enemyId's; "creeper" if
+            effects, carrying what its profile gives it (and nothing else). An enemy's profile is its table's for id (its enemyId's; "creeper" if
             none), its species speciesId if that's one of the profile's (else its first),
             and its background backgroundId if that's one of the profile's that fits, else
             one that fits at random (none, with an error, if none do). Yours are the
@@ -305,6 +323,12 @@
             p.hp = p.maxHp;
             p.ap = 0;
             p.effects = [];
+            p.inventory = {items:[]};
+            const rng = this.rngFor('items', p.id);
+            for (const {kind, count:[min, max]} of profile.items) {
+                const n = min + Math.floor(rng() * (max - min + 1));
+                if (n > 0) this.addItem(p, this.makeItem(kind, n), true);
+            }
         },
         
         // ---- Action points ----

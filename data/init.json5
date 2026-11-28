@@ -3,10 +3,10 @@
 	// with this one's, in this directory: each may include others in turn, so a file can
 	// be split further (environs.json5 into solids.json5, holes.json5... say). No table may
 	// be in two of them. See js/hc/model/map/Maps.js.
-	"include":["rules.json5", "environs.json5", "entities.json5"],
+	"include":["rules.json5", "environs.json5", "items.json5", "entities.json5"],
 	
-	// Any entry in the tables below (materials, solids, holes, floors, fixtures, species,
-	// backgrounds, enemies; not enemy groups) may extend another in the same table:
+	// Any entry in the tables below (materials, solids, holes, floors, fixtures, items,
+	// species, backgrounds, enemies; not enemy groups) may extend another in the same table:
 	// "extends":"<id>" starts it as that one, with its own properties over it. Objects (like
 	// "stats") merge a property at a time; anything else (text, numbers, arrays like
 	// "damage") replaces the parent's. An entry may extend one that extends another, and so
