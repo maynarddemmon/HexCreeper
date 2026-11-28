@@ -86,6 +86,7 @@
             this.parse = parse;
             this.extendable = extendable;
             this.byId = new Map();
+            this.parentOf = new Map();
         },
         
         /*  Replaces the subtypes with those given, as the data has them: {id:entry},
@@ -93,7 +94,11 @@
             id)}. */
         define: function(data) {
             this.byId = new Map();
+            this.parentOf = new Map();
             if (this.extendable && isObj(data)) {
+                for (const [id, entry] of Object.entries(data)) {
+                    if (typeof entry?.extends === 'string') this.parentOf.set(id, entry.extends);
+                }
                 const {entries, bad} = resolveExtends(data);
                 for (const [id, why] of bad) console.error('Bad ' + this.kind, id + ':', why);
                 data = entries;
@@ -106,6 +111,14 @@
                     console.error('Bad ' + this.kind, id);
                 }
             }
+        },
+        
+        /*  The ids of the subtype with id and those it extends, nearest first: [id, its
+            parent's, its parent's parent's, ...]. */
+        lineage: function(id) {
+            const out = [];
+            for (let at = id; at !== undefined && !out.includes(at); at = this.parentOf.get(at)) out.push(at);
+            return out;
         },
         
         /*  A subtype by id, or undefined. */

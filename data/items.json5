@@ -21,8 +21,12 @@
 	//              its own (0 if not given); armor: what it adds to the piece's (0 if not
 	//              given); cost: the action points equipping or unequipping it takes (the
 	//              equipCost rule's if not given). Enemies equip what they're given.
-	//   quench, satiates: what a dose of it does to thirst and hunger, if it can be drunk
-	//              or eaten (below 0 to make them worse: salty food)
+	//   quench, satiates, heals, rests: what a dose of it does to thirst, hunger, HP and
+	//              fatigue, if it can be drunk or eaten (below 0 to make them worse: salty
+	//              food). Each a number (for any species) or by species, e.g.
+	//              {"goblin":100, "hobgoblin":90, "*":5}: a species' own, else that of the
+	//              nearest species it extends (a hobgoblin would have a goblin's), else
+	//              "*"'s, else 0.
 	//   dose:      how many of it a drink or a bite is (1 if not given)
 	//   consumeCost: what eating or drinking it costs (the consumeCost rule's if not given)
 	//   fluid:     true for a fluid (water): it goes only in what holds fluids, and is
@@ -162,6 +166,25 @@
 			"stack":20,
 			"satiates":150,
 			"quench":-30
+		},
+		// Goblin food: meant for goblins, barely food for anyone else
+		"mold_cake":{
+			"name":"mold cake",
+			"description":"A dense cake of cave mold pressed with grease. Goblins love it; anyone else can barely keep it down.",
+			"material":"fungus",
+			"volume":100,
+			"stack":10,
+			"satiates":{"goblin":100, "hobgoblin":90, "orc":50, "half_orc":25, "ogre":75, "*":5},
+			"heals":{"goblin":0, "orc":0, "half_orc":0, "ogre":0, "*":-1}
+		},
+		"crawler_stalk":{
+			"name":"crawler stalk",
+			"description":"A pale, fleshy stalk that grows where crawlers nest. Filling, and it knits wounds.",
+			"material":"vegetable",
+			"volume":60,
+			"stack":10,
+			"satiates":50,
+			"heals":2.5
 		},
 		"water":{
 			"name":"water",

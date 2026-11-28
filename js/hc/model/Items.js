@@ -20,8 +20,12 @@
                    it adds to the piece's (0 if not given); cost: the action points
                    equipping it (or unequipping it) takes, in place of the equipCost
                    rule's (at least 0.1). One that's equipped doesn't stack.
-        quench, satiates  if it can be drunk or eaten: what a dose of it adds to thirst and
-                   to hunger (in points: below 0 takes away; see Needs.js)
+        quench, satiates, heals, rests  if it can be drunk or eaten: what a dose of it
+                   adds to thirst, hunger, HP and fatigue (in points: below 0 takes away; see
+                   Needs.js). Each a number (for any species), or by species: {"goblin":100,
+                   "hobgoblin":90, "*":5}, a species' own, else that of the nearest it
+                   extends (a hobgoblin would have a goblin's), else "*"'s, else 0 (see
+                   consumeEffects)
         dose       how many of it are eaten or drunk at once (1 if not given; what's left,
                    if fewer, does as much less)
         consumeCost  the action points eating or drinking it takes, in place of the
@@ -104,20 +108,29 @@
                 stack = entry.stack ?? 1,
                 inventory = entry.inventory === undefined ? null : parseLimits(entry.inventory) ?? undefined,
                 equip = entry.equip === undefined ? null : parseEquip(entry.equip),
-                {quench = 0, satiates = 0, dose = 1, consumeCost = null, fluid = false} = entry,
+                {dose = 1, consumeCost = null, fluid = false} = entry,
+                effects = Object.fromEntries(CONSUME_EFFECTS.map(e => [e, parseBySpecies(entry[e])])),
                 ok = isText(entry.plural) && material !== undefined && isNum(volume) &&
                     (entry.weight === undefined || isNum(entry.weight)) && isNatNum(capacity) &&
                     isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1) &&
-                    equip !== undefined && Number.isFinite(quench) && Number.isFinite(satiates) && isIntOfAtLeast(dose, 1) &&
+                    equip !== undefined && Object.values(effects).every(Boolean) && isIntOfAtLeast(dose, 1) &&
                     (consumeCost === null || (isNum(consumeCost) && consumeCost > 0)) && typeof fluid === 'boolean';
             return ok ? {
                 plural:entry.plural || entry.name + 's',
                 material:entry.material ?? null,
                 volume,
                 weight:entry.weight ?? volume * (material?.density ?? 0),
-                capacity, stack, inventory, equip, quench, satiates, dose, consumeCost, fluid
+                capacity, stack, inventory, equip, ...effects, dose, consumeCost, fluid
             } : null;
         },
+        
+        // What eating or drinking an item can do (see parseItem)
+        CONSUME_EFFECTS = ['quench', 'satiates', 'heals', 'rests'],
+        
+        /*  One of them as the data has it, made usable: by species, {id:n, "*":n} (a
+            number for any species is {"*":n}; none is {}), or null if it isn't. */
+        parseBySpecies = v => v === undefined ? {} : Number.isFinite(v) ? {'*':v} :
+            isObj(v) && Object.values(v).every(Number.isFinite) ? {...v} : null,
         
         /*  An item kind's equip as the data has it, made usable ({slot, damage (or null),
             penetration, armor, cost (or null)}), or undefined if it isn't. */
@@ -151,7 +164,7 @@
         // An item of a kind that isn't known: it weighs nothing, and takes a place.
         FALLBACK = {
             plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null, equip:null,
-            quench:0, satiates:0, dose:1, consumeCost:null, fluid:false
+            quench:{}, satiates:{}, heals:{}, rests:{}, dose:1, consumeCost:null, fluid:false
         },
         
         // How many of something weighing (or taking) each, whose limit leaves room, fit.
@@ -175,7 +188,8 @@
             parseLimits,
             parseItemList,
             DEFAULT_CORPSE,
-            NO_CORPSE
+            NO_CORPSE,
+            CONSUME_EFFECTS
         },
         
         // ---- Items ----
@@ -743,15 +757,31 @@
             return out;
         },
         
-        /*  Whether a kind can be eaten or drunk: it quenches or satiates. */
-        isConsumable: function(kind) {return !!(kind?.quench || kind?.satiates);},
+        /*  Whether a kind can be eaten or drunk: it quenches, satiates, heals or rests
+            (some species, at least). */
+        isConsumable: function(kind) {
+            return !!kind && CONSUME_EFFECTS.some(e => Object.values(kind[e] ?? {}).some(Boolean));
+        },
         
-        /** @private Piece p eats or drinks n of a kind (a dose's worth, as n is of its dose):
-            its thirst goes by its quench, its hunger by its satiates (see Needs.js). */
+        /*  What eating or drinking n of a kind (a dose of it, if not given) would do for
+            piece p, by its species (see parseItem: its own, else the nearest it extends,
+            else "*"): {quench, satiates, heals, rests}, in points (as much less as n is
+            less than a dose). */
+        consumeEffects: function(p, kind, n = kind.dose) {
+            const lineage = pkg.species.lineage(p.species),
+                of = table => (table[lineage.find(id => id in table)] ?? table['*'] ?? 0) * n / kind.dose;
+            return Object.fromEntries(CONSUME_EFFECTS.map(e => [e, of(kind[e] ?? {})]));
+        },
+        
+        /** @private Piece p eats or drinks n of a kind (see consumeEffects): its thirst goes
+            by its quench, its hunger by its satiates, its fatigue by its rests (see
+            Needs.js), and its HP by its heals (see Needs.changeHp: it can kill it). */
         _consume: function(p, kind, n) {
-            const part = n / kind.dose;
-            this.changeNeed(p, 'thirst', NEED_UNIT * kind.quench * part);
-            this.changeNeed(p, 'hunger', NEED_UNIT * kind.satiates * part);
+            const {quench, satiates, heals, rests} = this.consumeEffects(p, kind, n);
+            this.changeNeed(p, 'thirst', NEED_UNIT * quench);
+            this.changeNeed(p, 'hunger', NEED_UNIT * satiates);
+            this.changeNeed(p, 'fatigue', NEED_UNIT * rests);
+            if (heals) this.changeHp(p, heals);
         },
         
         /*  Why piece p can't eat or drink item id (wherever it can get at it: a dose of it,
@@ -790,8 +820,8 @@
                 this.fx(p.x, p.y, i18n(kind.fluid ? 'fx-drink' : 'fx-eat', this.itemLabel(item, n)), '--heal', {});
                 this.takeOut(holder, item, n);
                 this.tidyGround(p.x, p.y);
-                this._consume(p, kind, n);
                 this.spend(p, cost);
+                this._consume(p, kind, n); // (last: it can kill p)
                 this.afterPlayerAction();
             }
             return done;
@@ -830,8 +860,8 @@
                 const {fluid} = this.fluidSources(p).find(s => s.ref === ref),
                     kind = pkg.items.get(fluid);
                 this.fx(p.x, p.y, i18n('fx-drink', this.itemLabel({kind:fluid, count:kind.dose})), '--heal', {});
-                this._consume(p, kind, kind.dose);
                 this.spend(p, this.consumeCostOf(p, {kind:fluid}));
+                this._consume(p, kind, kind.dose);
                 this.afterPlayerAction();
             }
             return done;

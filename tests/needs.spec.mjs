@@ -14,9 +14,9 @@ const pinNeeds = page => page.evaluate(() => {
     set('thirst', {TurnTick:'-0.25', ApTick:'-0.05', LowRecovery:'-0.25', HighRecovery:'0.1', LowHp:'0', HighHp:'0', MinMultiplier:'2'});
     set('hunger', {TurnTick:'-0.25', ApTick:'-0.05', LowRecovery:'0', HighRecovery:'0', LowHp:'-0.25', HighHp:'0.1', MinMultiplier:'2'});
     set('fatigue', {TurnTick:'-0.1', ApTick:'-0.15', LowStats:'0', HighStats:'0'});
-    Object.assign(hc.items.get('mushroom_jerky'), {satiates:10, quench:-2});
-    Object.assign(hc.items.get('centipede_jerky'), {satiates:15, quench:-3});
-    Object.assign(hc.items.get('water'), {quench:25});
+    Object.assign(hc.items.get('mushroom_jerky'), {satiates:{'*':10}, quench:{'*':-2}, heals:{}, rests:{}});
+    Object.assign(hc.items.get('centipede_jerky'), {satiates:{'*':15}, quench:{'*':-3}, heals:{}, rests:{}});
+    Object.assign(hc.items.get('water'), {quench:{'*':25}, satiates:{}, heals:{}, rests:{}});
     for (const p of g.piecesOf('player')) g.giveNeeds(p);
 });
 
@@ -196,7 +196,7 @@ test('the Inventory dialog eats, drinks and fills; the sheet shows needs', async
     await page.keyboard.press('h');
     const btn = (attrs, action) => page.locator(`[${attrs}][data-action="${action}"]`);
     await expect(page.getByText('Stream (east)')).toBeVisible();
-    await expect(btn(`data-item="${ids.jerky}"`, 'eat')).toHaveAttribute('title', 'Eat mushroom jerky (a bite), for 0.25 action points.');
+    await expect(btn(`data-item="${ids.jerky}"`, 'eat')).toHaveAttribute('title', 'Eat mushroom jerky (a bite: thirst -2, hunger +10), for 0.25 action points.');
     await btn(`data-item="${ids.flask}"`, 'fill').click();
     await expect(page.getByText('0.25 L water')).toBeVisible();
     await btn('data-holder="source:1,0"', 'drink').click();
@@ -205,4 +205,51 @@ test('the Inventory dialog eats, drinks and fills; the sheet shows needs', async
     await expect(page.getByText('Hunger', {exact:true}).last()).toBeVisible(); // (the sheet's: the info panel has a Hunger bar)
     // 20, +25 from the stream, less the turn's ticks for the points spent (0.5 fill, 0.25 drink: 0.0375)
     await expect(page.getByText('44/100', {exact:true}).last()).toBeVisible();
+});
+
+test('food by species: a species\' own value, else the nearest it extends, else "*", else 0', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await pinNeeds(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(),
+            cake = hc.items.get('mold_cake'),
+            as = species => g.consumeEffects({species}, cake).satiates;
+        cake.satiates = {goblin:100, orc:50, '*':5};
+        const out = [hc.species.lineage('hobgoblin'), as('goblin'), as('hobgoblin'), as('orc'), as('human')];
+        cake.satiates = {goblin:100, hobgoblin:90};
+        out.push(as('hobgoblin'), as('human'), g.isConsumable(cake));
+        // As a number: for any species. Less than a dose does as much less.
+        const stalk = hc.items.get('crawler_stalk');
+        out.push(g.consumeEffects(c, stalk), g.consumeEffects(c, hc.items.get('water'), 100).quench);
+        return out;
+    });
+    expect(r).toEqual([['hobgoblin', 'goblin'], 100, 100, 50, 5, 90, 0, true,
+        {quench:0, satiates:50, heals:2.5, rests:0}, 10]);
+});
+
+test('heals and rests: food can mend (or hurt) and rest (or tire)', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await pinNeeds(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.placeCost = '0';
+        g.rules.apPool = '10';
+        c.ap = g.apMax(c);
+        c.hp = 1;
+        c.maxHp = 10;
+        const stalk = hc.items.get('crawler_stalk');
+        stalk.rests = {'*':-20};
+        const a = g.makeItem('crawler_stalk', 2);
+        g.addItem(c, a);
+        g.playerConsume(c, a.id);
+        out.push(c.hp, c.hpCarry, c.needs.fatigue);
+        stalk.heals = {human:-5};
+        g.playerConsume(c, a.id);
+        out.push(g.over);
+        return out;
+    });
+    // 2.5 HP: 2 now, half carried; fatigue -20, less the eating's tick
+    expect(r).toEqual([3, 50, 7500 - 2000 - 4, true]);
 });

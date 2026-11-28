@@ -353,6 +353,7 @@
 			"contents":[
 				{"kind":"mushroom_jerky", "count":[0, 6]},
 				{"kind":"centipede_jerky", "count":[0, 6]},
+				{"kind":"crawler_stalk", "count":[0, 2]},
 				{"kind":"club", "count":[0, 1]},
 				{"kind":"wooden_shield", "count":[0, 1]},
 				{"kind":"leather_gloves", "count":[0, 1]},
@@ -375,6 +376,7 @@
 			"inventory":{"capacity":6, "volume":100000},
 			"contents":[
 				{"kind":"mushroom_jerky", "count":[0, 3]},
+				{"kind":"crawler_stalk", "count":[0, 1]},
 				{"kind":"gold_coin", "count":[0, 10]}
 			],
 			"destroyInto":"wood_scraps",

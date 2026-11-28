@@ -116,9 +116,9 @@ test('backgrounds give items: your character starts with them, equipped, and an 
         g.character = {...g.character, background:'soldier', stats:{...base, str:base.str + 2}};
         g.reset();
         out.push(kinds(g.getPlayerCore()), g.goldHeld(), g.characterProblem(g.character));
-        // A goblin reaver: its own short sword (equipped first) and jerky, and a reaver's dagger
+        // A goblin reaver: its own short sword (equipped first) and mold cake, and a reaver's dagger
         const e = g.addPiece('core', 'enemy', 5, 5, null, 'goblin_reaver');
-        out.push(kinds(e).filter(k => !k.startsWith('mushroom')));
+        out.push(kinds(e).filter(k => !k.startsWith('mold')));
         // Placed pieces get nothing.
         g.setGold(100);
         g.playerPlace(...Object.values(g.placeCells(g.getPlayerCore())[0]), g.getPlayerCore());

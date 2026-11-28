@@ -120,14 +120,12 @@ test('enemies carry what their profile gives them, rolled for each', async ({pag
     await clearBoard(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game,
-            jerky = Array.from({length:30}, (_, i) => g.countOf(g.addPiece('core', 'enemy', 3 + i, 5, null, 'goblin'), 'mushroom_jerky')),
+            jerky = Array.from({length:30}, (_, i) => g.countOf(g.addPiece('core', 'enemy', 3 + i, 5, null, 'goblin'), 'mold_cake')),
             reaver = g.addPiece('core', 'enemy', 0, 9, null, 'hobgoblin_reaver');
         return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.map(it => it.kind)];
     });
-    // (A goblin's own jerky, 0 to 2, and its background's: an urchin's, 0 to 2 more; a reaver's dagger too.)
-    expect(r[0]).toBe(0);
-    expect(r[1]).toBeGreaterThanOrEqual(2);
-    expect(r[1]).toBeLessThanOrEqual(4);
+    // (A goblin's mold cake, 0 to 2; a reaver's dagger too, from its background.)
+    expect(r.slice(0, 2)).toEqual([0, 2]);
     expect(r[2]).toEqual(['long_sword', 'belt_pouch', 'canteen', 'dagger']);
 });
 

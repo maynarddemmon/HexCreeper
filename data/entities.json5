@@ -256,7 +256,7 @@
 			"description":"Grew up on the streets: quick fingers, a hard shell, little schooling and less charm.",
 			"playable":true,
 			"statAdj":{"dex":1, "wil":1, "int":-1, "cha":-1},
-			"items":[{"kind":"canteen", "contents":[{"kind":"water", "count":1000}]}, "dagger", {"kind":"mushroom_jerky", "count":[0, 2]}]
+			"items":[{"kind":"canteen", "contents":[{"kind":"water", "count":1000}]}, "dagger"]
 		},
 		"reaver":{
 			"name":"Reaver",
@@ -403,7 +403,7 @@
 			"backgrounds":["urchin","denizen"],
 			"hp":5,
 			"xp":5,
-			"items":[{"kind":"mushroom_jerky", "count":[0, 2]}]
+			"items":[{"kind":"mold_cake", "count":[0, 2]}]
 		},
 		"goblin_reaver":{
 			"extends":"goblin",
@@ -413,7 +413,7 @@
 			"stats":{"str":12, "con":12},
 			"hp":8,
 			"xp":10,
-			"items":["short_sword", {"kind":"mushroom_jerky", "count":[0, 2]}]
+			"items":["short_sword", {"kind":"mold_cake", "count":[0, 2]}]
 		},
 		"hobgoblin":{
 			"name":"Hobgoblin",
@@ -422,7 +422,7 @@
 			"backgrounds":["urchin","denizen","pit_fighter"],
 			"hp":8,
 			"xp":10,
-			"items":["club", {"kind":"centipede_jerky", "count":[0, 3]}]
+			"items":["club", {"kind":"mold_cake", "count":[0, 3]}]
 		},
 		"hobgoblin_reaver":{
 			"name":"Hobgoblin Reaver",

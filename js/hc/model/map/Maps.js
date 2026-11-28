@@ -187,6 +187,15 @@
                             }
                         }
                         pkg.defineEnemies(data.enemies, data.enemyGroups);
+                        for (const it of pkg.items.list()) {
+                            for (const e of pkg.Items.CONSUME_EFFECTS) {
+                                for (const s of Object.keys(it[e])) {
+                                    if (s !== '*' && !pkg.species.get(s)) {
+                                        console.warn('Item', it.id, 'has', e, 'for species', s, 'which there is none of');
+                                    }
+                                }
+                            }
+                        }
                         for (const b of pkg.backgrounds.list()) {
                             for (const {kind} of b.items) {
                                 if (!pkg.items.get(kind)) {

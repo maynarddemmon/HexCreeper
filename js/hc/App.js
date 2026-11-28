@@ -315,9 +315,17 @@
                     ref:s.ref, title:where(s.floor.name, s.dir), summary:'', open:true, expanded:null, takeAll:null, rows:[],
                     note:'inv-source', drink:why(game.drinkProblem(p, s.ref))
                 }),
-                sourceCost = ref => {
+                // What eating or drinking a dose of a kind would do for p, in words ("thirst
+                // +25, HP +2.5"), or that it does nothing (see Items.consumeEffects)
+                consumeWords = kind => {
+                    const words = Object.entries(game.consumeEffects(p, kind)).filter(([, v]) => v)
+                        .map(([e, v]) => i18n('consume-' + e, (v > 0 ? '+' : '') + Number(v.toFixed(2))));
+                    return words.length ? words.join(', ') : i18n('consume-nothing');
+                },
+                consumeTip = (key, what, it) => i18n(key, what, cost(game.consumeCostOf(p, it)), consumeWords(game.itemKind(it))),
+                sourceTip = (what, ref) => {
                     const fluid = game.fluidSources(p).find(s => s.ref === ref)?.fluid;
-                    return cost(game.consumeCostOf(p, {kind:fluid}));
+                    return consumeTip('tip-drink-from', what, {kind:fluid});
                 },
                 cost = n => formatAp(n);
             inventoryDialog.show({
@@ -341,9 +349,9 @@
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
                     equip:(what, id) => i18n('tip-equip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
                     unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
-                    eat:(what, id) => i18n('tip-eat', what, cost(game.consumeCostOf(p, game.reachItem(p, id).item))),
-                    drink:(what, id) => i18n('tip-drink', what, cost(game.consumeCostOf(p, game.reachItem(p, id).item))),
-                    drinkFrom:(what, ref) => i18n('tip-drink-from', what, sourceCost(ref)),
+                    eat:(what, id) => consumeTip('tip-eat', what, game.reachItem(p, id).item),
+                    drink:(what, id) => consumeTip('tip-drink', what, game.reachItem(p, id).item),
+                    drinkFrom:sourceTip,
                     fill:what => i18n('tip-fill', what, cost(game.fillCost(p)))
                 },
                 hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
