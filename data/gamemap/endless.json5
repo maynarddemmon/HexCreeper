@@ -1,7 +1,10 @@
 {
 	// Plays as the game always has, with every value at its default (see hc.cfg and the
 	// map components' attrs).
-	"tileGenerator":{"type":"proximity", "baseFloor":"stone_floor", "floorMax":3, "floorType":"loose_stone"},
+	"tileGenerator":{
+		"type":"proximity", "baseFloor":"stone_floor", "floorMax":3, "floorType":"loose_stone",
+		"featureTable":{"barricade":3, "chest":1, "cabinet":1, "table":1}
+	},
 	"spawnGenerator":{"type":"proximity"},
 	"enemyAI":{"type":"squad"}
 }

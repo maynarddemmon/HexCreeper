@@ -127,7 +127,7 @@
                 pieces:[...this.pieces.values()].map(p => ({...p, inventory:structuredClone(p.inventory)})),
                 ground:[...this.ground.values()].map(g => structuredClone(g)),
                 tiles:[...this.tiles.values()].map(t => ({...t})),
-                fixtures:[...this.fixtures.values()].map(f => ({...f, ...f.state ? {state:{...f.state}} : {}})),
+                fixtures:[...this.fixtures.values()].map(f => structuredClone(f)),
                 tileGenerator:{type:this.tileGenerator.type, attrs:{...this.tileGenerator.attrs}, state:this.tileGenerator.exportState()},
                 spawnGenerator:{type:this.spawnGenerator.type, attrs:{...this.spawnGenerator.attrs}, state:this.spawnGenerator.exportState()},
                 enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
@@ -157,7 +157,8 @@
                     isInventory(p.inventory)) ||
                 !isArr(o.ground) || !o.ground.every(g => isNum(g?.x) && isNum(g.y) && isInventory(g.inventory)) ||
                 !o.tiles.every(t => isNum(t?.x) && isNum(t.y) && typeof t.kind === 'string') ||
-                !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type))
+                !isArr(o.fixtures) || !o.fixtures.every(f => isNum(f?.x) && isNum(f.y) && FIXTURE_TYPES.includes(f.type) &&
+                    (f.inventory === undefined || isInventory(f.inventory)))
             ) throw new Error('Malformed game data');
             const rules = pkg.settings.resolveRules(o.rules, 'Saved game'),
                 objectives = o.gameMap?.objectives ?? [];
@@ -223,7 +224,7 @@
             this.tiles = new Map(o.tiles.map(t => [this.key(t.x, t.y), {...t}]));
             this.ground = new Map(o.ground.filter(g => g.inventory.items.length)
                 .map(g => [this.key(g.x, g.y), structuredClone(g)]));
-            this.fixtures = new Map(o.fixtures.map(f => [this.key(f.x, f.y), {...f, ...f.state ? {state:{...f.state}} : {}}]));
+            this.fixtures = new Map(o.fixtures.map(f => [this.key(f.x, f.y), structuredClone(f)]));
             this.tileGenerator = tileGenerator;
             this.spawnGenerator = spawnGenerator;
             this.enemyAI = enemyAI;

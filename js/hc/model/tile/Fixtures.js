@@ -68,6 +68,14 @@
       It can't be done if it would put the fixture in the way of a piece on it.
     - describe: [{when, text}]: words for its state, shown when you point at it (a door's
       "shut", "barred"): each text whose when (a formula of its state) isn't 0.
+    - inventory: if things can be put in it (a container: a chest, a table): {capacity,
+      weight, volume}, the most it can hold, each without limit if not given (see
+      Items.js). Your pieces can get at what's in one on their cell or next to it.
+    - contents: what one starts with, as an enemy profile's items (item kind ids, or
+      {"kind":id, "count":n or [min, max]}, rolled when it's made).
+    - access: a formula of its state: what's in it can be got at only when this isn't 0
+      (default 1: a chest has to be open).
+    When a container is gone, what was in it falls on the ground where it was.
     
     Heals heal your pieces (what the piece doesn't need flows along its links, and what
     nobody needs stays in the heal); harms damage any piece; loot gives gold coins to the
@@ -78,7 +86,7 @@
     'use strict';
     
     const {
-            Subtypes, hexDist,
+            Subtypes, hexDist, Items:{parseLimits, parseItemList},
             FIXTURE_HEAL, FIXTURE_HARM, FIXTURE_LOOT, FIXTURE_FEATURE, FIXTURE_TYPES, TILE_TYPE_FLOOR, ITEM_GOLD,
             isNatNum, isIntOfAtLeast
         } = pkg,
@@ -212,14 +220,18 @@
                     shape:e.shape ?? 'hex',
                     orientable:e.orientable ?? false,
                     actions:state ? parseActions(e.actions, state, names) : null,
-                    describe:parseDescribe(e.describe, names)
+                    describe:parseDescribe(e.describe, names),
+                    inventory:e.inventory === undefined ? null : parseLimits(e.inventory) ?? undefined,
+                    contents:parseItemList(e.contents),
+                    access:parseFormula(e.access, 1, names)
                 },
                 ok = FIXTURE_TYPES.includes(own.type) && own.reveal && (feature || ((infinite || own.pool) && (wholePool ? !infinite : own.magnitude))) && own.showMagnitude &&
                     typeof own.showPool === 'boolean' && own.area && own.duration && state && material !== undefined &&
                     (own.hp === null || isIntOfAtLeast(own.hp, 1)) && own.coverage !== undefined && own.moveCost !== undefined &&
                     (typeof own.coverage !== 'number' || isPercent(own.coverage)) &&
                     [e.floor, e.destroyInto, e.fillColor, e.borderColor].every(isText) &&
-                    ['hex', 'door'].includes(own.shape) && typeof own.orientable === 'boolean' && own.actions && own.describe;
+                    ['hex', 'door'].includes(own.shape) && typeof own.orientable === 'boolean' && own.actions && own.describe &&
+                    own.inventory !== undefined && own.contents && own.access !== undefined;
             return ok ? own : null;
         },
         
@@ -250,8 +262,8 @@
         /*  A new fixture of kind subtype (its type that kind's, or type if the kind isn't
             known), with its pool and magnitude rolled (by rng), not yet revealed: {x, y,
             type, subtype, pool, magnitude, uses, revealedAt, shown}, and hp and state (a
-            copy of its kind's) if its kind has them, and a facing (by rng) if it's
-            orientable. pool: what's left, or null if
+            copy of its kind's) if its kind has them, a facing (by rng) if it's orientable,
+            and an inventory, holding its contents (by rng), if it's a container. pool: what's left, or null if
             infinite; magnitude: what it gives, or null for all that's left; revealedAt:
             the turn it was revealed, or null; shown: whether its magnitude shows. */
         makeFixture: function(x, y, subtype, rng=Math.random, type=FIXTURE_LOOT) {
@@ -261,6 +273,10 @@
             if (kind.hp) f.hp = kind.hp;
             if (Object.keys(kind.state).length) f.state = {...kind.state};
             if (kind.orientable) f.facing = Math.floor(rng() * 6);
+            if (kind.inventory) {
+                f.inventory = {items:[]};
+                this.rollItems(f, kind.contents, rng);
+            }
             return f;
         },
         
@@ -342,11 +358,15 @@
         
         /*  Fixture f is gone (broken, used up, or its countdown has run out): it leaves the
             floor its kind names (if there is one) under it, and the fixture its kind's
-            destroyInto names (if there is one) in its place, revealed if f was. */
+            destroyInto names (if there is one) in its place, revealed if f was. What was in
+            it falls on the ground there. */
         removeFixture: function(f) {
             const kind = this.fixtureType(f),
                 k = this.key(f.x, f.y);
             this.fixtures.delete(k);
+            for (const it of f.inventory?.items ?? []) {
+                this.addItem(this.groundAt(f.x, f.y, true), it, true);
+            }
             if (pkg.floors.get(kind.floor)) {
                 this.tiles.set(k, this.makeTile(f.x, f.y, TILE_TYPE_FLOOR, kind.floor));
             }

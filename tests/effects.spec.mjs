@@ -37,7 +37,7 @@ test.beforeEach(async ({page}) => {
 test('the game\'s fixtures load, each with its type; bad ones are refused', async ({page}) => {
     const problems = await startGame(page);
     expect(await page.evaluate(() => hc.FIXTURE_TYPES.map(type => hc.fixtures.list().filter(f => f.type === type).map(s => s.id)))).toEqual([
-        ['heal', 'spring', 'salve'], ['harm', 'trap', 'mine'], ['loot', 'cache'], ['barricade', 'broken_barricade', 'wooden_door', 'broken_door', 'wood_scraps']
+        ['heal', 'spring', 'salve'], ['harm', 'trap', 'mine'], ['loot', 'cache'], ['barricade', 'broken_barricade', 'wooden_door', 'broken_door', 'wood_scraps', 'chest', 'cabinet', 'table']
     ]);
     await define(page, 'heal', {
         ok:{name:'ok', pool:3},

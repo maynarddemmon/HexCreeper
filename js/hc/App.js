@@ -225,51 +225,72 @@
             });
         },
         
-        /*  The inventory of your piece p, and what's on the ground under it (see
-            InventoryDialog and Items.js): each thing can be dropped or taken, for action
-            points. It closes if the turn ends, or p is gone. */
+        /*  The inventory of your piece p, what's on the ground under it, and what's in
+            the containers it can get at (see InventoryDialog and Items.js): each thing can
+            be taken, dropped or transferred, for action points. It stays open when the
+            turn ends, and closes if the game is over, or p is gone. */
         openInventory = p => {
             V.menuOpen = false;
             draw();
             inventoryDialog ??= new pkg.InventoryDialog(appView);
-            const rows = (holder, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => [
-                    {id:it.id, label:game.itemLabel(it), weight:formatWeight(game.itemWeight(it)), depth},
-                    ...rows(it, depth + 1)
-                ]),
-                ground = () => game.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}},
-                why = problem => problem ? i18n('inv-why-' + problem) : '',
-                act = fn => id => {
-                    const turn = game.turn;
-                    if (fn(id)) {
-                        gameView.afterTurn();
-                        if (game.over || game.turn !== turn || !game.pieces.has(p.id)) {
-                            inventoryDialog.hide();
-                        } else {
-                            inventoryDialog.refresh();
-                        }
-                    }
-                };
+            const why = problem => problem ? i18n('inv-why-' + problem) : '',
+                // An action's problem, or null when it isn't offered
+                rows = (holder, carried, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => {
+                    const actions = carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))};
+                    if (it.inventory) actions.takeAll = why(game.takeAllProblem(p, it.id));
+                    actions.transfer = why(game.over ? 'over' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap');
+                    return [
+                        {
+                            id:it.id, label:game.itemLabel(it), weight:formatWeight(game.itemWeight(it)), depth,
+                            container:!!it.inventory, actions
+                        },
+                        ...rows(it, carried, depth + 1)
+                    ];
+                }),
+                // What holder holds, against its limits (but the ground's)
+                summary = (holder, limited) => {
+                    const t = game.inventoryTotals(holder),
+                        l = game.inventoryLimits(holder),
+                        part = (used, limit, format) => limited && limit !== Infinity ? format(used) + '/' + format(limit) : format(used);
+                    return [
+                        part(t.capacity, l.capacity, String), part(t.weight, l.weight, formatWeight), part(t.volume, l.volume, formatVolume)
+                    ].join(' · ');
+                },
+                title = ({ref, holder, dir}) => {
+                    const name = ref.startsWith('fixture:') ? game.fixtureType(holder).name : '';
+                    return ref === 'piece' ? i18n('inv-carried') : ref === 'ground' ? i18n('inv-ground') :
+                        dir < 0 ? i18n('inv-fixture-here', name) : i18n('inv-fixture-near', name, i18n('dir-' + dir));
+                },
+                cost = n => formatAp(n);
             inventoryDialog.show({
                 title:i18n('dlg-inventory-title', logName(game.whoOf(p), true)),
-                describe:() => {
-                    const t = game.inventoryTotals(p),
-                        l = game.inventoryLimits(p),
-                        g = game.inventoryTotals(ground());
-                    return {
-                        carried:{
-                            rows:rows(p),
-                            summary:i18n('inv-summary', t.capacity, l.capacity, formatWeight(t.weight), formatWeight(l.weight),
-                                formatVolume(t.volume), formatVolume(l.volume))
-                        },
-                        ground:{rows:rows(ground()), summary:i18n('inv-ground-summary', formatWeight(g.weight), formatVolume(g.volume))}
-                    };
+                describe:() => game.reachHolders(p).map(top => ({
+                    ref:top.ref,
+                    title:title(top),
+                    summary:top.open ? summary(top.holder, top.ref !== 'ground') : '',
+                    open:top.open,
+                    takeAll:top.ref === 'piece' ? null : why(game.takeAllProblem(p, top.ref)),
+                    rows:top.open ? rows(top.holder, top.ref === 'piece') : []
+                })),
+                tips:{
+                    take:what => i18n('tip-take', what, cost(game.takeCost(p))),
+                    drop:what => i18n('tip-drop', what, cost(game.dropCost(p))),
+                    takeAll:what => i18n('tip-takeAll', what, cost(game.takeCost(p))),
+                    transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p)))
                 },
-                dropCost:formatAp(game.dropCost(p)),
-                takeCost:formatAp(game.takeCost(p)),
-                dropProblem:id => why(game.dropProblem(p, id)),
-                takeProblem:id => why(game.takeProblem(p, id)),
-                onDrop:act(id => game.playerDrop(p, id)),
-                onTake:act(id => game.playerTake(p, id))
+                hereProblem:(id, ref) => why(game.transferProblem(p, id, ref)),
+                onAction:(action, id, ref) => {
+                    const done = action === 'take' ? game.playerTake(p, id) :
+                        action === 'drop' ? game.playerDrop(p, id) :
+                        action === 'transfer' ? game.playerTransfer(p, id, ref) :
+                        game.playerTakeAll(p, ref);
+                    if (done) gameView.afterTurn();
+                    if (game.over || !game.pieces.has(p.id)) {
+                        inventoryDialog.hide();
+                    } else {
+                        inventoryDialog.refresh();
+                    }
+                }
             });
         },
         

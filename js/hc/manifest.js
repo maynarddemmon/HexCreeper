@@ -46,7 +46,7 @@ JS.Packages(file => {
     file(TILE_ROOT + 'Subtypes.js').provides('hc.Subtypes').requires('hc');
     file(TILE_ROOT + 'Solids.js').provides('hc.solids','hc.holes','hc.floors','hc.defineShadow').requires('hc.Subtypes','hc.cfg');
     file(TILE_ROOT + 'Fixtures.js').provides('hc.Fixtures','hc.fixtures','hc.fixtureOptions').requires(
-        'hc.Subtypes','hc.hexDist','hc.attrs','hc.solids','hc.ITEM_GOLD'
+        'hc.Subtypes','hc.hexDist','hc.attrs','hc.solids','hc.Items','hc.ITEM_GOLD'
     );
     
     // Map
@@ -67,7 +67,9 @@ JS.Packages(file => {
     file(MAP_ENEMY_AI_ROOT + 'SquadAI.js').provides('hc.SquadAI').requires('hc.EnemyAI','hc.hex','hc.PIECE_TYPES');
     
     file(MODEL_ROOT + 'Effects.js').provides('hc.Effects','hc.effects').requires('hc.Subtypes');
-    file(MODEL_ROOT + 'Combat.js').provides('hc.Combat','hc.species','hc.backgrounds','hc.enemies').requires('hc.Subtypes','hc.attrs','hc.EFFECT_EXHAUSTED','hc.EFFECT_RALLYING','hc.EFFECT_RALLIED');
+    file(MODEL_ROOT + 'Combat.js').provides('hc.Combat','hc.species','hc.backgrounds','hc.enemies').requires(
+        'hc.Subtypes','hc.attrs','hc.Items','hc.EFFECT_EXHAUSTED','hc.EFFECT_RALLYING','hc.EFFECT_RALLIED'
+    );
     file(MODEL_ROOT + 'Items.js').provides('hc.Items','hc.items').requires('hc.Subtypes','hc.attrs','hc.solids','hc.STAT_VARS','hc.ITEM_GOLD');
     file(MODEL_ROOT + 'Enemies.js').provides('hc.enemyGroups','hc.defineEnemies','hc.enemyTrees').requires('hc.Subtypes','hc.enemies');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Combat','hc.Goals','hc.solids','hc.Fixtures','hc.Effects','hc.Items','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');

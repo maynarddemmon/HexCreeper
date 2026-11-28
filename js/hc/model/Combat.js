@@ -89,7 +89,7 @@
     'use strict';
     
     const {
-            Subtypes, isObj, attrs:{evaluate},
+            Subtypes, isObj, attrs:{evaluate}, Items:{parseItemList},
             AP_UNIT, XP_UNIT, STATS,
             VAR_XP, VAR_LEVEL, STAT_VARS, XP_VARS, MULTI_KILL_VARS, DAMAGE_VARS,
             EFFECT_EXHAUSTED, EFFECT_RALLYING, EFFECT_RALLIED,
@@ -152,21 +152,12 @@
             return list.length && list.every(Boolean) ? list : null;
         },
         
-        /*  A profile's items as the data has them, made usable ([{kind, count:[min,
-            max]}]: it may have none), or null. */
-        parseItems = v => {
-            const countOf = n => Number.isInteger(n) ? [n, n] : n ?? [1, 1],
-                items = (v ?? []).map(e => typeof e === 'string' ? {kind:e, count:[1, 1]} :
-                    isObj(e) && typeof e.kind === 'string' ? {kind:e.kind, count:countOf(e.count)} : null);
-            return Array.isArray(v ?? []) && items.every(e => e && isRange(e.count)) ? items : null;
-        },
-        
         /*  A profile as the data has it, made usable ({species:[ids], stats:{its own},
             damage (or null: its species'), items, ...}), or null if it isn't (its species
             must be in pkg.species). */
         parseProfile = (entry, id, species = speciesOf(entry.species)) => {
             const stats = entry.stats ?? {}, level = entry.level ?? 1, damage = entry.damage,
-                items = parseItems(entry.items);
+                items = parseItemList(entry.items);
             if (!species) {
                 console.error('Profile', id, 'has no species', JSON.stringify(entry.species), 'that there is');
                 return null;
@@ -324,11 +315,7 @@
             p.ap = 0;
             p.effects = [];
             p.inventory = {items:[]};
-            const rng = this.rngFor('items', p.id);
-            for (const {kind, count:[min, max]} of profile.items) {
-                const n = min + Math.floor(rng() * (max - min + 1));
-                if (n > 0) this.addItem(p, this.makeItem(kind, n), true);
-            }
+            this.rollItems(p, profile.items, this.rngFor('items', p.id));
         },
         
         // ---- Action points ----
@@ -385,10 +372,12 @@
         rallyCost: function(p) {return Math.max(MIN_COST, this.apRule('rallyCost', p));},
         
         // ---- Items ----
-        // What taking an item and dropping one cost a piece (see Items.js): the takeCost
-        // and dropCost rules' action points (at least MIN_COST).
+        // What taking an item, dropping one and transferring one cost a piece (see
+        // Items.js): the takeCost, dropCost and transferCost rules' action points (at
+        // least MIN_COST).
         takeCost: function(p) {return Math.max(MIN_COST, this.apRule('takeCost', p));},
         dropCost: function(p) {return Math.max(MIN_COST, this.apRule('dropCost', p));},
+        transferCost: function(p) {return Math.max(MIN_COST, this.apRule('transferCost', p));},
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
             return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&

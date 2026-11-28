@@ -45,6 +45,7 @@
 		"rallyCost":"0.5",                 // what rallying costs, in action points
 		"takeCost":"0.25",                 // what taking an item costs (see js/hc/model/Items.js)
 		"dropCost":"0.15",                 // and dropping one
+		"transferCost":"0.25",             // and putting one in something (see Inventory)
 		"rallyTurns":"5",                  // the turns a rally lasts
 		"rallyAmount":"(con / 10) * level", // the HP a rallying piece gets back at the end of each of them
 		"rallyRefresh":"Math.max(10, 150 - level)", // the turns from rallying until a piece can rally again

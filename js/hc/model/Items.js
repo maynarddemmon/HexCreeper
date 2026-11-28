@@ -40,9 +40,15 @@
     it can't carry falls on the ground), and placing a piece spends it (see spendGold).
     Your gold is all your pieces carry (see goldHeld).
 
-    Your pieces can take what's on the ground under them (or in something on the ground
-    there), and drop what they carry (or what's in something they carry), for the
-    takeCost and dropCost rules' action points (see playerTake and playerDrop). */
+    A fixture can be a holder too: a container (a chest, a table: see Fixtures.js). What a
+    piece of yours can get at (its reach: see reachHolders) is what it carries, the ground
+    under it, and the containers you know of on its cell or next to it (what's in one only
+    while its access allows: an open chest), and what's in all those, all the way down.
+    Whatever it can get at it can take (into what it carries), drop (onto the ground under
+    it), or transfer (into any other holder it can get at), as much of it as fits, for the
+    takeCost, dropCost and transferCost rules' action points; and it can take all that's in
+    a holder, a thing at a time, while its points last (see playerTake, playerDrop,
+    playerTransfer and playerTakeAll). */
 (pkg => {
     'use strict';
     
@@ -89,6 +95,20 @@
             } : null;
         },
         
+        // The limits of what holds nothing
+        NO_ROOM = {capacity:0, weight:0, volume:0},
+        
+        /*  A list of items as the data has it (an enemy profile's items, a fixture's
+            contents), made usable ([{kind, count:[min, max]}]: it may be none), or null if
+            it isn't: item kind ids, or {"kind":id, "count":n or [min, max]}. */
+        parseItemList = v => {
+            const countOf = n => Number.isInteger(n) ? [n, n] : n ?? [1, 1],
+                isRange = r => Array.isArray(r) && r.length === 2 && r.every(isNatNum) && r[0] <= r[1],
+                items = Array.isArray(v ?? []) ? (v ?? []).map(e => typeof e === 'string' ? {kind:e, count:[1, 1]} :
+                    isObj(e) && typeof e.kind === 'string' ? {kind:e.kind, count:countOf(e.count)} : null) : [null];
+            return items.every(e => e && isRange(e.count)) ? items : null;
+        },
+        
         // An item of a kind that isn't known: it weighs nothing, and takes a place.
         FALLBACK = {plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null},
         
@@ -108,6 +128,8 @@
         // Class Methods and Attributes ////////////////////////////////////////
         extend: {
             isInventory,
+            parseLimits,
+            parseItemList,
             DEFAULT_CORPSE,
             NO_CORPSE
         },
@@ -161,12 +183,14 @@
         },
         
         // ---- Inventories ----
-        /*  The most holder (a piece, a cell's ground or an item) can hold: {capacity,
-            weight, volume}. */
+        /*  The most holder (a piece, a cell's ground, a fixture or an item) can hold:
+            {capacity, weight, volume}. */
         inventoryLimits: function(holder) {
             let limits;
             if (holder.kind !== undefined) {
-                limits = this.itemKind(holder).inventory ?? {capacity:0, weight:0, volume:0};
+                limits = this.itemKind(holder).inventory ?? NO_ROOM;
+            } else if (holder.subtype !== undefined) {
+                limits = this.fixtureType(holder).inventory ?? NO_ROOM;
             } else if (holder.owner !== undefined) {
                 const vars = {level:holder.level, ...holder.stats},
                     rule = id => Math.max(0, evaluate(this.rules[id], STAT_VARS, vars)) || 0;
@@ -307,6 +331,15 @@
             return taken;
         },
         
+        /*  Puts in holder (whatever its limits) the items a list of them (see
+            parseItemList) gives, how many of each rolled by rng. */
+        rollItems: function(holder, list, rng) {
+            for (const {kind, count:[min, max]} of list) {
+                const n = min + Math.floor(rng() * (max - min + 1));
+                if (n > 0) this.addItem(holder, this.makeItem(kind, n), true);
+            }
+        },
+        
         // ---- The ground ----
         /*  What's on the ground at (x, y), a holder ({x, y, inventory}), or undefined if
             there's nothing; with make, one with nothing in it, kept. */
@@ -384,20 +417,68 @@
             if (core && n > 0) this.addItem(core, this.makeItem(ITEM_GOLD, n), true);
         },
         
-        // ---- Taking and dropping ----
-        /*  Item id on the ground under piece p, or in something there (at any depth):
-            {item, holder}, or null. */
-        findOnGround: function(p, id) {
-            const g = this.groundAt(p.x, p.y);
-            return g ? this.findItem(g, id) : null;
+        // ---- Reach: what your pieces can get at ----
+        /*  Whether fixture f's inventory can be got at now: its kind's access (a formula
+            of its state) isn't 0 (a shut chest's is). */
+        fixtureOpen: function(f) {return !!this.fixtureValue(f, 'access');},
+        
+        /*  The holders piece p can get at, each {ref, holder, open, dir}: itself (ref
+            'piece'), the ground under it ('ground': with nothing on it, one that isn't
+            kept), and the fixtures you know of with an inventory on its cell or next to it
+            ('fixture:x,y'), open if they can be got at now (see fixtureOpen). dir: where a
+            fixture is, an index into hex.dirs, or -1 for p's own cell. */
+        reachHolders: function(p) {
+            const out = [
+                {ref:'piece', holder:p, open:true, dir:-1},
+                {ref:'ground', open:true, dir:-1, holder:this.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}}}
+            ];
+            for (const [dir, [dx, dy]] of [[-1, [0, 0]], ...pkg.hex.dirs.map((d, i) => [i, d])]) {
+                const f = this.fixtureAt(p.x + dx, p.y + dy);
+                if (f?.inventory) {
+                    out.push({ref:'fixture:' + this.key(f.x, f.y), holder:f, open:this.fixtureOpen(f), dir});
+                }
+            }
+            return out;
         },
         
-        /*  Why piece p can't take item id from the ground under it: '' if it can (as
-            much as it can carry: at least one), else 'over', 'player' (not yours),
-            'missing' (not there), 'ap' (not the points), or the limit it's over (see
-            addProblem). */
-        takeProblem: function(p, id) {
-            const found = p ? this.findOnGround(p, id) : null;
+        /*  Item id, wherever piece p can get at it (not in a fixture that isn't open):
+            {item, holder (what holds it), top (the reachHolders entry it's in)}, or
+            null. */
+        reachItem: function(p, id) {
+            let retval = null;
+            for (const top of this.reachHolders(p)) {
+                const found = top.open ? this.findItem(top.holder, id) : null;
+                if (found) {
+                    retval = {...found, top};
+                    break;
+                }
+            }
+            return retval;
+        },
+        
+        /*  The holder ref names, that piece p can get at (see reachHolders): 'piece',
+            'ground', 'fixture:x,y' (one that's open), or an item's id (one with an
+            inventory, wherever p can get at it); or null. */
+        reachHolder: function(p, ref) {
+            let retval;
+            if (typeof ref === 'number') {
+                const found = this.reachItem(p, ref);
+                retval = found?.item.inventory ? found.item : null;
+            } else {
+                const top = this.reachHolders(p).find(t => t.ref === ref);
+                retval = top?.open ? top.holder : null;
+            }
+            return retval;
+        },
+        
+        /*  Why piece p can't move item id (as much of it as fits: at least one) into the
+            holder ref names (see reachHolder), for cost action points: '' if it can, else
+            'over', 'player' (not yours), 'missing' (p can't get at it), 'nowhere' (or at
+            that), 'there' (that's where it is), 'ap' (not the points), or why it doesn't
+            fit (see addProblem: 'loop' for into itself). */
+        moveProblem: function(p, id, ref, cost) {
+            const found = p?.owner === 'player' ? this.reachItem(p, id) : null,
+                to = found ? this.reachHolder(p, ref) : null;
             let retval;
             if (this.over) {
                 retval = 'over';
@@ -405,59 +486,96 @@
                 retval = 'player';
             } else if (!found) {
                 retval = 'missing';
-            } else if (!this.canAfford(p, this.takeCost(p))) {
+            } else if (!to) {
+                retval = 'nowhere';
+            } else if (to === found.holder) {
+                retval = 'there';
+            } else if (!this.canAfford(p, cost)) {
                 retval = 'ap';
             } else {
-                retval = this.addProblem(p, found.item, 1);
+                retval = this.addProblem(to, found.item, 1);
             }
             return retval;
         },
         
-        /*  Piece p takes item id from the ground under it (all of it it can carry), for
-            the takeCost rule's action points. Returns whether it did. */
-        playerTake: function(p, id) {
-            const done = !this.takeProblem(p, id);
+        /** @private Piece p moves item id into the holder ref names, as much as fits, for
+            cost action points (moveProblem has said it can). Returns what it moved, in
+            words (see itemLabel). */
+        _move: function(p, id, ref, cost) {
+            const {item, holder} = this.reachItem(p, id),
+                to = ref === 'ground' ? this.groundAt(p.x, p.y, true) : this.reachHolder(p, ref),
+                n = this.fitCount(to, item),
+                label = this.itemLabel(item, n);
+            this.addItem(to, this.takeOut(holder, item, n), true);
+            this.tidyGround(p.x, p.y);
+            this.spend(p, cost);
+            return label;
+        },
+        
+        /** @private Piece p moves item id into the holder ref names, for cost action
+            points, if it can (see moveProblem), saying so with text (an I18N key). Returns
+            whether it did. */
+        _playerMove: function(p, id, ref, cost, text) {
+            const done = !this.moveProblem(p, id, ref, cost);
             if (done) {
-                const {item, holder} = this.findOnGround(p, id),
-                    n = this.fitCount(p, item);
-                this.fx(p.x, p.y, i18n('fx-take', this.itemLabel(item, n)), '--place-ink', {});
-                this.addItem(p, this.takeOut(holder, item, n), true);
-                this.tidyGround(p.x, p.y);
-                this.spend(p, this.takeCost(p));
+                this.fx(p.x, p.y, i18n(text, this._move(p, id, ref, cost)), '--place-ink', {});
                 this.afterPlayerAction();
             }
             return done;
         },
         
-        /*  Why piece p can't drop item id (it carries it, or something it carries holds
-            it): '' if it can, else 'over', 'player', 'missing', 'ap', or the ground's limit
-            it's over (see addProblem). */
-        dropProblem: function(p, id) {
-            const found = p?.owner === 'player' ? this.findItem(p, id) : null;
+        /*  Taking, dropping and transferring: piece p moves item id (wherever it can get
+            at it: see reachItem), as much of it as fits, into its own inventory (take),
+            onto the ground under it (drop), or into the holder ref names (transfer: see
+            reachHolder), for the takeCost, dropCost or transferCost rule's action points.
+            The problems say why it can't ('' if it can: see moveProblem); the rest do it,
+            if it can, and return whether they did. */
+        takeProblem: function(p, id) {return this.moveProblem(p, id, 'piece', this.takeCost(p));},
+        dropProblem: function(p, id) {return this.moveProblem(p, id, 'ground', this.dropCost(p));},
+        transferProblem: function(p, id, ref) {return this.moveProblem(p, id, ref, this.transferCost(p));},
+        playerTake: function(p, id) {return this._playerMove(p, id, 'piece', this.takeCost(p), 'fx-take');},
+        playerDrop: function(p, id) {return this._playerMove(p, id, 'ground', this.dropCost(p), 'fx-drop');},
+        playerTransfer: function(p, id, ref) {return this._playerMove(p, id, ref, this.transferCost(p), 'fx-transfer');},
+        
+        /*  Why piece p can't take all that's in the holder ref names (see reachHolder; not
+            itself): '' if it can take something of it, else 'over', 'player', 'nowhere',
+            'empty', 'ap', or why the first thing in it doesn't fit (see addProblem). */
+        takeAllProblem: function(p, ref) {
+            const from = p?.owner === 'player' && ref !== 'piece' ? this.reachHolder(p, ref) : null,
+                items = from?.inventory?.items ?? [];
             let retval;
             if (this.over) {
                 retval = 'over';
             } else if (p?.owner !== 'player') {
                 retval = 'player';
-            } else if (!found) {
-                retval = 'missing';
-            } else if (!this.canAfford(p, this.dropCost(p))) {
+            } else if (!from) {
+                retval = 'nowhere';
+            } else if (!items.length) {
+                retval = 'empty';
+            } else if (!this.canAfford(p, this.takeCost(p))) {
                 retval = 'ap';
             } else {
-                retval = this.addProblem(this.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}}, found.item);
+                retval = items.some(it => !this.addProblem(p, it, 1)) ? '' : this.addProblem(p, items[0], 1);
             }
             return retval;
         },
         
-        /*  Piece p drops item id (all of it) on the ground under it, for the dropCost rule's
-            action points. Returns whether it did. */
-        playerDrop: function(p, id) {
-            const done = !this.dropProblem(p, id);
+        /*  Piece p takes all that's in the holder ref names (not what's in what's in it),
+            in order, each as a take (as much as fits, for the takeCost rule's action
+            points), for as long as it has the points: what doesn't fit, it leaves. Returns
+            whether it took anything. */
+        playerTakeAll: function(p, ref) {
+            const done = !this.takeAllProblem(p, ref);
             if (done) {
-                const {item, holder} = this.findItem(p, id);
-                this.fx(p.x, p.y, i18n('fx-drop', this.itemLabel(item)), '--place-ink', {});
-                this.addItem(this.groundAt(p.x, p.y, true), this.takeOut(holder, item), true);
-                this.spend(p, this.dropCost(p));
+                const from = this.reachHolder(p, ref),
+                    cost = this.takeCost(p),
+                    took = [];
+                for (const it of [...from.inventory.items]) {
+                    if (this.canAfford(p, cost) && !this.addProblem(p, it, 1)) {
+                        took.push(this._move(p, it.id, 'piece', cost));
+                    }
+                }
+                this.fx(p.x, p.y, i18n('fx-take', took.join(', ')), '--place-ink', {});
                 this.afterPlayerAction();
             }
             return done;

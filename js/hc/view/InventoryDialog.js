@@ -14,72 +14,92 @@
             }
         } = pkg,
 
-        PANEL_WIDTH = 480,
+        PANEL_WIDTH = 640,
         ROW_HEIGHT = rowHeight - 6,
         INDENT = 16,           // each level deeper, in what holds it
-        BTN_WIDTH = 48,        // Take or Drop
-        WEIGHT_WIDTH = 80,
-        WEIGHT_X = PANEL_WIDTH - padding - BTN_WIDTH - padding - WEIGHT_WIDTH,
+        TOGGLE_WIDTH = 16,     // a container's ▸ / ▾
+        BTN_WIDTH = 64,        // each action
+        SLOTS = 3,             // the actions a row can have: take or drop, take all, transfer
+        WEIGHT_WIDTH = 72,
+        ACTIONS_X = PANEL_WIDTH - padding - SLOTS * BTN_WIDTH,
+        WEIGHT_X = ACTIONS_X - padding - WEIGHT_WIDTH,
 
-        /*  A section's heading, as wide as what it's in, over a line: its name, and on the
-            right a summary (what it holds against what it can). */
+        /*  An action's button, in slot (0 to SLOTS - 1) of view: action names it (its label
+            is "btn-" + action), with tip as its tooltip, or problem if it can't be done
+            (then it's disabled). Its element has data-action, and data-item or
+            data-holder (what it's for). */
+        actionBtn = (view, slot, action, tip, problem, onClick, data) => {
+            const btn = new UnderlineBtn(view, {
+                x:ACTIONS_X + slot * BTN_WIDTH, width:BTN_WIDTH, valign:'middle', fontSize:fontSizeMedium,
+                text:i18n('btn-' + action), disabled:!!problem, tooltip:problem || tip
+            }, [{doActivated:onClick}]);
+            Object.assign(btn.getIDE().dataset, {action, ...data});
+            return btn;
+        },
+
+        /*  A section's heading, as wide as what it's in, over a line: its name, a summary
+            (what it holds against what it can), and maybe an action. */
         InventoryHead = new JSClass('InventoryHead', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    text = attrs.text;
+                    {text, summary} = attrs;
                 delete attrs.text;
+                delete attrs.summary;
                 attrs.height = ROW_HEIGHT;
 
                 self.callSuper(parent, attrs);
 
                 self.getIDS().borderBottom = '1px solid ' + colorText;
                 new Text(self, {x:padding, y:3, text, fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'});
-                self._summary = new Text(self, {
-                    x:PANEL_WIDTH / 3, y:5, width:PANEL_WIDTH * 2 / 3 - padding, textAlign:'right',
+                new Text(self, {
+                    x:PANEL_WIDTH / 3, y:5, width:ACTIONS_X - padding - PANEL_WIDTH / 3, textAlign:'right', text:summary,
                     fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
                 });
-            },
-
-            setSummary: function(v) {this._summary.setText(v);}
+            }
         }),
 
-        /*  An item: what it is (indented as deep as it is in what holds it), what it weighs,
-            and a button to take or drop it, with why it can't be as its tooltip. */
+        /*  An item: a ▸ / ▾ to show or hide what's in it (if it holds things), what it is
+            (indented as deep as it is in what holds it), what it weighs, and its actions'
+            buttons. */
         ItemRow = new JSClass('ItemRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    {row, action, cost, problem, onAction} = attrs;
+                    {row, expanded, onToggle} = attrs;
                 delete attrs.row;
-                delete attrs.cost;
-                delete attrs.action;
-                delete attrs.problem;
-                delete attrs.onAction;
+                delete attrs.expanded;
+                delete attrs.onToggle;
                 attrs.height = ROW_HEIGHT;
 
                 self.callSuper(parent, attrs);
 
                 const x = padding + row.depth * INDENT;
+                if (row.container) {
+                    const toggle = new UnderlineBtn(self, {
+                        x, width:TOGGLE_WIDTH, valign:'middle', fontSize:fontSizeMedium, text:expanded ? '▾' : '▸',
+                        tooltip:i18n(expanded ? 'tip-collapse' : 'tip-expand', row.label)
+                    }, [{doActivated:() => onToggle(row.id)}]);
+                    Object.assign(toggle.getIDE().dataset, {action:'toggle', item:row.id});
+                    toggle.getIDE().setAttribute('aria-expanded', String(expanded));
+                }
                 new Text(self, {
-                    x, y:3, width:WEIGHT_X - x - padding, text:row.label, fontSize:fontSizeMedium, textColor:colorText
+                    x:x + TOGGLE_WIDTH, y:3, width:WEIGHT_X - x - TOGGLE_WIDTH - padding, text:row.label,
+                    fontSize:fontSizeMedium, textColor:colorText
                 }).enableEllipsis();
                 new Text(self, {
                     x:WEIGHT_X, y:5, width:WEIGHT_WIDTH, text:row.weight, textAlign:'right',
                     fontSize:fontSizeSmall, textColor:colorTextMuted, fontFamily:fontFamilyMono
                 });
-                const btn = self.btn = new UnderlineBtn(self, {
-                    x:PANEL_WIDTH - padding - BTN_WIDTH, valign:'middle', fontSize:fontSizeMedium,
-                    text:i18n('btn-' + action), disabled:!!problem,
-                    tooltip:problem || i18n('tip-' + action, row.label, cost)
-                }, [{doActivated: () => onAction(row.id)}]);
-                btn.getIDE().setAttribute('aria-label', i18n('btn-' + action) + ' ' + row.label);
-                btn.getIDE().dataset.item = row.id;
             }
         });
 
-    /*  What one of your pieces carries and what's on the ground under it, each with what
-        it holds against what it can, and what's in each thing below it, indented. Each
-        thing it carries can be dropped, and each on the ground taken, for action points
-        (see Items.js). */
+    /*  What one of your pieces carries, what's on the ground under it, and what's in the
+        containers (fixtures: chests, tables) on its cell or next to it, each with what it
+        holds against what it can. What's in each thing is below it, indented, shown with
+        its ▸ (and hidden again with its ▾). Each thing can be taken (into what the piece
+        carries: Take), dropped (onto the ground: Drop), or put in another holder
+        (Transfer: then each place it could go has a Here button), and all that's in a
+        holder taken at once (Take all), each for action points (see Items.js). It stays
+        open when the turn ends. */
     pkg.InventoryDialog = new JSClass('InventoryDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -92,27 +112,31 @@
 
             self.getFooterView().ackBtn.setText(ICON_CANCEL + ' ' + i18n('btn-close'));
 
-            const container = self._container = new WideView(self.getContentView()),
-                section = key => {
-                    const head = new InventoryHead(container, {text:i18n(key)}),
-                        rows = new WideView(container);
-                    new SpacedLayout(rows, {axis:'y', spacing:2, collapseParent:true});
-                    return {head, rows};
-                };
-            self._carried = section('inv-carried');
-            self._ground = section('inv-ground');
+            self._expanded = new Set();
+            const container = self._container = new WideView(self.getContentView());
             new SpacedLayout(container, {axis:'y', inset:padding, spacing:2, outset:padding, collapseParent:true});
         },
 
 
         // Methods /////////////////////////////////////////////////////////////
-        /*  Shows it. describe() gives what to show: {carried, ground}, each {summary, rows:
-            [{id, label, weight, depth}]}. dropProblem(id) and takeProblem(id) say why an
-            item can't be dropped or taken ('' if it can), and onDrop(id) and onTake(id) do
-            it. dropCost and takeCost say what each costs (action points, as text). */
+        /*  Shows it. opts:
+                title
+                describe()  what to show: [{ref, title, summary, open, takeAll, rows}], a
+                    section for each holder (ref: what names it: see Items.reachHolder;
+                    open: whether what's in it can be got at; takeAll: why it can't all
+                    be taken, '' if it can, or null for no Take all), its rows [{id,
+                    label, weight, depth, container, actions}] (actions: {take, drop,
+                    takeAll, transfer}, each why it can't be done, '' if it can, if it's
+                    offered)
+                tips        {take, drop, takeAll, transfer}: each action's tooltip, of
+                    what it's for
+                hereProblem(id, ref)  why item id can't go in the holder ref names
+                onAction(action, id, ref)  does an action: to item id (to holder ref,
+                    for transfer), or for takeAll, to holder ref */
         show: function(opts) {
             this.callSuper();
             this._opts = opts;
+            this._moving = null;
             this.setTitle(opts.title);
             this.refresh();
         },
@@ -120,25 +144,98 @@
         /*  Brings it up to date. */
         refresh: function() {
             const self = this,
-                {describe, dropProblem, takeProblem, onDrop, onTake, dropCost, takeCost} = self._opts,
-                {carried, ground} = describe(),
-                fill = (section, {summary, rows}, action, cost, problem, onAction) => {
-                    section.head.setSummary(summary);
-                    section.rows.destroyAllSubviews();
-                    if (rows.length) {
-                        for (const row of rows) {
-                            new ItemRow(section.rows, {row, action, cost, problem:problem(row.id), onAction});
-                        }
+                {describe, tips, hereProblem, onAction} = self._opts,
+                moving = self._moving,
+                container = self._container,
+                expanded = self._expanded,
+                act = (action, id, ref) => () => {
+                    self._moving = null;
+                    onAction(action, id, ref);
+                },
+                // In a Transfer, a Here button for the holder ref names
+                here = (view, ref, data) => actionBtn(
+                    view, SLOTS - 1, 'here', i18n('tip-here', moving.label), hereProblem(moving.id, ref),
+                    act('transfer', moving.id, ref), data
+                ),
+                note = key => new Text(container, {
+                    x:padding, height:ROW_HEIGHT, text:i18n(key), fontSize:fontSizeMedium, textColor:colorTextMuted
+                });
+            container.destroyAllSubviews();
+            if (moving) {
+                const banner = new WideView(container, {height:ROW_HEIGHT});
+                new Text(banner, {
+                    x:padding, y:3, width:ACTIONS_X - 2 * padding, text:i18n('inv-moving', moving.label),
+                    fontSize:fontSizeMedium, textColor:colorText, fontWeight:'bold'
+                }).enableEllipsis();
+                actionBtn(banner, SLOTS - 1, 'cancel', i18n('tip-cancel-transfer'), '', () => {
+                    self._moving = null;
+                    self.refresh();
+                }, {});
+            }
+            for (const section of describe()) {
+                const head = new InventoryHead(container, {text:section.title, summary:section.summary}),
+                    data = {holder:section.ref};
+                if (moving) {
+                    here(head, section.ref, data);
+                } else if (section.takeAll != null) {
+                    actionBtn(
+                        head, 1, 'takeAll', tips.takeAll(section.title), section.takeAll,
+                        act('takeAll', null, section.ref), data
+                    );
+                }
+                if (!section.open) {
+                    note('inv-shut');
+                } else if (!section.rows.length) {
+                    note('inv-nothing');
+                }
+                // Each row, but what's in what isn't expanded
+                let hideBelow = Infinity;
+                for (const row of section.rows) {
+                    if (row.depth > hideBelow) continue;
+                    hideBelow = row.container && !expanded.has(row.id) ? row.depth : Infinity;
+                    const view = new ItemRow(container, {
+                            row, expanded:expanded.has(row.id),
+                            onToggle:id => {
+                                expanded[expanded.has(id) ? 'delete' : 'add'](id);
+                                self.refresh();
+                            }
+                        }),
+                        item = {item:row.id},
+                        {take, drop, takeAll, transfer} = row.actions;
+                    if (moving) {
+                        if (row.container && row.id !== moving.id) here(view, row.id, item);
                     } else {
-                        new Text(section.rows, {
-                            x:padding, y:3, height:ROW_HEIGHT, text:i18n('inv-nothing'),
-                            fontSize:fontSizeMedium, textColor:colorTextMuted
-                        });
+                        if (take != null) {
+                            actionBtn(view, 0, 'take', tips.take(row.label), take, act('take', row.id), item);
+                        }
+                        if (drop != null) {
+                            actionBtn(view, 0, 'drop', tips.drop(row.label), drop, act('drop', row.id), item);
+                        }
+                        if (takeAll != null) {
+                                actionBtn(
+                                view, 1, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
+                            );
+                        }
+                        if (transfer != null) {
+                            actionBtn(view, 2, 'transfer', tips.transfer(row.label), transfer, () => {
+                                self._moving = {id:row.id, label:row.label};
+                                self.refresh();
+                            }, item);
+                        }
                     }
-                };
-            fill(self._carried, carried, 'drop', dropCost, dropProblem, onDrop);
-            fill(self._ground, ground, 'take', takeCost, takeProblem, onTake);
-            self.setContentHeightToFit(self._container.height);
+                }
+            }
+            self.setContentHeightToFit(container.height);
+        },
+
+        /*  Esc (or ×) in a Transfer leaves it (then closes). */
+        doClose: function() {
+            if (this._moving) {
+                this._moving = null;
+                this.refresh();
+            } else {
+                this.callSuper();
+            }
         }
     });
 })(hc);

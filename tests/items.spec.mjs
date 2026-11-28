@@ -244,7 +244,7 @@ test('weights and volumes show in the Units preference\'s units', async ({page})
     expect(r).toEqual(['2.36 kg', '0.3 L', '66.5 kg', '5.2 lb', '2.5 gal']);
 });
 
-test('the Inventory dialog (H) lists what your piece carries and what\'s on the ground; Take takes it', async ({page}) => {
+test('the Inventory dialog (H) lists what your piece carries and what\'s on the ground, what\'s in things shown with ▸; Take takes it', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const ids = await page.evaluate(() => {
@@ -261,16 +261,22 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     await expect(dialog.getByText('Tess · Inventory')).toBeVisible();
     await expect(dialog.getByText('12 gold coins')).toBeVisible();
     await expect(dialog.getByText('goblin corpse')).toBeVisible();
+    // What's in the corpse shows once it's expanded, and hides again.
+    const btn = (id, action) => page.locator(`[data-item="${id}"][data-action="${action}"]`);
+    await expect(dialog.getByText('dagger', {exact:true})).toHaveCount(0);
+    await btn(ids.corpse, 'toggle').click();
     await expect(dialog.getByText('dagger', {exact:true})).toBeVisible();
+    await btn(ids.corpse, 'toggle').click();
+    await expect(dialog.getByText('dagger', {exact:true})).toHaveCount(0);
+    await btn(ids.corpse, 'toggle').click();
     // The corpse is too heavy (66.5 kg); the dagger in it can be taken.
-    const take = id => page.locator(`[data-item="${id}"]`);
-    await expect(take(ids.corpse)).toHaveClass(/disabled/);
-    await expect(take(ids.corpse)).toHaveAttribute('title', 'It\'s too heavy.');
-    await expect(take(ids.dagger)).toHaveAttribute('title', 'Take dagger (as much as it can carry), for 0.25 action points.');
-    await take(ids.dagger).click();
+    await expect(btn(ids.corpse, 'take')).toHaveClass(/disabled/);
+    await expect(btn(ids.corpse, 'take')).toHaveAttribute('title', 'It\'s too heavy.');
+    await expect(btn(ids.dagger, 'take')).toHaveAttribute('title', 'Take dagger (as much as it can carry), for 0.25 action points.');
+    await btn(ids.dagger, 'take').click();
     // It's carried now, to drop.
-    await expect(take(ids.dagger)).toHaveText('Drop');
-    await expect(take(ids.dagger)).toHaveAttribute('title', 'Drop dagger on the ground here, for 0.15 action points.');
+    await expect(btn(ids.dagger, 'drop')).toHaveText('Drop');
+    await expect(btn(ids.dagger, 'drop')).toHaveAttribute('title', 'Drop dagger on the ground here, for 0.15 action points.');
     expect(await page.evaluate(() => hc.app.game.getPlayerCore().ap)).toBe(75);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
@@ -292,4 +298,148 @@ test('pointing at a cell with things on the ground says what they are', async ({
     });
     await page.mouse.move(...await cellOnPage(page, 2, 0));
     await expect(page.getByText('On the ground: 7 gold coins, club')).toBeVisible();
+});
+
+// ---- Containers: fixtures with an inventory; transfer; take all ----
+
+/*  A chest (open, unless shut) at (1, 0), next to the core, holding a dagger and 5 gold
+    coins, and a table under the core holding a belt pouch. Returns their ids. */
+const putContainers = (page, shut = false) => page.evaluate(shut => {
+    const g = hc.app.game,
+        put = (x, y, subtype) => {
+            const f = g.makeFixture(x, y, subtype, () => 0, 'feature');   // (0: no contents)
+            f.revealedAt = g.turn;
+            g.fixtures.set(g.key(x, y), f);
+            return f;
+        },
+        chest = put(1, 0, 'chest'),
+        table = put(0, 0, 'table'),
+        dagger = g.makeItem('dagger'), coins = g.makeItem('gold_coin', 5), pouch = g.makeItem('belt_pouch');
+    chest.state.open = !shut;
+    g.addItem(chest, dagger);
+    g.addItem(chest, coins);
+    g.addItem(table, pouch);
+    hc.view.draw();
+    return {dagger:dagger.id, coins:coins.id, pouch:pouch.id};
+}, shut);
+
+test('containers: a chest, cabinet and table hold things, start with their contents, and can be got at from next to them', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const ids = await putContainers(page);
+    const r = await page.evaluate(ids => {
+        const g = hc.app.game, c = g.getPlayerCore(),
+            full = g.makeFixture(5, 5, 'chest', () => 0.999, 'feature'),
+            out = [hc.fixtures.get('chest').inventory.capacity, full.inventory.items.map(it => it.kind + ':' + it.count)];
+        out.push(g.reachHolders(c).map(t => t.ref + (t.dir >= 0 ? '@' + t.dir : '')));
+        out.push(g.playerTake(c, ids.dagger), g.countOf(c, 'dagger'));
+        // Shut, it can't be got at.
+        c.ap = g.apMax(c);
+        g.fixtureAt(1, 0).state.open = false;
+        out.push(g.takeProblem(c, ids.coins), g.transferProblem(c, ids.pouch, 'fixture:1,0'));
+        return out;
+    }, ids);
+    expect(r).toEqual([20, ['gold_coin:40', 'dagger:1', 'short_sword:1', 'belt_pouch:1'],
+        ['piece', 'ground', 'fixture:0,0', 'fixture:1,0@1'], true, 1, 'missing', 'nowhere']);
+});
+
+test('a container that\'s broken leaves what was in it on the ground', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await putContainers(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game;
+        g.removeFixture(g.fixtureAt(1, 0));
+        return [g.fixtureAt(1, 0)?.subtype, g.groundAt(1, 0).inventory.items.map(it => g.itemLabel(it))];
+    });
+    expect(r).toEqual(['wood_scraps', ['dagger', '5 gold coins']]);
+});
+
+test('transfer puts a thing in any holder the piece can get at, for the transferCost rule\'s points', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const ids = await putContainers(page);
+    const r = await page.evaluate(ids => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.placeCost = '0';
+        g.rules.apPool = '10';
+        c.ap = g.apMax(c);
+        // From the chest into the pouch on the table, then the pouch (with them) into the chest
+        out.push(g.playerTransfer(c, ids.coins, ids.pouch), g.countOf(g.fixtureAt(0, 0), 'gold_coin'), c.ap);
+        out.push(g.transferProblem(c, ids.pouch, ids.pouch), g.transferProblem(c, ids.coins, ids.pouch));
+        out.push(g.playerTransfer(c, ids.pouch, 'fixture:1,0'), g.countOf(g.fixtureAt(1, 0), 'gold_coin'));
+        // The rule
+        g.rules.transferCost = '2';
+        out.push(g.playerTransfer(c, ids.dagger, 'ground'), c.ap);
+        c.ap = 100;
+        out.push(g.transferProblem(c, ids.dagger, 'piece'));
+        return out;
+    }, ids);
+    expect(r).toEqual([true, 5, 975, 'loop', 'there', true, 5, true, 750, 'ap']);
+});
+
+test('take all takes what\'s in a holder, a thing at a time, while the points last', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const ids = await putContainers(page);
+    const r = await page.evaluate(ids => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.placeCost = '0';
+        c.ap = 40;      // one take (0.25)
+        out.push(g.playerTakeAll(c, 'fixture:1,0'), g.countOf(c, 'dagger'), g.countOf(c, 'gold_coin'), c.ap);
+        c.ap = 100;
+        out.push(g.playerTakeAll(c, 'fixture:1,0'), g.countOf(c, 'gold_coin'), c.ap);
+        out.push(g.takeAllProblem(c, 'fixture:1,0'), g.takeAllProblem(c, 'piece'), g.takeAllProblem(c, ids.pouch));
+        return out;
+    }, ids);
+    expect(r).toEqual([true, 1, 0, 15, true, 5, 75, 'empty', 'nowhere', 'empty']);
+});
+
+test('containers and what\'s in them are saved', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await putContainers(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game,
+            saved = JSON.parse(JSON.stringify(g.exportToObj()));
+        g.reset();
+        g.importFromObj(saved);
+        const chest = g.fixtures.get(g.key(1, 0));
+        saved.fixtures.find(f => f.subtype === 'chest').inventory.items.length = 0;
+        return [chest.state.open, chest.inventory.items.map(it => g.itemLabel(it))];
+    });
+    expect(r).toEqual([true, ['dagger', '5 gold coins']]);
+});
+
+test('the Inventory dialog: containers near, Transfer\'s Here, Take all, and it stays open as turns end', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const ids = await putContainers(page, true);
+    await page.keyboard.press('h');
+    const btn = (attrs, action) => page.locator(`[${attrs}][data-action="${action}"]`);
+    await expect(page.getByText('Table (here)')).toBeVisible();
+    await expect(page.getByText('Chest (east)')).toBeVisible();
+    await expect(page.getByText('It\'s shut: open it first (Use).')).toBeVisible();
+    await expect(page.getByText('dagger', {exact:true})).toHaveCount(0);
+    // Transfer the pouch: each place it could go has a Here; Esc leaves the transfer.
+    await btn(`data-item="${ids.pouch}"`, 'transfer').click();
+    await expect(page.getByText('Transfer belt pouch: where to?')).toBeVisible();
+    await expect(btn('data-holder="fixture:1,0"', 'here')).toHaveAttribute('title', 'It can\'t go there.');
+    await expect(btn('data-holder="fixture:0,0"', 'here')).toHaveAttribute('title', 'It\'s there already.');
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Transfer belt pouch: where to?')).toHaveCount(0);
+    await expect(page.getByText('Table (here)')).toBeVisible();
+    await btn(`data-item="${ids.pouch}"`, 'transfer').click();
+    await btn('data-holder="piece"', 'here').click();
+    // That used the core's last points, so the turn ended: still open, a turn on.
+    await expect(page.getByText('Table (here)')).toBeVisible();
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        return [g.turn, c.inventory.items.map(it => it.kind)];
+    });
+    expect(r).toEqual([2, ['belt_pouch']]);
+    await btn('data-holder="fixture:0,0"', 'takeAll').waitFor();
+    await expect(btn('data-holder="fixture:0,0"', 'takeAll')).toHaveAttribute('title', 'There\'s nothing in it.');
+    await button(page, 'X Close').click();
+    await expect(page.getByText('Table (here)')).toBeHidden();
 });

@@ -300,6 +300,78 @@
 			"composition":"pinewood",
 			"coverage":0,
 			"fillColor":"#7536",
+		},
+		
+		// Containers: features with an "inventory" (see js/hc/model/tile/Fixtures.js), and
+		// maybe "contents" (what each starts with) and "access" (when what's in it can be
+		// got at). Your pieces can get at what's in one on their cell or next to it.
+		"chest":{
+			"type":"feature",
+			"name":"Chest",
+			"description":"A heavy oak chest. Open it to get at what's inside.",
+			"composition":"oakwood",
+			"hp":20,
+			"coverage":40,
+			"moveCost":0,
+			"state":{"open":false},
+			"actions":{
+				"open": {"when":"!open", "set":{"open":true}},
+				"close":{"when":"open", "set":{"open":false}}
+			},
+			"describe":[{"when":"open", "text":"open"}, {"when":"!open", "text":"shut"}],
+			"access":"open",
+			"inventory":{"capacity":20, "volume":150000},
+			"contents":[
+				{"kind":"gold_coin", "count":[0, 40]},
+				{"kind":"dagger", "count":[0, 1]},
+				{"kind":"short_sword", "count":[0, 1]},
+				{"kind":"belt_pouch", "count":[0, 1]}
+			],
+			"destroyInto":"wood_scraps",
+			"fillColor":"#8a5a2b",
+			"borderColor":"#c9a46b"
+		},
+		"cabinet":{
+			"type":"feature",
+			"name":"Cabinet",
+			"description":"A tall oak cabinet with doors.",
+			"composition":"oakwood",
+			"hp":15,
+			"coverage":70,
+			"moveCost":0,
+			"state":{"open":false},
+			"actions":{
+				"open": {"when":"!open", "set":{"open":true}},
+				"close":{"when":"open", "set":{"open":false}}
+			},
+			"describe":[{"when":"open", "text":"open"}, {"when":"!open", "text":"shut"}],
+			"access":"open",
+			"inventory":{"capacity":12, "volume":200000},
+			"contents":[
+				{"kind":"mushroom_jerky", "count":[0, 6]},
+				{"kind":"centipede_jerky", "count":[0, 6]},
+				{"kind":"club", "count":[0, 1]}
+			],
+			"destroyInto":"wood_scraps",
+			"fillColor":"#6b4524",
+			"borderColor":"#b08850"
+		},
+		"table":{
+			"type":"feature",
+			"name":"Table",
+			"description":"A rough pine table: slow to climb over. What's on it is there for the taking.",
+			"composition":"pinewood",
+			"hp":10,
+			"coverage":30,
+			"moveCost":2,
+			"inventory":{"capacity":6, "volume":100000},
+			"contents":[
+				{"kind":"mushroom_jerky", "count":[0, 3]},
+				{"kind":"gold_coin", "count":[0, 10]}
+			],
+			"destroyInto":"wood_scraps",
+			"fillColor":"#9a7448",
+			"borderColor":"#5a4028"
 		}
 	}
 }
