@@ -330,3 +330,34 @@ test('the selection stays on a piece after it moves', async ({page}) => {
     });
     expect(r).toEqual([true, false, 2]); // a can't move again, but stays selected
 });
+
+test('the info panel: the map and seed on a line, then the selected piece\'s name, level and bars', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        c.needs.thirst = 0;
+        c.hp = 1;
+        hc.view.draw();
+        return [g.gameMap.name, g.seed, c.maxHp, g.needBounds(c, 'thirst').max / 100];
+    });
+    const [map, seed, maxHp, maxThirst] = r;
+    await expect(page.getByText(`${map} · seed ${seed}`, {exact:true})).toBeVisible();
+    await expect(page.getByText('Tess · level 1', {exact:true})).toBeVisible();
+    const bar = label => page.locator('.myt-HudBar').filter({has:page.getByText(label, {exact:true})});
+    for (const label of ['AP', 'HP', 'Thirst', 'Hunger', 'Fatigue', 'XP']) await expect(bar(label)).toBeVisible();
+    await expect(bar('HP')).toContainText(`1/${maxHp}`);
+    await expect(bar('Thirst')).toContainText(`0/${maxThirst}`);
+    await expect(bar('AP')).toContainText('1/1');
+    // Another piece, selected: its own
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.setGold(100);
+        const {x, y} = g.placeCells(g.getPlayerCore())[0];
+        g.playerPlace(x, y, g.getPlayerCore());
+        g.selectedId = g.pieceAt(x, y).id;
+        g.pieceAt(x, y).parentId = null;
+        hc.view.draw();
+    });
+    await expect(page.getByText('Detached piece · level 1', {exact:true})).toBeVisible();
+});

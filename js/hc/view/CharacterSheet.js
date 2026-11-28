@@ -33,9 +33,6 @@
         // A value, and if it would change, what to: the new one beside it in green.
         changed = (was, now) => String(was) === String(now) ? String(was) : was + ' <span style="color:' + colorSuccess + ';">' + now + '</span>',
         
-        // Escaped, to show as text in a Text (which takes HTML).
-        escape = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
-        
         /*  A line of the sheet, as wide as what it's in: a label (labelWidth wide) and a
             value, and for a stat, buttons to put a point into it (+) or take one back (−). */
         SheetRow = new JSClass('SheetRow', WideView, {
@@ -106,8 +103,9 @@
             }
         });
     
-    /*  The character sheet for one of your pieces: across the top, its name (if it has
-        one), its description (which can always be edited), level, XP and status effects;
+    /*  The character sheet for one of your pieces: across the top, its name and its
+        description (both can always be edited: a placed piece can be named), level, XP,
+        status effects, needs and equipment;
         then, side by side, its stats, and what they make it in combat: HP, action points
         (its pool, recovery and initiative), accuracy and so on. It has three modes.
         
@@ -152,8 +150,7 @@
                     return s;
                 };
             
-            // Showing and levelling: its name; creating: its name (to type in)
-            self._nameRow = row(container);
+            // Its name (to type in: see _typed)
             self._nameInput = new InputRow(container, {label:i18n('sheet-name'), make:(parent, attrs) => {
                 const input = new M.InputText(parent, {...attrs, maxLength:CHARACTER_NAME_MAX});
                 input.getIDS().padding = '0 ' + padding/2 + 'px';
@@ -201,8 +198,8 @@
             {info:[[label, value], ...], combat:[[label, value], ...]} (seven and nine of
             them). statMax(stat) is the most a stat can be (its species'). preview(adds) is
             p with the points of adds ({stat:n}) put in, and onConfirm(adds) spends them.
-            onDescription(text) is called as its description is edited, and onInventory()
-            when Inventory is clicked. */
+            onName(text) and onDescription(text) are called as its name and description are
+            edited, and onInventory() when Inventory is clicked. */
         show: function(p, opts) {
             this.callSuper();
             if ('create' in opts) {
@@ -213,19 +210,18 @@
         },
         
         /** @private */
-        _show: function(p, {title, describe, statMax, preview, onConfirm, onDescription, onInventory}) {
+        _show: function(p, {title, describe, statMax, preview, onConfirm, onName, onDescription, onInventory}) {
             const self = this,
                 levelling = p.statPoints.available > 0;
             self._onInventory = onInventory;
             self._setMode(levelling ? 'level' : 'show', title, {
-                describe, onConfirm, onDescription,
+                describe, onConfirm, onName, onDescription,
                 base: () => p.stats,
                 limits: stat => [0, statMax(stat) - p.stats[stat]],
                 points: () => p.statPoints.available,
                 piece: adds => Object.keys(adds).length ? preview(adds) : p
             });
-            self._nameRow.setVisible(!!p.name);
-            if (p.name) self._nameRow.set(i18n('sheet-name'), escape(p.name));
+            self._nameInput.input.setValue(p.name ?? '');
             self._descriptionInput.input.setValue(p.description ?? '');
             self.refresh();
         },
@@ -297,10 +293,7 @@
             // (Close, just showing, in red, as other dialogs' Close and Cancel are.)
             footer.confirmBtn.setText(editing ? CONFIRM_LABEL : CLOSE_LABEL);
             footer.confirmBtn.setTextColor(editing ? colorSuccess : colorError);
-            for (const r of [self._nameInput, self._speciesInput, self._backgroundInput]) {
-                r.setVisible(creating);
-            }
-            if (creating) self._nameRow.setVisible(false);
+            for (const r of [self._speciesInput, self._backgroundInput]) r.setVisible(creating);
             self._pointsRow.setVisible(editing);
             for (const r of self._statRows) {
                 r.minusBtn.setVisible(editing);
@@ -348,9 +341,15 @@
             self.refresh();
         },
         
-        /** @private The name or description was typed in. */
+        /** @private The name was typed in: for the character being created, or the piece
+            shown (onName). */
         _typed: function(_event) {
-            this.refresh();
+            const self = this;
+            if (self._mode === 'create') {
+                self.refresh();
+            } else {
+                self._modeOpts.onName?.(self._nameInput.input.value ?? '');
+            }
         },
         
         /** @private The description was typed in: for the character being created, or the

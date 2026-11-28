@@ -136,6 +136,6 @@ test('I opens the selected piece\'s character sheet', async ({page}) => {
     await page.keyboard.press('i');
     await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
     for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1/1', '+1 a turn', 'Exhausted (1 more turn)']) {
-        await expect(page.getByText(text, {exact:true})).toBeVisible();
+        await expect(page.getByText(text, {exact:true}).last()).toBeVisible(); // (the sheet's: the info panel shows XP too)
     }
 });

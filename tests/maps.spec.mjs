@@ -69,7 +69,7 @@ test('the brief shows the map\'s description and a seed (no settings), and start
     await pressStart(page);
     await page.waitForFunction(() => hc.app.game.gameMap?.id === 'open_ground');
     expect(await page.evaluate(() => [hc.app.game.seed, hc.app.game.spawnGenerator.attrs.spawnEvery])).toEqual([1234, 2]);
-    await expect(page.getByText('1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
+    await expect(page.getByText('Open Ground · seed 1234', {exact:true}).filter({visible:true})).toBeVisible(); // the info panel
 });
 
 test('the same seed makes the same map; an empty seed makes a random one', async ({page}) => {

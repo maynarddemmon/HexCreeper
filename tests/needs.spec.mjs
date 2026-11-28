@@ -1,11 +1,29 @@
 import {test, expect} from '@playwright/test';
 import {startGame, clearBoard} from './helpers.mjs';
 
-/*  Thirst, hunger and fatigue (see Needs.js), and eating and drinking (Items.js). */
+/*  Thirst, hunger and fatigue (see Needs.js), and eating and drinking (Items.js). The tests
+    pin the rules and items they're written for (base 100: 25, 75, 100; ticks, effects, food
+    and water), whatever the data's tuning. */
+
+const pinNeeds = page => page.evaluate(() => {
+    const g = hc.app.game, r = g.rules,
+        set = (need, v) => Object.entries(v).forEach(([k, f]) => r[need + k] = f);
+    for (const n of ['Thirst', 'Hunger', 'Fatigue']) {
+        Object.assign(r, {['min' + n]:'0', ['lower' + n]:'25 * (con / 10)', ['upper' + n]:'75 * (con / 10)', ['max' + n]:'100 * (con / 10)'});
+    }
+    set('thirst', {TurnTick:'-0.25', ApTick:'-0.05', LowRecovery:'-0.25', HighRecovery:'0.1', LowHp:'0', HighHp:'0', MinMultiplier:'2'});
+    set('hunger', {TurnTick:'-0.25', ApTick:'-0.05', LowRecovery:'0', HighRecovery:'0', LowHp:'-0.25', HighHp:'0.1', MinMultiplier:'2'});
+    set('fatigue', {TurnTick:'-0.1', ApTick:'-0.15', LowStats:'0', HighStats:'0'});
+    Object.assign(hc.items.get('mushroom_jerky'), {satiates:10, quench:-2});
+    Object.assign(hc.items.get('centipede_jerky'), {satiates:15, quench:-3});
+    Object.assign(hc.items.get('water'), {quench:25});
+    for (const p of g.piecesOf('player')) g.giveNeeds(p);
+});
 
 test('your pieces have needs, starting at their upper; enemies don\'t; the bounds scale with con', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(),
             e = g.addPiece('core', 'enemy', 4, 4, null, 'goblin'),
@@ -19,6 +37,7 @@ test('your pieces have needs, starting at their upper; enemies don\'t; the bound
 test('needs go down each turn, and for each action point spent, kept within their bounds', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.placeCost = '0';
@@ -39,6 +58,7 @@ test('needs go down each turn, and for each action point spent, kept within thei
 test('thirst: low, less AP back; high, more; at its min, twice as little', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), base = g.apRecovery(c), out = [];
         for (const v of [8000, 2500, 0]) {
@@ -53,6 +73,7 @@ test('thirst: low, less AP back; high, more; at its min, twice as little', async
 test('hunger: low, HP lost each turn (fractions carry over, and it can kill); high, HP back', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.placeCost = '0';
@@ -78,6 +99,7 @@ test('hunger: low, HP lost each turn (fractions carry over, and it can kill); hi
 test('needs can change stats (fatigue\'s rules, 0 for now)', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [g.statVars(c).str];
         c.needs.fatigue = 1000;
@@ -92,6 +114,7 @@ test('needs can change stats (fatigue\'s rules, 0 for now)', async ({page}) => {
 test('eating and drinking: a dose (what\'s left, if less, does less), for the consume cost', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.placeCost = '0';
@@ -116,6 +139,7 @@ test('eating and drinking: a dose (what\'s left, if less, does less), for the co
 test('fluids go only in what holds fluids; flasks fill from a stream or pool, and pieces drink from one', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
         g.rules.placeCost = '0';
@@ -140,6 +164,7 @@ test('fluids go only in what holds fluids; flasks fill from a stream or pool, an
 test('needs are saved', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         c.needs.thirst = 1234;
@@ -157,6 +182,7 @@ test('needs are saved', async ({page}) => {
 test('the Inventory dialog eats, drinks and fills; the sheet shows needs', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
+    await pinNeeds(page);
     const ids = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), flask = g.makeItem('flask'), jerky = g.makeItem('mushroom_jerky');
         c.inventory.items.length = 0;
@@ -176,7 +202,7 @@ test('the Inventory dialog eats, drinks and fills; the sheet shows needs', async
     await btn('data-holder="source:1,0"', 'drink').click();
     await btn('data-holder="piece"', 'takeAll').count();
     await page.getByRole('button', {name:'Character', exact:true}).filter({visible:true}).click();
-    await expect(page.getByText('Hunger', {exact:true})).toBeVisible();
+    await expect(page.getByText('Hunger', {exact:true}).last()).toBeVisible(); // (the sheet's: the info panel has a Hunger bar)
     // 20, +25 from the stream, less the turn's ticks for the points spent (0.5 fill, 0.25 drink: 0.0375)
-    await expect(page.getByText('44/100', {exact:true})).toBeVisible();
+    await expect(page.getByText('44/100', {exact:true}).last()).toBeVisible();
 });

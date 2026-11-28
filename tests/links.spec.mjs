@@ -131,7 +131,7 @@ test('B detaches the selected piece; L, then a ringed piece, attaches it', async
         g.selectedId = window.ids.a;
         hc.view.draw();
     });
-    await expect(page.getByText('Detached · level 1', {exact:false})).toBeVisible();
+    await expect(page.getByText('Detached piece · level 1', {exact:false})).toBeVisible();
     await openMenu(page);
     await expect(menuItem(page, 'Detach')).toHaveClass(/\bdisabled\b/);
     await page.keyboard.press('Escape');

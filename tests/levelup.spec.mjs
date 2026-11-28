@@ -158,7 +158,7 @@ test('the sheet: level, XP and status across it, then stats beside combat (HP an
     await levelUp(page);
     await page.keyboard.press('i');
     await page.getByRole('button', {name:'Raise Constitution'}).click();
-    const line = label => page.getByText(label, {exact:true}).locator('xpath=..'),
+    const line = label => page.getByText(label, {exact:true}).last().locator('xpath=..'), // (the sheet's, not the info panel's)
         x = label => line(label).evaluate(row => row.parentNode.getBoundingClientRect().x),
         y = label => line(label).evaluate(row => row.getBoundingClientRect().y);
     // The level is a line of its own, above XP, not in the title.

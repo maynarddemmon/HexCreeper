@@ -172,3 +172,39 @@ test('the first time, with no character made before: no name, the first species 
     await expect(page.getByText('Strength', {exact:true}).locator('xpath=..')).toContainText('10');
     await expect(button(page, '✓ Confirm')).toHaveClass(/disabled/);
 });
+
+test('the sheet\'s name can be edited after creation: a placed piece can be named, and your core renamed', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const id = await page.evaluate(() => {
+        const g = hc.app.game;
+        g.setGold(100);
+        const {x, y} = g.placeCells(g.getPlayerCore())[0];
+        g.playerPlace(x, y, g.getPlayerCore());
+        g.selectedId = g.pieceAt(x, y).id;
+        hc.view.draw();
+        return g.selectedId;
+    });
+    await page.keyboard.press('i');
+    const name = page.getByRole('textbox', {name:'Name', exact:true}).filter({visible:true});
+    await expect(name).toHaveValue('');
+    await name.fill('Pip');
+    await expect(page.getByText('Pip · Human · Urchin', {exact:true})).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Pip · level 1', {exact:true})).toBeVisible();   // the info panel
+    // Emptied, it has none again; your core keeps its own.
+    await page.keyboard.press('i');
+    await name.fill('  ');
+    await page.keyboard.press('Escape');
+    const r = await page.evaluate(id => {
+        const g = hc.app.game;
+        g.selectedId = g.playerCoreId;
+        return g.pieces.get(id).name;
+    }, id);
+    expect(r).toBeUndefined();
+    await page.keyboard.press('i');
+    await name.fill('Tessa');
+    await name.fill('');
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => hc.app.game.getPlayerCore().name)).toBe('Tessa');
+});

@@ -52,7 +52,7 @@
             ICON_SEPARATOR, ICON_CANCEL,
             TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, PLAYER_MOVE_MODES,
             formatAp, formatXp, formatWeight, formatVolume,
-            VAR_XP, VAR_LEVEL, NEEDS, NEED_UNIT
+            VAR_XP, VAR_LEVEL, NEEDS, NEED_UNIT, AP_UNIT
         } = pkg,
         
         {game, draw} = V,
@@ -187,10 +187,25 @@
             V.menuOpen = false;
             draw();
             characterSheet ??= new pkg.CharacterSheet(appView);
+            const title = () => i18n(
+                'dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? ''
+            );
             characterSheet.show(p, {
-                title:i18n('dlg-sheet-title', logName(game.whoOf(p), true), pkg.species.get(p.species)?.name ?? '', pkg.backgrounds.get(p.background)?.name ?? ''),
+                title:title(),
                 onDescription:text => {
                     p.description = text;
+                },
+                // Its name, as it's typed (trimmed): none, if it's left empty, but your core
+                // keeps its own.
+                onName:text => {
+                    const name = text.trim();
+                    if (name) {
+                        p.name = name;
+                    } else if (p.id !== game.playerCoreId) {
+                        delete p.name;
+                    }
+                    characterSheet.setTitle(title());
+                    draw();
                 },
                 statMax:stat => game.statRange(p, stat)[1],
                 describe:describePiece,
@@ -781,8 +796,86 @@
             ];
         },
         
-        /*  The stats that don't fit in the header: the map and seed, core HP, the selected
-            piece, and the map's goals and penalties with how each stands. */
+        HUD_LABEL_WIDTH = 64,  // a line's label, right aligned
+        HUD_GAP = 6,           // between its label and what's after it, and a bar and its value
+        HUD_BAR_WIDTH = 120,
+        HUD_BAR_HEIGHT = 6,
+        HUD_VALUE_X = HUD_LABEL_WIDTH + HUD_GAP, // where a line's value starts (a bar, on a bar's line)
+        
+        /*  A line of the info panel: its label, right aligned (so the labels line up at
+            their right), and after it its value, left aligned (so the values line up at
+            their left), in valueColor. */
+        HudLine = new JSClass('HudLine', View, {
+            initNode: function(parent, attrs) {
+                const self = this,
+                    {label, valueColor = colorText} = attrs;
+                delete attrs.label;
+                delete attrs.valueColor;
+                attrs.width = INFO_WIDTH;
+                attrs.height = 16;
+                
+                self.callSuper(parent, attrs);
+                
+                new PlainText(self, {
+                    y:2, width:HUD_LABEL_WIDTH, text:label, textAlign:'right',
+                    fontSize:fontSizeMedium, textColor:colorTextMuted, whiteSpace:'nowrap'
+                });
+                self._value = self.makeValue(valueColor);
+            },
+            
+            /** @private Its value's text, at x. */
+            makeValue: function(textColor, x = HUD_VALUE_X) {
+                return new PlainText(this, {
+                    x, width:this.width - x, fontSize:fontSizeMedium, fontFamily:fontFamilyMono, textColor, whiteSpace:'nowrap'
+                });
+            },
+            
+            update: function(text) {this._value.setText(text);}
+        }),
+        
+        /*  A line of the info panel for one of the selected piece's numbers: its label, a
+            bar (in color: a CSS variable) filled as far as it is from 0 to its max, and its
+            value ("12/15"). The bar can have marks: a dash at each whole point (AP), or
+            where a need's lower and upper are. */
+        HudBar = new JSClass('HudBar', HudLine, {
+            initNode: function(parent, attrs) {
+                const self = this,
+                    {color} = attrs;
+                delete attrs.color;
+                
+                self.callSuper(parent, attrs);
+                
+                self._track = new View(self, {
+                    x:HUD_VALUE_X, y:3 + (self.height - HUD_BAR_HEIGHT) / 2, width:HUD_BAR_WIDTH, height:HUD_BAR_HEIGHT,
+                    bgColor:'var(--grid)', roundedCorners:2
+                });
+                self._fill = new View(self._track, {height:HUD_BAR_HEIGHT, bgColor:`var(${color})`, roundedCorners:2});
+                self._marks = [];
+            },
+            
+            makeValue: function(textColor) {return this.callSuper(textColor, HUD_VALUE_X + HUD_BAR_WIDTH + HUD_GAP);},
+            
+            /*  Shows value of max (as text: shown), with marks at the fractions marks (of the
+                bar's width). */
+            show: function(value, max, text, marks = []) {
+                const self = this,
+                    track = self._track;
+                self._fill.setWidth(track.width * Math.min(1, Math.max(0, max > 0 ? value / max : 0)));
+                self._value.setText(text);
+                while (self._marks.length < marks.length) {
+                    self._marks.push(new View(track, {width:1, height:HUD_BAR_HEIGHT, bgColor:'var(--bg)'}));
+                }
+                self._marks.forEach((m, i) => {
+                    m.setVisible(i < marks.length);
+                    if (i < marks.length) m.setX(Math.round(track.width * marks[i]) - 0.5);
+                });
+                self.setVisible(true);
+            }
+        }),
+        
+        /*  The stats that don't fit in the header: the map and its seed, the selected
+            piece (its name and level, then bars for its AP, HP, thirst, hunger, fatigue
+            and XP), and the map's goals and penalties with how each stands. */
         InfoPanel = new JSClass('InfoPanel', View, {
             initNode: function(parent, attrs) {
                 const self = this;
@@ -791,17 +884,18 @@
                 
                 self.getIDS().pointerEvents = 'none'; // Let clicks go through to the map.
                 
-                const row = (key, valueColor=colorText) => new LabeledValue(self, {
-                    label:i18n(key), fontSize:fontSizeMedium, valueTextColor:valueColor,
-                    width:INFO_WIDTH, whiteSpace:'nowrap'
-                });
-                self.mapInfo = row('info-map');
-                self.seed = row('info-seed');
-                self.hp = row('info-core-hp', colorAccent);
-                const bar = self.hpBar = new View(self, {x:padding, width:INFO_WIDTH - 2*padding, height:6, bgColor:'var(--grid)', roundedCorners:3});
-                self.hpFill = new View(bar, {height:6, bgColor:colorAccent, roundedCorners:3});
-                self.selected = row('info-selected');
-                self.goalsHeader = new PlainText(self, {x:padding, text:i18n('info-goals'), fontSize:fontSizeMedium, textColor:colorTextMuted});
+                self.selected = new HudLine(self, {label:i18n('info-selected'), valueColor:colorAccent});
+                // (Colours as the bars by the pieces: see index.html.)
+                self.bars = Object.fromEntries([
+                    ['ap', '--ap-bar'], ['hp', '--hp-bar'], ...NEEDS.map(n => [n, `--${n}-bar`]), ['xp', '--xp-bar']
+                ].map(([key, color]) => [key, new HudBar(self, {label:i18n('info-bar-' + key), color})]));
+                
+                new View(self, {height:padding/2});
+                
+                self.mapInfo = new HudLine(self, {label:i18n('info-map')});
+                
+                new View(self, {height:padding/2});
+                
                 self.goalRows = [];
                 
                 new M.SpacedLayout(self, {axis:'y', inset:padding/2, spacing, outset:padding/2, collapseParent:true});
@@ -809,19 +903,31 @@
             
             update: function() {
                 const self = this,
-                    core = game.getPlayerCore(),
-                    hp = Math.max(0, core ? core.hp : 0),
-                    max = core ? core.maxHp : 1,
-                    sel = game.getSelected();
-                self.mapInfo.update(game.gameMap?.name ?? i18n('info-none'));
-                self.seed.update(game.seed ?? i18n('info-none'));
-                self.hp.update(hp + '/' + max);
-                self.hpFill.setWidth(self.hpBar.width * hp / max);
+                    sel = game.getSelected(),
+                    bars = self.bars;
+                self.mapInfo.update(game.gameMap ? i18n('info-map-value', game.gameMap.name, game.seed ?? i18n('info-none')) : i18n('info-none'));
+                for (const bar of Object.values(bars)) bar.setVisible(false);
                 if (sel) {
-                    self.selected.update(
-                        i18n('info-selected-value', i18n(sel.id === game.playerCoreId ? 'info-core' : sel.parentId ? 'info-linked' : 'info-detached'), sel.level, sel.hp, sel.maxHp, formatXp(sel.xp), formatXp(game.xpRule('xpToLevel', sel)),
-                            formatAp(sel.ap), formatAp(game.apMax(sel)))
-                    );
+                    // (Your core by its name; another piece by its own, if it has one, or as linked or not.)
+                    const name = sel.id === game.playerCoreId || sel.name ? logName(game.whoOf(sel), true) :
+                        i18n(sel.parentId ? 'info-linked' : 'info-detached');
+                    self.selected.update(i18n('info-selected-value', name, sel.level));
+                    // AP, with a dash at each whole point
+                    const pool = game.apMax(sel),
+                        dashes = [];
+                    for (let k = AP_UNIT; k < pool; k += AP_UNIT) dashes.push(k / pool);
+                    bars.ap.show(sel.ap, pool, formatAp(sel.ap) + '/' + formatAp(pool), dashes);
+                    bars.hp.show(sel.hp, sel.maxHp, Math.max(0, sel.hp) + '/' + sel.maxHp);
+                    // Each need, with marks at its lower and upper (see Needs.js)
+                    for (const n of NEEDS) {
+                        const v = game.needValue(sel, n);
+                        if (v != null) {
+                            const {lower, upper, max} = game.needBounds(sel, n);
+                            bars[n].show(v, max, Math.floor(v / NEED_UNIT) + '/' + Math.floor(max / NEED_UNIT), [lower / max, upper / max]);
+                        }
+                    }
+                    const toLevel = game.xpRule('xpToLevel', sel);
+                    bars.xp.show(sel.xp, toLevel, formatXp(sel.xp) + '/' + formatXp(toLevel));
                 } else {
                     self.selected.update(i18n('info-none'));
                 }
@@ -836,19 +942,18 @@
                         r.description.destroy();
                         r.progress.destroy();
                     }
-                    const textAttrs = {x:padding, width:INFO_WIDTH - 2*padding};
+                    const textAttrs = {x:HUD_VALUE_X, width:INFO_WIDTH - HUD_VALUE_X};
                     self.goalRows = list.map(o => ({
                         name:new PlainText(self, {...textAttrs, fontSize:fontSizeMedium, whiteSpace:'nowrap'}),
                         description:new PlainText(self, {
-                            ...textAttrs, x:2*padding, width:INFO_WIDTH - 3*padding, text:o.description, visible:!!o.description,
+                            ...textAttrs, x:HUD_VALUE_X, width:INFO_WIDTH - HUD_VALUE_X, text:o.description, visible:!!o.description,
                             fontSize:fontSizeSmall, textColor:colorTextMuted, whiteSpace:'normal'
                         }),
                         progress:new PlainText(self, {
-                            ...textAttrs, x:2*padding, width:INFO_WIDTH - 3*padding, visible:!!o.progress,
+                            ...textAttrs, x:HUD_VALUE_X, width:INFO_WIDTH - HUD_VALUE_X, visible:!!o.progress,
                             fontSize:fontSizeSmall, fontFamily:fontFamilyMono, textColor:colorText, whiteSpace:'nowrap'
                         })
                     }));
-                    self.goalsHeader.setVisible(list.length > 0);
                 }
                 list.forEach((o, i) => {
                     const state = game.objectives[i],
