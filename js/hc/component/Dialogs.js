@@ -111,6 +111,10 @@
             hide: function(ignoreRestoreFocus) {
                 this.callSuper(ignoreRestoreFocus);
                 showingDialogs.delete(this);
+                // Focus left in it (with nowhere to go back to) goes, so its keys don't
+                // close it again before the browser moves focus off it.
+                const focused = document.activeElement;
+                if (focused && this.getIDE().contains(focused)) focused.blur();
             },
             
             getPanelView: function() {return this._panelView;},

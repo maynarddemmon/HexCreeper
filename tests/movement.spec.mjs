@@ -17,10 +17,11 @@ const setUp = async page => {
 };
 
 // What stepping a piece (the core, unless named) by (dx, dy) would do in mode: null, the
-// names of the pieces hit, or each named piece's position after.
+// names of the pieces hit, or each named piece's position after. (Fixed alone: a step of
+// yours that can't be done in fixed is tried in follow, then free.)
 const step = (page, dx, dy, mode, who = 'core') => page.evaluate(([dx, dy, mode, who]) => {
     const g = hc.app.game, names = Object.fromEntries(Object.entries(window.ids).map(([k, v]) => [v, k])),
-        r = g.resolveStep(g.boardView(), window.ids[who], dx, dy, mode);
+        r = g[mode === 'fixed' ? '_resolveStep' : 'resolveStep'](g.boardView(), window.ids[who], dx, dy, mode);
     if (!r) return null;
     if (r.attack) return {hits:r.hits.map(h => names[h.attacker.id])};
     const at = Object.fromEntries(Object.entries(window.ids).map(([n, id]) => [n, [g.pieces.get(id).x, g.pieces.get(id).y]]));
@@ -78,18 +79,6 @@ test('a step that can\'t be done in follow is tried in fixed (then free)', async
     await putFixture(page, 0, 0, 'harm');
     await page.evaluate(() => {hc.app.game.rules.linkRange = 1;});
     expect(await step(page, -1, 0, 'follow')).toEqual({core:[-1, 0], a:[0, 0], b:[1, 0]});
-});
-
-test('Go to and Explore may jump in follow mode, as a last resort; you may not', async ({page}) => {
-    await setUp(page);
-    const r = await page.evaluate(() => {
-        const g = hc.app.game, core = g.getPlayerCore();
-        g.moveMode = 'follow';
-        g.rules.apPool = '2';
-        core.ap = 200;
-        return [g.jumpTargets(core).length, g.jumpTargets(core, true).length > 0];
-    });
-    expect(r).toEqual([0, true]);
 });
 
 test('in follow, turning back onto your own swarm swaps with the piece you step onto', async ({page}) => {
@@ -204,35 +193,31 @@ test('in follow only the lead breaks solids; the rest go round them', async ({pa
     expect(await step(page, 1, -1, 'follow', 'a')).toEqual({hits:['a']}); // leading, a breaks it
 });
 
-test('your moves use the chosen mode; M (or the button) cycles it, and it\'s saved', async ({page}) => {
+test('your moves keep the swarm\'s shape; where it doesn\'t fit, the swarm follows (and the trail is saved)', async ({page}) => {
     await setUp(page);
+    const shape = () => page.evaluate(() => {
+        const g = hc.app.game;
+        return g.piecesOf('player').map(p => [p.x - g.getPlayerCore().x, p.y - g.getPlayerCore().y]).sort();
+    });
+    const before = await shape();
+    expect(await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), -1, 0))).toBe(true);
+    expect(await shape()).toEqual(before);
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.playerWait();
+        g.playerAct(g.getPlayerCore(), 0, 0);
+        g.playerWait();
+    });
     await solid(page, 2, -1);
-    const mode = button(page, 'Move: Fixed');
-    await page.evaluate(() => {hc.view.draw();});
-    await expect(mode).toBeVisible();
-    expect(await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 1, -1))).toBe(false);
-    await page.keyboard.press('m');
-    await expect(button(page, 'Move: Follow')).toBeVisible();
     const r = await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), done = g.playerAct(core, 1, -1),
             copy = new hc.Game();
         copy.importFromObj(JSON.parse(JSON.stringify(g.exportToObj())));
-        return [done, [core.x, core.y], [g.pieces.get(window.ids.a).x, g.pieces.get(window.ids.a).y], copy.moveMode, copy.pieces.get(core.id).trail];
+        return [done, [core.x, core.y], [g.pieces.get(window.ids.a).x, g.pieces.get(window.ids.a).y], copy.pieces.get(core.id).trail[0]];
     });
-    expect(r).toEqual([true, [1, -1], [0, 0], 'follow', [[0, 0]]]); // the trail is saved too
-    await page.keyboard.press('m');
-    await expect(button(page, 'Move: Fixed')).toBeVisible();
-});
-
-test('a game starts in the moveMode setting\'s mode: Fixed or Follow (Free is for shift-clicking)', async ({page}) => {
-    await setUp(page);
-    expect(await page.evaluate(() => ['follow', 'free'].map(moveMode => {
-        const g = hc.app.game, copy = new hc.Game();
-        g.gameMap = {...g.gameMap, rules:{moveMode}};
-        g.reset();
-        copy.importFromObj({...JSON.parse(JSON.stringify(g.exportToObj())), moveMode});
-        return [g.moveMode, copy.moveMode];
-    }))).toEqual([['follow', 'follow'], ['fixed', 'fixed']]);
+    expect(r).toEqual([true, [1, -1], [0, 0], [0, 0]]);
+    // No mode to pick
+    await expect(page.getByText('Move: Fixed')).toHaveCount(0);
 });
 
 test('a squad far off that can\'t get through keeping its shape squeezes through', async ({page}) => {

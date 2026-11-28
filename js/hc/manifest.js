@@ -12,7 +12,7 @@ JS.Packages(file => {
     file(HC_ROOT + 'hc.js').provides('hc','hc.theme','hc.cfg',
         'hc.AP_UNIT','hc.XP_UNIT','hc.STATS','hc.CHARACTER_NAME_MAX','hc.CHARACTER_DESCRIPTION_MAX','hc.ITEM_GOLD','hc.EQUIP_SLOTS','hc.NEEDS','hc.NEED_UNIT',
         'hc.EFFECT_EXHAUSTED','hc.EFFECT_RALLYING','hc.EFFECT_RALLIED',
-        'hc.MOVE_MODES','hc.PLAYER_MOVE_MODES',
+        'hc.MOVE_MODES',
         'hc.STAT_VARS','hc.XP_VARS','hc.MULTI_KILL_VARS','hc.DAMAGE_VARS','hc.COST_VARS',
         'hc.FIXTURE_TYPES','hc.FIXTURE_HEAL','hc.FIXTURE_HARM','hc.FIXTURE_LOOT','hc.FIXTURE_FEATURE'
     );
@@ -76,7 +76,7 @@ JS.Packages(file => {
     );
     file(MODEL_ROOT + 'Enemies.js').provides('hc.enemyGroups','hc.defineEnemies','hc.enemyTrees').requires('hc.Subtypes','hc.enemies');
     file(MODEL_ROOT + 'Game.js').provides('hc.Game').requires('hc.hex','hc.PIECE_TYPES','hc.Movement','hc.Navigation','hc.Formation','hc.Combat','hc.Goals','hc.solids','hc.Fixtures','hc.Effects','hc.Items','hc.Needs','hc.settings','hc.ProximityTileGenerator','hc.CavernsTileGenerator','hc.ProximitySpawnGenerator','hc.CavernsSpawnGenerator','hc.SquadAI');
-    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.attrs','hc.PLAYER_MOVE_MODES','hc.STAT_VARS','hc.XP_VARS','hc.MULTI_KILL_VARS','hc.DAMAGE_VARS');
+    file(MODEL_ROOT + 'Settings.js').provides('hc.settings').requires('hc.cfg','hc.attrs','hc.STAT_VARS','hc.XP_VARS','hc.MULTI_KILL_VARS','hc.DAMAGE_VARS');
     file(MODEL_ROOT + 'Persistence.js').provides('hc.PersistenceManager').requires('hc.Game');
     
     

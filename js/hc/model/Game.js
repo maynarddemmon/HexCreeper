@@ -12,7 +12,7 @@
         TILE_TYPE_FLOOR, TILE_TYPE_HOLE, TILE_TYPE_SOLID, FIXTURE_TYPES,
         hex:{keysNear, lineCellInto},
         hexDist, PIECE_TYPES,
-        PLAYER_MOVE_MODES, COST_VARS,
+        COST_VARS,
         attrs:{evaluate}
     } = pkg,
         
@@ -80,7 +80,6 @@
             this.fixtures = new Map();       // "x,y" -> {x, y, type:"heal" | "harm" | "loot", subtype, ...}: what's on open floor (see Fixtures.js)
             this.seenCells = new Set();      // keys of cells that have been in sight (fog of war)
             this.initiativeTurn = null;      // the turn your pieces last got initiative (see noticeEnemies)
-            this.moveMode = this.rules.moveMode; // how the player's pieces move (see Movement.js)
             const core = this.addPiece('core', 'player', 0, 0);
             this.playerCoreId = core.id;
             if (this.character && !this.characterProblem(this.character)) {
@@ -136,7 +135,6 @@
                 enemyAI:{type:this.enemyAI.type, attrs:{...this.enemyAI.attrs}, state:this.enemyAI.exportState()},
                 seenCells:[...this.seenCells],
                 initiativeTurn:this.initiativeTurn,
-                moveMode:this.moveMode,
                 playerCoreId:this.playerCoreId,
                 selectedId:this.selectedId,
                 corePath:this.corePath.map(c => [...c]),
@@ -234,7 +232,6 @@
             this.enemyAI = enemyAI;
             this.seenCells = new Set(o.seenCells);
             this.initiativeTurn = Number.isInteger(o.initiativeTurn) ? o.initiativeTurn : null;
-            this.moveMode = PLAYER_MOVE_MODES.includes(o.moveMode) ? o.moveMode : 'fixed';
             this.playerCoreId = o.playerCoreId;
             this.selectedId = o.selectedId;
             this.rules = rules;
@@ -417,7 +414,7 @@
         // step onto an opposing piece, the action is an attack instead: every such
         // member hits its target and nobody moves. For your pieces, only those it has the
         // action points for (see moveCost), unless afford is false.
-        legalMoves: function(piece, mode = this.modeFor(piece), afford = true) {
+        legalMoves: function(piece, mode = 'fixed', afford = true) {
             if (!piece || this.over) return [];
             const mine = piece.owner === 'player' && afford;
             if (mine && !this.canMove(piece)) return [];
@@ -447,16 +444,16 @@
         
         // Could `piece` step by (dx, dy) right now, in mode? Same rules as a normal move;
         // optionally refuse to step any piece that moves onto an active harm tile.
-        canStep: function(piece, dx, dy, avoidHarm = false, mode = this.modeFor(piece)) {
+        canStep: function(piece, dx, dy, avoidHarm = false, mode = 'fixed') {
             const r = this.resolveStep(this.boardView(avoidHarm), piece.id, dx, dy, mode);
             return !!r && !r.attack;
         },
         
-        findMove: function(piece, x, y, mode = this.modeFor(piece), afford = true) {
+        findMove: function(piece, x, y, mode = 'fixed', afford = true) {
             return this.legalMoves(piece, mode, afford).find(m => m.x === x && m.y === y) || null;
         },
         
-        act: function(piece, x, y, mode = this.modeFor(piece)) {
+        act: function(piece, x, y, mode = 'fixed') {
             const m = this.findMove(piece, x, y, mode);
             if (!m) return false;
             if (m.attack) {
@@ -499,7 +496,7 @@
         
         // Moves a piece by (dx, dy) in mode (as resolveStep says), if it can. Returns
         // whether it did.
-        moveGroup: function(piece, dx, dy, mode = this.modeFor(piece)) {
+        moveGroup: function(piece, dx, dy, mode = 'fixed') {
             const r = this.resolveStep(this.boardView(), piece.id, dx, dy, mode);
             if (r && !r.attack) this.applyMoves(piece, r.moves);
             return !!r && !r.attack;
@@ -711,7 +708,7 @@
         // Your pieces act in any order, each as often as its action points allow (see
         // Combat.js). Only the piece you choose spends them; pieces it carries keep theirs.
         // Your piece acts (moves or attacks): in its movement mode, or the one given.
-        playerAct: function(piece, x, y, mode = this.modeFor(piece)) {
+        playerAct: function(piece, x, y, mode = 'fixed') {
             // Into a fixture in the way that a step does something to (a door: see
             // Fixtures.stepAction): that, if it can, and nothing else.
             const step = piece?.owner === 'player' ? this.stepAction(piece, x, y) : undefined;

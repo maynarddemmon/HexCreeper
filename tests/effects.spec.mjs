@@ -22,12 +22,12 @@ const fixtureAt = (page, x, y) => page.evaluate(([x, y]) => hc.app.game.fixtures
 
 // Moves the core by (dx, dy) as its move, and the turn ends (by itself, once there's
 // nothing left to do, or else here).
-const step = (page, dx, dy) => page.evaluate(([dx, dy]) => {
+const step = (page, dx, dy, mode) => page.evaluate(([dx, dy, mode]) => {
     const g = hc.app.game, c = g.getPlayerCore(), turn = g.turn,
-        ok = g.playerAct(c, c.x + dx, c.y + dy);
+        ok = g.playerAct(c, c.x + dx, c.y + dy, mode ?? undefined);
     if (g.turn === turn) g.playerWait();
     return ok;
-}, [dx, dy]);
+}, [dx, dy, mode ?? null]);
 
 test.beforeEach(async ({page}) => {
     await startGame(page);
@@ -97,8 +97,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
         g.removePiece(g.pieceAt(1, 0));
         g.pieceAt(2, 0).parentId = c.id;
         g.addPiece('core', 'enemy', 1, 1);
-        g.moveMode = 'free';                // so a stays put when the core moves
-        g.enemyPhase = () => {};            // and the enemy too
+        g.enemyPhase = () => {};            // so the enemy stays put
         g.recomputeRanks();
         for (const p of g.pieces.values()) p.hp = p.maxHp = 20;
         g.playerWait();
@@ -117,9 +116,9 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
     const use = async subtype => {
         const before = await scores();
         await putFixture(page, 1, 0, subtype);
-        await step(page, 1, 0);
+        await step(page, 1, 0, 'free');     // (so a stays put when the core moves)
         const after = await scores();
-        await step(page, -1, 0);
+        await step(page, -1, 0, 'free');
         return after.map((s, i) => s - before[i]);
     };
     expect(await use('flat')).toEqual([3, 1]);   // the core, on it, first; a gets what's left
@@ -131,7 +130,7 @@ test('an area: flat, ring or fade, nearest first while the pool lasts; harm hits
         return [g.getPlayerCore().hp, g.pieceAt(2, 0).hp, g.pieceAt(1, 1).hp];
     });
     const before = await hp();
-    await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 1, 0));
+    await page.evaluate(() => hc.app.game.playerAct(hc.app.game.getPlayerCore(), 1, 0, 'free'));
     expect((await hp()).map((h, i) => before[i] - h)).toEqual([1, 1, 1]);
 });
 

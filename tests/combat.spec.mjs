@@ -94,7 +94,7 @@ test('a linked piece must stay within link range of its parent', async ({page}) 
         let steps = 0;
         for (let t = 0; t < 6; t++) {
             g.playerWait();
-            if (!g.playerAct(a, a.x + d[0], a.y + d[1])) break;
+            if (!g.playerAct(a, a.x + d[0], a.y + d[1], 'free')) break;  // (as usual, the swarm would follow it)
             steps++;
         }
         return {dist:hc.hexDist(a, c), steps, range:hc.app.game.rules.linkRange};

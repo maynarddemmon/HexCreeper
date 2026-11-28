@@ -18,7 +18,7 @@
             isObj,
             attrs:{num, bool, choice, expr, normalize, resolve},
             cfg,
-            PLAYER_MOVE_MODES, STAT_VARS, DAMAGE_VARS, XP_VARS, MULTI_KILL_VARS, COST_VARS, NEEDS
+            STAT_VARS, DAMAGE_VARS, XP_VARS, MULTI_KILL_VARS, COST_VARS, NEEDS
         } = pkg,
         
         /*  Each need's rules (see Needs.js), with their defaults: its bounds (minThirst,
@@ -79,7 +79,6 @@
         RULES = [
             num('visionRadius', 12, 1, 30),   // how far your pieces see (see hc.cfg.VISION)
             num('linkRange', 3, 1, 20),       // the farthest a linked piece can get from the one it's linked to
-            choice('moveMode', 'fixed', () => PLAYER_MOVE_MODES.map(m => ({value:m, label:m}))), // how your pieces move at the start: fixed or follow (see Movement.js)
             num('rankBase', 1, 1, 10),        // the rank of a piece without two children (it sets how XP is shared: see Combat.awardXp)
             // Character creation (see Combat.characterProblem): the stat points to spend, and
             // how far a stat can go below and above its species' typical value.

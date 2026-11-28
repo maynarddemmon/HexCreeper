@@ -98,7 +98,6 @@
         
         // Move Modes (see Movement.js)
         MOVE_MODES:['fixed', 'free', 'follow'],
-        PLAYER_MOVE_MODES:['fixed', 'follow'], // those you can set your moves to
         
         // Expression Vars
         VAR_XP,

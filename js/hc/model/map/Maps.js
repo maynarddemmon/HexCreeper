@@ -159,6 +159,14 @@
                         
                         // Items (after the materials they're made of)
                         pkg.items.define(data.items);
+                        if (!pkg.Items.defineCategories(data.itemCategories ?? [])) {
+                            console.warn('itemCategories should be a list of ids:', data.itemCategories);
+                        }
+                        for (const it of pkg.items.list()) {
+                            if (it.category && !pkg.Items.categories().includes(it.category)) {
+                                console.warn('Item', it.id, 'has category', it.category, 'not in itemCategories');
+                            }
+                        }
                         if (!pkg.items.get(ITEM_GOLD)) {
                             console.warn('There is no gold: no item', ITEM_GOLD);
                         }

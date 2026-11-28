@@ -21,8 +21,8 @@ test('the data is init.json5\'s tables and those of the files it includes: rules
     }))));
     expect(r).toEqual({
         tables:[
-            'backgrounds', 'defaultMap', 'effects', 'enemies', 'enemyGroups', 'fixtures', 'floors', 'holes', 'items', 'maps', 'materials',
-            'rules', 'shadow', 'solids', 'species'
+            'backgrounds', 'defaultMap', 'effects', 'enemies', 'enemyGroups', 'fixtures', 'floors', 'holes', 'itemCategories', 'items',
+            'maps', 'materials', 'rules', 'shadow', 'solids', 'species'
         ],
         maps:true, rules:'number', species:true, solids:true
     });

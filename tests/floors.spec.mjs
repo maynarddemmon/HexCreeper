@@ -59,7 +59,6 @@ test('a step onto dear going costs its moveCost times an action; a group pays fo
         g.playerPlace(3, 0, c);
         g.pieceAt(3, 0).ap = 0;
         c.ap = 400;
-        g.moveMode = 'fixed';
         g.playerAct(c, 1, 0);                    // the core onto mud, its child onto (2, 0)
         out.push(c.ap, g.pieceAt(2, 0) ? 'moved' : 'not');
         g.playerAct(c, 0, 0);                    // the core onto plain floor, the child onto mud

@@ -108,21 +108,23 @@ test('a fixture blocks as much sight as its material\'s opacity times its covera
     expect(r).toEqual([0.5, 0, 1, false, true]);
 });
 
-test('a fixture with HP in the way can be broken, as a solid can; it leaves its floor and destroyInto, which the piece advances onto', async ({page}) => {
+test('a fixture with HP in the way can be broken with Attack (a step into it does nothing); it leaves its floor and destroyInto', async ({page}) => {
     await putFixture(page, 1, 0, 'wall');
     await putFixture(page, 0, 1, 'hard');
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        c.ap = 400;
         // The hard one's DR is more than the core can do (sure combat: 1 damage).
-        out.push(g.legalMoves(c).some(m => m.x === 0 && m.y === 1));
-        g.playerAct(c, 1, 0);
+        out.push(g.attackTargets(c).some(m => m.x === 0 && m.y === 1));
+        out.push(g.legalMoves(c).some(m => m.x === 1 && m.y === 0), g.playerAct(c, 1, 0), g.fixtures.get('1,0').hp);
+        g.playerAttack(c, 1, 0);
         out.push(g.fixtures.get('1,0').hp);
-        g.playerAct(c, 1, 0);
+        g.playerAttack(c, 1, 0);
         const f = g.fixtures.get('1,0');
         out.push(f.subtype, f.revealedAt === g.turn, g.tiles.get('1,0')?.subtype, g.isOpen(1, 0), [c.x, c.y]);
         return out;
     });
-    expect(r).toEqual([false, 1, 'rubbish', true, 'mud', true, [1, 0]]);
+    expect(r).toEqual([false, false, false, 2, 1, 'rubbish', true, 'mud', true, [0, 0]]);
 });
 
 test('a fixture used up or run out leaves its destroyInto too', async ({page}) => {

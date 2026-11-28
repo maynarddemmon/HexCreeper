@@ -31,12 +31,18 @@
 	//   consumeCost: what eating or drinking it costs (the consumeCost rule's if not given)
 	//   fluid:     true for a fluid (water): it goes only in what holds fluids, and is
 	//              counted in millilitres (its volume is 1)
+	//   category:  what sort of thing it is: one of "itemCategories" (below). An inventory
+	//              lists what's equipped first, then the rest by category, in that order,
+	//              a faint line between each (those without one last)
 	// What a species leaves when it dies is one of these (its "corpse" in entities.json5:
 	// "corpse" if it doesn't say), holding everything it had, and named for it ("goblin
 	// corpse", "creeper husk", "corpse of Tess").
+	"itemCategories":["weapon", "armor", "food", "drink", "container", "money", "remains"],
+	
 	"items":{
 		// Money
 		"gold_coin":{
+			"category":"money",
 			"name":"gold coin",
 			"description":"Gold: what loot gives, and placing a piece costs.",
 			"material":"gold",
@@ -46,6 +52,7 @@
 		
 		// Remains
 		"corpse":{
+			"category":"remains",
 			"name":"corpse",
 			"description":"What's left of something that died, and everything it had.",
 			"material":"flesh",
@@ -71,6 +78,7 @@
 		
 		// Weapons (from Ouroboros)
 		"dagger":{
+			"category":"weapon",
 			"name":"dagger",
 			"description":"A short blade for close work.",
 			"material":"steel",
@@ -78,6 +86,7 @@
 			"equip":{"slot":"weapon", "damage":[1, 4], "penetration":1, "cost":0.25}
 		},
 		"short_sword":{
+			"category":"weapon",
 			"name":"short sword",
 			"description":"A bronze blade, handy in a tight spot.",
 			"material":"bronze",
@@ -85,6 +94,7 @@
 			"equip":{"slot":"weapon", "damage":[2, 6], "penetration":1, "cost":0.25}
 		},
 		"long_sword":{
+			"category":"weapon",
 			"name":"long sword",
 			"description":"A long steel blade.",
 			"material":"steel",
@@ -92,6 +102,7 @@
 			"equip":{"slot":"weapon", "damage":[2, 8], "penetration":2, "cost":0.25}
 		},
 		"club":{
+			"category":"weapon",
 			"name":"club",
 			"description":"A heavy length of ironwood.",
 			"material":"ironwood",
@@ -101,6 +112,7 @@
 		
 		// Armour
 		"wooden_shield":{
+			"category":"armor",
 			"name":"wooden shield",
 			"description":"A round oak shield.",
 			"material":"oakwood",
@@ -108,6 +120,7 @@
 			"equip":{"slot":"offhand", "armor":1, "cost":0.5}
 		},
 		"leather_armor":{
+			"category":"armor",
 			"name":"leather armour",
 			"plural":"leather armour",
 			"description":"A jerkin of boiled leather.",
@@ -116,6 +129,7 @@
 			"equip":{"slot":"body", "armor":1, "cost":1}
 		},
 		"chain_shirt":{
+			"category":"armor",
 			"name":"chain shirt",
 			"description":"Steel rings, heavy but sure.",
 			"material":"steel",
@@ -123,6 +137,7 @@
 			"equip":{"slot":"body", "armor":2, "cost":1}
 		},
 		"iron_helm":{
+			"category":"armor",
 			"name":"iron helm",
 			"description":"A plain iron cap.",
 			"material":"iron",
@@ -130,6 +145,7 @@
 			"equip":{"slot":"head", "armor":1, "cost":0.25}
 		},
 		"leather_gloves":{
+			"category":"armor",
 			"name":"leather gloves",
 			"plural":"pairs of leather gloves",
 			"description":"Worn but supple. No protection to speak of, yet.",
@@ -138,6 +154,7 @@
 			"equip":{"slot":"hands", "cost":0.25}
 		},
 		"leather_boots":{
+			"category":"armor",
 			"name":"leather boots",
 			"plural":"pairs of leather boots",
 			"description":"Sturdy boots. No protection to speak of, yet.",
@@ -148,6 +165,7 @@
 		
 		// Food and drink (see js/hc/model/Needs.js)
 		"mushroom_jerky":{
+			"category":"food",
 			"name":"mushroom jerky",
 			"plural":"mushroom jerky",
 			"description":"Dried strips of cave mushroom. Salty.",
@@ -158,6 +176,7 @@
 			"quench":-20
 		},
 		"centipede_jerky":{
+			"category":"food",
 			"name":"centipede jerky",
 			"plural":"centipede jerky",
 			"description":"Dried giant centipede. Chewy, and saltier still.",
@@ -169,6 +188,7 @@
 		},
 		// Goblin food: meant for goblins, barely food for anyone else
 		"mold_cake":{
+			"category":"food",
 			"name":"mold cake",
 			"description":"A dense cake of cave mold pressed with grease. Goblins love it; anyone else can barely keep it down.",
 			"material":"fungus",
@@ -178,6 +198,7 @@
 			"heals":{"goblin":0, "orc":0, "half_orc":0, "ogre":0, "*":-1}
 		},
 		"crawler_stalk":{
+			"category":"food",
 			"name":"crawler stalk",
 			"description":"A pale, fleshy stalk that grows where crawlers nest. Filling, and it knits wounds.",
 			"material":"vegetable",
@@ -187,6 +208,7 @@
 			"heals":2.5
 		},
 		"water":{
+			"category":"drink",
 			"name":"water",
 			"plural":"water",
 			"description":"Water: a drink is a quarter of a litre.",
@@ -200,6 +222,7 @@
 		
 		// Containers
 		"flask":{
+			"category":"drink",
 			"name":"flask",
 			"description":"A small tin flask: a quarter of a litre.",
 			"material":"tin",
@@ -208,6 +231,7 @@
 			"inventory":{"capacity":1, "volume":250, "fluids":true}
 		},
 		"canteen":{
+			"category":"drink",
 			"name":"canteen",
 			"description":"A tin canteen: a litre.",
 			"material":"tin",
@@ -216,6 +240,7 @@
 			"inventory":{"capacity":1, "volume":1000, "fluids":true}
 		},
 		"water_skin":{
+			"category":"drink",
 			"name":"water skin",
 			"description":"A leather skin: two litres.",
 			"material":"leather",
@@ -224,6 +249,7 @@
 			"inventory":{"capacity":1, "volume":2000, "fluids":true}
 		},
 		"belt_pouch":{
+			"category":"container",
 			"name":"belt pouch",
 			"description":"A small leather pouch.",
 			"material":"leather",

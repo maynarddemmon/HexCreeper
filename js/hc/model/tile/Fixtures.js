@@ -331,8 +331,9 @@
         
         /*  Whether piece can break fixture f: it's a piece of yours, f has HP, and its most
             damage is more than f's DR (its material's hardness) after its penetration (see
-            Combat.js). A step attacks one only if it's in the way (see Movement.boardView);
-            Attack, any (see Game.attackAt). */
+            Combat.js). Only Attack hits one (see Game.attackAt; 2026-11-28: a step into one
+            in the way did too, which broke chests you only meant to open: see
+            containerStep). */
         canBreakFixture: function(piece, f) {
             return piece.owner === 'player' && f?.hp != null &&
                 this.damageRange(piece)[1] > this.armorAgainst(piece, this.fixtureType(f).material?.hardness ?? 0);
@@ -482,6 +483,27 @@
             if (onStep.length) {
                 const name = this.fixtureActions(p, f).find(n => onStep.includes(n));
                 retval = name ? {action:name} : null;
+            }
+            return retval;
+        },
+        
+        /*  Piece p of yours steps into (x, y), next to it, where there's a container you
+            know of in the way (a chest, a cabinet): if what's in it can't be got at, it does
+            the first action that lets it be, if it can (opens a shut chest), for an action.
+            Returns whether what's in it can be got at now (the caller opens the inventory: see
+            App.stepInto), or undefined if there's no such container there (it's a step as
+            usual). */
+        containerStep: function(p, x, y) {
+            const f = p?.owner === 'player' && !this.over && hexDist(p, {x, y}) === 1 ? this.fixtureAt(x, y) : null;
+            let retval;
+            if (f?.inventory && this.fixtureBlocks(x, y)) {
+                retval = this.fixtureOpen(f);
+                if (!retval) {
+                    const actions = this.fixtureType(f).actions,
+                        name = this.fixtureActions(p, f).find(n =>
+                            this.fixtureValue({...f, state:this.actedState(f, actions[n])}, 'access'));
+                    retval = !!name && this.playerUse(p, x, y, name);
+                }
             }
             return retval;
         },

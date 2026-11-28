@@ -116,15 +116,6 @@ test('an exhausted piece gets no points back at the end of the turn; each jump a
     expect(r).toEqual([[true, true], [0, [2], 200], [0, [1], 200], [0, [], 200], [200, 0, 200]]);
 });
 
-test('no jumping in follow mode', async ({page}) => {
-    await setUp(page);
-    expect(await page.evaluate(() => {
-        const g = hc.app.game;
-        g.moveMode = 'follow';
-        return [g.canJump(g.getPlayerCore()), g.playerJump(g.getPlayerCore(), 2, 0)];
-    })).toEqual([false, false]);
-});
-
 test('J, then a highlighted cell, jumps the selected piece there', async ({page}) => {
     await setUp(page);
     await page.evaluate(() => {

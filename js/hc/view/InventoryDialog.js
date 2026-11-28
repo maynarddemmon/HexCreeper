@@ -3,7 +3,7 @@
 
     const JSClass = JS.Class,
         M = myt,
-        {I18N:{get:i18n}, Text, SpacedLayout} = M,
+        {I18N:{get:i18n}, View, Text, SpacedLayout} = M,
 
         {
             WideView, UnderlineBtn, ICON_CANCEL,
@@ -80,7 +80,8 @@
 
         /*  An item: a ▸ / ▾ to show or hide what's in it (if it holds things), what it is
             (indented as deep as it is in what holds it), what it weighs, and its actions'
-            buttons. */
+            buttons; with divider, a faint line over it, from where it starts, where a new
+            group starts (see Items.inventoryOrder). */
         ItemRow = new JSClass('ItemRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
@@ -93,6 +94,12 @@
                 self.callSuper(parent, attrs);
 
                 const x = padding + row.depth * INDENT;
+                if (row.divider) {
+                    new View(self, {
+                        x, width:PANEL_WIDTH - padding - x, height:1,
+                        bgColor:colorTextMuted, opacity:0.35, ignoreLayout:true
+                    });
+                }
                 if (row.container) toggleBtn(self, x, row.label, expanded, () => onToggle(row.id), {item:row.id});
                 new Text(self, {
                     x:x + TOGGLE_WIDTH, y:3, width:WEIGHT_X - x - TOGGLE_WIDTH - padding, text:row.label,
@@ -141,8 +148,9 @@
                     Items.reachHolder; open: whether what's in it can be got at; expanded:
                     whether what's in it shows, or null if it always does; takeAll: why it
                     can't all be taken, '' if it can, or null for no Take all), its rows
-                    [{id, label, weight, depth, container, expanded, equipped, fluid,
-                    actions}] (actions: {take, drop, takeAll, transfer, equip, consume,
+                    [{id, label, weight, depth, divider, container, expanded, equipped,
+                    fluid, actions}] (divider: a new group starts there; actions: {take,
+                    drop, takeAll, transfer, equip, consume,
                     fill}, each why it can't be done, '' if it can, if it's offered: equip
                     is Equip, or Unequip for what's equipped; consume Eat, or Drink for a
                     fluid). A section for a stream or pool (something to drink from, not

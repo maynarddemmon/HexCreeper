@@ -33,6 +33,9 @@
         fluid      whether it's a fluid (water): it goes only in what holds fluids (an
                    inventory with "fluids":true: a flask), and nothing else goes there. It's
                    counted in its volume (a millilitre of water is one).
+        category   what sort of thing it is (weapon, food...): one of the data's
+                   "itemCategories", which an inventory lists in that order, after what's
+                   equipped (see inventoryOrder); last, if not given
     Entries can extend others (see Subtypes.js).
 
     An item is plain data, saved with the game: {id, kind, count}, count being how many
@@ -73,6 +76,8 @@
 (pkg => {
     'use strict';
     
+    let categories = []; // the item categories, in order (see Items.defineCategories)
+    
     const {I18N:{get:i18n}} = myt,
         {
             Subtypes, isObj, attrs:{evaluate},
@@ -108,19 +113,20 @@
                 stack = entry.stack ?? 1,
                 inventory = entry.inventory === undefined ? null : parseLimits(entry.inventory) ?? undefined,
                 equip = entry.equip === undefined ? null : parseEquip(entry.equip),
-                {dose = 1, consumeCost = null, fluid = false} = entry,
+                {dose = 1, consumeCost = null, fluid = false, category = null} = entry,
                 effects = Object.fromEntries(CONSUME_EFFECTS.map(e => [e, parseBySpecies(entry[e])])),
                 ok = isText(entry.plural) && material !== undefined && isNum(volume) &&
                     (entry.weight === undefined || isNum(entry.weight)) && isNatNum(capacity) &&
                     isIntOfAtLeast(stack, 1) && inventory !== undefined && !(inventory && stack > 1) &&
                     equip !== undefined && Object.values(effects).every(Boolean) && isIntOfAtLeast(dose, 1) &&
-                    (consumeCost === null || (isNum(consumeCost) && consumeCost > 0)) && typeof fluid === 'boolean';
+                    (consumeCost === null || (isNum(consumeCost) && consumeCost > 0)) && typeof fluid === 'boolean' &&
+                    (category === null || isText(category));
             return ok ? {
                 plural:entry.plural || entry.name + 's',
                 material:entry.material ?? null,
                 volume,
                 weight:entry.weight ?? volume * (material?.density ?? 0),
-                capacity, stack, inventory, equip, ...effects, dose, consumeCost, fluid
+                capacity, stack, inventory, equip, ...effects, dose, consumeCost, fluid, category
             } : null;
         },
         
@@ -164,7 +170,7 @@
         // An item of a kind that isn't known: it weighs nothing, and takes a place.
         FALLBACK = {
             plural:'', material:null, volume:0, weight:0, capacity:1, stack:1, inventory:null, equip:null,
-            quench:{}, satiates:{}, heals:{}, rests:{}, dose:1, consumeCost:null, fluid:false
+            quench:{}, satiates:{}, heals:{}, rests:{}, dose:1, consumeCost:null, fluid:false, category:null
         },
         
         // How many of something weighing (or taking) each, whose limit leaves room, fit.
@@ -189,7 +195,28 @@
             parseItemList,
             DEFAULT_CORPSE,
             NO_CORPSE,
-            CONSUME_EFFECTS
+            CONSUME_EFFECTS,
+            
+            /*  The item categories (see category), in the order inventories list them: the
+                data's itemCategories, ids. Returns whether they were usable (else there are
+                none). */
+            defineCategories: list => {
+                const ok = Array.isArray(list) && list.every(isText);
+                categories = ok ? [...list] : [];
+                return ok;
+            },
+            categories: () => [...categories]
+        },
+        
+        /*  The order to list holder's items in: what's equipped (that its piece wears, or
+            wore, on a corpse) first, then by their kinds' categories (see
+            defineCategories; those without one last), each in the order they're in.
+            Each {item, group}: 'equipped', its category, or '' (none). */
+        inventoryOrder: function(holder) {
+            const rank = g => g === 'equipped' ? -1 : (i => i < 0 ? categories.length : i)(categories.indexOf(g));
+            return (holder.inventory?.items ?? [])
+                .map(item => ({item, group:item.equipped ? 'equipped' : this.itemKind(item).category ?? ''}))
+                .sort((a, b) => rank(a.group) - rank(b.group));
         },
         
         // ---- Items ----
@@ -450,16 +477,19 @@
         
         /*  Piece p has died: its remains are left on the ground where it was, its corpse
             (its species' corpse: see above) holding all it had, or with no corpse, what it
-            had. Its corpse is named for it: by its name, if it has one, or its species'. */
+            had (what it wore still equipped: see _equipItem). Its corpse is named for it:
+            by its name, if it has one, or its species'. */
         leaveRemains: function(p) {
             const species = pkg.species.get(p.species),
                 corpse = species?.corpse ?? DEFAULT_CORPSE,
                 ground = this.groundAt(p.x, p.y, true),
                 had = p.inventory?.items ?? [];
             p.inventory = {items:[]};
-            for (const it of had) delete it.equipped;
             if (corpse === NO_CORPSE) {
-                for (const it of had) this.addItem(ground, it, true);
+                for (const it of had) {
+                    delete it.equipped;
+                    this.addItem(ground, it, true);
+                }
             } else {
                 const c = this.makeItem(corpse),
                     into = c.inventory ? c : ground,
@@ -533,12 +563,29 @@
             }
         },
         
+        /*  What a piece wore when it died stays equipped on its corpse (see leaveRemains),
+            and has to be unequipped there before it can be taken (see moveProblem: 'worn'),
+            for its equip cost, as if it were the corpse's.
+            
+            The item id that piece p would equip (or with unequip, unequip): what it
+            carries (not in something it carries), or to unequip, what's equipped anywhere
+            else it can get at (on a corpse); or null. @private */
+        _equipItem: function(p, id, unequip) {
+            let it = p?.owner === 'player' ? (p.inventory?.items ?? []).find(i => i.id === id) ?? null : null;
+            if (!it && unequip && p?.owner === 'player') {
+                const found = this.reachItem(p, id);
+                it = found?.item.equipped ? found.item : null;
+            }
+            return it;
+        },
+        
         /*  Why piece p can't equip item id (or with unequip, unequip it): '' if it can,
             else 'over', 'player' (not yours), 'missing' (it doesn't carry it, not in
-            something it carries), 'unequippable' (it can't be equipped), 'equipped' (or
-            'unequipped': it already is), or 'ap' (not the points: see Combat.equipCostOf). */
+            something it carries; to unequip, nor is it equipped where it can get at it),
+            'unequippable' (it can't be equipped), 'equipped' (or 'unequipped': it already
+            is), or 'ap' (not the points: see Combat.equipCostOf). */
         equipProblem: function(p, id, unequip = false) {
-            const it = p?.owner === 'player' ? (p.inventory?.items ?? []).find(i => i.id === id) : null;
+            const it = this._equipItem(p, id, unequip);
             let retval;
             if (this.over) {
                 retval = 'over';
@@ -564,7 +611,7 @@
         playerEquip: function(p, id, unequip = false) {
             const done = !this.equipProblem(p, id, unequip);
             if (done) {
-                const it = p.inventory.items.find(i => i.id === id);
+                const it = this._equipItem(p, id, unequip);
                 if (unequip) {
                     delete it.equipped;
                 } else {
@@ -655,9 +702,10 @@
         
         /*  Why piece p can't move item id (as much of it as fits: at least one) into the
             holder ref names (see reachHolder), for cost action points: '' if it can, else
-            'over', 'player' (not yours), 'missing' (p can't get at it), 'nowhere' (or at
-            that), 'there' (that's where it is), 'ap' (not the points), or why it doesn't
-            fit (see addProblem: 'loop' for into itself). */
+            'over', 'player' (not yours), 'missing' (p can't get at it), 'worn' (it's
+            equipped on a corpse: see _equipItem), 'nowhere' (or at that), 'there' (that's
+            where it is), 'ap' (not the points), or why it doesn't fit (see addProblem:
+            'loop' for into itself). */
         moveProblem: function(p, id, ref, cost) {
             const found = p?.owner === 'player' ? this.reachItem(p, id) : null,
                 to = found ? this.reachHolder(p, ref) : null;
@@ -668,6 +716,8 @@
                 retval = 'player';
             } else if (!found) {
                 retval = 'missing';
+            } else if (found.item.equipped && found.holder !== p) {
+                retval = 'worn';
             } else if (!to) {
                 retval = 'nowhere';
             } else if (to === found.holder) {
@@ -722,10 +772,12 @@
         
         /*  Why piece p can't take all that's in the holder ref names (see reachHolder; not
             itself): '' if it can take something of it, else 'over', 'player', 'nowhere',
-            'empty', 'ap', or why the first thing in it doesn't fit (see addProblem). */
+            'empty', 'worn' (all there is in it is: see moveProblem), 'ap', or why the first
+            thing in it doesn't fit (see addProblem). What's worn it leaves. */
         takeAllProblem: function(p, ref) {
             const from = p?.owner === 'player' && ref !== 'piece' ? this.reachHolder(p, ref) : null,
-                items = from?.inventory?.items ?? [];
+                all = from?.inventory?.items ?? [],
+                items = all.filter(it => !it.equipped);
             let retval;
             if (this.over) {
                 retval = 'over';
@@ -733,8 +785,10 @@
                 retval = 'player';
             } else if (!from) {
                 retval = 'nowhere';
-            } else if (!items.length) {
+            } else if (!all.length) {
                 retval = 'empty';
+            } else if (!items.length) {
+                retval = 'worn';
             } else if (!this.canAfford(p, this.takeCost(p))) {
                 retval = 'ap';
             } else {
@@ -753,7 +807,7 @@
                 const from = this.reachHolder(p, ref),
                     cost = this.takeCost(p),
                     took = [];
-                for (const it of [...from.inventory.items]) {
+                for (const it of from.inventory.items.filter(i => !i.equipped)) {
                     if (this.canAfford(p, cost) && !this.addProblem(p, it, 1)) {
                         took.push(this._move(p, it.id, 'piece', cost));
                     }

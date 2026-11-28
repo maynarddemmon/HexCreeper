@@ -99,8 +99,8 @@ test('Go to: G, then a cell; the piece goes there a step a turn, its swarm follo
     await expect(status(page, 'Arrived.')).toBeVisible({timeout:10000});
     expect(await page.evaluate(() => {
         const g = hc.app.game, core = g.getPlayerCore(), other = g.piecesOf('player').find(p => p !== core);
-        return {core:[core.x, core.y], follows:hc.hexDist(core, other) === 1, turn:g.turn, mode:g.moveMode};
-    })).toEqual({core:[3, 0], follows:true, turn:4, mode:'fixed'}); // turns 2 and 3 ended after the first two steps
+        return {core:[core.x, core.y], follows:hc.hexDist(core, other) === 1, turn:g.turn};
+    })).toEqual({core:[3, 0], follows:true, turn:4}); // turns 2 and 3 ended after the first two steps
     // Pointing at another cell then says what's there.
     await page.mouse.move(...await cellOnPage(page, 1, -2));
     await expect(status(page, 'Stone floor · Plain stone.')).toBeVisible();

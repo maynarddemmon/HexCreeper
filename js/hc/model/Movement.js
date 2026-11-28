@@ -4,7 +4,7 @@
     - fixed: the piece's whole subtree moves with it, keeping its shape.
     - free: only the piece moves, but any piece linked below it that would then be out of
       link range is dragged along by the same step (and so on down). Not a mode you pick
-      (PLAYER_MOVE_MODES): you get it by Shift-clicking (see View: clickMoves).
+      you get it by Shift-clicking (see View: clickMoves).
     - follow: the piece leads and its whole tree follows (what's below it, and its parent,
       grandparent and so on, with their other branches): each piece stays or moves a
       cell, and a search finds an arrangement that keeps the links in range, if there's
@@ -14,8 +14,11 @@
       lead may step on one). So a swarm files after its leader through tight places and
       round corners, and sorts itself out where pieces are in each other's way.
     
-    A step that can't be done in follow is tried in fixed, then free, as long as that
-    doesn't make it an attack, so a swarm stuck following can still get going.
+    Your pieces step in fixed (Go to and Explore in follow). A step that can't be done in
+    follow is tried in fixed, then free; one of yours that can't be done in fixed, in
+    follow, then free (2026-11-28: there was a mode you picked, fixed or follow, before);
+    as long as that doesn't make it an attack. So a swarm keeps its shape where it can,
+    and still gets through where it can't.
     
     In every mode a link may not end out of range unless it got shorter. Attacks: in fixed,
     every piece of the subtree that would land on a target hits it (a group attack); in
@@ -53,11 +56,14 @@
                 target(id, x, y) -> what the piece would hit by moving there, or null
             Returns null if it can't be done, {attack:true, hits} for an attack, or
             {attack:false, moves:[[id, x, y], ...]} for the pieces that move and where.
-            In follow, if it can't be done, it's tried in fixed, then free, but not to attack. */
+            If it can't be done, it's tried in the other modes, but not to attack: in follow,
+            fixed then free; for a piece of yours in fixed, follow then free. */
         resolveStep: function(view, id, dx, dy, mode) {
             let r = this._resolveStep(view, id, dx, dy, mode);
-            if (!r && mode === 'follow') {
-                for (const m of ['fixed', 'free']) {
+            if (!r) {
+                const fallbacks = mode === 'follow' ? ['fixed', 'free'] :
+                    mode === 'fixed' && this.pieces.get(id)?.owner === 'player' ? ['follow', 'free'] : [];
+                for (const m of fallbacks) {
                     r = this._resolveStep(view, id, dx, dy, m);
                     if (r?.attack) r = null;
                     if (r) break;
@@ -397,20 +403,19 @@
             return done;
         },
         
-        // A piece of yours can jump, for an action (see Combat.js), except in
-        // follow mode (unless anyMode, for Go to and Explore, which jump as a last resort).
-        // Enemies can jump too (see planSquad).
-        jumpTargets: function(p, anyMode=false) {
+        // A piece of yours can jump, for an action (see Combat.js). Enemies can jump too
+        // (see planSquad).
+        jumpTargets: function(p) {
             let out = [];
-            if (p?.owner === 'player' && this.canAfford(p) && (anyMode || this.modeFor(p) !== 'follow')) {
+            if (p?.owner === 'player' && this.canAfford(p)) {
                 out = this.jumpCells(this.boardView(), p.id);
             }
             return out;
         },
         canJump: function(p) {return this.jumpTargets(p).length > 0;},
-        playerJump: function(p, x, y, anyMode=false) {
+        playerJump: function(p, x, y) {
             let done = false;
-            if (this.jumpTargets(p, anyMode).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
+            if (this.jumpTargets(p).some(c => c.x === x && c.y === y) && this.jumpPiece(p, x, y)) {
                 this.spend(p);
                 this.afterPlayerAction();
                 done = true;
@@ -440,25 +445,20 @@
                 open: (x, y) => this.isOpen(x, y) && !(avoidHarm && this.isHarm(x, y)),
                 harm: (x, y) => this.isHarm(x, y),
                 target: (id, x, y) => {
+                    // (Not a fixture: only Attack hits one. See Fixtures.canBreakFixture.)
                     const g = this.pieces.get(id),
                         t = this.pieceAt(x, y),
-                        tile = this.tiles.get(this.key(x, y)),
-                        f = this.fixtures.get(this.key(x, y));
+                        tile = this.tiles.get(this.key(x, y));
                     let hit = null;
                     if (t && t.owner !== g.owner) {
                         hit = {attacker:g, target:t};
                     } else if (this.canBreak(g, tile)) {
                         hit = {attacker:g, target:tile, solid:true};
-                    } else if (f && this.fixtureBlocks(x, y) && this.canBreakFixture(g, f)) {
-                        hit = {attacker:g, target:f, fixture:true};
                     }
                     return hit;
                 }
             };
         },
-        
-        // The mode a piece moves in by default: the player's chosen mode, or fixed.
-        modeFor: function(piece) {return piece?.owner === 'player' ? this.moveMode : 'fixed';},
         
         /*  Adds the cell piece g is leaving to its trail, the cells it was on, latest first,
             as many as the link range (Follow walks them). A jump starts it afresh, since

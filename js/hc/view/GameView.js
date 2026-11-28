@@ -132,7 +132,7 @@
                         return;
                     }
                 }
-                // Shift (force): a move in Free mode (see clickMoves), else in yours, even onto a
+                // Shift (force): a move in Free mode (see clickMoves), else as usual, even onto a
                 // cell one of your pieces is on.
                 const sel = game.getSelected(),
                     move = force && sel && V.clickMoves(sel, true).find(m => m.x === c.x && m.y === c.y);
@@ -149,7 +149,7 @@
                     return;
                 }
                 // A move, or a jump to a cell it can jump to (see jumpAt)
-                if (sel && (game.playerAct(sel, c.x, c.y) || (V.jumpAt(sel, c) && game.playerJump(sel, c.x, c.y)))) {
+                if (sel && (pkg.app.stepInto(sel, c.x, c.y) || (V.jumpAt(sel, c) && game.playerJump(sel, c.x, c.y)))) {
                     this.afterTurn();
                 }
             }

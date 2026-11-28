@@ -508,3 +508,55 @@ test('H closes the Inventory dialog', async ({page}) => {
     await page.keyboard.press('h');
     await expect(page.getByText('Tess · Inventory')).toBeVisible();
 });
+
+test('stepping into a chest opens it (an action) and its inventory, and never breaks it; open, just the inventory', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await putContainers(page, true);
+    await page.evaluate(() => {
+        const g = hc.app.game;
+        g.rules.apPool = '3';
+        g.getPlayerCore().ap = 300;
+        g.selectedId = g.playerCoreId;
+        hc.app.centerOn(false);
+    });
+    const chest = () => page.evaluate(() => {
+        const g = hc.app.game, f = g.fixtures.get('1,0'), c = g.getPlayerCore();
+        return [f.state.open, f.hp, c.ap, c.x, c.y];
+    });
+    const [, hp] = await chest();
+    const title = page.getByText('Tess · Inventory');
+    await page.mouse.click(...await cellOnPage(page, 1, 0));
+    await expect(title).toBeVisible();
+    await expect(page.getByText('dagger', {exact:true}).last()).toBeVisible();
+    expect(await chest()).toEqual([true, hp, 200, 0, 0]);
+    await page.keyboard.press('h');
+    await expect(title).toBeHidden();
+    await page.mouse.click(...await cellOnPage(page, 1, 0));    // open already: no points
+    await expect(title).toBeVisible();
+    expect(await chest()).toEqual([true, hp, 200, 0, 0]);
+});
+
+test('an inventory lists what\'s equipped first, then by category, a faint line between groups', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const order = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        c.inventory = {items:[]};
+        for (const kind of ['mushroom_jerky', 'gold_coin', 'dagger', 'chain_shirt', 'flask', 'iron_helm', 'club']) {
+            g.addItem(c, g.makeItem(kind), true);
+        }
+        g.playerEquip(c, c.inventory.items.find(it => it.kind === 'chain_shirt').id);
+        return g.inventoryOrder(c).map(({item, group}) => item.kind + ':' + group);
+    });
+    expect(order).toEqual([
+        'chain_shirt:equipped', 'dagger:weapon', 'club:weapon', 'iron_helm:armor', 'mushroom_jerky:food', 'flask:drink',
+        'gold_coin:money'
+    ]);
+    await page.keyboard.press('h');
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
+    const rows = await page.locator('.myt-ItemRow').evaluateAll(els => els.map(e =>
+        [e.querySelector('.myt-Text')?.textContent, [...e.children].some(d => d.style.height === '1px')]));
+    expect(rows.map(([t]) => t.split(' ')[0])).toEqual(['chain', 'dagger', 'club', 'iron', 'mushroom', 'flask', 'gold']);
+    expect(rows.map(([, line]) => line)).toEqual([false, true, false, true, true, true, true]);
+});

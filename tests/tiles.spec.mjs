@@ -209,11 +209,12 @@ test.describe('rules', () => {
                 place:g.placeCells().some(q => q.x === a[0] && q.y === a[1]) || g.playerPlace(a[0], a[1], c)
             };
             
-            // A group can't move if any member would land on one.
+            // A group can't move in Fixed if any member would land on one. (A step of yours
+            // that can't then tries Follow.)
             g.tiles.clear();
             g.playerPlace(a[0], a[1], c);
             block(a[0] + b[0], a[1] + b[1]);
-            out.groupMove = g.playerAct(c, b[0], b[1]);
+            out.groupMove = !!g._resolveStep(g.boardView(), c.id, b[0], b[1], 'fixed');
             out.coreStayed = c.x === 0 && c.y === 0;
             return out;
         }, kind);

@@ -107,7 +107,8 @@ test('a detached piece moves freely, carrying what\'s linked below it', async ({
     const r = await page.evaluate(() => {
         const g = hc.app.game, a = g.pieces.get(window.ids.a);
         hc.app.game.rules.linkRange = 1;
-        const before = g.legalMoves(a).some(m => m.x === 2 && m.y === -1); // 2 from the core: out of range
+        // 2 from the core: out of range (in Free: as usual, the core would follow it)
+        const before = g.legalMoves(a, 'free').some(m => m.x === 2 && m.y === -1);
         g.playerDetach(a);
         g.playerWait();
         const after = g.legalMoves(a).some(m => m.x === 2 && m.y === -1);

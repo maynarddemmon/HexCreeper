@@ -64,7 +64,7 @@ test('a weapon\'s damage and penetration replace the piece\'s own; armour adds t
     expect(r.after).toEqual([[2 + r.bonus, 8 + r.bonus].map(n => Math.max(0, n)), 2 + r.pen, 4]);
 });
 
-test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'t equipped', async ({page}) => {
+test('enemies equip what they\'re given; what\'s left in a corpse stays equipped, and must be unequipped to be taken', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const r = await page.evaluate(() => {
@@ -75,6 +75,19 @@ test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'
         const corpse = g.groundAt(1, 0).inventory.items[0];
         // (Not its food, which the data tunes)
         out.push(corpse.inventory.items.filter(it => !g.isConsumable(g.itemKind(it))).map(it => it.kind + (it.equipped ? '*' : '')));
+        // Worn: it can't be taken, moved or taken with the rest, till it's unequipped, for
+        // its equip cost.
+        const sword = corpse.inventory.items.find(it => it.kind === 'long_sword');
+        g.rules.apPool = '9';
+        c.ap = 900;
+        c.x = 1;
+        g.board.delete('0,0');
+        g.board.set('1,0', c.id);
+        out.push(g.takeProblem(c, sword.id), g.transferProblem(c, sword.id, 'ground'), g.equipProblem(c, sword.id));
+        g.playerTakeAll(c, corpse.id);
+        out.push(corpse.inventory.items.map(it => it.kind), g.takeAllProblem(c, corpse.id));
+        const ap = c.ap;
+        out.push(g.playerEquip(c, sword.id, true), ap - c.ap, g.takeProblem(c, sword.id), g.playerTake(c, sword.id), !!sword.equipped);
         // Yours: dropping it unequips it.
         const dagger = g.makeItem('dagger');
         g.addItem(c, dagger, true);
@@ -83,7 +96,12 @@ test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'
         out.push(dagger.equipped);
         return out;
     });
-    expect(r).toEqual([['long_sword'], 8, ['long_sword', 'belt_pouch', 'canteen', 'dagger'], undefined]);
+    expect(r).toEqual([
+        ['long_sword'], 8, ['long_sword*', 'belt_pouch', 'canteen', 'dagger'],
+        'worn', 'worn', 'missing', ['long_sword'], 'worn',
+        true, 25, '', true, false,
+        undefined
+    ]);
 });
 
 test('the Inventory dialog equips and unequips; the character sheet shows what\'s equipped and its armor', async ({page}) => {

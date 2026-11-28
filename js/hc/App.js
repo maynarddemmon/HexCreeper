@@ -10,7 +10,6 @@
         goldView,
         turnView,
         endTurnBtn,
-        modeBtn,
         pieceMenu,
         actionMenu = null, // the choice of what to do to a fixture (see Use), while it's open
         saveBtn,
@@ -50,7 +49,7 @@
                 DATA_BASE_DIR, HEADER_HEIGHT, FOOTER_HEIGHT, GITHUB_URL
             },
             ICON_SEPARATOR, ICON_CANCEL,
-            TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR, PLAYER_MOVE_MODES,
+            TILE_TYPE_SOLID, TILE_TYPE_HOLE, TILE_TYPE_FLOOR,
             formatAp, formatXp, formatWeight, formatVolume,
             VAR_XP, VAR_LEVEL, NEEDS, NEED_UNIT, AP_UNIT
         } = pkg,
@@ -271,9 +270,13 @@
             draw();
             inventoryDialog ??= new pkg.InventoryDialog(appView);
             const why = problem => problem ? i18n('inv-why-' + problem) : '',
-                // An action's problem, or null when it isn't offered
-                rows = (holder, carried, depth = 0) => (holder.inventory?.items ?? []).flatMap(it => {
+                // An action's problem, or null when it isn't offered. What's equipped first,
+                // then by category, a line before each group but the first (see
+                // Items.inventoryOrder).
+                rows = (holder, carried, depth = 0) => game.inventoryOrder(holder).flatMap(({item:it, group}, i, a) => {
                     const kind = game.itemKind(it),
+                        // (What's worn on a corpse has to be unequipped before it goes anywhere.)
+                        worn = it.equipped && holder !== p,
                         // (A fluid can't be taken or dropped: it's poured from one flask to another.)
                         actions = kind.fluid ? {} : carried ? {drop:why(game.dropProblem(p, it.id))} : {take:why(game.takeProblem(p, it.id))},
                         slot = kind.equip?.slot;
@@ -286,12 +289,16 @@
                     }
                     // Food, a drink, or a flask (to drink what's in it)
                     if (game.isConsumable(kind) || kind.inventory?.fluids) actions.consume = why(game.consumeProblem(p, it.id));
-                    // What it carries itself can be equipped (or unequipped).
-                    if (slot && holder === p) actions.equip = why(game.equipProblem(p, it.id, !!it.equipped));
-                    actions.transfer = why(game.over ? 'over' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap');
+                    // What it carries itself can be equipped (or unequipped), and what's worn
+                    // on a corpse, unequipped.
+                    if (slot && (holder === p || worn)) actions.equip = why(game.equipProblem(p, it.id, !!it.equipped));
+                    actions.transfer = why(
+                        game.over ? 'over' : worn ? 'worn' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap'
+                    );
                     return [
                         {
                             id:it.id, weight:formatWeight(game.itemWeight(it)), depth,
+                            divider:i > 0 && group !== a[i - 1].group,
                             label:it.equipped ? i18n('item-equipped', game.itemLabel(it), i18n('slot-' + slot)) : game.itemLabel(it),
                             container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped,
                             fluid:kind.fluid || !!kind.inventory?.fluids, actions
@@ -353,7 +360,10 @@
                     takeAll:what => i18n('tip-takeAll', what, cost(game.takeCost(p))),
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
                     equip:(what, id) => i18n('tip-equip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
-                    unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
+                    // (What's worn on a corpse too)
+                    unequip:(what, id) => i18n(
+                        'tip-unequip', what, cost(game.equipCostOf(p, game.reachItem(p, id).item))
+                    ),
                     eat:(what, id) => consumeTip('tip-eat', what, game.consumeTarget(p, id)?.item ?? {kind:''}),
                     drink:(what, id) => consumeTip('tip-drink', what, game.consumeTarget(p, id)?.item ?? {kind:''}),
                     drinkFrom:sourceTip,
@@ -628,7 +638,7 @@
         doPlanned = ({id, kind, x, y, other}) => {
             const q = game.pieces.get(id);
             return kind === 'swap' ? game.playerSwap(q, game.pieces.get(other)) :
-                kind === 'jump' ? game.playerJump(q, x, y, true) :
+                kind === 'jump' ? game.playerJump(q, x, y) :
                 game.playerAct(q, x, y, kind);
         },
         
@@ -750,11 +760,20 @@
         // The side of the board each move key goes to, for W and X (see stepUpDown).
         SIDE_OF_KEY = {q:0, z:0, Numpad7:0, Numpad1:0, e:1, c:1, Numpad9:1, Numpad3:1},
         
+        /*  Your piece p steps (or attacks) into (x, y), in mode (see Game.playerAct); or, into
+            a container in the way (a chest), opens it, if it's shut, and its inventory (see
+            Fixtures.containerStep). Returns whether it did anything. */
+        stepInto = (p, x, y, mode) => {
+            const box = game.containerStep(p, x, y);
+            if (box) openInventory(p);
+            return box ?? game.playerAct(p, x, y, mode);
+        },
+        
         // Moves (or attacks with) the selected piece by d, [dx, dy]. Returns whether it did.
         stepSelected = d => {
             const sel = game.getSelected();
             let retval = false;
-            if (sel && game.playerAct(sel, sel.x + d[0], sel.y + d[1])) {
+            if (sel && stepInto(sel, sel.x + d[0], sel.y + d[1])) {
                 gameView.afterTurn();
                 retval = true;
             }
@@ -1248,13 +1267,6 @@
             endTurnBtn = new Btn(ftrView, {buttonType:'solid', text:i18n('btn-end-turn'), fontSize:fontSizeMedium, tooltip:i18n('tip-end-turn')}, [{
                 doActivated:endTurn
             }]);
-            modeBtn = new Btn(ftrView, {text:i18n('btn-mode', i18n('mode-fixed')), fontSize:fontSizeMedium, tooltip:i18n('tip-mode')}, [{
-                doActivated: () => {
-                    const modes = PLAYER_MOVE_MODES;
-                    game.moveMode = modes[(modes.indexOf(game.moveMode) + 1) % modes.length];
-                    draw();
-                }
-            }]);
             
             new IconBtn(ftrView, {icon:'locate-fixed', label:i18n('lbl-center'), tooltip:i18n('tip-center')}, [{
                 doActivated: () => {centerOn();}
@@ -1280,8 +1292,6 @@
             endTurnBtn.setDisabled(gameOver);
             saveBtn.setDisabled(gameOver);
             exportBtn.setDisabled(gameOver);
-            
-            modeBtn.setTextAndFit(i18n('btn-mode', i18n('mode-' + game.moveMode)));
             
             // The selected piece's menu, beside it while it's open.
             const sel = game.getSelected();
@@ -1355,6 +1365,8 @@
         
         /*  Go to: the selected piece sets off for cell c. */
         goTo: c => {startNav('goto', [c.x, c.y]);},
+        
+        stepInto: (p, x, y, mode) => stepInto(p, x, y, mode),
         
         newGame: () => {
             stopNav('');
@@ -1540,7 +1552,6 @@
                     }
                     return;
                 }
-                if (k === 'm') {modeBtn.doActivated(); return;}
                 if (k === 'Tab') {
                     e.preventDefault();
                     const mine = game.piecesOf('player');

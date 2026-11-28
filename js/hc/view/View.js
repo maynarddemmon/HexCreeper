@@ -122,8 +122,8 @@
             panTo,
             stepPan,
             
-            /*  The moves a click can make for piece p: in your mode; or, with Shift held (or
-                shift true), in Free mode (just it moves), and where that can't go, in yours.
+            /*  The moves a click can make for piece p: as usual (Fixed); or, with Shift held
+                (or shift true), in Free mode (just it moves), and where that can't go, as usual.
                 As legalMoves gives them. */
             clickMoves: (p, shift=V.shift) => {
                 const game = V.game,

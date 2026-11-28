@@ -5,7 +5,7 @@ const settingsTitle = page => page.getByText('Settings', {exact:true}).filter({v
 
 test('the header has every button, and End Turn ends the turn', async ({page}) => {
     await startGame(page);
-    for (const name of ['End Turn', 'Move: Fixed', 'Center', 'Save', 'Export', 'Import', 'New game', 'Settings', 'Help']) {
+    for (const name of ['End Turn', 'Center', 'Save', 'Export', 'Import', 'New game', 'Settings', 'Help']) {
         await expect(button(page, name)).toBeVisible();
     }
     await button(page, 'End Turn').click();
@@ -125,12 +125,11 @@ test('shift-click moves just the piece, in Fixed or Follow', async ({page}) => {
         hc.app.centerOn(false);
     });
     // Where the core and the piece linked to it are, after a shift-click to the core's left
-    const shiftClick = async mode => {
-        await page.evaluate(mode => {
+    const shiftClick = async () => {
+        await page.evaluate(() => {
             const g = hc.app.game;
-            g.moveMode = mode;
             g.selectedId = g.playerCoreId;
-        }, mode);
+        });
         await page.keyboard.down('Shift');
         await page.mouse.click(...await cellOnPage(page, -1, 0));
         await page.keyboard.up('Shift');
@@ -143,15 +142,7 @@ test('shift-click moves just the piece, in Fixed or Follow', async ({page}) => {
     expect(await shiftShown()).toBe(true);
     await page.keyboard.up('Shift');
     expect(await shiftShown()).toBe(false);
-    expect(await shiftClick('fixed')).toEqual([[-1, 0], [1, 0]]); // the core alone
-    // Back where it was, on a new turn
-    await page.evaluate(() => {
-        const g = hc.app.game;
-        g.playerWait();
-        g.playerAct(g.getPlayerCore(), 0, 0, 'free');
-        g.playerWait();
-    });
-    expect(await shiftClick('follow')).toEqual([[-1, 0], [1, 0]]);
+    expect(await shiftClick()).toEqual([[-1, 0], [1, 0]]); // the core alone
 });
 
 test('clicking a cell the selected piece can jump to jumps it there', async ({page}) => {
@@ -168,11 +159,6 @@ test('clicking a cell the selected piece can jump to jumps it there', async ({pa
         const c = hc.app.game.getPlayerCore();
         return [c.x, c.y, c.ap];
     });
-    // Not in Follow mode
-    await page.evaluate(() => {hc.app.game.moveMode = 'follow';});
-    await page.mouse.click(...await cellOnPage(page, 2, -1));
-    expect(await core()).toEqual([0, 0, 200]);
-    await page.evaluate(() => {hc.app.game.moveMode = 'fixed';});
     // Hovering shows it there, as a ghost, and a click jumps.
     await page.mouse.move(...await cellOnPage(page, 2, -1));
     expect(await page.evaluate(() => hc.view.jumpAt(hc.app.game.getPlayerCore(), hc.view.hover))).toEqual({x:2, y:-1});
