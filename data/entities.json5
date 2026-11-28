@@ -422,7 +422,7 @@
 			"backgrounds":["urchin","denizen","pit_fighter"],
 			"hp":8,
 			"xp":10,
-			"items":["club", {"kind":"mold_cake", "count":[0, 3]}]
+			"items":["club", {"kind":"mold_cake", "count":[0, 3]}, {"kind":"mushroom_jerky", "count":[0, 1]}]
 		},
 		"hobgoblin_reaver":{
 			"name":"Hobgoblin Reaver",
@@ -431,7 +431,7 @@
 			"backgrounds":["reaver"],
 			"hp":13,
 			"xp":15,
-			"items":["long_sword", "belt_pouch"]
+			"items":["long_sword", "belt_pouch", {"kind":"mushroom_jerky", "count":1}, {"kind":"centipede_jerky", "count":[0, 1]}]
 		},
 	},
 	

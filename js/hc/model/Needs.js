@@ -5,7 +5,7 @@
     max, starting at its upper. Its bounds are rules of the piece's level and stats (its
     own: not what its needs make them), so a tougher piece lasts longer: for thirst,
     minThirst, lowerThirst, upperThirst and maxThirst (0, 25, 75 and 100, times con / 10).
-    If they change, the value is kept within them.
+    If they change, the value keeps its place between its min and max (see rescaleNeeds).
 
     Each goes down (its ticks are added: they're below 0) at the end of every turn
     (thirstTurnTick: housekeeping, before action points come back) and for every action
@@ -65,6 +65,26 @@
         },
         
         // ---- A piece's needs ----
+        /*  Every need's bounds for piece p: {need:{min, lower, upper, max}}, or null if it
+            has no needs. */
+        needsBounds: function(p) {
+            return p.needs ? Object.fromEntries(NEEDS.map(n => [n, this.needBounds(p, n)])) : null;
+        },
+        
+        /*  Piece p's bounds were was (see needsBounds) and have changed (its con has): each
+            of its needs keeps where it was between its min and max (a thirst half full
+            stays half full). */
+        rescaleNeeds: function(p, was) {
+            if (p.needs && was) {
+                for (const n of NEEDS) {
+                    const before = was[n], after = this.needBounds(p, n),
+                        span = before.max - before.min,
+                        part = span > 0 ? (Math.min(before.max, Math.max(before.min, p.needs[n])) - before.min) / span : 1;
+                    p.needs[n] = Math.round(after.min + part * (after.max - after.min));
+                }
+            }
+        },
+        
         /*  Piece p (one of yours) gets its needs, each at its upper. */
         giveNeeds: function(p) {
             p.needs = Object.fromEntries(NEEDS.map(n => [n, this.needBounds(p, n).upper]));

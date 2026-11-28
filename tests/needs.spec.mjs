@@ -253,3 +253,22 @@ test('heals and rests: food can mend (or hurt) and rest (or tire)', async ({page
     // 2.5 HP: 2 now, half carried; fatigue -20, less the eating's tick
     expect(r).toEqual([3, 50, 7500 - 2000 - 4, true]);
 });
+
+test('raising or lowering con scales the needs with their bounds (and the levelling sheet shows it)', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await pinNeeds(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        c.stats.con = 10;
+        g.giveNeeds(c);
+        c.needs.thirst = 5000;                  // half of 0 to 100
+        c.needs.hunger = 10000;                 // full
+        c.statPoints.available = 2;
+        const preview = g.withStats(c, {con:2});
+        const unchanged = c.needs.thirst;
+        g.spendStatPoints(c, {con:2});          // 0 to 120
+        return [preview.needs.thirst, unchanged, c.needs.thirst, c.needs.hunger, c.needs.fatigue, g.needBounds(c, 'thirst').max];
+    });
+    expect(r).toEqual([6000, 5000, 6000, 12000, 9000, 12000]);
+});

@@ -694,26 +694,33 @@
             copy, its max HP (and HP) worked out again. For the character sheet to show
             what spending them would do. */
         withStats: function(p, adds) {
-            const q = {...p, stats:{...p.stats}};
-            for (const [s, v] of Object.entries(adds)) q.stats[s] += v;
-            this.updateMaxHp(q);
+            const q = {...p, stats:{...p.stats}, needs:p.needs && {...p.needs}};
+            this.changeStats(q, adds);
             return q;
+        },
+        
+        /** @private Piece p's stats change by adds ({stat:n}): its max HP follows, and its
+            needs keep where they were between their bounds (see Needs.rescaleNeeds). */
+        changeStats: function(p, adds) {
+            const was = this.needsBounds(p);
+            for (const [s, v] of Object.entries(adds)) p.stats[s] += v;
+            this.updateMaxHp(p);
+            this.rescaleNeeds(p, was);
         },
         
         /*  Your piece p spends stat points: adds, {stat:n}, says how many on each stat (none
             below 0, none taking a stat over its species' max, and in all no more than it
-            has available). Its max HP and the rest follow its stats. Returns whether it
-            did. */
+            has available). Its max HP, its needs and the rest follow its stats. Returns
+            whether it did. */
         spendStatPoints: function(p, adds) {
             const entries = Object.entries(adds),
                 total = entries.reduce((n, [, v]) => n + v, 0);
             let retval = false;
             if (p?.owner === 'player' && this.pieces.has(p.id) && total <= p.statPoints.available &&
                 entries.every(([s, v]) => STATS.includes(s) && isNatNum(v) && p.stats[s] + v <= this.statRange(p, s)[1])) {
-                for (const [s, v] of entries) p.stats[s] += v;
+                this.changeStats(p, adds);
                 p.statPoints.available -= total;
                 p.statPoints.spent += total;
-                this.updateMaxHp(p);
                 retval = true;
             }
             return retval;
