@@ -424,6 +424,13 @@
             return g;
         },
         
+        /*  The ground under piece p and next to it is let go of where there's nothing on it
+            (after it's taken something from there). */
+        tidyAround: function(p) {
+            this.tidyGround(p.x, p.y);
+            for (const [dx, dy] of pkg.hex.dirs) this.tidyGround(p.x + dx, p.y + dy);
+        },
+        
         /*  The ground at (x, y) is let go of if there's nothing on it. */
         tidyGround: function(x, y) {
             if (!this.groundAt(x, y)?.inventory.items.length) this.ground.delete(this.key(x, y));
@@ -580,8 +587,11 @@
         /*  The holders piece p can get at, each {ref, holder, open, dir}: itself (ref
             'piece'), the ground under it ('ground': with nothing on it, one that isn't
             kept), and the fixtures you know of with an inventory on its cell or next to it
-            ('fixture:x,y'), open if they can be got at now (see fixtureOpen). dir: where a
-            fixture is, an index into hex.dirs, or -1 for p's own cell. */
+            ('fixture:x,y'), open if they can be got at now (see fixtureOpen), and the ground
+            next to it where something there holds things (a corpse: 'near:x,y',
+            containersOnly: only those things, and what's in them, can be got at; nothing
+            can be put there but in them). dir: where it is, an index into hex.dirs, or -1
+            for p's own cell. */
         reachHolders: function(p) {
             const out = [
                 {ref:'piece', holder:p, open:true, dir:-1},
@@ -593,6 +603,14 @@
                     out.push({ref:'fixture:' + this.key(f.x, f.y), holder:f, open:this.fixtureOpen(f), dir});
                 }
             }
+            // What holds things on the ground next to it (a corpse): only those, not what's
+            // loose there.
+            pkg.hex.dirs.forEach(([dx, dy], dir) => {
+                const g = this.groundAt(p.x + dx, p.y + dy);
+                if (g?.inventory.items.some(it => it.inventory)) {
+                    out.push({ref:'near:' + this.key(g.x, g.y), holder:g, open:true, dir, containersOnly:true});
+                }
+            });
             return out;
         },
         
@@ -602,7 +620,15 @@
         reachItem: function(p, id) {
             let retval = null;
             for (const top of this.reachHolders(p)) {
-                const found = top.open ? this.findItem(top.holder, id) : null;
+                let found = null;
+                if (top.containersOnly) {
+                    // (Only what holds things, and what's in them)
+                    for (const it of top.holder.inventory.items) {
+                        if (it.inventory) found ??= it.id === id ? {item:it, holder:top.holder} : this.findItem(it, id);
+                    }
+                } else if (top.open) {
+                    found = this.findItem(top.holder, id);
+                }
                 if (found) {
                     retval = {...found, top};
                     break;
@@ -620,8 +646,9 @@
                 const found = this.reachItem(p, ref);
                 retval = found?.item.inventory ? found.item : null;
             } else {
+                // (Not the ground next to it: what was put there it couldn't get at.)
                 const top = this.reachHolders(p).find(t => t.ref === ref);
-                retval = top?.open ? top.holder : null;
+                retval = top?.open && !top.containersOnly ? top.holder : null;
             }
             return retval;
         },
@@ -663,7 +690,7 @@
                 label = this.itemLabel(item, n);
             delete item.equipped; // (it's no longer carried as it was)
             this.addItem(to, this.takeOut(holder, item, n), true);
-            this.tidyGround(p.x, p.y);
+            this.tidyAround(p);
             this.spend(p, cost);
             return label;
         },
@@ -784,11 +811,21 @@
             if (heals) this.changeHp(p, heals);
         },
         
+        /*  What piece p would eat or drink for item id (wherever it can get at it): it, or
+            if it holds fluids (a flask), what's in it (drinking from it), {item, holder};
+            {item:null} for an empty flask; or null if p can't get at it. */
+        consumeTarget: function(p, id) {
+            const found = this.reachItem(p, id);
+            return found && this.itemKind(found.item).inventory?.fluids ?
+                {item:found.item.inventory.items[0] ?? null, holder:found.item} : found;
+        },
+        
         /*  Why piece p can't eat or drink item id (wherever it can get at it: a dose of it,
-            or what's left): '' if it can, else 'over', 'player', 'missing', 'inedible'
-            (it can't be eaten or drunk), 'needless' (p has no needs) or 'ap'. */
+            or what's left; for a flask, what's in it): '' if it can, else 'over', 'player',
+            'missing', 'empty' (a flask with nothing in it), 'inedible' (it can't be eaten
+            or drunk), 'needless' (p has no needs) or 'ap'. */
         consumeProblem: function(p, id) {
-            const found = p?.owner === 'player' ? this.reachItem(p, id) : null;
+            const found = p?.owner === 'player' ? this.consumeTarget(p, id) : null;
             let retval;
             if (this.over) {
                 retval = 'over';
@@ -796,6 +833,8 @@
                 retval = 'player';
             } else if (!found) {
                 retval = 'missing';
+            } else if (!found.item) {
+                retval = 'empty';
             } else if (!this.isConsumable(this.itemKind(found.item))) {
                 retval = 'inedible';
             } else if (!p.needs) {
@@ -813,13 +852,13 @@
         playerConsume: function(p, id) {
             const done = !this.consumeProblem(p, id);
             if (done) {
-                const {item, holder} = this.reachItem(p, id),
+                const {item, holder} = this.consumeTarget(p, id),
                     kind = this.itemKind(item),
                     n = Math.min(kind.dose, item.count),
                     cost = this.consumeCostOf(p, item);
                 this.fx(p.x, p.y, i18n(kind.fluid ? 'fx-drink' : 'fx-eat', this.itemLabel(item, n)), '--heal', {});
                 this.takeOut(holder, item, n);
-                this.tidyGround(p.x, p.y);
+                this.tidyAround(p);
                 this.spend(p, cost);
                 this._consume(p, kind, n); // (last: it can kill p)
                 this.afterPlayerAction();

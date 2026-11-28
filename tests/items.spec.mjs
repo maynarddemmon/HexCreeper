@@ -122,9 +122,9 @@ test('enemies carry what their profile gives them, rolled for each', async ({pag
         const g = hc.app.game,
             jerky = Array.from({length:30}, (_, i) => g.countOf(g.addPiece('core', 'enemy', 3 + i, 5, null, 'goblin'), 'mold_cake')),
             reaver = g.addPiece('core', 'enemy', 0, 9, null, 'hobgoblin_reaver');
-        return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.map(it => it.kind)];
+        return [Math.min(...jerky), Math.max(...jerky), reaver.inventory.items.filter(it => !g.isConsumable(g.itemKind(it))).map(it => it.kind)];
     });
-    // (A goblin's mold cake, 0 to 2; a reaver's dagger too, from its background.)
+    // (A goblin's mold cake, 0 to 2; a reaver's dagger too, from its background; not its food, which the data tunes.)
     expect(r.slice(0, 2)).toEqual([0, 2]);
     expect(r[2]).toEqual(['long_sword', 'belt_pouch', 'canteen', 'dagger']);
 });
@@ -454,4 +454,57 @@ test('the Inventory dialog: containers near, Transfer\'s Here, Take all, and it 
     await expect(btn('data-holder="fixture:0,0"', 'takeAll')).toHaveAttribute('title', 'There\'s nothing in it.');
     await button(page, 'X Close').click();
     await expect(page.getByText('Table (here)')).toBeHidden();
+});
+
+test('corpses next to a piece can be got at (only what holds things there, and what\'s in it)', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), out = [];
+        g.rules.placeCost = '0';
+        g.rules.apPool = '10';
+        c.ap = g.apMax(c);
+        c.inventory.items.length = 0;
+        const corpse = g.makeItem('corpse'), dagger = g.makeItem('dagger'), loose = g.makeItem('club'), far = g.makeItem('corpse');
+        g.addItem(corpse, dagger);
+        g.addItem(g.groundAt(1, 0, true), corpse);
+        g.addItem(g.groundAt(1, 0), loose);
+        g.addItem(g.groundAt(2, 0, true), far);
+        out.push(g.reachHolders(c).filter(t => t.ref.startsWith('near:')).map(t => t.ref + '@' + t.dir));
+        out.push(!!g.reachItem(c, dagger.id), !!g.reachItem(c, loose.id), !!g.reachItem(c, far.id));
+        // Nothing goes on the ground there, but in the corpse it can.
+        out.push(g.transferProblem(c, dagger.id, 'near:1,0'));
+        out.push(g.playerTake(c, dagger.id), g.playerTransfer(c, dagger.id, corpse.id), g.playerTake(c, corpse.id) || g.takeProblem(c, corpse.id));
+        // Taken away, the ground there is let go of (once nothing's left)
+        g.findItem(g.groundAt(1, 0), loose.id);
+        return out;
+    });
+    expect(r).toEqual([['near:1,0@1'], true, false, false, 'nowhere', true, true, 'weight']);
+});
+
+test('a flask can be drunk from as it is', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const r = await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.rules.placeCost = '0';
+        c.inventory.items.length = 0;
+        const flask = g.makeItem('flask'), dry = g.makeItem('flask');
+        g.addItem(c, flask);
+        g.addItem(c, dry);
+        g.addItem(flask, g.makeItem('water', 250));
+        c.needs.thirst = 0;
+        return [g.consumeProblem(c, dry.id), g.playerConsume(c, flask.id), flask.inventory.items.length, c.needs.thirst > 0];
+    });
+    expect(r).toEqual(['empty', true, 0, true]);
+});
+
+test('H closes the Inventory dialog', async ({page}) => {
+    await startGame(page);
+    await page.keyboard.press('h');
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
+    await page.keyboard.press('h');
+    await expect(page.getByText('Tess · Inventory')).toBeHidden();
+    await page.keyboard.press('h');
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
 });

@@ -133,7 +133,8 @@ test('eating and drinking: a dose (what\'s left, if less, does less), for the co
     });
     // Jerky: hunger +15, thirst -3; 100 mL of a 250 mL dose: thirst +10. Each less a hundredth for the
     // 0.25 points it took (0.05 a point, rounded).
-    expect(r).toEqual([true, 1, 8999, 7199, 975, true, 0, 8198, 'inedible']);
+    // (The flask, empty now, has nothing to drink.)
+    expect(r).toEqual([true, 1, 8999, 7199, 975, true, 0, 8198, 'empty']);
 });
 
 test('fluids go only in what holds fluids; flasks fill from a stream or pool, and pieces drink from one', async ({page}) => {

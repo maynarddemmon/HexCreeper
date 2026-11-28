@@ -73,7 +73,8 @@ test('enemies equip what they\'re given; what\'s moved or left in a corpse isn\'
             out = [g.equipment(e).map(it => it.kind), g.damageRange(e)[1] - Math.max(0, g.statRule('damageBonus', e))];
         g.damage(e, 100, c);
         const corpse = g.groundAt(1, 0).inventory.items[0];
-        out.push(corpse.inventory.items.map(it => it.kind + (it.equipped ? '*' : '')));
+        // (Not its food, which the data tunes)
+        out.push(corpse.inventory.items.filter(it => !g.isConsumable(g.itemKind(it))).map(it => it.kind + (it.equipped ? '*' : '')));
         // Yours: dropping it unequips it.
         const dagger = g.makeItem('dagger');
         g.addItem(c, dagger, true);

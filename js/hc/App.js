@@ -284,7 +284,8 @@
                     } else if (it.inventory) {
                         actions.takeAll = why(game.takeAllProblem(p, it.id));
                     }
-                    if (game.isConsumable(kind)) actions.consume = why(game.consumeProblem(p, it.id));
+                    // Food, a drink, or a flask (to drink what's in it)
+                    if (game.isConsumable(kind) || kind.inventory?.fluids) actions.consume = why(game.consumeProblem(p, it.id));
                     // What it carries itself can be equipped (or unequipped).
                     if (slot && holder === p) actions.equip = why(game.equipProblem(p, it.id, !!it.equipped));
                     actions.transfer = why(game.over ? 'over' : game.canAfford(p, game.transferCost(p)) ? '' : 'ap');
@@ -292,7 +293,8 @@
                         {
                             id:it.id, weight:formatWeight(game.itemWeight(it)), depth,
                             label:it.equipped ? i18n('item-equipped', game.itemLabel(it), i18n('slot-' + slot)) : game.itemLabel(it),
-                            container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped, fluid:kind.fluid, actions
+                            container:!!it.inventory, expanded:!!it.expanded, equipped:!!it.equipped,
+                            fluid:kind.fluid || !!kind.inventory?.fluids, actions
                         },
                         ...rows(it, carried, depth + 1)
                     ];
@@ -309,7 +311,7 @@
                 // Something named, where it is: "Chest (here)", "Stream (east)"
                 where = (name, dir) => dir < 0 ? i18n('inv-fixture-here', name) : i18n('inv-fixture-near', name, i18n('dir-' + dir)),
                 title = ({ref, holder, dir}) => ref === 'piece' ? i18n('inv-carried') : ref === 'ground' ? i18n('inv-ground') :
-                    where(game.fixtureType(holder).name, dir),
+                    ref.startsWith('near:') ? where(i18n('inv-ground'), dir) : where(game.fixtureType(holder).name, dir),
                 // A stream or pool's section: something to drink, or fill a flask from
                 sourceSection = s => ({
                     ref:s.ref, title:where(s.floor.name, s.dir), summary:'', open:true, expanded:null, takeAll:null, rows:[],
@@ -334,11 +336,14 @@
                     ...game.reachHolders(p).map(top => ({
                         ref:top.ref,
                         title:title(top),
-                        summary:top.open ? summary(top.holder, top.ref !== 'ground') : '',
+                        summary:top.open && !top.containersOnly ? summary(top.holder, top.ref !== 'ground') : '',
                         open:top.open,
                         expanded:top.ref.startsWith('fixture:') ? top.holder.expanded !== false : null,
-                        takeAll:top.ref === 'piece' ? null : why(game.takeAllProblem(p, top.ref)),
-                        rows:top.open ? rows(top.holder, top.ref === 'piece') : []
+                        takeAll:top.ref === 'piece' || top.containersOnly ? null : why(game.takeAllProblem(p, top.ref)),
+                        // (On the ground next to it, only what holds things: a corpse)
+                        rows:!top.open ? [] : top.containersOnly ?
+                            rows({inventory:{items:top.holder.inventory.items.filter(it => it.inventory)}}, false) :
+                            rows(top.holder, top.ref === 'piece')
                     })),
                     ...game.fluidSources(p).map(sourceSection)
                 ],
@@ -349,8 +354,8 @@
                     transfer:what => i18n('tip-transfer', what, cost(game.transferCost(p))),
                     equip:(what, id) => i18n('tip-equip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
                     unequip:(what, id) => i18n('tip-unequip', what, cost(game.equipCostOf(p, game.findItem(p, id).item))),
-                    eat:(what, id) => consumeTip('tip-eat', what, game.reachItem(p, id).item),
-                    drink:(what, id) => consumeTip('tip-drink', what, game.reachItem(p, id).item),
+                    eat:(what, id) => consumeTip('tip-eat', what, game.consumeTarget(p, id)?.item ?? {kind:''}),
+                    drink:(what, id) => consumeTip('tip-drink', what, game.consumeTarget(p, id)?.item ?? {kind:''}),
                     drinkFrom:sourceTip,
                     fill:what => i18n('tip-fill', what, cost(game.fillCost(p)))
                 },

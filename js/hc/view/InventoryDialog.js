@@ -14,12 +14,12 @@
             }
         } = pkg,
 
-        PANEL_WIDTH = 640,
+        PANEL_WIDTH = 700,
         ROW_HEIGHT = rowHeight - 6,
         INDENT = 16,           // each level deeper, in what holds it
         TOGGLE_WIDTH = 16,     // a container's ▸ / ▾
         BTN_WIDTH = 64,        // each action
-        SLOTS = 3,             // the actions a row can have: take or drop, take all, transfer
+        SLOTS = 4,             // a row's actions: take or drop; eat or drink; take all, equip or fill; transfer
         WEIGHT_WIDTH = 72,
         ACTIONS_X = PANEL_WIDTH - padding - SLOTS * BTN_WIDTH,
         WEIGHT_X = ACTIONS_X - padding - WEIGHT_WIDTH,
@@ -217,7 +217,7 @@
                     );
                 } else if (section.takeAll != null) {
                     actionBtn(
-                        head, 1, 'takeAll', tips.takeAll(section.title), section.takeAll,
+                        head, 2, 'takeAll', tips.takeAll(section.title), section.takeAll,
                         act('takeAll', null, section.ref), data
                     );
                 }
@@ -247,7 +247,7 @@
                         }
                         if (takeAll != null) {
                             actionBtn(
-                                view, 1, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
+                                view, 2, 'takeAll', tips.takeAll(row.label), takeAll, act('takeAll', null, row.id), item
                             );
                         }
                         if (consume != null) {
@@ -255,14 +255,14 @@
                             actionBtn(view, 1, action, tips[action](row.label, row.id), consume, act(action, row.id), item);
                         }
                         if (fill != null) {
-                            actionBtn(view, 1, 'fill', tips.fill(row.label), fill, act('fill', row.id), item);
+                            actionBtn(view, 2, 'fill', tips.fill(row.label), fill, act('fill', row.id), item);
                         }
                         if (equip != null) {
                             const action = row.equipped ? 'unequip' : 'equip';
-                            actionBtn(view, 1, action, tips[action](row.label, row.id), equip, act(action, row.id), item);
+                            actionBtn(view, 2, action, tips[action](row.label, row.id), equip, act(action, row.id), item);
                         }
                         if (transfer != null) {
-                            actionBtn(view, 2, 'transfer', tips.transfer(row.label), transfer, () => {
+                            actionBtn(view, 3, 'transfer', tips.transfer(row.label), transfer, () => {
                                 self._moving = {id:row.id, label:row.label};
                                 self.refresh();
                             }, item);
@@ -281,6 +281,19 @@
             } else {
                 this.callSuper();
             }
+        },
+        
+        /*  H, which opens it, closes it too (a Transfer and all). */
+        _keyDownCapture: function(event) {
+            let retval;
+            if (M.KeyObservable.getCodeFromEvent(event) === 'KeyH') {
+                this._moving = null;
+                this.doClose();
+                retval = false;
+            } else {
+                retval = this.callSuper(event);
+            }
+            return retval;
         }
     });
 })(hc);
