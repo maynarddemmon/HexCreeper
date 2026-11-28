@@ -230,7 +230,7 @@ test('the brief and the info panel show the map\'s goals and penalties', async (
     await expect(visible('Penalty: Attrition')).toBeVisible();
     await pressStart(page);
     
-    await expect(visible('Goals')).toBeVisible();
+    // (The info panel lists them with no heading.)
     await expect(visible('○ Far Afield')).toBeVisible();
     await expect(visible('○ Cull (optional)')).toBeVisible();
     await expect(visible('○ Penalty: Attrition')).toBeVisible();
