@@ -121,7 +121,7 @@ test('a muted status effect shows in the character sheet, but has no icon; a hid
         return n;
     });
     expect(white).toBe(0);
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByText('Cursed (5 more turns)', {exact:true})).toBeVisible();
     await expect(page.getByText(/Marked/)).toHaveCount(0);
 });
@@ -133,7 +133,7 @@ test('I opens the selected piece\'s character sheet', async ({page}) => {
         g.addEffect(g.getPlayerCore(), 'exhausted', 1);
         hc.view.draw();
     });
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
     for (const text of ['Strength', 'Charisma', 'Melee accuracy', '0/20', '1/1', '+1 a turn', 'Exhausted (1 more turn)']) {
         await expect(page.getByText(text, {exact:true}).last()).toBeVisible(); // (the sheet's: the info panel shows XP too)

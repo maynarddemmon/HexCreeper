@@ -60,6 +60,7 @@
 		--effect-icon:#fff; /* A piece's status effect icons, above it */
 		--level-up:#fd4;    /* A piece's level up rings, its stat points marker, and the Character button while it has points */
 		--level-up-bg:#fd44;
+		--origin-arrow:#fff; /* The arrow at the edge pointing to the map's origin (0, 0), when it's off the board */
 		--enemy-arrow:#f33; /* Arrows at the edge pointing to enemy squads you can see but that are off the board */
 		
 		--heal:      #6d8;
@@ -132,19 +133,19 @@
 		border-radius:6px;
 		cursor:pointer;
 	}
-	.hc-Btn:hover {background-color:var(--btn-bg-hover);}
+	.hc-Btn:hover, .hc-Btn:focus-visible {outline:none; background-color:var(--btn-bg-hover);} /* focused (by keyboard) looks hovered */
 	.hc-Btn.disabled {opacity:0.45; cursor:default;}
-	.hc-Btn.disabled:hover {background-color:var(--btn-bg);}
+	.hc-Btn.disabled:hover, .hc-Btn.disabled:focus-visible {background-color:var(--btn-bg);}
 
 	/* A mode that's on, e.g. Place or Heal while choosing, or the chosen grid. */
 	.hc-Btn.on {background-color:var(--sel-bg); border-color:var(--sel-stroke); color:var(--ink);}
 
 	.hc-Btn.plain {background-color:transparent; border:1px solid transparent; color:var(--ink);}
-	.hc-Btn.plain:hover {background-color:var(--btn-bg-hover);}
+	.hc-Btn.plain:hover, .hc-Btn.plain:focus-visible {background-color:var(--btn-bg-hover);}
 
 	.hc-Btn.solid {background-color:var(--core); border-color:var(--core); color:#fff;}
-	.hc-Btn.solid:hover {background-color:var(--core-dark); border-color:var(--core-dark);}
-	.hc-Btn.solid.disabled:hover {background-color:var(--core); border-color:var(--core);}
+	.hc-Btn.solid:hover, .hc-Btn.solid:focus-visible {background-color:var(--core-dark); border-color:var(--core-dark);}
+	.hc-Btn.solid.disabled:hover, .hc-Btn.solid.disabled:focus-visible {background-color:var(--core); border-color:var(--core);}
 
 	/* Something waiting for you, e.g. stat points to spend: the button pulses. */
 	.hc-Btn.attention {animation:hc-attention 1.2s ease-in-out infinite; border-color:var(--level-up); color:var(--ink);}
@@ -169,8 +170,8 @@
 		height:1px;
 		transition:width .3s ease;
 	}
-	.hc-Btn.underline:hover::after {width:100%;}
-	.hc-Btn.underline.disabled:hover::after {width:0%;}
+	.hc-Btn.underline:hover::after, .hc-Btn.underline:focus-visible::after {width:100%;}
+	.hc-Btn.underline.disabled:hover::after, .hc-Btn.underline.disabled:focus-visible::after {width:0%;}
 </style>
 <script>
 const writeScript = src => document.write('<script src="./'+src+'.js">\x3C/script>');

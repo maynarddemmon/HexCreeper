@@ -114,7 +114,7 @@ test('the character sheet names the species and background', async ({page}) => {
     await page.evaluate(() => {
         hc.app.game.selectedId = hc.app.game.playerCoreId;
     });
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
 });
 

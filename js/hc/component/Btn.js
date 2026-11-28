@@ -23,6 +23,9 @@
                 attrs.focusable ??= true;
                 attrs.focusIndicator ??= false;
                 attrs.height ??= btnHeight;
+                // Enter only: Space is the game's (End Turn), even in a dialog or menu (see
+                // InventoryDialog and the piece menu).
+                attrs.activationKeys ??= [M.global.keys.CODE_ENTER];
                 
                 const buttonType = attrs.buttonType || '';
                 delete attrs.buttonType;

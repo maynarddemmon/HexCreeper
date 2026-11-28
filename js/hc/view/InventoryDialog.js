@@ -158,6 +158,7 @@
                     note (what to say in place of its rows: an I18N key).
                 onSheet()   switches to the piece's character sheet (Character, on the
                     left of the footer)
+                onEndTurn()  ends the turn (Space), the dialog staying open
                 onToggle(ref)  shows or hides what's in the holder ref names (see
                     Items.toggleExpanded)
                 tips        {take, drop, takeAll, transfer, equip, unequip, eat, drink,
@@ -172,12 +173,15 @@
             this._opts = opts;
             this._moving = null;
             this.setTitle(opts.title);
+            this.getContentView().getIDE().scrollTop = 0;
             this.refresh();
         },
 
-        /*  Brings it up to date. */
+        /*  Brings it up to date, scrolled where it was (after an action, say). */
         refresh: function() {
             const self = this,
+                scroller = self.getContentView().getIDE(),
+                scrollTop = scroller.scrollTop,
                 {describe, tips, hereProblem, onAction, onToggle} = self._opts,
                 moving = self._moving,
                 container = self._container,
@@ -279,6 +283,7 @@
                 }
             }
             self.setContentHeightToFit(container.height);
+            scroller.scrollTop = scrollTop;
         },
 
         /*  Esc (or ×) in a Transfer leaves it (then closes). */
@@ -291,12 +296,18 @@
             }
         },
         
-        /*  H, which opens it, closes it too (a Transfer and all). */
+        /*  I, which opens it, closes it too (a Transfer and all); Space ends the turn (no
+            button takes it: see Btn). */
         _keyDownCapture: function(event) {
+            const code = M.KeyObservable.getCodeFromEvent(event);
             let retval;
-            if (M.KeyObservable.getCodeFromEvent(event) === 'KeyH') {
+            if (code === 'KeyI') {
                 this._moving = null;
                 this.doClose();
+                retval = false;
+            } else if (code === M.global.keys.CODE_SPACE) {
+                event.value.preventDefault();
+                this._opts?.onEndTurn?.();
                 retval = false;
             } else {
                 retval = this.callSuper(event);

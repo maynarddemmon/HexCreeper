@@ -270,6 +270,14 @@
             draw();
             inventoryDialog ??= new pkg.InventoryDialog(appView);
             const why = problem => problem ? i18n('inv-why-' + problem) : '',
+                // After an action or a turn: it closes if the game's over or p is gone.
+                afterAction = () => {
+                    if (game.over || !game.pieces.has(p.id)) {
+                        inventoryDialog.hide();
+                    } else {
+                        inventoryDialog.refresh();
+                    }
+                },
                 // An action's problem, or null when it isn't offered. What's equipped first,
                 // then by category, a line before each group but the first (see
                 // Items.inventoryOrder).
@@ -375,6 +383,10 @@
                     inventoryDialog.hide();
                     openSheet(p);
                 },
+                onEndTurn:() => {
+                    endTurn();
+                    afterAction();
+                },
                 onAction:(action, id, ref) => {
                     const done = action === 'equip' || action === 'unequip' ? game.playerEquip(p, id, action === 'unequip') :
                         action === 'take' ? game.playerTake(p, id) :
@@ -385,11 +397,7 @@
                         action === 'fill' ? game.playerFill(p, id) :
                         game.playerTakeAll(p, ref);
                     if (done) gameView.afterTurn();
-                    if (game.over || !game.pieces.has(p.id)) {
-                        inventoryDialog.hide();
-                    } else {
-                        inventoryDialog.refresh();
-                    }
+                    afterAction();
                 }
             });
         },
@@ -587,8 +595,8 @@
         
         // Keys for the menu's items, which act on the selected piece.
         MENU_KEYS = {
-            p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', u:'use', r:'rally', i:'sheet', h:'inventory',
-            g:'goto', o:'explore', n:'snake', t:'tree'
+            p:'place', v:'swap', j:'jump', l:'attach', b:'detach', f:'attack', u:'use', r:'rally', h:'sheet',
+            i:'inventory', g:'goto', o:'explore', n:'snake', t:'tree'
         },
         
         // ---- Go to and Explore ----
@@ -1543,8 +1551,9 @@
                     }
                     return;
                 }
-                if (V.menuOpen) {
-                    // The menu: arrows and Tab move between its items.
+                if (V.menuOpen && k !== ' ') {
+                    // The menu: arrows and Tab move between its items (and Enter picks one;
+                    // Space ends the turn, as ever: see Btn).
                     const delta = {ArrowDown:1, ArrowRight:1, ArrowUp:-1, ArrowLeft:-1, Tab:e.shiftKey ? -1 : 1}[k];
                     if (delta) {
                         handled();

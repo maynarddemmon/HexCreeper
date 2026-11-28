@@ -18,6 +18,7 @@
         STAT_POINTS_ICON = 'circle-arrow-up', // over a piece of yours with stat points to spend
         LEVEL_UP_RINGS = 3,
         ENEMY_ARROW_SIZE = 0.75,     // an off-board enemy squad's arrow, of your core's
+        ORIGIN_ARROW_SIZE = 0.75,    // and the map's origin's
         // The board as you see it, in pixels in from each edge of the canvas: the header
         // and footer lie over the top and bottom of it. Off-board arrows show for what's
         // outside it, and run along its edges, ARROW_INSET further in.
@@ -1128,7 +1129,8 @@
         
         // Off-screen indicators: an arrow at the edge of the board (as you see it, between
         // the header and footer: see BOARD_INSET_TOP...), pointing (from its middle) at
-        // what's off it. Red, and smaller, for each enemy squad you can see none of on the
+        // what's off it. White, and smaller, for the map's origin (0, 0: where you started),
+        // under the rest; red, and smaller, for each enemy squad you can see none of on the
         // board, at its leader (or, if you can't see that, a piece of it you can); gold for
         // your core, over them.
         const left = BOARD_INSET_LEFT,
@@ -1144,6 +1146,8 @@
                 ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -8); ctx.lineTo(-8, 8); ctx.closePath(); ctx.fill();
                 ctx.restore();
             };
+        const [ox, oy] = cellCenter(0, 0);
+        if (offBoard(ox, oy)) edgeArrow(ox, oy, '--origin-arrow', ORIGIN_ARROW_SIZE);
         for (const leader of game.piecesOf('enemy').filter(e => !game.parent(e))) {
             const seen = game.group(leader).filter(e => game.inSight(e.x, e.y)).map(e => [e, cellCenter(e.x, e.y)]);
             if (seen.length && seen.every(([, [sx, sy]]) => offBoard(sx, sy))) {

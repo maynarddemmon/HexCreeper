@@ -112,14 +112,14 @@ test('the Inventory dialog equips and unequips; the character sheet shows what\'
         g.addItem(c, it, true);
         return it.id;
     });
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     const btn = action => page.locator(`[data-item="${id}"][data-action="${action}"]`);
     await expect(btn('equip')).toHaveAttribute('title', 'Equip chain shirt (in place of what\'s equipped there), for 1 action points.');
     await btn('equip').click();
     await expect(page.getByText('chain shirt (body)')).toBeVisible();
     await expect(btn('unequip')).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByText('chain shirt', {exact:true})).toBeVisible();
     const armor = page.getByText('Armor', {exact:true}).locator('xpath=..');
     await expect(armor).toContainText('2');
@@ -154,7 +154,7 @@ test('backgrounds give items: your character starts with them, equipped, and an 
 test('the Inventory dialog and the character sheet each switch to the other', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(page.getByText('Tess · Inventory')).toBeVisible();
     await page.getByRole('button', {name:'Character', exact:true}).filter({visible:true}).click();
     await expect(page.getByText('Tess · Inventory')).toBeHidden();

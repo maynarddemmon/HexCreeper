@@ -157,7 +157,7 @@ test('the character sheet shows your name and description', async ({page}) => {
         g.getPlayerCore().description = 'Fond of <b>tags</b>.';
         g.selectedId = g.playerCoreId;
     });
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByText('Tess · Human · Urchin', {exact:true})).toBeVisible();
     await expect(page.getByRole('textbox', {name:'Description', exact:true})).toHaveValue('Fond of <b>tags</b>.');
 });
@@ -185,7 +185,7 @@ test('the sheet\'s name can be edited after creation: a placed piece can be name
         hc.view.draw();
         return g.selectedId;
     });
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     const name = page.getByRole('textbox', {name:'Name', exact:true}).filter({visible:true});
     await expect(name).toHaveValue('');
     await name.fill('Pip');
@@ -193,7 +193,7 @@ test('the sheet\'s name can be edited after creation: a placed piece can be name
     await page.keyboard.press('Escape');
     await expect(page.getByText('Pip · level 1', {exact:true})).toBeVisible();   // the info panel
     // Emptied, it has none again; your core keeps its own.
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await name.fill('  ');
     await page.keyboard.press('Escape');
     const r = await page.evaluate(id => {
@@ -202,7 +202,7 @@ test('the sheet\'s name can be edited after creation: a placed piece can be name
         return g.pieces.get(id).name;
     }, id);
     expect(r).toBeUndefined();
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await name.fill('Tessa');
     await name.fill('');
     await page.keyboard.press('Escape');

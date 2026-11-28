@@ -176,3 +176,29 @@ test('a map sets the vision radius; fog of war can be turned off in hc.cfg', asy
         return hc.app.game.cellsInSight();
     })).toBe(null);
 });
+
+test('a white arrow at the edge points to the map\'s origin while it\'s off the board', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const colourAt = (x, y) => page.evaluate(([x, y]) => {
+        const V = hc.view, {HEADER_HEIGHT, FOOTER_HEIGHT} = hc.cfg;
+        V.stopPan();
+        V.render(performance.now());
+        const [sx, sy] = V.cellCenter(x, y), pad = 22,
+            ax = Math.min(V.W - pad, Math.max(pad, sx)),
+            ay = Math.min(V.H - FOOTER_HEIGHT - pad, Math.max(HEADER_HEIGHT + pad, sy));
+        return [...V.canvas.getContext('2d').getImageData(Math.round(ax * V.dpr), Math.round(ay * V.dpr), 1, 1).data].join();
+    }, [x, y]);
+    const WHITE = '255,255,255,255';
+    expect(await colourAt(0, 0)).not.toBe(WHITE);    // (on the board: none)
+    // The core, and the camera, far to the east: the origin's off the board to the west.
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore();
+        g.board.delete(g.key(c.x, c.y));
+        c.x = 60;
+        g.board.set(g.key(c.x, c.y), c.id);
+        hc.app.centerOn(false);
+    });
+    expect(await page.evaluate(() => hc.view.cellCenter(0, 0)[0] < 0)).toBe(true);
+    expect(await colourAt(0, 0)).toBe(WHITE);
+});

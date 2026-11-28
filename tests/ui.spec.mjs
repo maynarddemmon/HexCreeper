@@ -247,9 +247,29 @@ test('Enter opens the selected piece\'s menu; the arrow keys move between its it
     expect(await focused()).toMatch(/^Inventory/);
     for (let i = 0; i < 12 && !/^Place/.test(await focused()); i++) await page.keyboard.press('ArrowDown');
     expect(await focused()).toMatch(/^Place/);
-    await page.keyboard.press('Space');       // the focused item's, not the end of the turn
+    // Its focus looks as hovering does (see .hc-Btn:focus-visible).
+    const [focusedBg, blurredBg] = await page.evaluate(() => {
+        const btn = document.activeElement, focused = getComputedStyle(btn).backgroundColor;
+        btn.blur();
+        return [focused, getComputedStyle(btn).backgroundColor];
+    });
+    expect(focusedBg).not.toBe(blurredBg);
+    await page.evaluate(() => {
+        const V = hc.view;
+        V.menuOpen = false;
+        hc.view.draw();
+    });
+    await page.keyboard.press('Enter');
+    for (let i = 0; i < 12 && !/^Place/.test(await focused()); i++) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');       // the focused item's
     await expect(page.getByText(/Place piece: choose an empty cell/)).toBeVisible();
     expect(await page.evaluate(() => [hc.view.menuOpen, hc.app.game.turn])).toEqual([false, 1]);
+    // Space, with the menu open, ends the turn (no button takes it).
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Enter');
+    expect(await page.evaluate(() => hc.view.menuOpen)).toBe(true);
+    await page.keyboard.press('Space');
+    await expect.poll(() => page.evaluate(() => [hc.view.menuOpen, hc.app.game.turn])).toEqual([false, 2]);
 });
 
 test('nearing the edge of the board pans it by one hex; elsewhere it stays put', async ({page}) => {

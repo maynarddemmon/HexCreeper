@@ -136,7 +136,7 @@ test('stat points can\'t take a stat over its species\' max, and the sheet\'s + 
     await page.evaluate(() => {
         hc.app.game.selectedId = hc.app.game.playerCoreId;
     });
-    await page.keyboard.press('i');
+    await page.keyboard.press('h');
     await expect(page.getByRole('button', {name:'Raise Strength'})).toHaveClass(/disabled/);
     await expect(page.getByRole('button', {name:'Raise Agility'})).not.toHaveClass(/disabled/);
 });

@@ -247,7 +247,7 @@ test('weights and volumes show in the Units preference\'s units', async ({page})
     expect(r).toEqual(['2.36 kg', '0.3 L', '66.5 kg', '5.2 lb', '2.5 gal']);
 });
 
-test('the Inventory dialog (H) lists what your piece carries and what\'s on the ground, what\'s in things shown with ▸; Take takes it', async ({page}) => {
+test('the Inventory dialog (I) lists what your piece carries and what\'s on the ground, what\'s in things shown with ▸; Take takes it', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     const ids = await page.evaluate(() => {
@@ -260,7 +260,7 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
         g.setGold(12);
         return {dagger:dagger.id, corpse:corpse.id};
     });
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     const dialog = page.locator('body');
     await expect(dialog.getByText('Tess · Inventory')).toBeVisible();
     await expect(dialog.getByText('12 gold coins')).toBeVisible();
@@ -421,7 +421,7 @@ test('the Inventory dialog: containers near, Transfer\'s Here, Take all, and it 
     await startGame(page);
     await clearBoard(page);
     const ids = await putContainers(page, true);
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     const btn = (attrs, action) => page.locator(`[${attrs}][data-action="${action}"]`);
     await expect(page.getByText('Table (here)')).toBeVisible();
     await expect(page.getByText('Chest (east)')).toBeVisible();
@@ -499,13 +499,13 @@ test('a flask can be drunk from as it is', async ({page}) => {
     expect(r).toEqual(['empty', true, 0, true]);
 });
 
-test('H closes the Inventory dialog', async ({page}) => {
+test('I closes the Inventory dialog', async ({page}) => {
     await startGame(page);
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(page.getByText('Tess · Inventory')).toBeVisible();
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(page.getByText('Tess · Inventory')).toBeHidden();
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(page.getByText('Tess · Inventory')).toBeVisible();
 });
 
@@ -530,7 +530,7 @@ test('stepping into a chest opens it (an action) and its inventory, and never br
     await expect(title).toBeVisible();
     await expect(page.getByText('dagger', {exact:true}).last()).toBeVisible();
     expect(await chest()).toEqual([true, hp, 200, 0, 0]);
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(title).toBeHidden();
     await page.mouse.click(...await cellOnPage(page, 1, 0));    // open already: no points
     await expect(title).toBeVisible();
@@ -553,10 +553,51 @@ test('an inventory lists what\'s equipped first, then by category, a faint line 
         'chain_shirt:equipped', 'dagger:weapon', 'club:weapon', 'iron_helm:armor', 'mushroom_jerky:food', 'flask:drink',
         'gold_coin:money'
     ]);
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     await expect(page.getByText('Tess · Inventory')).toBeVisible();
     const rows = await page.locator('.myt-ItemRow').evaluateAll(els => els.map(e =>
         [e.querySelector('.myt-Text')?.textContent, [...e.children].some(d => d.style.height === '1px')]));
     expect(rows.map(([t]) => t.split(' ')[0])).toEqual(['chain', 'dagger', 'club', 'iron', 'mushroom', 'flask', 'gold']);
     expect(rows.map(([, line]) => line)).toEqual([false, true, false, true, true, true, true]);
+});
+
+test('Space in the Inventory dialog ends the turn, and it stays open; no button takes Space', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    const turn = () => page.evaluate(() => hc.app.game.turn);
+    const title = page.getByText('Tess · Inventory');
+    await page.keyboard.press('i');
+    await expect(title).toBeVisible();
+    const before = await turn();
+    // (With its Character button focused, which Space would have clicked)
+    await page.locator('[data-action], button').filter({hasText:'Character'}).last().focus();
+    await page.keyboard.press('Space');
+    await expect.poll(turn).toBe(before + 1);
+    await expect(title).toBeVisible();
+    await expect(page.getByText('Tess · Character')).toHaveCount(0);
+});
+
+test('the Inventory dialog keeps its scroll after an action', async ({page}) => {
+    await startGame(page);
+    await clearBoard(page);
+    await page.evaluate(() => {
+        const g = hc.app.game, c = g.getPlayerCore(), ground = g.groundAt(c.x, c.y, true);
+        g.rules.apPool = '9';
+        c.ap = 900;
+        for (let i = 0; i < 40; i++) g.addItem(ground, g.makeItem('dagger'), true);   // (a row each)
+    });
+    await page.keyboard.press('i');
+    await expect(page.getByText('Tess · Inventory')).toBeVisible();
+    // (What scrolls: the dialog's content)
+    const scrollTop = (to = null) => page.evaluate(to => {
+        const e = [...document.querySelectorAll('.myt-InventoryDialog *')]
+            .find(d => getComputedStyle(d).overflowY === 'auto' && d.scrollHeight > d.clientHeight);
+        if (to != null) e.scrollTop = to;
+        return e.scrollTop;
+    }, to);
+    const top = await scrollTop(100000);
+    expect(top).toBeGreaterThan(50);
+    await page.locator('[data-action="take"]').last().click();
+    await expect.poll(() => page.evaluate(() => hc.app.game.getPlayerCore().inventory.items.length)).toBeGreaterThan(0);
+    expect(await scrollTop()).toBeGreaterThan(top - 60);
 });

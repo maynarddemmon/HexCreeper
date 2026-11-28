@@ -194,7 +194,7 @@ test('the Inventory dialog eats, drinks and fills; the sheet shows needs', async
         c.needs.thirst = 2000;
         return {flask:flask.id, jerky:jerky.id};
     });
-    await page.keyboard.press('h');
+    await page.keyboard.press('i');
     const btn = (attrs, action) => page.locator(`[${attrs}][data-action="${action}"]`);
     await expect(page.getByText('Stream (east)')).toBeVisible();
     await expect(btn(`data-item="${ids.jerky}"`, 'eat')).toHaveAttribute('title', 'Eat mushroom jerky (a bite: thirst -2, hunger +10), for 0.25 action points.');
