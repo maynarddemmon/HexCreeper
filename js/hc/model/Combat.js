@@ -383,6 +383,12 @@
         // rallyRefresh rule's turns (counting from then), and can't rally again until both
         // are over.
         rallyCost: function(p) {return Math.max(MIN_COST, this.apRule('rallyCost', p));},
+        
+        // ---- Items ----
+        // What taking an item and dropping one cost a piece (see Items.js): the takeCost
+        // and dropCost rules' action points (at least MIN_COST).
+        takeCost: function(p) {return Math.max(MIN_COST, this.apRule('takeCost', p));},
+        dropCost: function(p) {return Math.max(MIN_COST, this.apRule('dropCost', p));},
         rallyRefresh: function(p) {return Math.max(0, this.statRule('rallyRefresh', p));},
         canRally: function(p) {
             return !this.over && p?.owner === 'player' && p.hp < p.maxHp && !this.effectOn(p, EFFECT_RALLYING) &&

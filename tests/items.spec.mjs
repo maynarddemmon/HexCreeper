@@ -155,7 +155,7 @@ test('placing a piece spends gold from what its parent carries first, then the o
     expect(r).toEqual([3, 0, 3, 6, false]);
 });
 
-test('your piece takes from the ground under it, and drops there, each for an action', async ({page}) => {
+test('your piece takes from the ground under it, and drops there, for the takeCost and dropCost rules\' points', async ({page}) => {
     await startGame(page);
     await clearBoard(page);
     await addTestItems(page);
@@ -172,13 +172,15 @@ test('your piece takes from the ground under it, and drops there, each for an ac
         // Out of the box on the ground: as much as it can carry (2 g: 2 of the 3).
         g.rules.carryWeight = '2';
         out.push(g.takeProblem(c, brick.id), g.playerTake(c, pebbles.id), g.countOf(c, 'pebble'), g.countOf(box, 'pebble'), c.ap);
-        out.push(g.takeProblem(c, pebbles.id));   // no points left
+        c.ap = 20;
+        out.push(g.takeProblem(c, pebbles.id));   // not the points: it costs 0.25
         g.rules.carryWeight = '1000000';
         c.ap = g.apMax(c);
         out.push(g.playerTake(c, box.id), g.groundAt(c.x, c.y).inventory.items.map(it => it.kind));
         c.ap = g.apMax(c);
-        // Dropping what's in something it carries
-        out.push(g.playerDrop(c, pebbles.id), g.countOf(c, 'pebble'), g.countOf(g.groundAt(c.x, c.y), 'pebble'));
+        // Dropping what's in something it carries (for what the rule says)
+        g.rules.dropCost = '0.5';
+        out.push(g.playerDrop(c, pebbles.id), g.countOf(c, 'pebble'), g.countOf(g.groundAt(c.x, c.y), 'pebble'), c.ap);
         c.ap = g.apMax(c);
         out.push(g.dropProblem(c, 999), g.playerDrop(c, c.inventory.items[0].id));
         // The ground keeps nothing it doesn't hold.
@@ -190,7 +192,7 @@ test('your piece takes from the ground under it, and drops there, each for an ac
         out.push(g.groundAt(c.x, c.y));
         return out;
     });
-    expect(r).toEqual(['weight', true, 2, 1, 0, 'ap', true, ['brick'], true, 2, 1, 'missing', true, undefined]);
+    expect(r).toEqual(['weight', true, 2, 1, 75, 'ap', true, ['brick'], true, 2, 1, 50, 'missing', true, undefined]);
 });
 
 test('inventories and what\'s on the ground are saved', async ({page}) => {
@@ -264,11 +266,12 @@ test('the Inventory dialog (H) lists what your piece carries and what\'s on the 
     const take = id => page.locator(`[data-item="${id}"]`);
     await expect(take(ids.corpse)).toHaveClass(/disabled/);
     await expect(take(ids.corpse)).toHaveAttribute('title', 'It\'s too heavy.');
+    await expect(take(ids.dagger)).toHaveAttribute('title', 'Take dagger (as much as it can carry), for 0.25 action points.');
     await take(ids.dagger).click();
-    // It's carried now, to drop; with no points left, nothing more can be.
+    // It's carried now, to drop.
     await expect(take(ids.dagger)).toHaveText('Drop');
-    await expect(take(ids.dagger)).toHaveAttribute('title', 'Not enough action points.');
-    await expect(take(ids.corpse)).toHaveAttribute('title', 'Not enough action points.');
+    await expect(take(ids.dagger)).toHaveAttribute('title', 'Drop dagger on the ground here, for 0.25 action points.');
+    expect(await page.evaluate(() => hc.app.game.getPlayerCore().ap)).toBe(75);
     const r = await page.evaluate(() => {
         const g = hc.app.game, c = g.getPlayerCore();
         return [c.inventory.items.map(it => it.kind), g.groundAt(c.x, c.y).inventory.items[0].inventory.items.length];

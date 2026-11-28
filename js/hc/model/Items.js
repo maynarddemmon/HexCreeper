@@ -41,8 +41,8 @@
     Your gold is all your pieces carry (see goldHeld).
 
     Your pieces can take what's on the ground under them (or in something on the ground
-    there), and drop what they carry (or what's in something they carry), each for an
-    action (see playerTake and playerDrop). */
+    there), and drop what they carry (or what's in something they carry), for the
+    takeCost and dropCost rules' action points (see playerTake and playerDrop). */
 (pkg => {
     'use strict';
     
@@ -405,7 +405,7 @@
                 retval = 'player';
             } else if (!found) {
                 retval = 'missing';
-            } else if (!this.canAfford(p)) {
+            } else if (!this.canAfford(p, this.takeCost(p))) {
                 retval = 'ap';
             } else {
                 retval = this.addProblem(p, found.item, 1);
@@ -413,8 +413,8 @@
             return retval;
         },
         
-        /*  Piece p takes item id from the ground under it (all of it it can carry), for an
-            action. Returns whether it did. */
+        /*  Piece p takes item id from the ground under it (all of it it can carry), for
+            the takeCost rule's action points. Returns whether it did. */
         playerTake: function(p, id) {
             const done = !this.takeProblem(p, id);
             if (done) {
@@ -423,7 +423,7 @@
                 this.fx(p.x, p.y, i18n('fx-take', this.itemLabel(item, n)), '--place-ink', {});
                 this.addItem(p, this.takeOut(holder, item, n), true);
                 this.tidyGround(p.x, p.y);
-                this.spend(p);
+                this.spend(p, this.takeCost(p));
                 this.afterPlayerAction();
             }
             return done;
@@ -441,7 +441,7 @@
                 retval = 'player';
             } else if (!found) {
                 retval = 'missing';
-            } else if (!this.canAfford(p)) {
+            } else if (!this.canAfford(p, this.dropCost(p))) {
                 retval = 'ap';
             } else {
                 retval = this.addProblem(this.groundAt(p.x, p.y) ?? {x:p.x, y:p.y, inventory:{items:[]}}, found.item);
@@ -449,15 +449,15 @@
             return retval;
         },
         
-        /*  Piece p drops item id (all of it) on the ground under it, for an action. Returns
-            whether it did. */
+        /*  Piece p drops item id (all of it) on the ground under it, for the dropCost rule's
+            action points. Returns whether it did. */
         playerDrop: function(p, id) {
             const done = !this.dropProblem(p, id);
             if (done) {
                 const {item, holder} = this.findItem(p, id);
                 this.fx(p.x, p.y, i18n('fx-drop', this.itemLabel(item)), '--place-ink', {});
                 this.addItem(this.groundAt(p.x, p.y, true), this.takeOut(holder, item), true);
-                this.spend(p);
+                this.spend(p, this.dropCost(p));
                 this.afterPlayerAction();
             }
             return done;

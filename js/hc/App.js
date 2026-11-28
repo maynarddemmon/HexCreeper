@@ -226,8 +226,8 @@
         },
         
         /*  The inventory of your piece p, and what's on the ground under it (see
-            InventoryDialog and Items.js): each thing can be dropped or taken, for an
-            action. It closes if the turn ends, or p is gone. */
+            InventoryDialog and Items.js): each thing can be dropped or taken, for action
+            points. It closes if the turn ends, or p is gone. */
         openInventory = p => {
             V.menuOpen = false;
             draw();
@@ -264,6 +264,8 @@
                         ground:{rows:rows(ground()), summary:i18n('inv-ground-summary', formatWeight(g.weight), formatVolume(g.volume))}
                     };
                 },
+                dropCost:formatAp(game.dropCost(p)),
+                takeCost:formatAp(game.takeCost(p)),
                 dropProblem:id => why(game.dropProblem(p, id)),
                 takeProblem:id => why(game.takeProblem(p, id)),
                 onDrop:act(id => game.playerDrop(p, id)),

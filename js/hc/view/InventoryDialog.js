@@ -48,8 +48,9 @@
         ItemRow = new JSClass('ItemRow', WideView, {
             initNode: function(parent, attrs) {
                 const self = this,
-                    {row, action, problem, onAction} = attrs;
+                    {row, action, cost, problem, onAction} = attrs;
                 delete attrs.row;
+                delete attrs.cost;
                 delete attrs.action;
                 delete attrs.problem;
                 delete attrs.onAction;
@@ -68,7 +69,7 @@
                 const btn = self.btn = new UnderlineBtn(self, {
                     x:PANEL_WIDTH - padding - BTN_WIDTH, valign:'middle', fontSize:fontSizeMedium,
                     text:i18n('btn-' + action), disabled:!!problem,
-                    tooltip:problem || i18n('tip-' + action, row.label)
+                    tooltip:problem || i18n('tip-' + action, row.label, cost)
                 }, [{doActivated: () => onAction(row.id)}]);
                 btn.getIDE().setAttribute('aria-label', i18n('btn-' + action) + ' ' + row.label);
                 btn.getIDE().dataset.item = row.id;
@@ -77,8 +78,8 @@
 
     /*  What one of your pieces carries and what's on the ground under it, each with what
         it holds against what it can, and what's in each thing below it, indented. Each
-        thing it carries can be dropped, and each on the ground taken, for an action (see
-        Items.js). */
+        thing it carries can be dropped, and each on the ground taken, for action points
+        (see Items.js). */
     pkg.InventoryDialog = new JSClass('InventoryDialog', pkg.AckDialog, {
         // Life Cycle //////////////////////////////////////////////////////////
         initNode: function(parent, attrs) {
@@ -108,7 +109,7 @@
         /*  Shows it. describe() gives what to show: {carried, ground}, each {summary, rows:
             [{id, label, weight, depth}]}. dropProblem(id) and takeProblem(id) say why an
             item can't be dropped or taken ('' if it can), and onDrop(id) and onTake(id) do
-            it. */
+            it. dropCost and takeCost say what each costs (action points, as text). */
         show: function(opts) {
             this.callSuper();
             this._opts = opts;
@@ -119,14 +120,14 @@
         /*  Brings it up to date. */
         refresh: function() {
             const self = this,
-                {describe, dropProblem, takeProblem, onDrop, onTake} = self._opts,
+                {describe, dropProblem, takeProblem, onDrop, onTake, dropCost, takeCost} = self._opts,
                 {carried, ground} = describe(),
-                fill = (section, {summary, rows}, action, problem, onAction) => {
+                fill = (section, {summary, rows}, action, cost, problem, onAction) => {
                     section.head.setSummary(summary);
                     section.rows.destroyAllSubviews();
                     if (rows.length) {
                         for (const row of rows) {
-                            new ItemRow(section.rows, {row, action, problem:problem(row.id), onAction});
+                            new ItemRow(section.rows, {row, action, cost, problem:problem(row.id), onAction});
                         }
                     } else {
                         new Text(section.rows, {
@@ -135,8 +136,8 @@
                         });
                     }
                 };
-            fill(self._carried, carried, 'drop', dropProblem, onDrop);
-            fill(self._ground, ground, 'take', takeProblem, onTake);
+            fill(self._carried, carried, 'drop', dropCost, dropProblem, onDrop);
+            fill(self._ground, ground, 'take', takeCost, takeProblem, onTake);
             self.setContentHeightToFit(self._container.height);
         }
     });

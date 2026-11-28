@@ -25,7 +25,7 @@ Every rule in the game, its default numbers, and why it is the way it is. The nu
 - An **inventory** is `{items:[...]}` on a **holder**: a piece, a cell's ground (`Game.ground`, kept only while it holds something) or an item, so they **nest** (a corpse holding a pouch holding coins). Limits: capacity (a stack takes its kind's capacity once), weight (with what's inside) and volume (an item's own: a container's volume should allow for what it holds). Pieces' come from rules of stats (`carryCapacity` **10 + str / 2**, `carryWeight` **2500 × str** g, `carryVolume` **2000 × con** cm³); the ground's are rules (`groundCapacity` 1000, 10 t, 10 m³); an item's, its kind's (none given: unlimited). Nothing goes in itself. Stacks merge up to their size; a named item (a corpse) doesn't stack.
 - **Corpses**: a piece that dies leaves its species' `corpse` (an item kind, `corpse` if not given; `none`: just what it had) on its cell, holding everything it had, regardless of limits, named for it ("goblin corpse", "corpse of Tess"). Small species leave `small_corpse`, ogres `large_corpse`, creepers a `husk`.
 - An enemy's profile can give it `items` (ids, or `{kind, count}` with count n or [min, max], rolled per piece from the seed).
-- Your piece can **take** what's on the ground under it, or in something there (as much of a stack as it can carry), and **drop** what it carries or what's in something it carries, each for an action, from the Inventory dialog (H). Neither keeps the turn from ending by itself.
+- Your piece can **take** what's on the ground under it, or in something there (as much of a stack as it can carry), and **drop** what it carries or what's in something it carries, from the Inventory dialog (H), for `takeCost` and `dropCost` action points (2026-11-27: **0.25** each, rules of level and stats, at least `MIN_COST`; they were an action). Neither keeps the turn from ending by itself.
 - Weights and volumes show in kg and litres, or pounds and US gallons (the Units preference). Saves (version 8) keep pieces' inventories, the ground and `nextItemId`.
 - To come: container fixtures (chests, tables, cabinets) with take and put; equipment (weapons and armour feeding damage, penetration and armor) and consumables.
 - History: before, score came from kills (a combo: n kills in one move scored n × their total score value, n² for 1-point enemies, counting pieces destroyed below a killed one), from healing nobody needed (`healScore`, 1 a point) and from loot, and the header showed it as *to spend / earned in all*. There was a heal combo before 2026-11-21 too.
@@ -252,6 +252,7 @@ Rules and attrs are never shown to the player: they're tuned in code (combat and
 | `apPool`, `apRecovery`, `apInitiative`, `actionCost` | formulas, defaults in `data/rules.json5`: see Action points |
 | `jumpExhaustion` (turns a jump exhausts a piece for) | formula, `2` in `data/rules.json5`: see Status effects |
 | `placeCost` (a formula of `coreLevel`, `maxLevel` and `levels`) | `4 + ceil(levels / 2)` |
+| `takeCost`, `dropCost` | formulas, `0.25` each in `data/rules.json5`: see Items and inventories |
 | `rallyCost`, `rallyTurns`, `rallyAmount`, `rallyRefresh` | formulas, `0.5`, `3`, `(con / 10) * level`, `Math.max(10, 150 - level)` in `data/rules.json5`: see Rally |
 
 **Tile generator "proximity"** (`ProximityTileGenerator.ATTRS`):

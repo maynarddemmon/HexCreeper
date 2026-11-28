@@ -43,7 +43,9 @@
 		"actionCost":"1",                  // what an action costs (a step, an attack, a jump, a swap, a detach or attach)
 		"jumpExhaustion":"2",              // the turns a jump exhausts a piece for (no action points back): each jump adds as many
 		"rallyCost":"0.5",                 // what rallying costs, in action points
-		"rallyTurns":"3",                  // the turns a rally lasts
+		"takeCost":"0.25",                 // what taking an item costs (see js/hc/model/Items.js)
+		"dropCost":"0.15",                 // and dropping one
+		"rallyTurns":"5",                  // the turns a rally lasts
 		"rallyAmount":"(con / 10) * level", // the HP a rallying piece gets back at the end of each of them
 		"rallyRefresh":"Math.max(10, 150 - level)", // the turns from rallying until a piece can rally again
 		
